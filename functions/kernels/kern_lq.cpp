@@ -1,0 +1,29 @@
+#include "kern_lq.h"
+
+Registry<Function_Base>::Register<Kern_LQ> Kern_LQ_1( "Kern_LQ" );
+Registry<Function_Base,Config&>::Register<Kern_LQ> Kern_LQ_2( "Kern_LQ" );
+
+Kern_LQ::Kern_LQ () {}
+Kern_LQ::Kern_LQ (const Config &c):
+    Function_Base(c)
+{
+    if (get_verbose()) std::cout << std::endl << label << std::endl;
+}
+double Kern_LQ::operator() (const aed_rctype& b, const aed_rctype& af)
+{
+    double x = b.transpose()*af;
+    return x*x + x;
+}
+aed_type Kern_LQ::derivative(const aed_rctype& b, const aed_rctype& af)
+{
+    double temp = 2.0 * b.transpose()*af;
+    return temp*b + b;
+}
+double Kern_LQ::prime(const aed_rctype& b, const aed_rctype& af, const aed_rctype& ff)
+{
+    return derivative(b, af).transpose()*ff;
+}
+std::string Kern_LQ::get_label()
+{
+    return label;
+}

@@ -1,0 +1,31 @@
+#include "kern_rbf.h"
+
+Registry<Function_Base>::Register<Kern_RBF> Kern_RBF_1( "Kern_RBF" );
+Registry<Function_Base,Config&>::Register<Kern_RBF> Kern_RBF_2( "Kern_RBF" );
+
+Kern_RBF::Kern_RBF () {}
+Kern_RBF::Kern_RBF (const Config &c):
+    Function_Base(c),
+    sigma(c.get<double>("MPARAMS")),
+    gamma(1.0/(2.0*sigma*sigma))
+{
+    if (get_verbose()) std::cout << std::endl << label << " | sigma: " << sigma
+        << " | gamma: " << gamma << std::endl;
+}
+double Kern_RBF::operator() (const aed_rctype& b, const aed_rctype& af)
+{
+    const aed_type v = af-b;
+    return exp(-gamma*(v.dot(v)));
+}
+aed_type Kern_RBF::derivative(const aed_rctype& b, const aed_rctype& af)
+{
+    return  -2.0*gamma*(af-b)*(*this)(af,b);
+}
+double Kern_RBF::prime(const aed_rctype& b, const aed_rctype& af, const aed_rctype& ff)
+{
+    return derivative(b, af).transpose()*ff;
+}
+std::string Kern_RBF::get_label()
+{
+    return label;
+}
