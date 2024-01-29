@@ -3,8 +3,21 @@
 
 #include "../CORE/typedefs.h"
 
+//template
+//<class F=Function_Base&>
 class M_Core {
     public:
+//        F f;
+//        Config &config;
+//
+//        M_Core(Config &c):
+//            config(c),
+//            f(c)
+//    {}
+//        M_Core(F &f, Config &c):
+//            config(c),
+//            f(f)
+//    {}
         int verbose;
         bool trained=false;
         t_type weights;
@@ -12,7 +25,6 @@ class M_Core {
         virtual ~M_Core() {}
 
         virtual double predict(const rvec &v)const=0;
-        virtual void train(phi_type &Phi, const t_type &T)=0;
         virtual t_type get_weights_uncertainty()const=0;
 
         bool is_trained() const {
@@ -24,5 +36,34 @@ class M_Core {
         void set_weights(const t_type w) {
             weights=w;
         }
+};
+class M_Predict {
+    public:
+
+        virtual ~M_Predict() {}
+
+        /** \brief Predict local energy of an atom or bond energy.
+         *
+         *  The result depends on how aed is computed.
+         *
+         *  If it is computed between a pair of atoms than the result is a bond energy.
+         *
+         *  If aed contains sum over all nearest neighbours than the result is
+         *  a local atomic energy \f$ E_i \f$.
+         * */
+        virtual double epredict(const aed_rctype &aed)=0;
+
+        /** \brief Predict force between a pair of atoms in a k-direction. */
+        virtual double fpredict(const fd_type &fdij, const aed_rctype &aedi, size_t k)=0;
+
+        /** \brief Predict force between a pair of atoms. */
+        virtual force_type fpredict(const fd_type &fdij,
+                const aed_rctype &aedi)=0;
+};
+class M_Train {
+    public:
+        virtual ~M_Train() {}
+
+        virtual void train(phi_type &Phi, const t_type &T)=0;
 };
 #endif

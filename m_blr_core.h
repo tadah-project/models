@@ -11,13 +11,20 @@
 
 template
 <class BF=Function_Base&>
-class M_BLR_Core: public virtual M_Core {
+class M_BLR_Core:
+    public virtual M_Core,
+    public virtual M_Predict,
+    public virtual M_Train {
     public:
-        Config &config;
+        //using M_Core<BF>::weights;
+        //using M_Core<BF>::trained;
+        //using M_Core<BF>::config;
         mat Sigma;
+        Config &config;
         BF bf;
         M_BLR_Core(Config &c):
             config(c),
+            //M_Core<BF>(c),
             bf(c)
     {
         static_assert(std::is_base_of<BF_Base, BF>::value,
@@ -31,6 +38,7 @@ class M_BLR_Core: public virtual M_Core {
 
         M_BLR_Core(BF &bf, Config &c):
             config(c),
+            //M_Core<BF>(bf,c),
             bf(bf)
     {
         if (dynamic_cast<BF_Base*>(&bf) == nullptr)
@@ -67,7 +75,7 @@ class M_BLR_Core: public virtual M_Core {
                 trained=true;
             }
 
-            M_Core::verbose=(config.get<int>("VERBOSE"));
+            verbose=(config.get<int>("VERBOSE"));
         }
 };
 #endif

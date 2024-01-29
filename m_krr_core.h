@@ -12,14 +12,21 @@
 
 template
 <class K=Function_Base&>
-class M_KRR_Core: public virtual M_Core {
+class M_KRR_Core:
+    public virtual M_Core,
+    public virtual M_Predict,
+    public virtual M_Train {
     public:
-        Config &config;
+        //using M_Core<K>::weights;
+        //using M_Core<K>::trained;
+        //using M_Core<K>::config;
         mat Sigma;
+        Config &config;
         K kernel;
         EKM<K> ekm;
         M_KRR_Core(Config &c):
             config(c),
+            //M_Core<K>(c),
             kernel(c),
             ekm(c)
     {
@@ -33,6 +40,7 @@ class M_KRR_Core: public virtual M_Core {
 
         M_KRR_Core(K &kernel, Config &c):
             config(c),
+            //M_Core<K>(kernel, c),
             kernel(kernel),
             ekm(kernel)
     {
@@ -75,7 +83,7 @@ class M_KRR_Core: public virtual M_Core {
                 trained=true;
             }
 
-            M_Core::verbose=(config.get<int>("VERBOSE"));
+            verbose=(config.get<int>("VERBOSE"));
         }
 };
 #endif
