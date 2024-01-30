@@ -11,7 +11,6 @@ class M_Core {
 
         virtual ~M_Core() {}
 
-        virtual t_type get_weights_uncertainty()const=0;
 
         bool is_trained() const {
             return trained;
@@ -51,5 +50,6 @@ class M_Train {
     public:
         virtual ~M_Train() {}
         virtual void train(phi_type &Phi, const t_type &T)=0;
+        virtual t_type get_weights_uncertainty()const=0;
 };
 #endif
