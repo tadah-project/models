@@ -3,28 +3,14 @@
 
 #include "../CORE/typedefs.h"
 
-//template
-//<class F=Function_Base&>
 class M_Core {
     public:
-//        F f;
-//        Config &config;
-//
-//        M_Core(Config &c):
-//            config(c),
-//            f(c)
-//    {}
-//        M_Core(F &f, Config &c):
-//            config(c),
-//            f(f)
-//    {}
         int verbose;
         bool trained=false;
         t_type weights;
 
         virtual ~M_Core() {}
 
-        virtual double predict(const rvec &v)const=0;
         virtual t_type get_weights_uncertainty()const=0;
 
         bool is_trained() const {
@@ -36,6 +22,7 @@ class M_Core {
         void set_weights(const t_type w) {
             weights=w;
         }
+        virtual double predict(const rvec &v)const=0;
 };
 class M_Predict {
     public:
@@ -63,7 +50,6 @@ class M_Predict {
 class M_Train {
     public:
         virtual ~M_Train() {}
-
         virtual void train(phi_type &Phi, const t_type &T)=0;
 };
 #endif

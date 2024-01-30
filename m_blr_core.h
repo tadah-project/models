@@ -12,19 +12,14 @@
 template
 <class BF=Function_Base&>
 class M_BLR_Core:
-    public virtual M_Core,
-    public virtual M_Predict,
-    public virtual M_Train {
+    public virtual M_Core
+{
     public:
-        //using M_Core<BF>::weights;
-        //using M_Core<BF>::trained;
-        //using M_Core<BF>::config;
         mat Sigma;
         Config &config;
         BF bf;
         M_BLR_Core(Config &c):
             config(c),
-            //M_Core<BF>(c),
             bf(c)
     {
         static_assert(std::is_base_of<BF_Base, BF>::value,
@@ -38,14 +33,10 @@ class M_BLR_Core:
 
         M_BLR_Core(BF &bf, Config &c):
             config(c),
-            //M_Core<BF>(bf,c),
             bf(bf)
     {
         if (dynamic_cast<BF_Base*>(&bf) == nullptr)
             throw std::invalid_argument("Provided object is not of BF_Base type");
-
-        //static_assert(std::is_same<Function_Base&, BF>::value,
-        //        "This constructor requires BF=Function_Base&\n");
 
         init();
     }
@@ -53,19 +44,6 @@ class M_BLR_Core:
             return bf.epredict(get_weights(),v);
         };
 
-        void train(phi_type &Phi, const t_type &T) {
-            if(trained) {
-                throw std::runtime_error("This object is already trained!");
-            }
-            LinearRegressor::train(config,Phi, T,weights,Sigma);
-            trained=true;
-        }
-        t_type get_weights_uncertainty() const{
-            double lambda=config.get<double>("LAMBDA");
-            if(lambda >= 0) throw std::runtime_error(
-                    "Sigma matrix is only computed for LAMBDA < 0");
-            return Sigma.diagonal();
-        }
 
     private:
         void init() {
@@ -76,6 +54,41 @@ class M_BLR_Core:
             }
 
             verbose=(config.get<int>("VERBOSE"));
+        }
+};
+template
+<class BF=Function_Base&>
+class M_BLR_Train:
+    public M_BLR_Core<BF>,    // MUST NOT BE VIRUAL!!
+    public M_Train
+{
+
+    public:
+        using M_BLR_Core<BF>::trained;
+        using M_BLR_Core<BF>::config;
+        using M_BLR_Core<BF>::weights;
+        using M_BLR_Core<BF>::Sigma;
+
+        M_BLR_Train(Config &c):
+            M_BLR_Core<BF>(c)
+    {}
+
+        M_BLR_Train(BF &bf, Config &c):
+            M_BLR_Core<BF>(bf, c)
+    {}
+
+        void train(phi_type &Phi, const t_type &T) {
+            if(trained) {
+                throw std::runtime_error("This object is already trained!");
+            }
+            LinearRegressor::train(config,Phi, T,weights,Sigma);
+            trained=true;
+        }
+        t_type get_weights_uncertainty() const{
+            double lambda=config.template get<double>("LAMBDA");
+            if(lambda >= 0) throw std::runtime_error(
+                    "Sigma matrix is only computed for LAMBDA < 0");
+            return Sigma.diagonal();
         }
 };
 #endif
