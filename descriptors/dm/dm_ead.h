@@ -54,7 +54,7 @@ class DM_EAD: public DM_Base {
         DM_EAD(Config&);
         void calc_aed(
                 rho_rtype rho,
-                aed_rtype aed);
+                aed_type2 &aed);
         int calc_dXijdri_dXjidri(
                 const double rij,
                 const double rij_sq,

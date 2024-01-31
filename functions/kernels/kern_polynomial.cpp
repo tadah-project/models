@@ -13,15 +13,15 @@ Kern_Polynomial::Kern_Polynomial (const Config &c):
     if (get_verbose()) std::cout << std::endl << label << " | degree: " << d
         <<" | gamma: " << gamma << " | c: " << c << std::endl;
 }
-double Kern_Polynomial::operator() (const aed_rctype& b, const aed_rctype& af)
+double Kern_Polynomial::operator() (const aed_type2& b, const aed_type2& af)
 {
-    return std::pow(gamma*(b.dot(af))+c,d);
+    return std::pow(gamma*(b*af)+c,d);
 }
-aed_type Kern_Polynomial::derivative(const aed_rctype& b, const aed_rctype& af)
+aed_type2 Kern_Polynomial::derivative(const aed_type2& b, const aed_type2& af)
 {
-    return  d*gamma*std::pow(gamma*(b.dot(af))+c,d-1)*b;
+    return  d*gamma*std::pow(gamma*(b*af)+c,d-1)*b;
 }
-double Kern_Polynomial::prime(const aed_rctype& b, const aed_rctype& af, const aed_rctype& ff)
+double Kern_Polynomial::prime(const aed_type2& b, const aed_type2& af, const aed_type2& ff)
 {
     return derivative(b, af).transpose()*ff;
 }

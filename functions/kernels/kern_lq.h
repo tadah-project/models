@@ -23,9 +23,9 @@ class Kern_LQ : public virtual Kern_Base {
          * Label used for this class
          */
         std::string label = "Kern_LQ";
-        double operator() (const aed_rctype& b, const aed_rctype& af);
-        aed_type derivative(const aed_rctype& b, const aed_rctype& af);
-        double prime(const aed_rctype& b, const aed_rctype& af, const aed_rctype& ff);
+        double operator() (const aed_type2& b, const aed_type2& af);
+        aed_type2 derivative(const aed_type2& b, const aed_type2& af);
+        double prime(const aed_type2& b, const aed_type2& af, const aed_type2& ff);
         std::string get_label();
 
 };

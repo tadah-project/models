@@ -14,7 +14,7 @@ class EKM {
             EKM(T &t):
                 kernel(t)
     {}
-        void configure(aeds_type &basis) {
+        void configure(aeds_type2 &basis) {
             // KK is temp matrix
             KK = Eigen::MatrixXd(basis.size(), basis.size());
 
@@ -39,7 +39,7 @@ class EKM {
                 Phi.row(i)= KK*Phi.row(i).transpose();
             }
         }
-        aed_type project(aed_rtype aed, aeds_type &basis) {
+        aed_type project(aed_type2 &aed, aeds_type2 &basis) {
             aed_type temp(basis.size());
             for (long int b=0; b<basis.cols(); b++) {
                 temp(b) = kernel(aed,basis[b]);

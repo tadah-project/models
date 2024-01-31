@@ -22,15 +22,15 @@ class Kern_Linear :  public virtual Kern_Base {
          * Label used for this class
          */
         std::string label = "Kern_Linear";
-        double operator() (const aed_rctype& b, const aed_rctype& af);
-        aed_type derivative(const aed_rctype& b, const aed_rctype& );
-        double prime(const aed_rctype& b, const aed_rctype& af, const aed_rctype& ff);
-        void set_basis(const aeds_type ) {}
+        double operator() (const aed_type2& b, const aed_type2& af);
+        aed_type2 derivative(const aed_type2& b, const aed_type2& );
+        double prime(const aed_type2& b, const aed_type2& af, const aed_type2& ff);
+        void set_basis(const aeds_type2 ) {}
 
-        double epredict(const t_type &weights, const aed_rctype& aed);
+        double epredict(const t_type &weights, const aed_type2& aed);
         double fpredict(const t_type &weights, const fd_type &fdij,
-                const aed_rctype& aedi, const size_t k);
+                const aed_type2& aedi, const size_t k);
         force_type fpredict(const t_type &weights, const fd_type &fdij,
-                const aed_rctype& aedi);
+                const aed_type2& aedi);
 };
 #endif

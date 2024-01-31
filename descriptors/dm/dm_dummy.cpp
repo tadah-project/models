@@ -6,7 +6,7 @@ DM_Dummy::DM_Dummy() {}
 DM_Dummy::DM_Dummy(Config&) {}
 void DM_Dummy::calc_aed(
         rho_rtype,
-        aed_rtype ) {}
+        aed_type2 & ) {}
 int DM_Dummy::calc_dXijdri_dXjidri(
         const double,
         const double,

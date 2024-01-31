@@ -39,7 +39,7 @@ DM_Blip::DM_Blip(Config &c):
 
 void DM_Blip::calc_aed(
         rho_rtype rhoi,
-        aed_rtype aed)
+        aed_type2 &aed)
 {
     size_t Lshift = 0;
     size_t ii=0;

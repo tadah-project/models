@@ -11,7 +11,7 @@ void D2_Dummy::calc_aed(
         const double,
         const double,
         const double,
-        aed_rtype ) {}
+        aed_type2 & ) {}
 void D2_Dummy::calc_dXijdri(
         const double,
         const double,
@@ -23,7 +23,7 @@ void D2_Dummy::calc_all(
         const double,
         const double,
         const double,
-        aed_rtype ,
+        aed_type2 & ,
         fd_type &) {}
 size_t D2_Dummy::size() { return s; }
 std::string D2_Dummy::label() { return lab; }

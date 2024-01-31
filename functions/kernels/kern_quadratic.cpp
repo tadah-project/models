@@ -9,17 +9,17 @@ Kern_Quadratic::Kern_Quadratic (const Config &c):
 {
     if (get_verbose()) std::cout << std::endl << label << std::endl;
 }
-double Kern_Quadratic::operator() (const aed_rctype& b, const aed_rctype& af)
+double Kern_Quadratic::operator() (const aed_type2& b, const aed_type2& af)
 {
     double x = b.transpose()*af;
     return  x*x;
 }
-aed_type Kern_Quadratic::derivative(const aed_rctype& b, const aed_rctype& af)
+aed_type2 Kern_Quadratic::derivative(const aed_type2& b, const aed_type2& af)
 {
     double temp = 2.0 * b.transpose()*af;
     return b*temp;;
 }
-double Kern_Quadratic::prime(const aed_rctype& b, const aed_rctype& af, const aed_rctype& ff)
+double Kern_Quadratic::prime(const aed_type2& b, const aed_type2& af, const aed_type2& ff)
 {
     //return dot(derivative(b, af), ff);
     // it is faster this way

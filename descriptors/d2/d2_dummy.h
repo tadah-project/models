@@ -21,7 +21,7 @@ class D2_Dummy : public D2_Base {
                 const double,
                 const double,
                 const double,
-                aed_rtype aed);
+                aed_type2 &aed);
         void calc_dXijdri(
                 const double,
                 const double,
@@ -33,7 +33,7 @@ class D2_Dummy : public D2_Base {
                 const double,
                 const double,
                 const double,
-                aed_rtype aed,
+                aed_type2 &aed,
                 fd_type &fd_ij);
         size_t size();
         std::string label();

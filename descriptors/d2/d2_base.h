@@ -20,7 +20,7 @@ class D2_Base: public D_Base {
                 const double rij,
                 const double rij_sq,
                 const double fc_ij,
-                aed_rtype aed)=0;
+                aed_type2& aed)=0;
 
         /** \brief Calculate \ref FD
          *
@@ -49,8 +49,8 @@ class D2_Base: public D_Base {
         const double rij,
         const double fcijp,
         const double fcijn,
-        aed_rtype aedp,
-        aed_rtype aedn,
+        aed_type2& aedp,
+        aed_type2& aedn,
         fd_type &fd_ij,
         const double h);
 
@@ -60,7 +60,7 @@ class D2_Base: public D_Base {
                 const double rij_sq,
                 const double fc_ij,
                 const double fcp_ij,
-                aed_rtype aed,
+                aed_type2& aed,
                 fd_type &fd_ij)=0;
         virtual std::string label()=0;
 };

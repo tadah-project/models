@@ -19,7 +19,7 @@ class DM_Base: public D_Base {
          */
         virtual void calc_aed(
                 rho_rtype rho,
-                aed_rtype aed)=0;
+                aed_type2 &aed)=0;
 
         /** \brief Calculate \ref FD
          *

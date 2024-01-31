@@ -15,7 +15,7 @@
  */
 class Kern_Base: public virtual Function_Base {
     public:
-        aeds_type basis;
+        aeds_type2 basis;
         virtual ~Kern_Base();
 
         /**
@@ -24,7 +24,7 @@ class Kern_Base: public virtual Function_Base {
          * - b = basis vector
          * - af = atomic energy descriptor
          */
-        virtual double operator() (const aed_rctype &b, const aed_rctype &af)=0;
+        virtual double operator() (const aed_type2 &b, const aed_type2 &af)=0;
 
         /**
          * Calculate the kernel derivative wrt to the second argument
@@ -32,7 +32,7 @@ class Kern_Base: public virtual Function_Base {
          * - b = basis vector
          * - af = atomic energy descriptor
          */
-        virtual aed_type derivative(const aed_rctype &b, const aed_rctype &af)=0;
+        virtual aed_type2 derivative(const aed_type2 &b, const aed_type2 &af)=0;
 
         /**
          * Calculate inner product of the kernel derivative
@@ -43,16 +43,16 @@ class Kern_Base: public virtual Function_Base {
          * - ff = force descriptor (TODO i-th dir component of it)
          *   TODO consider calculating all 3-directions at once
          */
-        virtual double prime(const aed_rctype &b, const aed_rctype &af,
-                const aed_rctype &ff)=0;
+        virtual double prime(const aed_type2 &b, const aed_type2 &af,
+                const aed_type2 &ff)=0;
 
         /** \brief Set basis for calculations */
-        virtual void set_basis(const aeds_type b);
+        virtual void set_basis(const aeds_type2 b);
 
-        virtual double epredict(const t_type &kweights, const aed_rctype &aed);
+        virtual double epredict(const t_type &kweights, const aed_type2 &aed);
         virtual double fpredict(const t_type &kweights, const fd_type &fdij,
-                const aed_rctype &aedi, const size_t k);
+                const aed_type2 &aedi, const size_t k);
         virtual force_type fpredict(const t_type &kweights, const fd_type &fdij,
-                const aed_rctype &aedi);
+                const aed_type2 &aedi);
 };
 #endif

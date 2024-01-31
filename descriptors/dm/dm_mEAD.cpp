@@ -47,7 +47,7 @@ DM_mEAD<F>::DM_mEAD(Config &config):
 template <typename F>
 void DM_mEAD<F>::calc_aed(
         rho_rtype rhoi,
-        aed_rtype aed)
+        aed_type2 &aed)
 {
     size_t Lshift = 0;
     size_t ii=0;

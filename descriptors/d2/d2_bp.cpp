@@ -34,7 +34,7 @@ void D2_BP::calc_aed(
         const double rij,
         const double ,
         const double fc_ij,
-        aed_rtype aed)
+        aed_type2 &aed)
 {
 
     size_t i=fidx;
@@ -60,7 +60,7 @@ void D2_BP::calc_all(
         const double ,
         const double fc_ij,
         const double fcp_ij,
-        aed_rtype aed,
+        aed_type2 &aed,
         fd_type &fd_ij)
 {
 

@@ -30,19 +30,19 @@ struct Function_Base {
         virtual ~Function_Base() {};
 
         // For Kernels
-        virtual double operator() (const aed_rctype& , const aed_rctype& ) { return 0.0; };
-        virtual aed_type derivative(const aed_rctype& , const aed_rctype& ) { return aed_type(); };
-        virtual double prime(const aed_rctype& , const aed_rctype& ,
-                const aed_rctype& ) { return 0.0; }
-        virtual void set_basis(const aeds_type ) {};
+        virtual double operator() (const aed_type2& , const aed_type2& ) { return 0.0; };
+        virtual aed_type2 derivative(const aed_type2& , const aed_type2& ) { return aed_type2(); };
+        virtual double prime(const aed_type2& , const aed_type2& ,
+                const aed_type2& ) { return 0.0; }
+        virtual void set_basis(const aeds_type2 ) {};
 
         /** \brief Return label of this object */
         virtual std::string get_label()=0;
-        virtual double epredict(const t_type &, const aed_rctype& )=0;
+        virtual double epredict(const t_type &, const aed_type2& )=0;
         virtual double fpredict(const t_type &, const fd_type &,
-                const aed_rctype&, const size_t )=0;
+                const aed_type2&, const size_t )=0;
         virtual force_type fpredict(const t_type &, const fd_type &,
-                const aed_rctype& )=0;
+                const aed_type2& )=0;
 };
 template<> inline Registry<Function_Base>::Map Registry<Function_Base>::registry{};
 template<> inline Registry<Function_Base,Config&>::Map Registry<Function_Base,Config&>::registry{};

@@ -83,15 +83,15 @@ class M_KRR_Core:
 //            M_KRR_Core<K>(kernel, c)
 //    {}
 //
-//        double epredict(const aed_rctype &aed) {
+//        double epredict(const aed_type2 &aed) {
 //            return kernel.epredict(weights,aed);
 //        };
 //
-//        double fpredict(const fd_type &fdij, const aed_rctype &aedi, const size_t k) {
+//        double fpredict(const fd_type &fdij, const aed_type2 &aedi, const size_t k) {
 //            return kernel.fpredict(weights,fdij,aedi,k);
 //        }
 //
-//        force_type fpredict(const fd_type &fdij, const aed_rctype &aedi) {
+//        force_type fpredict(const fd_type &fdij, const aed_type2 &aedi) {
 //            return kernel.fpredict(weights,fdij,aedi).array();
 //        }
 //

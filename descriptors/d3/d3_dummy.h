@@ -14,7 +14,7 @@ class D3_Dummy: public D3_Base {
                 const double rik,
                 const double fc_ij,
                 const double fc_ik,
-                aed_rtype aed);
+                aed_type2& aed);
         void calc_fd(
                 const size_t fidx,
                 const double rij,
@@ -32,7 +32,7 @@ class D3_Dummy: public D3_Base {
                 const double fc_ik,
                 const double fcp_ij,
                 const double fcp_ik,
-                aed_rtype aed,
+                aed_type2& aed,
                 fd_type &fd_ij);
         size_t size();
         std::string label();

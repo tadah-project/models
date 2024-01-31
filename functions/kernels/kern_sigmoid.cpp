@@ -12,15 +12,15 @@ Kern_Sigmoid::Kern_Sigmoid (const Config &c):
     if (get_verbose()) std::cout << std::endl << label << " | gamma: " << gamma 
         << " | c: " << c << std::endl;
 }
-double Kern_Sigmoid::operator() (const aed_rctype& b, const aed_rctype& af)
+double Kern_Sigmoid::operator() (const aed_type2& b, const aed_type2& af)
 {
-    return std::tanh(gamma*(b.dot(af))+c);
+    return std::tanh(gamma*(b*af)+c);
 }
-aed_type Kern_Sigmoid::derivative(const aed_rctype& b, const aed_rctype& af)
+aed_type2 Kern_Sigmoid::derivative(const aed_type2& b, const aed_type2& af)
 {
     return gamma*(1.0-std::pow((*this)(af,b),2))*b;
 }
-double Kern_Sigmoid::prime(const aed_rctype& b, const aed_rctype& af, const aed_rctype& ff)
+double Kern_Sigmoid::prime(const aed_type2& b, const aed_type2& af, const aed_type2& ff)
 {
     return derivative(b, af).transpose()*ff;
 }

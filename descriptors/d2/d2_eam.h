@@ -59,7 +59,7 @@ class D2_EAM : public D2_Base {
                 double rij,
                 const double rij_sq,
                 const double,
-                aed_rtype aed);
+                aed_type2 &aed);
         void calc_dXijdri(
                 double rij,
                 const double rij_sq,
@@ -71,7 +71,7 @@ class D2_EAM : public D2_Base {
                 const double rij_sq,
                 const double,
                 const double,
-                aed_rtype aed,
+                aed_type2 &aed,
                 fd_type &fd_ij);
         size_t size();
         std::string label();

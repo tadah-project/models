@@ -14,7 +14,7 @@ void D2_LJ::calc_aed(
         const double,
         const double rij_sq,
         const double fc_ij,
-        aed_rtype aed)
+        aed_type2 &aed)
 {
     double r2_inv = 1.0/rij_sq;
     double r6_inv = r2_inv*r2_inv*r2_inv;
@@ -41,7 +41,7 @@ void D2_LJ::calc_all(
         const double rij_sq,
         const double fc_ij,
         const double fcp_ij,
-        aed_rtype aed,
+        aed_type2 &aed,
         fd_type &fd_ij)
 {
     double r2_inv = 1.0/rij_sq;

@@ -40,7 +40,7 @@ void D2_EAM::calc_aed(
 		const double rij,
 		const double,
 		const double,
-		aed_rtype aed)
+		aed_type2 &aed)
 {
 
 	double r = rij;
@@ -83,7 +83,7 @@ void D2_EAM::calc_all(
 		const double,
 		const double,
 		const double,
-		aed_rtype aed,
+		aed_type2 &aed,
 		fd_type &fd_ij)
 {
 	double r = rij;

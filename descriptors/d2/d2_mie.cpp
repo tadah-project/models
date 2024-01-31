@@ -25,7 +25,7 @@ void D2_MIE::calc_aed(
         const double rij,
         const double,
         const double fc_ij,
-        aed_rtype aed)
+        aed_type2 &aed)
 {
     double rn_inv = 1.0/pow(rij,n);
     double rm_inv = 1.0/pow(rij,m);
@@ -50,7 +50,7 @@ void D2_MIE::calc_all(
         const double,
         const double fc_ij,
         const double fcp_ij,
-        aed_rtype aed,
+        aed_type2 &aed,
         fd_type &fd_ij)
 {
 

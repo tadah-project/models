@@ -34,7 +34,7 @@ class D2_MIE : public D2_Base {
                 const double,
                 const double rij_sq,
                 const double fc_ij,
-                aed_rtype aed);
+                aed_type2 &aed);
         void calc_dXijdri(
                 const double rij,
                 const double rij_sq,
@@ -46,7 +46,7 @@ class D2_MIE : public D2_Base {
                 const double rij_sq,
                 const double fc_ij,
                 const double fcp_ij,
-                aed_rtype aed,
+                aed_type2 &aed,
                 fd_type &fd_ij);
         size_t size();
         std::string label();

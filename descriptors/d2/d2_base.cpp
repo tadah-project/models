@@ -4,8 +4,8 @@ void D2_Base::calc_fd_approx(
         const double ,
         const double ,
         const double ,
-        aed_rtype aedp,
-        aed_rtype aedn,
+        aed_type2& aedp,
+        aed_type2& aedn,
         fd_type &fd_ij,
         const double h) {
 

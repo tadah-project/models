@@ -111,7 +111,7 @@ class DM_mEAD: public DM_Base, public F {
         DM_mEAD(Config&);
         void calc_aed(
                 rho_rtype rho,
-                aed_rtype aed);
+                aed_type2 &aed);
         int calc_dXijdri_dXjidri(
                 const double rij,
                 const double rij_sq,

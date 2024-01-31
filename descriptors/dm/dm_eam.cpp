@@ -37,7 +37,7 @@ DM_EAM::DM_EAM(Config &c):
 
 void DM_EAM::calc_aed(
 		rho_rtype rho,
-		aed_rtype aed)
+		aed_type2 &aed)
 {
     //std::cout << "rho[i]:   " << rho(0) << std::endl;
     double p = rho(0)*ef.rdrho + 1.0;

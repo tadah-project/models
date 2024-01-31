@@ -58,7 +58,7 @@ class DM_EAM: public DM_Base {
         DM_EAM(Config&);
         void calc_aed(
                 rho_rtype rho,
-                aed_rtype aed);
+                aed_type2 &aed);
         int calc_dXijdri_dXjidri(
                 const double rij,
                 const double rij_sq,

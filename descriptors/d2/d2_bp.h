@@ -38,7 +38,7 @@ class D2_BP : public D2_Base {
                 const double rij,
                 const double ,
                 const double fc_ij,
-                aed_rtype aed);
+                aed_type2 &aed);
         void calc_dXijdri(
                 const double rij,
                 const double ,
@@ -50,7 +50,7 @@ class D2_BP : public D2_Base {
                 const double ,
                 const double fc_ij,
                 const double fcp_ij,
-                aed_rtype aed,
+                aed_type2 &aed,
                 fd_type &fd_ij);
         size_t size();
         std::string label();
