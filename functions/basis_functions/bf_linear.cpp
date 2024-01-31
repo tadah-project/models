@@ -16,10 +16,10 @@ double BF_Linear::epredict(const t_type &weights, const aed_type2& aed)
 double BF_Linear::fpredict(const t_type &weights, const fd_type &fdij,
         const aed_type2& , const size_t k)
 {
-    return -fdij.col(k).transpose() * weights;
+    return -(fdij.col(k).transpose() * weights);
 }
 force_type BF_Linear::fpredict(const t_type &weights, const fd_type &fdij,
         const aed_type2& )
 {
-    return -Vec3d(fdij.transpose() * weights);
+    return -(fdij.transpose() * weights);
 }

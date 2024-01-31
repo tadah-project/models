@@ -31,10 +31,10 @@ double Kern_Linear::epredict(const t_type &weights, const aed_type2& aed)
 double Kern_Linear::fpredict(const t_type &weights, const fd_type &fdij,
         const aed_type2& , const size_t k)
 {
-    return -fdij.col(k).transpose() * weights;
+    return -(fdij.col(k).transpose() * weights);
 }
 force_type Kern_Linear::fpredict(const t_type &weights, const fd_type &fdij,
         const aed_type2& )
 {
-    return -fdij.transpose() * weights;
+    return -(fdij.transpose() * weights);
 }
