@@ -3,6 +3,7 @@
 
 #include "../LIBS/Eigen/Dense"
 #include "../CORE/typedefs.h"
+#include "../CORE/coretypes.h"
 
 template <typename K>
 class EKM {
@@ -39,8 +40,8 @@ class EKM {
                 Phi.row(i)= KK*Phi.row(i).transpose();
             }
         }
-        aed_type project(aed_type2 &aed, aeds_type2 &basis) {
-            aed_type temp(basis.size());
+        aed_type2 project(aed_type2 &aed, aeds_type2 &basis) {
+            aed_type2 temp(basis.size());
             for (long int b=0; b<basis.cols(); b++) {
                 temp(b) = kernel(aed,basis[b]);
             }

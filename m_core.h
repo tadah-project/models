@@ -21,7 +21,7 @@ class M_Core {
         void set_weights(const t_type w) {
             weights=w;
         }
-        virtual double predict(const rvec &v)const=0;
+        virtual double predict(const aed_type2 &v)const=0;
         virtual t_type get_weights_uncertainty()const=0;
 };
 class M_Predict {

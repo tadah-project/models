@@ -38,7 +38,7 @@ DM_Blip::DM_Blip(Config &c):
 }
 
 void DM_Blip::calc_aed(
-        rho_rtype rhoi,
+        rho_type& rhoi,
         aed_type2 &aed)
 {
     size_t Lshift = 0;
@@ -61,8 +61,8 @@ int DM_Blip::calc_dXijdri_dXjidri(
         const Vec3d &vec_ij,
         const double fc_ij,
         const double fcp_ij,
-        rho_rtype rhoi,
-        rho_rtype rhoj,
+        rho_type& rhoi,
+        rho_type& rhoj,
         fd_type &fd_ij,
         const double wi,
         const double wj)
@@ -153,7 +153,7 @@ int DM_Blip::calc_dXijdri(
         const Vec3d &vec_ij,
         const double fc_ij,
         const double fcp_ij,
-        rho_rtype rhoi,
+        rho_type& rhoi,
         fd_type &fd_ij)
 {
     const double x = vec_ij[0];
@@ -224,7 +224,7 @@ std::string DM_Blip::label() {
     return lab;
 }
 
-void DM_Blip::init_rhoi(rho_rtype rhoi)
+void DM_Blip::init_rhoi(rho_type& rhoi)
 {
     rhoi.resize(2*rhoisize);
     rhoi.setZero();
@@ -234,7 +234,7 @@ void DM_Blip::calc_rho(
         const double,
         const double fc_ij,
         const Vec3d &vec_ij,
-        rho_rtype rhoi)
+        rho_type& rhoi)
 {
     size_t ii=0;
     for (int L=0; L<=Lmax; ++L) {

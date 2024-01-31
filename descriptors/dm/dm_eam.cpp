@@ -36,7 +36,7 @@ DM_EAM::DM_EAM(Config &c):
 }
 
 void DM_EAM::calc_aed(
-		rho_rtype rho,
+		rho_type& rho,
 		aed_type2 &aed)
 {
     //std::cout << "rho[i]:   " << rho(0) << std::endl;
@@ -64,8 +64,8 @@ int DM_EAM::calc_dXijdri_dXjidri(
 		const Vec3d &,
 		const double,
 		const double,
-		rho_rtype rhoi,
-		rho_rtype rhoj,
+		rho_type& rhoi,
+		rho_type& rhoj,
 		fd_type &fd_ij,
         const double,
         const double)
@@ -95,7 +95,7 @@ int DM_EAM::calc_dXijdri(
 		const Vec3d &,
 		const double,
 		const double,
-		rho_rtype rhoi,
+		rho_type& rhoi,
 		fd_type &fd_ij)
 {
     double r = rij;
@@ -189,7 +189,7 @@ void DM_EAM::gen_splines(int &n, double &delta, std::vector<double> &f,
 		spline[m][0] = 3.0*spline[m][3]/delta;
 	}
 }
-void DM_EAM::init_rhoi(rho_rtype rhoi)
+void DM_EAM::init_rhoi(rho_type& rhoi)
 {
     rhoi.resize(2);
     rhoi.setZero();
@@ -201,7 +201,7 @@ void DM_EAM::calc_rho(
         const double,
         const double,
         const Vec3d &,
-        rho_rtype rho)
+        rho_type& rho)
 {
     double r = rij;
     double p = r*ef.rdr + 1.0;

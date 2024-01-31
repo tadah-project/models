@@ -46,7 +46,7 @@ DM_mEAD<F>::DM_mEAD(Config &config):
 
 template <typename F>
 void DM_mEAD<F>::calc_aed(
-        rho_rtype rhoi,
+        rho_type& rhoi,
         aed_type2 &aed)
 {
     size_t Lshift = 0;
@@ -70,8 +70,8 @@ int DM_mEAD<F>::calc_dXijdri_dXjidri(
         const Vec3d &vec_ij,
         const double fc_ij,
         const double fcp_ij,
-        rho_rtype rhoi,
-        rho_rtype rhoj,
+        rho_type& rhoi,
+        rho_type& rhoj,
         fd_type &fd_ij,
         const double wi,
         const double wj)
@@ -164,7 +164,7 @@ int DM_mEAD<F>::calc_dXijdri(
         const Vec3d &vec_ij,
         const double fc_ij,
         const double fcp_ij,
-        rho_rtype rhoi,
+        rho_type& rhoi,
         fd_type &fd_ij)
 {
     const double x = vec_ij[0];
@@ -238,7 +238,7 @@ std::string DM_mEAD<F>::label() {
 }
 
 template <typename F>
-void DM_mEAD<F>::init_rhoi(rho_rtype rhoi)
+void DM_mEAD<F>::init_rhoi(rho_type& rhoi)
 {
     rhoi.resize(2*rhoisize);
     rhoi.setZero();
@@ -249,7 +249,7 @@ void DM_mEAD<F>::calc_rho(
         const double,
         const double fc_ij,
         const Vec3d &vec_ij,
-        rho_rtype rhoi)
+        rho_type& rhoi)
 {
     size_t ii=0;
     for (int L=0; L<=Lmax; ++L) {

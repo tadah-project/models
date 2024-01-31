@@ -42,7 +42,7 @@ DM_EAD::DM_EAD(Config &config):
 }
 
 void DM_EAD::calc_aed(
-        rho_rtype rhoi,
+        rho_type& rhoi,
         aed_type2 &aed)
 {
     size_t Lshift = 0;
@@ -65,8 +65,8 @@ int DM_EAD::calc_dXijdri_dXjidri(
         const Vec3d &vec_ij,
         const double fc_ij,
         const double fcp_ij,
-        rho_rtype rhoi,
-        rho_rtype rhoj,
+        rho_type& rhoi,
+        rho_type& rhoj,
         fd_type &fd_ij,
         const double wi,
         const double wj)
@@ -158,7 +158,7 @@ int DM_EAD::calc_dXijdri(
         const Vec3d &vec_ij,
         const double fc_ij,
         const double fcp_ij,
-        rho_rtype rhoi,
+        rho_type& rhoi,
         fd_type &fd_ij)
 {
     const double x = vec_ij[0];
@@ -229,7 +229,7 @@ std::string DM_EAD::label() {
     return lab;
 }
 
-void DM_EAD::init_rhoi(rho_rtype rhoi)
+void DM_EAD::init_rhoi(rho_type& rhoi)
 {
     rhoi.resize(2*rhoisize);
     rhoi.setZero();
@@ -239,7 +239,7 @@ void DM_EAD::calc_rho(
         const double,
         const double fc_ij,
         const Vec3d &vec_ij,
-        rho_rtype rhoi)
+        rho_type& rhoi)
 {
     size_t ii=0;
     for (int L=0; L<=Lmax; ++L) {

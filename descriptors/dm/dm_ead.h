@@ -53,7 +53,7 @@ class DM_EAD: public DM_Base {
     public:
         DM_EAD(Config&);
         void calc_aed(
-                rho_rtype rho,
+                rho_type& rho,
                 aed_type2 &aed);
         int calc_dXijdri_dXjidri(
                 const double rij,
@@ -61,8 +61,8 @@ class DM_EAD: public DM_Base {
                 const Vec3d &vec_ij,
                 const double fc_ij,
                 const double fcp_ij,
-                rho_rtype rhoi,
-                rho_rtype rhoj,
+                rho_type& rhoi,
+                rho_type& rhoj,
                 fd_type &fd_ij,
                 const double wi,
                 const double wj);
@@ -72,17 +72,17 @@ class DM_EAD: public DM_Base {
                 const Vec3d &vec_ij,
                 const double fc_ij,
                 const double fcp_ij,
-                rho_rtype rhoi,
+                rho_type& rhoi,
                 fd_type &fd_ij);
         size_t size();
         std::string label();
-        void init_rhoi(rho_rtype rhoi);
+        void init_rhoi(rho_type& rhoi);
         void calc_rho(
                 const double rij,
                 const double rij_sq,
                 const double fc_ij,
                 const Vec3d &vec_ij,
-                rho_rtype rho);
+                rho_type& rho);
         size_t rhoi_size();
         size_t rhoip_size();
 };

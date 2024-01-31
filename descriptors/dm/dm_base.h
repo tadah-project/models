@@ -18,7 +18,7 @@ class DM_Base: public D_Base {
          * Calculate Atomic Energy Descriptor for the atom local environment.
          */
         virtual void calc_aed(
-                rho_rtype rho,
+                rho_type& rho,
                 aed_type2 &aed)=0;
 
         /** \brief Calculate \ref FD
@@ -40,8 +40,8 @@ class DM_Base: public D_Base {
                 const Vec3d &vec_ij,
                 const double fc_ij,
                 const double fcp_ij,
-                rho_rtype rhoi,
-                rho_rtype rhoj,
+                rho_type& rhoi,
+                rho_type& rhoj,
                 fd_type &fd_ij,
                 const double wi,
                 const double wj)=0;
@@ -64,11 +64,11 @@ class DM_Base: public D_Base {
                 const Vec3d &vec_ij,
                 const double fc_ij,
                 const double fcp_ij,
-                rho_rtype rhoi,
+                rho_type& rhoi,
                 fd_type &fd_ij)=0;
 
         /** \brief Resize arrays for a density and F' */
-        virtual void init_rhoi(rho_rtype rhoi)=0;
+        virtual void init_rhoi(rho_type& rhoi)=0;
 
         /** \brief Calculate density */
         virtual void calc_rho(
@@ -76,7 +76,7 @@ class DM_Base: public D_Base {
                 const double rij_sq,
                 const double fc_ij,
                 const Vec3d &vec_ij,
-                rho_rtype rho)=0;
+                rho_type& rho)=0;
 
         /** \brief Return size of the density array */
         virtual size_t rhoi_size()=0;

@@ -39,7 +39,7 @@ class M_KRR_Core:
 
         init();
     }
-        double predict(const rvec &v) const{
+        double predict(const aed_type2 &v) const{
             return kernel.epredict(weights,v);
         }
 
