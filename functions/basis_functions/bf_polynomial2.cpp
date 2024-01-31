@@ -37,7 +37,7 @@ double BF_Polynomial2::fpredict(const t_type &weights, const fd_type &fdij,
 force_type BF_Polynomial2::fpredict(const t_type &weights, const fd_type &fdij,
         const aed_rctype& aedi)
 {
-    force_type v(3);
+    force_type v;
     v.setZero();
     size_t b=0;
     for (long int i=0; i<fdij.rows(); ++i) {

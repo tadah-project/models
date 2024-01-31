@@ -21,5 +21,5 @@ double BF_Linear::fpredict(const t_type &weights, const fd_type &fdij,
 force_type BF_Linear::fpredict(const t_type &weights, const fd_type &fdij,
         const aed_rctype& )
 {
-    return -fdij.transpose() * weights;
+    return -Vec3d(fdij.transpose() * weights);
 }

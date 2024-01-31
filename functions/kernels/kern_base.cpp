@@ -25,7 +25,7 @@ double Kern_Base::fpredict(const t_type &kweights, const fd_type &fdij,
 force_type Kern_Base::fpredict(const t_type &kweights, const fd_type &fdij,
         const aed_rctype &aedi)
 {
-    force_type v(3);
+    force_type v;
     v.setZero();
     for (long int b=0; b<basis.cols(); ++b) {
         for (size_t k=0; k<3; ++k) {

@@ -10,7 +10,7 @@ void DM_Dummy::calc_aed(
 int DM_Dummy::calc_dXijdri_dXjidri(
         const double,
         const double,
-        const Eigen::Vector3d &,
+        const Vec3d &,
         const double,
         const double,
         rho_rtype,
@@ -21,7 +21,7 @@ int DM_Dummy::calc_dXijdri_dXjidri(
 int DM_Dummy::calc_dXijdri(
         const double,
         const double,
-        const Eigen::Vector3d &,
+        const Vec3d &,
         const double,
         const double,
         rho_rtype,
@@ -33,7 +33,7 @@ void DM_Dummy::calc_rho(
         const double,
         const double,
         const double,
-        const Eigen::Vector3d &,
+        const Vec3d &,
         rho_rtype) {}
 size_t DM_Dummy::rhoi_size() { return 0; }
 size_t DM_Dummy::rhoip_size() { return 0; }

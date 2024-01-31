@@ -22,7 +22,7 @@ class DM_Dummy: public DM_Base {
         int calc_dXijdri_dXjidri(
                 const double rij,
                 const double rij_sq,
-                const Eigen::Vector3d &vec_ij,
+                const Vec3d &vec_ij,
                 const double fc_ij,
                 const double fcp_ij,
                 rho_rtype rhoi,
@@ -33,7 +33,7 @@ class DM_Dummy: public DM_Base {
         int calc_dXijdri(
                 const double rij,
                 const double rij_sq,
-                const Eigen::Vector3d &vec_ij,
+                const Vec3d &vec_ij,
                 const double fc_ij,
                 const double fcp_ij,
                 rho_rtype rhoi,
@@ -45,7 +45,7 @@ class DM_Dummy: public DM_Base {
                 const double rij,
                 const double rij_sq,
                 const double fc_ij,
-                const Eigen::Vector3d &vec_ij,
+                const Vec3d &vec_ij,
                 rho_rtype rho);
         size_t rhoi_size();
         size_t rhoip_size();

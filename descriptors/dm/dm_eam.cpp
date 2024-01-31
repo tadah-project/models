@@ -61,7 +61,7 @@ void DM_EAM::calc_aed(
 int DM_EAM::calc_dXijdri_dXjidri(
 		const double rij,
 		const double,
-		const Eigen::Vector3d &,
+		const Vec3d &,
 		const double,
 		const double,
 		rho_rtype rhoi,
@@ -92,7 +92,7 @@ int DM_EAM::calc_dXijdri_dXjidri(
 int DM_EAM::calc_dXijdri(
 		const double rij,
 		const double,
-		const Eigen::Vector3d &,
+		const Vec3d &,
 		const double,
 		const double,
 		rho_rtype rhoi,
@@ -200,7 +200,7 @@ void DM_EAM::calc_rho(
 		const double rij,
         const double,
         const double,
-        const Eigen::Vector3d &,
+        const Vec3d &,
         rho_rtype rho)
 {
     double r = rij;

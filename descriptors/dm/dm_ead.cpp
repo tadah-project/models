@@ -62,7 +62,7 @@ void DM_EAD::calc_aed(
 int DM_EAD::calc_dXijdri_dXjidri(
         const double rij,
         const double,
-        const Eigen::Vector3d &vec_ij,
+        const Vec3d &vec_ij,
         const double fc_ij,
         const double fcp_ij,
         rho_rtype rhoi,
@@ -155,7 +155,7 @@ int DM_EAD::calc_dXijdri_dXjidri(
 int DM_EAD::calc_dXijdri(
         const double rij,
         const double,
-        const Eigen::Vector3d &vec_ij,
+        const Vec3d &vec_ij,
         const double fc_ij,
         const double fcp_ij,
         rho_rtype rhoi,
@@ -238,7 +238,7 @@ void DM_EAD::calc_rho(
         const double rij,
         const double,
         const double fc_ij,
-        const Eigen::Vector3d &vec_ij,
+        const Vec3d &vec_ij,
         rho_rtype rhoi)
 {
     size_t ii=0;
