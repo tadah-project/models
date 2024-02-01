@@ -2,8 +2,8 @@
 #define EKM_H
 
 #include "../LIBS/Eigen/Dense"
-#include "../CORE/typedefs.h"
-#include "../CORE/coretypes.h"
+#include "../CORE/eigen_types.h"
+#include "../CORE/core_types.h"
 
 template <typename K>
 class EKM {

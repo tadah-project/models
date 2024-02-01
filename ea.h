@@ -3,7 +3,7 @@
 
 #include "../LIBS/Eigen/Dense"
 #include "../CORE/config/config.h"
-#include "../CORE/typedefs.h"
+#include "../CORE/eigen_types.h"
 
 class EA {
     private:

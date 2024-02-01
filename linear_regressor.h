@@ -2,7 +2,8 @@
 #define LINEAR_REGRESSOR_H
 
 #include "../CORE/config/config.h"
-#include "../CORE/typedefs.h"
+#include "../CORE/eigen_types.h"
+#include "../CORE/core_types.h"
 #include "../LIBS/Eigen/Dense"
 #include "ea.h"
 #include <vector>

@@ -1,7 +1,8 @@
 #ifndef M_Core_H
 #define M_Core_H
 
-#include "../CORE/typedefs.h"
+#include "../CORE/core_types.h"
+#include "../CORE/eigen_types.h"
 
 class M_Core {
     public:

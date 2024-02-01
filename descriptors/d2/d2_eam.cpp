@@ -12,7 +12,7 @@ D2_EAM::D2_EAM(Config &c):
 	ef.file_path = c("SETFL")[0];
 	read_setfl();
 
-	if (abs(ef.rcut - c.get<double>("RCUT2B")) > std::numeric_limits<double>::min()) {
+	if (std::abs(ef.rcut - c.get<double>("RCUT2B")) > std::numeric_limits<double>::min()) {
         if (verbose) {
             std::cout << std::endl;
             std::cout << "Config file cutoff and setfl file cutoff differ: "

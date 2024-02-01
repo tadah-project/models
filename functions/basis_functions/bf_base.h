@@ -1,7 +1,7 @@
 #ifndef BASIS_FUNCTIONS_H
 #define BASIS_FUNCTIONS_H
 
-#include "../../../CORE/typedefs.h"
+#include "../../../CORE/core_types.h"
 #include "../function_base.h"
 
 #include <iostream>

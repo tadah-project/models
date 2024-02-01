@@ -12,7 +12,7 @@ DM_EAM::DM_EAM(Config &c):
     ef.file_path = c("SETFL")[0];
     read_setfl();
 
-    if (abs(ef.rcut - c.get<double>("RCUTMB")) > std::numeric_limits<double>::min()) {
+    if (std::abs(ef.rcut - c.get<double>("RCUTMB")) > std::numeric_limits<double>::min()) {
         if (verbose) {
             std::cout << "Config file cutoff and setfl file cutoff differ: "
                 << c.get<double>("RCUTMB") << " " << ef.rcut << std::endl;
@@ -193,8 +193,6 @@ void DM_EAM::init_rhoi(rho_type& rhoi)
 {
     rhoi.resize(2);
     rhoi.setZero();
-    //rho.resize(1);
-    //rho[0] = Eigen::Matrix<double,1,2>(1,2);    // [0] - rho, [1] - rho prime aka fp[i]
 }
 void DM_EAM::calc_rho(
 		const double rij,
@@ -210,7 +208,6 @@ void DM_EAM::calc_rho(
     p -= m;
     p = std::min(p,1.0);
     std::vector<double> coeff = rhor_spline[m];
-    // rho[i]
     rho(0) += ((coeff[3]*p + coeff[4])*p + coeff[5])*p + coeff[6];
 
 }

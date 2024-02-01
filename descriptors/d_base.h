@@ -2,8 +2,7 @@
 #define D_BASE_H
 
 #include "../../CORE/config/config.h"
-#include "../../CORE/typedefs.h"
-#include "../../LIBS/Eigen/Dense"
+#include "../../CORE/core_types.h"
 #include "../../CORE/registry.h"
 
 /** \brief Base class for all descriptor types.
