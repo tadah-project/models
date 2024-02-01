@@ -1,6 +1,5 @@
 #include "d3_dummy.h"
 
-Registry<D3_Base,Config&>::Register<D3_Dummy> D3_Dummy_1( "D3_Dummy" );
 
 D3_Dummy::D3_Dummy() {}
 D3_Dummy::D3_Dummy(Config &) {}

@@ -1,7 +1,5 @@
 #include "kern_rbf.h"
 
-Registry<Function_Base>::Register<Kern_RBF> Kern_RBF_1( "Kern_RBF" );
-Registry<Function_Base,Config&>::Register<Kern_RBF> Kern_RBF_2( "Kern_RBF" );
 
 Kern_RBF::Kern_RBF () {}
 Kern_RBF::Kern_RBF (const Config &c):

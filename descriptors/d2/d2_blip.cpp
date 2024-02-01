@@ -2,7 +2,6 @@
 #include "../d_basis_functions.h"
 #include <stdexcept>
 
-Registry<D2_Base,Config&>::Register<D2_Blip> D2_Blip_1( "D2_Blip" );
 
 D2_Blip::D2_Blip(Config &c):
     verbose(c.get<int>("VERBOSE"))

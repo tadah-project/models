@@ -3,6 +3,7 @@
 #include <stdexcept>
 
 
+template<> Registry<Cut_Base,double>::Map Registry<Cut_Base,double>::registry{};
 Registry<Cut_Base,double>::Register<Cut_Cos> Cut_Cos_1( "Cut_Cos" );
 Registry<Cut_Base,double>::Register<Cut_Tanh> Cut_Tanh_1( "Cut_Tanh" );
 Registry<Cut_Base,double>::Register<Cut_Poly2> Cut_Poly_1( "Cut_Poly2" );

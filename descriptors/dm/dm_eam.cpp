@@ -1,6 +1,5 @@
 #include "dm_eam.h"
 
-Registry<DM_Base,Config&>::Register<DM_EAM> DM_EAM_1( "DM_EAM" );
 
 DM_EAM::DM_EAM(Config &c):
     verbose(c.get<int>("VERBOSE")) 

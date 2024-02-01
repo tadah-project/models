@@ -4,3 +4,4 @@
 #include "d2_bp.h"
 #include "d2_eam.h"
 #include "d2_lj.h"
+#include "d2_mie.h"

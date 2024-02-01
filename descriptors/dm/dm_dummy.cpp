@@ -1,6 +1,5 @@
 #include "dm_dummy.h"
 
-Registry<DM_Base,Config&>::Register<DM_Dummy> DM_Dummy_1( "DM_Dummy" );
 
 DM_Dummy::DM_Dummy() {}
 DM_Dummy::DM_Dummy(Config&) {}

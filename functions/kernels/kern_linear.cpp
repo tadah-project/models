@@ -1,7 +1,5 @@
 #include "kern_linear.h"
 
-Registry<Function_Base>::Register<Kern_Linear> Kern_Linear_1( "Kern_Linear" );
-Registry<Function_Base,Config&>::Register<Kern_Linear> Kern_Linear_2( "Kern_Linear" );
 
 Kern_Linear::Kern_Linear() {}
 Kern_Linear::Kern_Linear (const Config &c):

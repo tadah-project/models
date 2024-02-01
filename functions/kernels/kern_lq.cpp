@@ -1,7 +1,5 @@
 #include "kern_lq.h"
 
-Registry<Function_Base>::Register<Kern_LQ> Kern_LQ_1( "Kern_LQ" );
-Registry<Function_Base,Config&>::Register<Kern_LQ> Kern_LQ_2( "Kern_LQ" );
 
 Kern_LQ::Kern_LQ () {}
 Kern_LQ::Kern_LQ (const Config &c):

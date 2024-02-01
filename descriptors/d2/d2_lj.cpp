@@ -1,6 +1,5 @@
 #include "d2_lj.h"
 
-Registry<D2_Base,Config&>::Register<D2_LJ> D2_LJ_1( "D2_LJ" );
 
 D2_LJ::D2_LJ(Config &c):
     verbose(c.get<int>("VERBOSE"))

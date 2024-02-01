@@ -1,6 +1,5 @@
 #include "d2_mie.h"
 
-Registry<D2_Base,Config&>::Register<D2_MIE> D2_MIE_1( "D2_MIE" );
 
 D2_MIE::D2_MIE(Config &c):
     verbose(c.get<int>("VERBOSE"))

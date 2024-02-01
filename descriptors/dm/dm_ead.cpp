@@ -3,7 +3,6 @@
 #include <vector>
 #include <iomanip>
 
-Registry<DM_Base,Config&>::Register<DM_EAD> DM_EAD_1( "DM_EAD" );
 
 /* Index ii iterates rhoi array
  * rhoi array is split 50/50 into density and derivative

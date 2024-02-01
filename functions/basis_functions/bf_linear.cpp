@@ -1,7 +1,5 @@
 #include "bf_linear.h"
 
-Registry<Function_Base>::Register<BF_Linear> BF_Linear_1( "BF_Linear" );
-Registry<Function_Base,Config&>::Register<BF_Linear> BF_Linear_2( "BF_Linear" );
 
 
 BF_Linear::BF_Linear() {}

@@ -1,7 +1,5 @@
 #include "kern_sigmoid.h"
 
-Registry<Function_Base>::Register<Kern_Sigmoid> Kern_Sigmoid_1( "Kern_Sigmoid" );
-Registry<Function_Base,Config&>::Register<Kern_Sigmoid> Kern_Sigmoid_2( "Kern_Sigmoid" );
 
 Kern_Sigmoid::Kern_Sigmoid () {}
 Kern_Sigmoid::Kern_Sigmoid (const Config &c):

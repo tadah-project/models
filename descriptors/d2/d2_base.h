@@ -64,5 +64,5 @@ class D2_Base: public D_Base {
                 fd_type &fd_ij)=0;
         virtual std::string label()=0;
 };
-template<> inline Registry<D2_Base,Config&>::Map Registry<D2_Base,Config&>::registry{};
+//template<> inline Registry<D2_Base,Config&>::Map Registry<D2_Base,Config&>::registry{};
 #endif

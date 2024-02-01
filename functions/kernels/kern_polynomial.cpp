@@ -1,7 +1,5 @@
 #include "kern_polynomial.h"
 
-Registry<Function_Base>::Register<Kern_Polynomial> Kern_Polynomial_1( "Kern_Polynomial" );
-Registry<Function_Base,Config&>::Register<Kern_Polynomial> Kern_Polynomial_2( "Kern_Polynomial" );
 
 Kern_Polynomial::Kern_Polynomial () {}
 Kern_Polynomial::Kern_Polynomial (const Config &c):

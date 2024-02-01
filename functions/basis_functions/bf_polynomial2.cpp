@@ -1,7 +1,5 @@
 #include "bf_polynomial2.h"
 
-Registry<Function_Base>::Register<BF_Polynomial2> BF_Polynomial2_1( "BF_Polynomial2" );
-Registry<Function_Base,Config&>::Register<BF_Polynomial2> BF_Polynomial2_2( "BF_Polynomial2" );
 
 BF_Polynomial2::BF_Polynomial2() {}
 BF_Polynomial2::BF_Polynomial2(const Config &c): Function_Base(c)

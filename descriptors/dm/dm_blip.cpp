@@ -3,7 +3,6 @@
 #include <vector>
 #include <iomanip>
 
-Registry<DM_Base,Config&>::Register<DM_Blip> DM_Blip_1( "DM_Blip" );
 
 DM_Blip::DM_Blip(Config &c):
     verbose(c.get<int>("VERBOSE")),

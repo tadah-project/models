@@ -1,6 +1,5 @@
 #include "d2_dummy.h"
 
-Registry<D2_Base,Config&>::Register<D2_Dummy> D2_Dummy_1( "D2_Dummy" );
 
 D2_Dummy::D2_Dummy() {}
 D2_Dummy::D2_Dummy(Config &c):

@@ -1,7 +1,5 @@
 #include "kern_quadratic.h"
 
-Registry<Function_Base>::Register<Kern_Quadratic> Kern_Quadratic_1( "Kern_Quadratic" );
-Registry<Function_Base,Config&>::Register<Kern_Quadratic> Kern_Quadratic_2( "Kern_Quadratic" );
 
 Kern_Quadratic::Kern_Quadratic () {}
 Kern_Quadratic::Kern_Quadratic (const Config &c): 

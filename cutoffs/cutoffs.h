@@ -139,5 +139,5 @@ class Cut_Poly2 : public Cut_Base {
         double calc(double r);
         double calc_prime(double r);
 };
-template<> inline Registry<Cut_Base,double>::Map Registry<Cut_Base,double>::registry{};
+//template<> inline Registry<Cut_Base,double>::Map Registry<Cut_Base,double>::registry{};
 #endif

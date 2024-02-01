@@ -1,7 +1,6 @@
 #include "d2_bp.h"
 #include "../d_basis_functions.h"
 
-Registry<D2_Base,Config&>::Register<D2_BP> D2_BP_1( "D2_BP" );
 
 D2_BP::D2_BP(Config &c):
     verbose(c.get<int>("VERBOSE"))

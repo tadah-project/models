@@ -1,6 +1,5 @@
 #include "d2_eam.h"
 
-Registry<D2_Base,Config&>::Register<D2_EAM> D2_EAM_1( "D2_EAM" );
 
 D2_EAM::D2_EAM(Config &c):
     verbose(c.get<int>("VERBOSE"))

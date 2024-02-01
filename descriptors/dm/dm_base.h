@@ -86,5 +86,5 @@ class DM_Base: public D_Base {
         virtual size_t size()=0;
         virtual std::string label()=0;
 };
-template<> inline Registry<DM_Base,Config&>::Map Registry<DM_Base,Config&>::registry{};
+//template<> inline Registry<DM_Base,Config&>::Map Registry<DM_Base,Config&>::registry{};
 #endif

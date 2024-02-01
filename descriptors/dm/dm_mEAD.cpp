@@ -4,7 +4,6 @@
 #include <iomanip>
 
 
-Registry<DM_Base,Config&>::Register<DM_mEAD<F_RLR>> DM_mEAD_1( "DM_mEAD1" );
 
 /* Index ii iterates rhoi array
  * rhoi array is split 50/50 into density and derivative
