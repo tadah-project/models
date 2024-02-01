@@ -3,7 +3,7 @@
 
 #include "../../CORE/registry.h"
 #include "../../CORE/core_types.h"
-#include "../../CORE/eigen_types.h"
+//#include "../../CORE/eigen_types.h"
 #include "../../CORE/config/config.h"
 
 #include <iomanip>

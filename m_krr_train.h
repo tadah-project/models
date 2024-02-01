@@ -5,7 +5,7 @@
 #include "../CORE/config/config.h"
 #include "functions/function_base.h"
 #include "functions/kernels/kern_base.h"
-#include "m_core.h"
+#include "m_train.h"
 #include "m_krr_core.h"
 #include "ekm.h"
 

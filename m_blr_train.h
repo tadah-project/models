@@ -1,7 +1,7 @@
 #ifndef M_BLR_TRAIN_H
 #define M_BLR_TRAIN_H
 
-#include "m_core.h"
+#include "m_train.h"
 #include "m_blr_core.h"
 #include "linear_regressor.h"
 #include "functions/function_base.h"
