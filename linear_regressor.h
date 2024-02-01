@@ -23,12 +23,17 @@ class LinearRegressor {
     public:
         static void train(Config &config, const phi_type &Phi, const t_type &T,
                 t_type &weights, mat &Sigma) {
+
+            // Convert t_type to Eigen type
+           vec ww=Eigen::Map<vec>(weights.data.data(),weights.data.size());
+           vec TT=Eigen::Map<const vec>(T.data.data(),T.data.size());
+
             int verbose = config.get<int>("VERBOSE");
 
             double lambda=config.get<double>("LAMBDA");
 
             if (lambda == 0)
-                weights = Phi.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(T);
+                ww = Phi.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(TT);
             else {
                 double alpha = config.get<double>("ALPHA");
                 double beta = config.get<double>("BETA");
@@ -47,7 +52,7 @@ class LinearRegressor {
 
                 if (lambda<0) {
                     EA ea(config);
-                    ea.run(Phi,T,S,U,V,alpha,beta);
+                    ea.run(Phi,TT,S,U,V,alpha,beta);
                     lambda=alpha/beta;
 
                     mat P_inv(S.rows(),S.rows());
@@ -74,11 +79,12 @@ class LinearRegressor {
                         D(i,i) = 0.0;
                 }
                 if (verbose) std::cout << std::endl << "REG LAMBDA: " << lambda << std::endl;
-                weights = V*D*U.transpose()*T;
-                //weights = beta*Sigma*V*S.asDiagonal()*U.transpose()*T;
+                ww = V*D*U.transpose()*TT;
+                //weights = beta*Sigma*V*S.asDiagonal()*U.transpose()*TT;
                 // add Sigma to the config file
                 dump_sigma(config,Sigma);
             }
+            weights = t_type(ww);
         }
         static void dump_sigma(Config &config, mat &Sigma) {
             vec Sigma_as_vector(Eigen::Map<vec>(Sigma.data(), Sigma.cols()*Sigma.rows()));
