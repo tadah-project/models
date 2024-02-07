@@ -1,26 +1,29 @@
 #ifndef M_EA_H
 #define M_EA_H
 
-#include "../LIBS/Eigen/Dense"
 #include "../CORE/config/config.h"
-#include "../CORE/eigen_types.h"
+#include "svd.h"
+#include "ridge_regression.h"
+#include "../CORE/core_types.h"
+#include "../CORE/lapack.h"
 
 class EA {
     private:
-        Config &config;
+        const Config &config;
+        const SVD &svd;
+        const t_type &T;
         int verbose;
     public:
-        EA(Config &c):
+        EA(const Config &c, const SVD &svd, const t_type &T):
             config(c),
+            svd(svd),
+            T(T),
             verbose(c.get<int>("VERBOSE"))
     {}
 
-        int run  (const mat &Phi,const vec &T,
-                const mat &S, const mat &U,const mat &V,
-                double &alpha, double &beta) {
-
+        int run(double &alpha, double &beta) {
             // Phi = USV^T
-            size_t N=Phi.rows();
+            size_t N=svd.shapeA().first;
             size_t maxsteps=40;
             const double EPS2 = 5e-12;
             int convergence_status = 1;
@@ -31,40 +34,41 @@ class EA {
             size_t counter=0;
             double lambda = alpha/beta;
 
+            double *s = svd.getS();
+
             // square of the S matrix contains all eigenvalues
             // of Phi^T*Phi = (VSU^T)(USV^T) = VS^2V^T = S^2
-            const vec eval = S.array().pow(2);
-
+            double *eval = new double[svd.sizeS()];
+            for (size_t i=0; i<svd.sizeS(); ++i)
+                eval[i] = s[i]*s[i];
 
             if (verbose) printf("%9s  %9s  %9s  %9s  %9s  %9s\n","del alpha", "del beta", "alpha", "beta", "lambda", "gamma");
             // D is a filter factors matrix
-            mat D(S.rows(),S.rows());
-            D.setZero();
+            double *d = new double[svd.sizeS()];
+
             int outprec=config.get<int>("OUTPREC");
 
+            double *t = new double[svd.shapeA().first];
+            double *x = new double[svd.shapeA().second];
             while (test1>EPS2 || test2>EPS2) {
 
-                for (long int i=0; i<S.rows(); ++i) {
-                    double s = S(i,0);
-                    if (s>std::numeric_limits<double>::min())
-                        D(i,i) = (s)/(s*s+lambda);
-                    else
-                        D(i,i) = 0.0;
-                }
                 // regularised least square problem (Tikhonov Regularization):
-                vec m_n = V*D*U.transpose()*T;
+                t_type m_n((size_t)svd.sizeS());
+                RidgeRegression::solve(svd,T,m_n,lambda);
 
                 double gamma = 0.0;
-                for (long int j=0; j<S.rows(); j++) {
-                    // exlude eigenvalues which are smaller than ~1e-10
-                    // for numerical stability b/c matrix is not regularized
-                    if (beta*eval(j) > std::numeric_limits<double>::min()) {
-                        gamma += (beta*eval(j))/(beta*eval(j)+alpha);
+                for (size_t j=0; j<svd.sizeS(); j++) {
+                    if (beta*eval[j] > std::numeric_limits<double>::min()) {
+                        gamma += (beta*eval[j])/(beta*eval[j]+alpha);
                     }
                 }
-                alpha = gamma / m_n.dot(m_n);
+                alpha = gamma / (m_n*m_n);
 
-                double temp = (T-Phi*m_n).dot(T-Phi*m_n);
+
+                t_type Tpred = svd.predict(m_n,t,x);
+                double temp = (T-Tpred)*(T-Tpred);
+
+                //double temp = (T-U*S.asDiagonal()*V.transpose()*m_n).dot(T-U*S.asDiagonal()*V.transpose()*m_n);
                 beta = (static_cast<double>(N)-gamma)/temp;
 
                 test1 = fabs(alpha_old-alpha)/alpha;
@@ -82,8 +86,45 @@ class EA {
             }
             if (convergence_status && verbose) std::cout << "Number of steps for convergence: " + to_string(counter,outprec) << std::endl;
             if (!convergence_status && verbose) std::cout << "Max number of steps reached: " + to_string(counter,outprec) << std::endl;
-            return convergence_status;
 
+            delete [] eval;
+            delete [] d;
+
+            delete[] t;
+            delete[] x;
+
+            return convergence_status;
+        };
+        Matrix get_sigma(double alpha, double beta) {
+            double *vt = svd.getVT();
+            double *s = svd.getS();
+            int n = static_cast<int>(svd.shapeVT().first);
+
+            Matrix Sigma((size_t)n,(size_t)n);
+            Sigma.setZero();
+            double *sigma = &Sigma.data()[0];
+
+            // Build P_inv matrix
+            for (size_t i=0; i<svd.sizeS(); ++i) {
+                Sigma(i,i) = 1.0/(beta*s[i]*s[i]+alpha);
+            }
+
+            //Sigma = V*P_inv*V.transpose();
+            char transa = 'T';
+            char transb = 'N';
+            double alpha_ = 1.0;
+            double beta_ = 0.0;
+
+            double *work = new double[n*n];
+
+            dgemm_(&transb, &transb, &n, &n, &n, &alpha_, sigma, &n, vt, &n,
+                &beta_, work, &n);
+
+            dgemm_(&transa, &transb, &n, &n, &n, &alpha_, vt, &n, work, &n,
+                &beta_, sigma, &n);
+
+            delete[] work;
+            return Sigma;
         }
 };
 #endif
