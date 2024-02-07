@@ -31,7 +31,7 @@ class M_BLR_Train:
             M_BLR_Core<BF>(bf, c)
     {}
 
-        void train(phi_type &Phi, const t_type &T) {
+        void train(phi_type &Phi, t_type &T) {
             if(trained) {
                 throw std::runtime_error("This object is already trained!");
             }

@@ -36,7 +36,7 @@ class M_KRR_Train:
             ekm(kernel)
     {}
 
-        void train(phi_type &Phi, const t_type &T) {
+        void train(phi_type &Phi, t_type &T) {
             if(trained) {
                 throw std::runtime_error("This object is already trained!");
             }
@@ -47,7 +47,7 @@ class M_KRR_Train:
 
             if (kernel.get_label()!="Kern_Linear") {
                 //kernalize weights
-                weights = ekm.KK.transpose()*weights;
+                weights = ekm.KK*weights;
             }
             trained=true;
         }

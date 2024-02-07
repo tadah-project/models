@@ -14,7 +14,7 @@ class M_BLR_Core:
     public virtual M_Core
 {
     public:
-        mat Sigma;
+        Matrix Sigma;
         Config &config;
         BF bf;
         M_BLR_Core(Config &c):

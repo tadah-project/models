@@ -1,7 +1,7 @@
 #include "kern_base.h"
 
 Kern_Base::~Kern_Base() {}
-void Kern_Base::set_basis(const aeds_type2 b)
+void Kern_Base::set_basis(const Matrix b)
 {
     basis = b;
 }

@@ -25,7 +25,7 @@ class Kern_Linear :  public virtual Kern_Base {
         double operator() (const aed_type2& b, const aed_type2& af);
         aed_type2 derivative(const aed_type2& b, const aed_type2& );
         double prime(const aed_type2& b, const aed_type2& af, const aed_type2& ff);
-        void set_basis(const aeds_type2 ) {}
+        void set_basis(const Matrix ) {}
 
         double epredict(const t_type &weights, const aed_type2& aed);
         double fpredict(const t_type &weights, const fd_type &fdij,

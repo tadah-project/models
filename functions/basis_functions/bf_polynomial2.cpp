@@ -24,8 +24,8 @@ double BF_Polynomial2::fpredict(const t_type &weights, const fd_type &fdij,
 {
     double res=0.0;
     size_t b=0;
-    for (long int i=0; i<fdij.rows(); ++i) {
-        for (long int ii=i; ii<fdij.rows(); ++ii) {
+    for (size_t i=0; i<fdij.rows(); ++i) {
+        for (size_t ii=i; ii<fdij.rows(); ++ii) {
             res -= weights(b)*(fdij(i,k)*aedi(ii) + fdij(ii,k)*aedi(i));
             b++;
         }
@@ -38,8 +38,8 @@ force_type BF_Polynomial2::fpredict(const t_type &weights, const fd_type &fdij,
     force_type v;
     v.setZero();
     size_t b=0;
-    for (long int i=0; i<fdij.rows(); ++i) {
-        for (long int ii=i; ii<fdij.rows(); ++ii) {
+    for (size_t i=0; i<fdij.rows(); ++i) {
+        for (size_t ii=i; ii<fdij.rows(); ++ii) {
             for (size_t k=0; k<3; ++k) {
                 v(k) -= weights(b)*(fdij(i,k)*aedi(ii) + fdij(ii,k)*aedi(i));
             }

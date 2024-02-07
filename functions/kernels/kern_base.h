@@ -15,7 +15,7 @@
  */
 class Kern_Base: public virtual Function_Base {
     public:
-        aeds_type2 basis;
+        Matrix basis;
         virtual ~Kern_Base();
 
         /**
@@ -47,7 +47,7 @@ class Kern_Base: public virtual Function_Base {
                 const aed_type2 &ff)=0;
 
         /** \brief Set basis for calculations */
-        virtual void set_basis(const aeds_type2 b);
+        virtual void set_basis(const Matrix b);
 
         virtual double epredict(const t_type &kweights, const aed_type2 &aed);
         virtual double fpredict(const t_type &kweights, const fd_type &fdij,

@@ -2,7 +2,6 @@
 #define M_PREDICT_H
 
 #include "../CORE/core_types.h"
-//#include "../CORE/eigen_types.h"
 
 class M_Predict {
     public:

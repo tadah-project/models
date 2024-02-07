@@ -3,7 +3,6 @@
 
 #include "../../CORE/registry.h"
 #include "../../CORE/core_types.h"
-//#include "../../CORE/eigen_types.h"
 #include "../../CORE/config/config.h"
 
 #include <iomanip>
@@ -35,7 +34,7 @@ struct Function_Base {
         virtual aed_type2 derivative(const aed_type2& , const aed_type2& ) { return aed_type2(); };
         virtual double prime(const aed_type2& , const aed_type2& ,
                 const aed_type2& ) { return 0.0; }
-        virtual void set_basis(const aeds_type2 ) {};
+        virtual void set_basis(const Matrix ) {};
 
         /** \brief Return label of this object */
         virtual std::string get_label()=0;

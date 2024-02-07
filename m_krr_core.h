@@ -14,7 +14,7 @@ class M_KRR_Core:
     public virtual M_Core
 {
     public:
-        mat Sigma;
+        Matrix Sigma;
         Config &config;
         K kernel;
 
