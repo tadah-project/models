@@ -9,15 +9,15 @@ std::string BF_Linear::get_label() {
 }
 double BF_Linear::epredict(const t_type &weights, const aed_type2& aed)
 {
-    return weights.transpose()*aed;
+    return weights*aed;
 }
 double BF_Linear::fpredict(const t_type &weights, const fd_type &fdij,
         const aed_type2& , const size_t k)
 {
-    return -(fdij.col(k).transpose() * weights);
+    return -(fdij.col(k) * weights);
 }
 force_type BF_Linear::fpredict(const t_type &weights, const fd_type &fdij,
         const aed_type2& )
 {
-    return -(fdij.transpose() * weights);
+    return -(fdij * weights);
 }

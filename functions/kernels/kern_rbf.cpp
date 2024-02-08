@@ -21,7 +21,7 @@ aed_type2 Kern_RBF::derivative(const aed_type2& b, const aed_type2& af)
 }
 double Kern_RBF::prime(const aed_type2& b, const aed_type2& af, const aed_type2& ff)
 {
-    return derivative(b, af).transpose()*ff;
+    return derivative(b, af)*ff;
 }
 std::string Kern_RBF::get_label()
 {
