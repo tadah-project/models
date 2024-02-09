@@ -18,7 +18,7 @@ class EKM {
 
             // Compute lower diagonal part only
             for (size_t i=0; i<KK.cols(); i++) {
-                for (size_t j=i+1; j<KK.cols(); j++) {
+                for (size_t j=i; j<KK.cols(); j++) {
                     double val = kernel(basis.col(i),basis.col(j));
                     KK(i,j) = val;
                 }
