@@ -71,8 +71,8 @@ class EA {
                 //double temp = (T-U*S.asDiagonal()*V.transpose()*m_n).dot(T-U*S.asDiagonal()*V.transpose()*m_n);
                 beta = (static_cast<double>(N)-gamma)/temp;
 
-                test1 = fabs(alpha_old-alpha)/alpha;
-                test2 = fabs(beta_old-beta)/beta;
+                test1 = std::fabs(alpha_old-alpha)/alpha;
+                test2 = std::fabs(beta_old-beta)/beta;
                 if (verbose) printf("%.3e  %.3e  %.3e  %.3e  %.3e  %.3e\n",test1, test2,alpha, beta, alpha/beta, gamma);
 
                 lambda = alpha/beta;
