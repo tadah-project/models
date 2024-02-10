@@ -9,6 +9,8 @@ Kern_RBF::Kern_RBF (const Config &c):
 {
     if (get_verbose()) std::cout << std::endl << label << " | sigma: " << sigma
         << " | gamma: " << gamma << std::endl;
+
+    read_basis_from_config(c,basis);
 }
 double Kern_RBF::operator() (const aed_type2& b, const aed_type2& af)
 {

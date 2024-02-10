@@ -2,10 +2,12 @@
 
 
 Kern_Quadratic::Kern_Quadratic () {}
-Kern_Quadratic::Kern_Quadratic (const Config &c): 
+Kern_Quadratic::Kern_Quadratic (const Config &c):
     Function_Base(c)
 {
     if (get_verbose()) std::cout << std::endl << label << std::endl;
+
+    read_basis_from_config(c,basis);
 }
 double Kern_Quadratic::operator() (const aed_type2& b, const aed_type2& af)
 {

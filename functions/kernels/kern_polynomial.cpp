@@ -10,6 +10,7 @@ Kern_Polynomial::Kern_Polynomial (const Config &c):
 {
     if (get_verbose()) std::cout << std::endl << label << " | degree: " << d
         <<" | gamma: " << gamma << " | c: " << c << std::endl;
+    read_basis_from_config(c,basis);
 }
 double Kern_Polynomial::operator() (const aed_type2& b, const aed_type2& af)
 {
