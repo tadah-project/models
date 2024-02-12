@@ -13,18 +13,18 @@ class OLS {
                 int m = A.rows();  //IN
                 int n = A.cols();  //IN
                 int nrhs = 1; // number of colums in B (targets T) //IN
-                double *a = &A.data()[0]; //IN
+                double *a = A.ptr(); //IN
                 int lda = m;
-                double *b = &B.data()[0];    // IN/OUT
+                double *b = B.ptr();    // IN/OUT
                 int ldb = std::max(m,n);
                 double *s = new double[std::min(m,n)];   // size: rows
                 double rcond = 1e-8;   // 1 use machine precision
                 int rank;
                 double *work;
                 int lwork=-1; // QUERRY
-                int liwork = std::max(
-                        0,int(std::log2(std::min(m,n)/(25+1))) + 1)
-                    + 11*std::min(m,n);
+                //int liwork = std::max(
+                //        0,int(std::log2(std::min(m,n)/(25+1))) + 1)
+                //    + 11*std::min(m,n);
                 int smlsiz = 25;
                 int nlvl = std::max( 0, int( std::log2( std::min(m,n)/(smlsiz+1) ) )+1 );
                 int *iwork = new int[3*std::min(m,n)*nlvl + 11*std::min(m,n)];
@@ -37,9 +37,6 @@ class OLS {
                 dgelsd_(&m,&n,&nrhs,a,&lda,b,&ldb,s,&rcond,&rank,
                         work, &lwork, iwork, &info);
 
-                for (size_t i=0;i<n;++i)
-                    std::cout << B(i)<< " ";
-                std::cout<< std::endl;
                 weights = B.copy(A.cols());
 
                 delete[] s;
