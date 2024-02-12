@@ -38,7 +38,7 @@ class RidgeRegression {
                 //STEP1: U^T T
                 char trans = 'T';
                 double alpha_ = 1.0;
-                double *x = &T.data()[0];
+                double *x = T.ptr();
                 double *y = new double[lda];
                 int incx = 1;
                 double beta_ = 0.0;
@@ -55,7 +55,7 @@ class RidgeRegression {
                 dgemv_(&trans, &ldvt, &n, &alpha_, vt, &ldvt, y, &incx,
                         &beta_, x, &incx);
 
-                weights = t_type(x, (size_t)ldvt);
+                weights = t_type(x, (size_t)ldvt, true);
 
                 delete[] d;
                 delete[] y;
