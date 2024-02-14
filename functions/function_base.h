@@ -1,14 +1,9 @@
 #ifndef FUNCTION_BASE_h
 #define FUNCTION_BASE_h
 
-#include "../../CORE/registry.h"
 #include "../../CORE/core_types.h"
 #include "../../CORE/config/config.h"
 
-#include <iomanip>
-#include <iostream>
-#include <limits>
-#include <vector>
 
 /** Base class for Kernels and Basis Functions */
 struct Function_Base {

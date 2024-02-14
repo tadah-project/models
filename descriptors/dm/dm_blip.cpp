@@ -226,7 +226,7 @@ std::string DM_Blip::label() {
 void DM_Blip::init_rhoi(rho_type& rhoi)
 {
     rhoi.resize(2*rhoisize);
-    rhoi.setZero();
+    rhoi.set_zero();
 }
 void DM_Blip::calc_rho(
         const double rij,

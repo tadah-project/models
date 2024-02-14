@@ -240,7 +240,7 @@ template <typename F>
 void DM_mEAD<F>::init_rhoi(rho_type& rhoi)
 {
     rhoi.resize(2*rhoisize);
-    rhoi.setZero();
+    rhoi.set_zero();
 }
 template <typename F>
 void DM_mEAD<F>::calc_rho(

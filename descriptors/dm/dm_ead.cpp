@@ -231,7 +231,7 @@ std::string DM_EAD::label() {
 void DM_EAD::init_rhoi(rho_type& rhoi)
 {
     rhoi.resize(2*rhoisize);
-    rhoi.setZero();
+    rhoi.set_zero();
 }
 void DM_EAD::calc_rho(
         const double rij,

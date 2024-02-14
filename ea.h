@@ -101,7 +101,6 @@ class EA {
             int n = static_cast<int>(svd.shapeVT().first);
 
             Matrix Sigma((size_t)n,(size_t)n);
-            Sigma.setZero();
             double *sigma = &Sigma.data()[0];
 
             // Build P_inv matrix

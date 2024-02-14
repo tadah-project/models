@@ -1,7 +1,6 @@
 #ifndef D2_BLIP_H
 #define D2_BLIP_H
 #include "d2_base.h"
-#include <vector>
 
 /** \brief Blip two-body descriptor.
  *

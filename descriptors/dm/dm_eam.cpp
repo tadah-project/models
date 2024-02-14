@@ -191,7 +191,7 @@ void DM_EAM::gen_splines(int &n, double &delta, std::vector<double> &f,
 void DM_EAM::init_rhoi(rho_type& rhoi)
 {
     rhoi.resize(2);
-    rhoi.setZero();
+    rhoi.set_zero();
 }
 void DM_EAM::calc_rho(
 		const double rij,
