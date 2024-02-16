@@ -14,10 +14,10 @@ double BF_Linear::epredict(const t_type &weights, const aed_type2& aed)
 double BF_Linear::fpredict(const t_type &weights, const fd_type &fdij,
         const aed_type2& , const size_t k)
 {
-    return -(fdij(k) * weights);
+    return -1*(fdij(k) * weights);
 }
 force_type BF_Linear::fpredict(const t_type &weights, const fd_type &fdij,
         const aed_type2& )
 {
-    return -(fdij * weights);
+    return -1*(fdij * weights);
 }
