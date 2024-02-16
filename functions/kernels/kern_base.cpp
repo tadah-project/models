@@ -18,7 +18,7 @@ double Kern_Base::fpredict(const t_type &kweights, const fd_type &fdij,
 {
     double res=0.0;
     for (size_t b=0; b<basis.cols(); ++b) {
-        res -= kweights[b]*(*this).prime(basis.col(b),aedi,fdij.col(k));
+        res -= kweights[b]*(*this).prime(basis.col(b),aedi,fdij(k));
     }
     return res;
 }
@@ -29,7 +29,7 @@ force_type Kern_Base::fpredict(const t_type &kweights, const fd_type &fdij,
     v.set_zero();
     for (size_t b=0; b<basis.cols(); ++b) {
         for (size_t k=0; k<3; ++k) {
-            v(k) -= kweights[b]*(*this).prime(basis.col(b),aedi,fdij.col(k));
+            v(k) -= kweights[b]*(*this).prime(basis.col(b),aedi,fdij(k));
         }
     }
     return v;
