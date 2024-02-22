@@ -1,5 +1,5 @@
 #include "f_all.h"
-#include "../CORE/registry.h"
+#include "../../CORE/registry.h"
 
 template<> Registry<Function_Base>::Map Registry<Function_Base>::registry{};
 template<> Registry<Function_Base,Config&>::Map Registry<Function_Base,Config&>::registry{};
