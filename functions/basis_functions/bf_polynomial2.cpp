@@ -8,7 +8,7 @@ std::string BF_Polynomial2::get_label()
 {
   return label;
 }
-double BF_Polynomial2::epredict(const t_type &weights, const aed_type2& aed)
+double BF_Polynomial2::epredict(const t_type &weights, const aed_type2& aed) const
 {
   size_t b=0;
   double res=0.0;
@@ -20,7 +20,7 @@ double BF_Polynomial2::epredict(const t_type &weights, const aed_type2& aed)
   return res;
 }
 double BF_Polynomial2::fpredict(const t_type &weights, const fd_type &fdij,
-                                const aed_type2& aedi, const size_t k)
+                                const aed_type2& aedi, const size_t k) const
 {
   double res=0.0;
   size_t b=0;
@@ -32,7 +32,7 @@ double BF_Polynomial2::fpredict(const t_type &weights, const fd_type &fdij,
   return res;
 }
 force_type BF_Polynomial2::fpredict(const t_type &weights, const fd_type &fdij,
-                                    const aed_type2& aedi)
+                                    const aed_type2& aedi) const
 {
   force_type v;
   for (size_t k=0; k<3; ++k) {

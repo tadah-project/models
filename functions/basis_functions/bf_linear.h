@@ -9,10 +9,10 @@ struct BF_Linear: public virtual BF_Base
     BF_Linear(const Config &c);
     std::string get_label();
     std::string label = "BF_Linear";
-    double epredict(const t_type &weights, const aed_type2& aed);
+    double epredict(const t_type &weights, const aed_type2& aed) const;
     double fpredict(const t_type &weights, const fd_type &fdij,
-            const aed_type2& aedi, const size_t k);
+            const aed_type2& aedi, const size_t k) const;
     force_type fpredict(const t_type &weights, const fd_type &fdij,
-            const aed_type2& aedi);
+            const aed_type2& aedi) const;
 };
 #endif
