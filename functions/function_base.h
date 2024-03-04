@@ -33,11 +33,11 @@ struct Function_Base {
 
         /** \brief Return label of this object */
         virtual std::string get_label()=0;
-        virtual double epredict(const t_type &, const aed_type2& )=0;
+        virtual double epredict(const t_type &, const aed_type2& ) const=0;
         virtual double fpredict(const t_type &, const fd_type &,
-                const aed_type2&, const size_t )=0;
+                const aed_type2&, const size_t ) const=0;
         virtual force_type fpredict(const t_type &, const fd_type &,
-                const aed_type2& )=0;
+                const aed_type2& ) const=0;
 };
 //template<> inline Registry<Function_Base>::Map Registry<Function_Base>::registry{};
 //template<> inline Registry<Function_Base,Config&>::Map Registry<Function_Base,Config&>::registry{};

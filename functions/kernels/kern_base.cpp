@@ -5,7 +5,7 @@ void Kern_Base::set_basis(const Matrix b)
 {
     basis = b;
 }
-double Kern_Base::epredict(const t_type &kweights, const aed_type2 &aed)
+double Kern_Base::epredict(const t_type &kweights, const aed_type2 &aed) const
 {
     double energy=0;
     for (size_t b=0; b<basis.cols(); ++b) {
@@ -14,7 +14,7 @@ double Kern_Base::epredict(const t_type &kweights, const aed_type2 &aed)
     return energy;
 }
 double Kern_Base::fpredict(const t_type &kweights, const fd_type &fdij,
-        const aed_type2 &aedi, const size_t k)
+        const aed_type2 &aedi, const size_t k) const
 {
     double res=0.0;
     for (size_t b=0; b<basis.cols(); ++b) {
@@ -23,7 +23,7 @@ double Kern_Base::fpredict(const t_type &kweights, const fd_type &fdij,
     return res;
 }
 force_type Kern_Base::fpredict(const t_type &kweights, const fd_type &fdij,
-        const aed_type2 &aedi)
+        const aed_type2 &aedi) const
 {
     force_type v;
     v.set_zero();
