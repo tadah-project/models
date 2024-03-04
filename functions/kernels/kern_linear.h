@@ -27,10 +27,10 @@ class Kern_Linear :  public virtual Kern_Base {
         double prime(const aed_type2& b, const aed_type2& af, const aed_type2& ff);
         void set_basis(const Matrix ) {}
 
-        double epredict(const t_type &weights, const aed_type2& aed);
+        double epredict(const t_type &weights, const aed_type2& aed) const;
         double fpredict(const t_type &weights, const fd_type &fdij,
-                const aed_type2& aedi, const size_t k);
+                const aed_type2& aedi, const size_t k) const;
         force_type fpredict(const t_type &weights, const fd_type &fdij,
-                const aed_type2& aedi);
+                const aed_type2& aedi) const;
 };
 #endif

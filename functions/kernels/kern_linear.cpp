@@ -22,17 +22,17 @@ std::string Kern_Linear::get_label()
 {
     return label;
 }
-double Kern_Linear::epredict(const t_type &weights, const aed_type2& aed)
+double Kern_Linear::epredict(const t_type &weights, const aed_type2& aed) const
 {
     return weights*aed;
 }
 double Kern_Linear::fpredict(const t_type &weights, const fd_type &fdij,
-        const aed_type2& , const size_t k)
+        const aed_type2& , const size_t k) const
 {
     return -(fdij(k) * weights);
 }
 force_type Kern_Linear::fpredict(const t_type &weights, const fd_type &fdij,
-        const aed_type2& )
+        const aed_type2& ) const
 {
     return -(fdij * weights);
 }

@@ -54,11 +54,11 @@ class Kern_Base: public virtual Function_Base {
         /** \brief Return basis stored by this object */
         virtual Matrix get_basis();
 
-        virtual double epredict(const t_type &kweights, const aed_type2 &aed);
+        virtual double epredict(const t_type &kweights, const aed_type2 &aed) const;
         virtual double fpredict(const t_type &kweights, const fd_type &fdij,
-                const aed_type2 &aedi, const size_t k);
+                const aed_type2 &aedi, const size_t k) const;
         virtual force_type fpredict(const t_type &kweights, const fd_type &fdij,
-                const aed_type2 &aedi);
+                const aed_type2 &aedi) const;
 
         virtual void read_basis_from_config(const Config &config,
                 Matrix &b);
