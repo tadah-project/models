@@ -5,15 +5,15 @@ Kern_Linear::Kern_Linear() {}
 Kern_Linear::Kern_Linear (const Config &c):
     Function_Base(c)
 {}
-double Kern_Linear::operator() (const aed_type2& b, const aed_type2& af)
+double Kern_Linear::operator() (const aed_type2& b, const aed_type2& af) const
 {
     return b*af;;
 }
-aed_type2 Kern_Linear::derivative(const aed_type2& b, const aed_type2&)
+aed_type2 Kern_Linear::derivative(const aed_type2& b, const aed_type2&) const
 {
     return b;
 }
-double Kern_Linear::prime(const aed_type2& b, const aed_type2& , const aed_type2& ff)
+double Kern_Linear::prime(const aed_type2& b, const aed_type2& , const aed_type2& ff) const
 {
     // return derivative(b,af).transpose() * ff;
     return b * ff;

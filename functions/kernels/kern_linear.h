@@ -22,9 +22,9 @@ class Kern_Linear :  public virtual Kern_Base {
          * Label used for this class
          */
         std::string label = "Kern_Linear";
-        double operator() (const aed_type2& b, const aed_type2& af);
-        aed_type2 derivative(const aed_type2& b, const aed_type2& );
-        double prime(const aed_type2& b, const aed_type2& af, const aed_type2& ff);
+        double operator() (const aed_type2& b, const aed_type2& af) const;
+        aed_type2 derivative(const aed_type2& b, const aed_type2& ) const;
+        double prime(const aed_type2& b, const aed_type2& af, const aed_type2& ff) const;
         void set_basis(const Matrix ) {}
 
         double epredict(const t_type &weights, const aed_type2& aed) const;

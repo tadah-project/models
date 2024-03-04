@@ -24,7 +24,7 @@ class Kern_Base: public virtual Function_Base {
          * - b = basis vector
          * - af = atomic energy descriptor
          */
-        virtual double operator() (const aed_type2 &b, const aed_type2 &af)=0;
+        virtual double operator() (const aed_type2 &b, const aed_type2 &af) const=0;
 
         /**
          * Calculate the kernel derivative wrt to the second argument
@@ -32,7 +32,7 @@ class Kern_Base: public virtual Function_Base {
          * - b = basis vector
          * - af = atomic energy descriptor
          */
-        virtual aed_type2 derivative(const aed_type2 &b, const aed_type2 &af)=0;
+        virtual aed_type2 derivative(const aed_type2 &b, const aed_type2 &af) const=0;
 
         /**
          * Calculate inner product of the kernel derivative
@@ -44,7 +44,7 @@ class Kern_Base: public virtual Function_Base {
          *   TODO consider calculating all 3-directions at once
          */
         virtual double prime(const aed_type2 &b, const aed_type2 &af,
-                const aed_type2 &ff)=0;
+                const aed_type2 &ff) const=0;
 
         /** \brief Set basis for calculations */
         virtual void set_basis(const Matrix b);

@@ -12,15 +12,15 @@ Kern_Polynomial::Kern_Polynomial (const Config &c):
         <<" | gamma: " << gamma << " | c: " << c << std::endl;
     read_basis_from_config(c,basis);
 }
-double Kern_Polynomial::operator() (const aed_type2& b, const aed_type2& af)
+double Kern_Polynomial::operator() (const aed_type2& b, const aed_type2& af) const
 {
     return std::pow(gamma*(b*af)+c,d);
 }
-aed_type2 Kern_Polynomial::derivative(const aed_type2& b, const aed_type2& af)
+aed_type2 Kern_Polynomial::derivative(const aed_type2& b, const aed_type2& af) const
 {
     return  d*gamma*std::pow(gamma*(b*af)+c,d-1)*b;
 }
-double Kern_Polynomial::prime(const aed_type2& b, const aed_type2& af, const aed_type2& ff)
+double Kern_Polynomial::prime(const aed_type2& b, const aed_type2& af, const aed_type2& ff) const
 {
     return derivative(b, af)*ff;
 }

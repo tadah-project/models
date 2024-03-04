@@ -26,9 +26,9 @@ class Kern_Polynomial : public virtual Kern_Base {
          */
         std::string label = "Kern_Polynomial";
         std::string get_label();
-        double operator() (const aed_type2& b, const aed_type2& af);
-        aed_type2 derivative(const aed_type2& b, const aed_type2& af);
-        double prime(const aed_type2& b, const aed_type2& af, const aed_type2& ff);
+        double operator() (const aed_type2& b, const aed_type2& af) const;
+        aed_type2 derivative(const aed_type2& b, const aed_type2& af) const;
+        double prime(const aed_type2& b, const aed_type2& af, const aed_type2& ff) const;
 
 };
 #endif

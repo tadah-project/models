@@ -12,16 +12,16 @@ Kern_RBF::Kern_RBF (const Config &c):
 
     read_basis_from_config(c,basis);
 }
-double Kern_RBF::operator() (const aed_type2& b, const aed_type2& af)
+double Kern_RBF::operator() (const aed_type2& b, const aed_type2& af) const
 {
     const aed_type2 v = af-b;
     return exp(-gamma*(v*v));
 }
-aed_type2 Kern_RBF::derivative(const aed_type2& b, const aed_type2& af)
+aed_type2 Kern_RBF::derivative(const aed_type2& b, const aed_type2& af) const
 {
     return  -2.0*gamma*(af-b)*(*this)(af,b);
 }
-double Kern_RBF::prime(const aed_type2& b, const aed_type2& af, const aed_type2& ff)
+double Kern_RBF::prime(const aed_type2& b, const aed_type2& af, const aed_type2& ff) const
 {
     return derivative(b, af)*ff;
 }
