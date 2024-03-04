@@ -72,4 +72,4 @@ trigger_job:
   stage: trigger
   needs: [run-tests-1, run-tests-2, build-release-shared, build-release-static]
   trigger:
-    project: tadah/tadah.mlip
+    project: tadah/mlip
