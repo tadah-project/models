@@ -31,10 +31,7 @@ build-tests:
   stage: build.tests
   needs:
     - job: build-debug
-    - project: tadah/core
-      job: build-tests
-      ref: main
-      artifacts: true
+
   script:
     - cd ${DEBUG_DIR}
     - cmake .. -DTADAH_ENABLE_OPENMP=ON -DTADAH_BUILD_TESTS=ON -DCMAKE_CXX_FLAGS="--coverage -g -O1"
