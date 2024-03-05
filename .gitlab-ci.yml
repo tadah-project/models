@@ -85,8 +85,14 @@ build-release-static:
     - make -j ${CPU_BUILD}
 
 
-trigger_job:
+trigger_job-1:
   stage: trigger
   needs: [run-tests-1, run-tests-2, build-release-shared, build-release-static]
   trigger:
     project: tadah/mlip
+
+trigger_job-2:
+  stage: trigger
+  needs: [run-tests-1, run-tests-2, build-release-shared, build-release-static]
+  trigger:
+    project: tadah/md
