@@ -44,7 +44,7 @@ if(TADAH_ENABLE_OPENMP)
     target_link_libraries(tadah.models.obj PUBLIC OpenMP::OpenMP_CXX)
 endif()
 
-add_library(tadah.models STATIC $<TARGET_OBJECTS:tadah.models.obj>)
+add_library(tadah.models $<TARGET_OBJECTS:tadah.models.obj>)
 
 include(CTest) 
 if(TADAH_BUILD_TESTS)

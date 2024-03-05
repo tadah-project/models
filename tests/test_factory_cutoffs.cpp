@@ -10,9 +10,9 @@ TEST_CASE( "Testing Factory: Cutoffs", "[factory_cutoffs]" ) {
     double rcut2b = 6.2;
     double rcut2bsq = rcut2b*rcut2b;
 
-    for (auto c:Registry<Cut_Base,double>::registry) {
+    for (auto c:CONFIG::Registry<Cut_Base,double>::registry) {
         std::string cuttype = c.first;
-        Cut_Base *c2b = factory<Cut_Base,double>( cuttype, rcut2b );
+        Cut_Base *c2b = CONFIG::factory<Cut_Base,double>( cuttype, rcut2b );
 
         REQUIRE( c2b->label() == cuttype );
 
@@ -23,7 +23,7 @@ TEST_CASE( "Testing Factory: Cutoffs", "[factory_cutoffs]" ) {
 
         // cutoff cannot be negative
         double temp = -0.1;
-        REQUIRE_THROWS(factory<Cut_Base,double>( cuttype, temp ));
+        REQUIRE_THROWS(CONFIG::factory<Cut_Base,double>( cuttype, temp ));
         REQUIRE_THROWS_AS(c2b->set_rcut(temp), std::runtime_error);
         REQUIRE_THROWS_AS(c2b->test_rcut(temp), std::runtime_error);
 
