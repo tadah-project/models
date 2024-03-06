@@ -23,15 +23,7 @@ ExternalProject_Add(Tadah.CORE
     BINARY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../CORE/build
     INSTALL_COMMAND cmake -E echo "Skipping install step."
     )
-
-# check required modules are present
-if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../CORE")
-    message("This module requires CORE module for compilation.")
-    message(FATAL_ERROR "CORE module not found.")
-endif()
-
 link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../CORE/build)
-
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -77,6 +69,8 @@ add_library(tadah.models.obj OBJECT
     ${DESCRIPTORS_SRC}
     ${MODELS_SRC}
     )
+
+add_dependencies(tadah.models.obj Tadah.CORE)
 
 if(TADAH_ENABLE_OPENMP)
     find_package(OpenMP REQUIRED)
