@@ -81,3 +81,7 @@ trigger_job-2:
   needs: [run-tests-1, build-release-shared, build-release-static]
   trigger:
     project: tadah/md
+  inherit:
+    variables: false # this job won't inherit any variables
+  variables: # variables set by this job will still be passed to the child-pipeline
+    inherit: "This comes from the parent pipeline"
