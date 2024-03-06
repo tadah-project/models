@@ -45,13 +45,6 @@ run-tests-1:
   stage: run.tests
   needs: [build-tests]
   script:
-    - ta-dah --version
-    - ta-dah --help
-
-run-tests-2:
-  stage: run.tests
-  needs: [build-tests]
-  script:
     - cd ${DEBUG_DIR}
     - make test
     - gcovr --exclude='.*/Eigen/.*' --exclude='.*/catch2/.*' --exclude='.*/tests/.*' --exclude='.*/CLI11/.*' --exclude='.*/toml11/.*'  --exclude='.*/CMakeFiles/.*' -r ..
@@ -75,12 +68,12 @@ build-release-static:
 
 trigger_job-1:
   stage: trigger
-  needs: [run-tests-1, run-tests-2, build-release-shared, build-release-static]
+  needs: [run-tests-1, build-release-shared, build-release-static]
   trigger:
     project: tadah/mlip
 
 trigger_job-2:
   stage: trigger
-  needs: [run-tests-1, run-tests-2, build-release-shared, build-release-static]
+  needs: [run-tests-1, build-release-shared, build-release-static]
   trigger:
     project: tadah/md
