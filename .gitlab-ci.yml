@@ -14,7 +14,7 @@ stages:
 
 before_script:
   - echo "CI_BUILDS_DIR" $CI_BUILDS_DIR
-  - echo "CI_JOB_DIR" $CI_JOB_DIR
+  - echo "CI_JOB_ID" $CI_JOB_ID
   - echo "CI_PROJECT_NAME" $CI_PROJECT_NAME
   - echo "CI_CLONE_PATH" $CI_CLONE_PATH
   - mkdir -p ${RELEASE_DIR}
