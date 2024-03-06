@@ -26,15 +26,6 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(Tadah.CORE)
 
-#add_subdirectory(${tadah.core_SOURCE_DIR} ${tadah.core_BINARY_DIR})
-#FetchContent_GetProperties(Tadah.CORE)
-#if(NOT tadah.core_POPULATED)
-#    FetchContent_Populate(Tadah.CORE)
-#    #add_subdirectory(${tadah.core_SOURCE_DIR} ${tadah.core_BINARY_DIR})
-#    link_directories(${tadah.core_BINARY_DIR})
-#endif()
-
-
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -80,8 +71,6 @@ add_library(tadah.models.obj OBJECT
     ${MODELS_SRC}
     )
 
-add_dependencies(tadah.models.obj tadah.core)
-
 if(TADAH_ENABLE_OPENMP)
     find_package(OpenMP REQUIRED)
     target_link_libraries(tadah.models.obj PUBLIC OpenMP::OpenMP_CXX)
@@ -89,10 +78,7 @@ endif()
 
 add_library(tadah.models $<TARGET_OBJECTS:tadah.models.obj>)
 
-include(CTest) 
 if(TADAH_BUILD_TESTS)
-    message(${BUILD_TESTING})
+    include(CTest) 
     add_subdirectory(tests)
 endif()
-
-#set(CATCH_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/tests/catch2)
