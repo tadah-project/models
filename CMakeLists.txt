@@ -14,19 +14,24 @@ if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR}
     You may need to remove CMakeCache.txt and CMakeFiles dir. ")
 endif()
 
+include(ExternalProject)
+ExternalProject_Add(Tadah.CORE
+    GIT_REPOSITORY git@git.ecdf.ed.ac.uk:tadah/core.git
+    GIT_TAG main
+    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../CORE
+    PATCH_COMMAND  mkdir -p build
+    BINARY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../CORE/build
+    INSTALL_COMMAND cmake -E echo "Skipping install step."
+    )
+
 # check required modules are present
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../CORE")
     message("This module requires CORE module for compilation.")
     message(FATAL_ERROR "CORE module not found.")
 endif()
 
-include(ExternalProject)
-ExternalProject_Add(Tadah.CORE
-    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../CORE
-    BINARY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../CORE/build
-    INSTALL_COMMAND cmake -E echo "Skipping install step."
-    )
 link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../CORE/build)
+
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
