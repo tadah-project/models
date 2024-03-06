@@ -4,7 +4,7 @@ variables:
   CPU_BUILD: 4
   CPU_SIM: 4
   INSTALL_PATH: "~/.local"
-  GIT_CLONE_PATH: $CI_BUILDS_DIR/$CI_JOB_ID/$CI_PROJECT_NAME
+  GIT_CLONE_PATH: $CI_BUILDS_DIR/$CI_COMMIT_SHA/$CI_PROJECT_NAME
    
 stages:
   - build
@@ -15,6 +15,7 @@ stages:
 before_script:
   - echo "CI_BUILDS_DIR" $CI_BUILDS_DIR
   - echo "CI_JOB_ID" $CI_JOB_ID
+  - echo "CI_COMMIT_SHA" $CI_COMMIT_SHA
   - echo "CI_PROJECT_NAME" $CI_PROJECT_NAME
   - echo "GIT_CLONE_PATH" $GIT_CLONE_PATH
   - mkdir -p ${RELEASE_DIR}
@@ -75,12 +76,22 @@ trigger_job-1:
   needs: [run-tests-1, build-release-shared, build-release-static]
   trigger:
     project: tadah/mlip
+  # GitLab bug:
+  # https://gitlab.com/gitlab-org/gitlab/-/issues/220047
+  # Workaround:
+  inherit:
+    variables: false # this job won't inherit any variables
+  variables: # variables set by this job will still be passed to the child-pipeline
+    inherit: "This comes from the parent pipeline"
 
 trigger_job-2:
   stage: trigger
   needs: [run-tests-1, build-release-shared, build-release-static]
   trigger:
     project: tadah/md
+  # GitLab bug:
+  # https://gitlab.com/gitlab-org/gitlab/-/issues/220047
+  # Workaround:
   inherit:
     variables: false # this job won't inherit any variables
   variables: # variables set by this job will still be passed to the child-pipeline
