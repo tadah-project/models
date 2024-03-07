@@ -14,18 +14,6 @@ if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR}
     You may need to remove CMakeCache.txt and CMakeFiles dir. ")
 endif()
 
-include(FetchContent)
-FetchContent_Declare(
-    Tadah.CORE
-    GIT_REPOSITORY git@git.ecdf.ed.ac.uk:tadah/core.git
-    GIT_TAG origin/main
-    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../CORE
-    PATCH_COMMAND  mkdir -p build
-    BINARY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../CORE/build
-    )
-
-FetchContent_MakeAvailable(Tadah.CORE)
-
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -55,6 +43,18 @@ if (BUILD_SHARED_LIBS)
         set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
     endif("${isSystemDir}" STREQUAL "-1")
 endif()
+
+include(FetchContent)
+FetchContent_Declare(
+    Tadah.CORE
+    GIT_REPOSITORY git@git.ecdf.ed.ac.uk:tadah/core.git
+    GIT_TAG origin/main
+    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../CORE
+    PATCH_COMMAND  mkdir -p build
+    BINARY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../CORE/build
+    )
+
+FetchContent_MakeAvailable(Tadah.CORE)
 
 file(GLOB MODELS_SRC CONFIGURE_DEPENDS "*.cpp" "*.h" "*.hpp")
 file(GLOB_RECURSE CUTOFFS_SRC CONFIGURE_DEPENDS 
