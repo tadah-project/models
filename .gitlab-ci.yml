@@ -56,11 +56,24 @@ build-release-static:
     - cmake .. -DCMAKE_BUILD_TYPE=Release -DTADAH_ENABLE_OPENMP=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=${INSTALL_PATH}
     - make -j ${CPU_BUILD}
 
-trigger_job:
+trigger_job-mlip:
   stage: trigger
   needs: [run-tests-1, build-release-shared, build-release-static]
   trigger:
     project: tadah/mlip
+  # GitLab bug:
+  # https://gitlab.com/gitlab-org/gitlab/-/issues/220047
+  # Workaround:
+  inherit:
+    variables: false # this job won't inherit any variables
+  variables: # variables set by this job will still be passed to the child-pipeline
+    inherit: "This comes from the parent pipeline"
+
+trigger_job-md:
+  stage: trigger
+  needs: [run-tests-1, build-release-shared, build-release-static]
+  trigger:
+    project: tadah/md
   # GitLab bug:
   # https://gitlab.com/gitlab-org/gitlab/-/issues/220047
   # Workaround:
