@@ -78,7 +78,6 @@ if(TADAH_ENABLE_OPENMP)
 endif()
 
 add_library(tadah.models $<TARGET_OBJECTS:tadah.models.obj>)
-target_link_libraries(tadah.models PRIVATE config::rc)
 
 if(TADAH_BUILD_TESTS)
     include(CTest) 
