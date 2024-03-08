@@ -8,7 +8,7 @@ struct BF_Polynomial2: public virtual BF_Base
     BF_Polynomial2();
     BF_Polynomial2(const Config &c);
     std::string label = "BF_Polynomial2";
-    std::string get_label();
+    std::string get_label() const;
     double epredict(const t_type &weights, const aed_type2& aed) const;
     double fpredict(const t_type &weights, const fd_type &fdij,
             const aed_type2& aedi, const size_t k) const;

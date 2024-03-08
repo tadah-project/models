@@ -27,7 +27,7 @@ class Kern_Sigmoid : public virtual Kern_Base {
         double operator() (const aed_type2& b, const aed_type2& af) const;
         aed_type2 derivative(const aed_type2& b, const aed_type2& af) const;
         double prime(const aed_type2& b, const aed_type2& af, const aed_type2& ff) const;
-        std::string get_label();
+        std::string get_label() const;
 
 };
 #endif

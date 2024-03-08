@@ -16,7 +16,7 @@ class Kern_Linear :  public virtual Kern_Base {
     public:
         Kern_Linear ();
         Kern_Linear (const Config &c);
-        std::string get_label();
+        std::string get_label() const;
 
         /**
          * Label used for this class

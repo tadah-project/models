@@ -24,7 +24,7 @@ double Kern_Sigmoid::prime(const aed_type2& b, const aed_type2& af, const aed_ty
 {
     return derivative(b, af)*ff;
 }
-std::string Kern_Sigmoid::get_label()
+std::string Kern_Sigmoid::get_label() const
 {
     return label;
 }

@@ -26,7 +26,7 @@ double Kern_Quadratic::prime(const aed_type2& b, const aed_type2& af, const aed_
     double scale = 2.0*b*af;
     return scale*ff*b;
 }
-std::string Kern_Quadratic::get_label()
+std::string Kern_Quadratic::get_label() const
 {
     return label;
 }

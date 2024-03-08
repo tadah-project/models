@@ -7,7 +7,7 @@ struct BF_Linear: public virtual BF_Base
 {
     BF_Linear();
     BF_Linear(const Config &c);
-    std::string get_label();
+    std::string get_label() const;
     std::string label = "BF_Linear";
     double epredict(const t_type &weights, const aed_type2& aed) const;
     double fpredict(const t_type &weights, const fd_type &fdij,

@@ -24,7 +24,7 @@ double Kern_Polynomial::prime(const aed_type2& b, const aed_type2& af, const aed
 {
     return derivative(b, af)*ff;
 }
-std::string Kern_Polynomial::get_label()
+std::string Kern_Polynomial::get_label() const
 {
     return label;
 }

@@ -4,7 +4,7 @@
 BF_Polynomial2::BF_Polynomial2() {}
 BF_Polynomial2::BF_Polynomial2(const Config &c): Function_Base(c)
 {}
-std::string BF_Polynomial2::get_label()
+std::string BF_Polynomial2::get_label() const
 {
   return label;
 }

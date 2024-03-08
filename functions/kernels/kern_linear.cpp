@@ -18,7 +18,7 @@ double Kern_Linear::prime(const aed_type2& b, const aed_type2& , const aed_type2
     // return derivative(b,af).transpose() * ff;
     return b * ff;
 }
-std::string Kern_Linear::get_label()
+std::string Kern_Linear::get_label() const
 {
     return label;
 }

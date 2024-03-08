@@ -4,7 +4,7 @@
 
 BF_Linear::BF_Linear() {}
 BF_Linear::BF_Linear(const Config &c): Function_Base(c) {}
-std::string BF_Linear::get_label() {
+std::string BF_Linear::get_label() const {
     return label;
 }
 double BF_Linear::epredict(const t_type &weights, const aed_type2& aed) const

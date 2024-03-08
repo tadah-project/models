@@ -32,7 +32,7 @@ struct Function_Base {
         virtual void set_basis(const Matrix ) {};
 
         /** \brief Return label of this object */
-        virtual std::string get_label()=0;
+        virtual std::string get_label() const=0;
         virtual double epredict(const t_type &, const aed_type2& ) const=0;
         virtual double fpredict(const t_type &, const fd_type &,
                 const aed_type2&, const size_t ) const=0;
