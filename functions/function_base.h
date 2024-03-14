@@ -39,6 +39,4 @@ struct Function_Base {
         virtual force_type fpredict(const t_type &, const fd_type &,
                 const aed_type2& ) const=0;
 };
-//template<> inline Registry<Function_Base>::Map Registry<Function_Base>::registry{};
-//template<> inline Registry<Function_Base,Config&>::Map Registry<Function_Base,Config&>::registry{};
 #endif
