@@ -1,5 +1,6 @@
 #include "d2_blip.h"
 #include "../d_basis_functions.h"
+#include <cstdlib>
 #include <stdexcept>
 
 
@@ -26,6 +27,11 @@ D2_Blip::D2_Blip(Config &c):
     if (mius.size()!=etas.size()) {
         throw std::runtime_error("SGRID2B and CGRID2B arrays differ in size.\n");
     }
+
+  for (const auto &e:etas) {
+    if(std::abs(e)<std::numeric_limits<double>::min())
+        throw std::runtime_error("At least one of SGRID2B values is zero.\n");
+  }
 
     s=mius.size();
 }

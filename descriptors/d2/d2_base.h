@@ -60,6 +60,8 @@ public:
   void calc_fd_approx(CUT *fc, double r, fd_type &fd, double h=1e-8) {
     aed_type2 aed_n((*this).size()); // r+h
     aed_type2 aed_p((*this).size()); // r-h
+    aed_n.set_zero();
+    aed_p.set_zero();
     double rn = r-h;
     double rp = r+h;
     double fcp = fc->calc(rp);

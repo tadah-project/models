@@ -51,7 +51,7 @@ void test_D2(Config &c) {
   //c.add("VERBOSE", 1);
   // We cannot test r=rcut as finite difference will fail
   // but we can test r slightly smaller than rcut
-  std::vector<double> rs = {2,2.1001,2.0123,5,11};
+  std::vector<double> rs = {2,2.0001,2.0123,5,11};
   std::vector<double> rcuts {10, 2.1, 2.5, 3.5,6.7};
 
   for (const auto &r: rs) {
@@ -95,7 +95,7 @@ TEST_CASE( "Testing D2_BLIP", "[D2]" ) {
   Config c;
   c.remove("INIT2B");
   c.add("INIT2B", "true");
-  c.add("SGRID2B","0.0 0.4 5.6");
+  c.add("SGRID2B","0.01 0.4 5.6");
   c.add("CGRID2B","0.0 1.2 3.4");
   test_D2<D>(c);
   D d(c);
@@ -113,13 +113,19 @@ TEST_CASE( "Testing D2_BLIP", "[D2]" ) {
   c.add("SGRID2B","0.4 5.6");
   c.add("CGRID2B","0.0");
   REQUIRE_THROWS(D(c));
+
+  c.remove("SGRID2B");
+  c.remove("CGRID2B");
+  c.add("SGRID2B","0.0 0.4 5.6");
+  c.add("CGRID2B","0.0 1.2 3.4");
+  REQUIRE_THROWS(D(c));
 }
 TEST_CASE( "Testing D2_BP", "[D2]" ) {
   using D = D2_BP;
   Config c;
   c.remove("INIT2B");
   c.add("INIT2B", "true");
-  c.add("SGRID2B","0.0 0.4");
+  c.add("SGRID2B","0.01 0.4");
   c.add("CGRID2B","0.0 1.2");
   test_D2<D>(c);
   D d(c);
@@ -135,6 +141,12 @@ TEST_CASE( "Testing D2_BP", "[D2]" ) {
   c.remove("CGRID2B");
   c.add("SGRID2B","0.4 5.6");
   c.add("CGRID2B","0.0");
+  REQUIRE_THROWS(D(c));
+
+  c.remove("SGRID2B");
+  c.remove("CGRID2B");
+  c.add("SGRID2B","0.0 0.4");
+  c.add("CGRID2B","0.0 1.2");
   REQUIRE_THROWS(D(c));
 }
 TEST_CASE( "Testing D2_EAM", "[D2]" ) {
