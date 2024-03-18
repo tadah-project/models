@@ -5,8 +5,11 @@
 
 template<typename D, typename C>
 void test_d2(Config &c, double r) {
-
+  std::streambuf *orig = std::cout.rdbuf();
+  std::stringstream ss;
+  std::cout.rdbuf (ss.rdbuf()); // redirect cout
   D d(c);
+  std::cout.rdbuf (orig); // restore
   double rcut = c.get<double>("RCUT2B");
   C fc(rcut);
   aed_type2 aed(d.size());
@@ -47,8 +50,11 @@ void test_d2(Config &c, double r) {
 
 template<typename D>
 void test_D2(Config &c) {
-  //c.remove("VERBOSE");
-  //c.add("VERBOSE", 1);
+  std::streambuf *orig = std::cout.rdbuf();
+  std::stringstream ss;
+  std::cout.rdbuf (ss.rdbuf()); // redirect cout
+  c.remove("VERBOSE");
+  c.add("VERBOSE", 1);
   // We cannot test r=rcut as finite difference will fail
   // but we can test r slightly smaller than rcut
   std::vector<double> rs = {2,2.0001,2.0123,5,11};
@@ -67,6 +73,7 @@ void test_D2(Config &c) {
   Config c2; // INIT2B=false
   D d(c2);
   REQUIRE(d.size()==0);
+  std::cout.rdbuf (orig); // restore
 }
 
 TEST_CASE( "Testing D2_Dummy", "[D2]" ) {
@@ -91,6 +98,9 @@ TEST_CASE( "Testing D2_LJ", "[D2]" ) {
   REQUIRE(d.label()=="D2_LJ");
 }
 TEST_CASE( "Testing D2_BLIP", "[D2]" ) {
+  std::streambuf *orig = std::cout.rdbuf();
+  std::stringstream ss;
+  std::cout.rdbuf (ss.rdbuf()); // redirect cout
   using D = D2_Blip;
   Config c;
   c.remove("INIT2B");
@@ -119,8 +129,12 @@ TEST_CASE( "Testing D2_BLIP", "[D2]" ) {
   c.add("SGRID2B","0.0 0.4 5.6");
   c.add("CGRID2B","0.0 1.2 3.4");
   REQUIRE_THROWS(D(c));
+  std::cout.rdbuf (orig); // restore
 }
 TEST_CASE( "Testing D2_BP", "[D2]" ) {
+  std::streambuf *orig = std::cout.rdbuf();
+  std::stringstream ss;
+  std::cout.rdbuf (ss.rdbuf()); // redirect cout
   using D = D2_BP;
   Config c;
   c.remove("INIT2B");
@@ -148,8 +162,28 @@ TEST_CASE( "Testing D2_BP", "[D2]" ) {
   c.add("SGRID2B","0.0 0.4");
   c.add("CGRID2B","0.0 1.2");
   REQUIRE_THROWS(D(c));
+  std::cout.rdbuf (orig); // restore
 }
 TEST_CASE( "Testing D2_EAM", "[D2]" ) {
+  std::streambuf *orig = std::cout.rdbuf();
+  std::stringstream ss;
+  std::cout.rdbuf (ss.rdbuf()); // redirect cout
+  Config c;
+  c.remove("INIT2B");
+  c.add("INIT2B", "true");
+  c.add("SETFL","tests_data/eam.alloy");
+  test_D2<D2_EAM>(c);
+  D2_EAM d(c);
+  REQUIRE(d.size()==1);
+  REQUIRE(d.label()=="D2_EAM");
+
+  // thors
+  Config c_err;
+  c_err.remove("INIT2B");
+  c_err.add("INIT2B", "true");
+  c_err.add("SETFL","path/to/nowhere");
+  REQUIRE_THROWS(D2_EAM(c_err));
+  std::cout.rdbuf (orig); // restore
 }
 TEST_CASE( "Testing D2_MIE", "[D2]" ) {
   Config c;

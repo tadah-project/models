@@ -82,7 +82,7 @@ int DM_EAM::calc_dXijdri_dXjidri(
 
     // here rho_i[1] is a derivative of rho_i at local atom, similarly for rho_j
     //double psip = rho_i[1]*rhojp + rho_j[1]*rhoip;
-    double psip = rhoi(1)*rhojp + rhoj(1)*rhoip;
+    double psip = rhoi(1)*rhojp - rhoj(1)*rhoip;
 
     fd_ij(fidx,0) = psip; // requires *delij*recip in the main loop
     return 0;
