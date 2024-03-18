@@ -1,6 +1,6 @@
 #include "catch2/catch.hpp"
 #include "../descriptors/d3/d3_all.h"
-#include "tadah/CORE/maths.h"
+#include "../../CORE/maths.h"
 
 TEST_CASE( "Testing D3_Dummy", "[D3]" ) {
   Config c;
