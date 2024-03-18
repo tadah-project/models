@@ -1,7 +1,7 @@
 #include "catch2/catch.hpp"
 #include "../descriptors/d2/d2_all.h"
-#include "tadah/CORE/maths.h"
-#include "tadah/MODELS/cutoffs/cutoffs.h"
+#include "../../CORE/maths.h"
+#include "../cutoffs/cutoffs.h"
 
 template<typename D, typename C>
 void test_d2(Config &c, double r) {
