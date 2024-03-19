@@ -53,13 +53,13 @@ TEST_CASE( "Testing Kern_Base", "[kernels]" ) {
   Config cbasis("tests_data/basis");
   Kern_Quadratic kern2;
   kern2.read_basis_from_config(cbasis, matbas);
-  Matrix test_basis(2,3);
+  Matrix test_basis(3,2);
   test_basis(0,0)=1.0;
   test_basis(1,0)=2.0;
-  test_basis(0,1)=3.0;
-  test_basis(1,1)=4.0;
-  test_basis(0,2)=5.0;
-  test_basis(1,2)=6.0;
+  test_basis(2,0)=3.0;
+  test_basis(0,1)=4.0;
+  test_basis(1,1)=5.0;
+  test_basis(2,1)=6.0;
 
   for(size_t i=0;i<2;++i)
     for(size_t j=0;j<3;++j) {
