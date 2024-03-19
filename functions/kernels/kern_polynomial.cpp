@@ -2,15 +2,15 @@
 
 
 Kern_Polynomial::Kern_Polynomial () {}
-Kern_Polynomial::Kern_Polynomial (const Config &c):
-    Function_Base(c),
-    d(c.get<int>("MPARAMS",0)),
-    gamma(c.get<double>("MPARAMS",1)),
-    c(c.get<double>("MPARAMS",2))
+Kern_Polynomial::Kern_Polynomial (const Config &config):
+    Function_Base(config),
+    d(config.get<int>("MPARAMS",0)),
+    gamma(config.get<double>("MPARAMS",1)),
+    c(config.get<double>("MPARAMS",2))
 {
     if (get_verbose()) std::cout << std::endl << label << " | degree: " << d
         <<" | gamma: " << gamma << " | c: " << c << std::endl;
-    read_basis_from_config(c,basis);
+    read_basis_from_config(config,basis);
 }
 double Kern_Polynomial::operator() (const aed_type2& b, const aed_type2& af) const
 {
