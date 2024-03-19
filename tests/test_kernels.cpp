@@ -4,6 +4,8 @@
 #include <stdexcept>
 #include "../../CORE/registry.h"
 #include "../functions/f_all.h"
+#include "tadah/CORE/config/config.h"
+#include "tadah/CORE/core_types.h"
 #include <string>
 
 
@@ -17,7 +19,7 @@
 TEST_CASE( "Testing Kern_Base", "[kernels]" ) {
   Kern_Quadratic kern;
   Matrix basis(3,2);
-  basis.random();
+  basis.random(12123133,-1e-1,1e-1);
   kern.set_basis(basis);
   Matrix basis2 = kern.get_basis();
   for(size_t i=0;i<3;++i)
@@ -30,6 +32,43 @@ TEST_CASE( "Testing Kern_Base", "[kernels]" ) {
   REQUIRE(Kern_LQ().get_label()=="Kern_LQ");
   REQUIRE(Kern_RBF().get_label()=="Kern_RBF");
   REQUIRE(Kern_Sigmoid().get_label()=="Kern_Sigmoid");
+
+  aed_type2 w(2);
+  w.random(123,-1e-1,1e-1);
+  aed_type2 aed(2);
+  aed.random(993,-1e-1,1e-1);
+  fd_type fd(2);
+  fd.random(753,-1e-1,1e-1);
+
+  REQUIRE_THAT(-2.6205958572365892791e-07, 
+               Catch::Matchers::WithinRel(kern.epredict(w,aed)));
+
+  force_type f(-1.8492084592792111712e-06, 
+               -6.9215962664449518545e-07,
+               1.7444537090573425304e-06);
+
+  force_type fp = kern.fpredict(w,fd,aed);
+  for(size_t i=0;i<3;++i) {
+    REQUIRE_THAT(f(i), Catch::Matchers::WithinRel(kern.fpredict(w,fd,aed,i)));
+    REQUIRE_THAT(f(i), Catch::Matchers::WithinRel(fp(i)));
+  }
+
+  Matrix matbas(3,2);
+  Config cbasis("tests_data/basis");
+  Kern_Quadratic kern2;
+  kern2.read_basis_from_config(cbasis, matbas);
+  Matrix test_basis(2,3);
+  test_basis(0,0)=1.0;
+  test_basis(1,0)=2.0;
+  test_basis(0,1)=3.0;
+  test_basis(1,1)=4.0;
+  test_basis(0,2)=5.0;
+  test_basis(1,2)=6.0;
+
+  for(size_t i=0;i<2;++i)
+    for(size_t j=0;j<3;++j) {
+      REQUIRE_THAT(matbas(i,j), Catch::Matchers::WithinRel(test_basis(i,j)));
+    }
 }
 TEST_CASE( "Testing Kern_Linear 1", "[kernels]" ) {
   using K=Kern_Linear;

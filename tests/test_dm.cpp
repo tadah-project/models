@@ -2,6 +2,7 @@
 #include "../descriptors/dm/dm_all.h"
 #include "../../CORE/maths.h"
 #include "../cutoffs/cutoffs.h"
+#include "tadah/CORE/core_types.h"
 #include <cmath>
 #include <vector>
 
@@ -342,8 +343,6 @@ void test_case(Config &config_mb,
   REQUIRE(dm.label() == label);
   REQUIRE(dm.size() == size);
 }
-TEST_CASE( "Testing DM_Dummy", "[DM]" ) {
-}
 TEST_CASE( "Testing DM_EAD 1", "[DM]" ) {
   Config config_mb;
   config_mb.add("RCUTMB",10);
@@ -418,4 +417,43 @@ TEST_CASE( "Testing DM_EAM 2", "[DM]" ) {
   config_mb.add("INITMB","true");
   config_mb.add("SETFL","tests_data/eam.alloy");
   test_case<DM_EAM,Cut_Dummy>(config_mb, "DM_EAM", 1);
+}
+TEST_CASE( "Testing DM_Dummy 1", "[DM]" ) {
+  Config config_mb;
+  config_mb.add("RCUTMB",5.58190742024);
+  config_mb.remove("INITMB");
+  config_mb.add("INITMB","true");
+  config_mb.add("SETFL","tests_data/eam.alloy");
+  test_case<DM_EAM,Cut_Dummy>(config_mb, "DM_EAM", 1);
+
+  // throws
+  Config c_err;
+  c_err.remove("INITMB");
+  c_err.add("INITMB", "true");
+  c_err.add("SETFL","path/to/nowhere");
+  REQUIRE_THROWS(DM_EAM(c_err));
+}
+TEST_CASE( "Testing DM_Dummy", "[DM]" ) {
+  Config c;
+  c.add("RCUTMB",5.58190742024);
+  c.remove("INITMB");
+  c.add("INITMB","true");
+
+  REQUIRE_NOTHROW(DM_Dummy());
+  REQUIRE_NOTHROW(DM_Dummy(c));
+
+  DM_Dummy d(c);
+  REQUIRE(d.size()==0);
+  REQUIRE(d.label()=="DM_Dummy");
+  aed_type2 aed;
+  rho_type rho1;
+  fd_type fd;
+  Vec3d del;
+  REQUIRE_NOTHROW(d.calc_aed(rho1,aed));
+  REQUIRE_NOTHROW(d.init_rhoi(rho1));
+  REQUIRE_NOTHROW(d.calc_rho(0,0,0,del,rho1));
+  REQUIRE_NOTHROW(d.calc_dXijdri(0,0,del,0,0,rho1,fd));
+  REQUIRE_NOTHROW(d.calc_dXijdri_dXjidri(0,0,del,0,0,rho1,rho1,fd,1,1));
+  REQUIRE(d.rhoi_size()==0);
+  REQUIRE(d.rhoip_size()==0);
 }
