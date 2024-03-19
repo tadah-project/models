@@ -1,11 +1,7 @@
 #include "catch2/catch.hpp"
-#include <iomanip>
-#include <limits>
-#include <stdexcept>
-#include "../../CORE/registry.h"
 #include "../functions/f_all.h"
-#include "tadah/CORE/config/config.h"
-#include "tadah/CORE/core_types.h"
+#include "../../CORE/config/config.h"
+#include "../../CORE/core_types.h"
 #include <string>
 
 

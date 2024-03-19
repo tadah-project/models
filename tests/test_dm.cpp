@@ -2,7 +2,7 @@
 #include "../descriptors/dm/dm_all.h"
 #include "../../CORE/maths.h"
 #include "../cutoffs/cutoffs.h"
-#include "tadah/CORE/core_types.h"
+#include "../../CORE/core_types.h"
 #include <cmath>
 #include <vector>
 
