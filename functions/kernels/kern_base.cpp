@@ -35,6 +35,7 @@ force_type Kern_Base::fpredict(const t_type &kweights, const fd_type &fdij,
     return v;
 }
 void Kern_Base::read_basis_from_config(const Config &config, Matrix &b) {
+    // storage is in column-major order
     if (!(config.exist("SBASIS") && config.exist("BASIS"))) return;
     size_t sbasis = config.get<size_t>("SBASIS");
     size_t vlen = config("BASIS").size()/sbasis;
