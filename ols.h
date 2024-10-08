@@ -8,6 +8,8 @@ class OLS {
     public:
         template <typename M, typename V>
             static void solve(M &A, V &B, V &weights) {
+                if (B.size()<A.cols())
+                    B.resize(A.cols());
                 // A will be destroyed on exit
                 // B will contain solution
                 int m = A.rows();  //IN
