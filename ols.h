@@ -37,6 +37,9 @@ class OLS {
                 dgelsd_(&m,&n,&nrhs,a,&lda,b,&ldb,s,&rcond,&rank,
                         work, &lwork, iwork, &info);
 
+                std::cout << "weights: " << weights.size() << std::endl;
+                std::cout << "B: " << B.size() << std::endl;
+                std::cout << "A.cols() " << A.cols() << std::endl;
                 weights = B.copy(A.cols());
 
                 delete[] s;
