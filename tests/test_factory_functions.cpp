@@ -1,8 +1,8 @@
 #include "catch2/catch.hpp"
 #include <limits>
 #include <stdexcept>
-#include "../../CORE/registry.h"
-#include "../functions/f_all.h"
+#include <tadah/core/registry.h>
+#include <tadah/models/functions/f_all.h>
 #include <string>
 
 TEST_CASE( "Testing Factory: Functions", "[factory_functions]" ) {

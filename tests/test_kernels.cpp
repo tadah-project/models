@@ -1,7 +1,7 @@
 #include "catch2/catch.hpp"
-#include "../functions/f_all.h"
-#include "../../CORE/config/config.h"
-#include "../../CORE/core_types.h"
+#include <tadah/models/functions/f_all.h>
+#include <tadah/core/config.h>
+#include <tadah/core/core_types.h>
 #include <string>
 
 

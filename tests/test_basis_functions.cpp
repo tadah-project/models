@@ -2,8 +2,8 @@
 #include <iomanip>
 #include <limits>
 #include <stdexcept>
-#include "../../CORE/registry.h"
-#include "../functions/f_all.h"
+#include <tadah/core/registry.h>
+#include <tadah/models/functions/f_all.h>
 #include <string>
 
 
