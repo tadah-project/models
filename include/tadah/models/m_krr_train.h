@@ -8,7 +8,7 @@
 #include <tadah/models/m_krr_core.h>
 #include <tadah/models/ekm.h>
 #include <tadah/core/maths.h>
-#include <tadah/core/config/config.h>
+#include <tadah/core/config.h>
 
 #include <iostream>
 #include <limits>

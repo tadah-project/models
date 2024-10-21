@@ -1,7 +1,7 @@
 #ifndef LINEAR_REGRESSOR_H
 #define LINEAR_REGRESSOR_H
 
-#include <tadah/core/config/config.h>
+#include <tadah/core/config.h>
 #include <tadah/core/core_types.h>
 #include <tadah/models/ea.h>
 #include <tadah/models/svd.h>

@@ -1,7 +1,7 @@
 #ifndef M_KRR_Core_H
 #define M_KRR_Core_H
 
-#include <tadah/core/config/config.h>
+#include <tadah/core/config.h>
 #include <tadah/models/functions/function_base.h>
 #include <tadah/models/functions/kernels/kern_base.h>
 #include <tadah/models/m_core.h>
