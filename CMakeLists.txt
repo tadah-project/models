@@ -63,7 +63,7 @@ target_include_directories(tadah.models PUBLIC include)
 target_include_directories(tadah.models PUBLIC ${Tadah.CORE_SOURCE_DIR}/include)
 target_include_directories(tadah.models PUBLIC ${Tadah.CORE_SOURCE_DIR}/external/toml11)
 
-target_link_libraries(tadah.models PUBLIC Tadah.CORE)
+target_link_libraries(tadah.models PUBLIC tadah.core)
 
 if(TADAH_ENABLE_OPENMP)
     find_package(OpenMP REQUIRED)
