@@ -4,7 +4,7 @@
 #include <tadah/models/m_core.h>
 #include <tadah/models/functions/function_base.h>
 #include <tadah/models/functions/basis_functions/bf_base.h>
-#include <tadah/core/config/config.h>
+#include <tadah/core/config.h>
 
 #include <iostream>
 
