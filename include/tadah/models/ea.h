@@ -2,7 +2,7 @@
 #define M_EA_H
 
 #include <tadah/core/config.h>
-#include <svd.h>
+#include <tadah/models/svd.h>
 #include <tadah/models/ridge_regression.h>
 #include <tadah/core/core_types.h>
 #include <tadah/core/lapack.h>
