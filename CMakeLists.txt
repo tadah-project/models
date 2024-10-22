@@ -46,25 +46,16 @@ endif()
 
 include(FetchContent)
 
-execute_process(
-    COMMAND git rev-parse --abbrev-ref HEAD
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    OUTPUT_VARIABLE GIT_BRANCH
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    ERROR_VARIABLE ERROR_MSG
-    RESULT_VARIABLE RESULT
-)
-
-message(STATUS "Git branch: ${GIT_BRANCH}")
-message(STATUS "Error message: ${ERROR_MSG}")
-message(STATUS "Result: ${RESULT}")
-
-execute_process(
+if(DEFINED ENV{CI_COMMIT_REF_NAME})
+    set(GIT_BRANCH "$ENV{CI_COMMIT_REF_NAME}")
+else()
+    execute_process(
     COMMAND git rev-parse --symbolic-full-name --abbrev-ref HEAD
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     OUTPUT_VARIABLE GIT_BRANCH
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-)
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+endif()
+
 FetchContent_Declare(
     Tadah.CORE
     GIT_REPOSITORY https://git.ecdf.ed.ac.uk/tadah/core.git
