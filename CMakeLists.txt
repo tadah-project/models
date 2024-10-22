@@ -47,7 +47,7 @@ endif()
 include(FetchContent)
 #get_filename_component(BUILD_DIR_NAME ${CMAKE_BINARY_DIR} NAME)
 execute_process(
-    COMMAND git rev-parse --abbrev-ref HEAD
+    COMMAND git rev-parse --symbolic-full-name --abbrev-ref HEAD
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     OUTPUT_VARIABLE GIT_BRANCH
     OUTPUT_STRIP_TRAILING_WHITESPACE
@@ -55,8 +55,7 @@ execute_process(
 FetchContent_Declare(
     Tadah.CORE
     GIT_REPOSITORY https://git.ecdf.ed.ac.uk/tadah/core.git
-    #GIT_TAG origin/develop
-    GIT_TAG ${GIT_BRANCH}
+    GIT_TAG origin/${GIT_BRANCH}
     #SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../CORE
     #PATCH_COMMAND  mkdir -p ${BUILD_DIR_NAME}
     #BINARY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../CORE/${BUILD_DIR_NAME}
