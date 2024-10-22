@@ -45,7 +45,20 @@ if (BUILD_SHARED_LIBS)
 endif()
 
 include(FetchContent)
-#get_filename_component(BUILD_DIR_NAME ${CMAKE_BINARY_DIR} NAME)
+
+execute_process(
+    COMMAND git rev-parse --abbrev-ref HEAD
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    OUTPUT_VARIABLE GIT_BRANCH
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_VARIABLE ERROR_MSG
+    RESULT_VARIABLE RESULT
+)
+
+message(STATUS "Git branch: ${GIT_BRANCH}")
+message(STATUS "Error message: ${ERROR_MSG}")
+message(STATUS "Result: ${RESULT}")
+
 execute_process(
     COMMAND git rev-parse --symbolic-full-name --abbrev-ref HEAD
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
