@@ -14,12 +14,12 @@
 
 TEST_CASE( "Testing Kern_Base", "[kernels]" ) {
   Kern_Quadratic kern;
-  Matrix basis(3,2);
+  Matrix basis(2,3);
   basis.random(12123133,-1e-1,1e-1);
   kern.set_basis(basis);
   Matrix basis2 = kern.get_basis();
-  for(size_t i=0;i<3;++i)
-    for(size_t j=0;j<2;++j)
+  for(size_t i=0;i<2;++i)
+    for(size_t j=0;j<3;++j)
       REQUIRE(basis(i,j)==basis2(i,j));
 
   REQUIRE(Kern_Linear().get_label()=="Kern_Linear");
@@ -36,14 +36,16 @@ TEST_CASE( "Testing Kern_Base", "[kernels]" ) {
   fd_type fd(2);
   fd.random(753,-1e-1,1e-1);
 
-  REQUIRE_THAT(-2.6205958572365892791e-07, 
+  REQUIRE_THAT(-2.550268080975944376e-07, 
                Catch::Matchers::WithinRel(kern.epredict(w,aed)));
 
-  force_type f(-1.8492084592792111712e-06, 
-               -6.9215962664449518545e-07,
-               1.7444537090573425304e-06);
+  
+  force_type f(-1.7213414105943962782e-06,
+               -7.0973251842941221188e-07,
+                1.7240688918227218902e-06);
 
   force_type fp = kern.fpredict(w,fd,aed);
+  std::cout << std::setprecision(20) << fp << std::endl;
   for(size_t i=0;i<3;++i) {
     REQUIRE_THAT(f(i), Catch::Matchers::WithinRel(kern.fpredict(w,fd,aed,i)));
     REQUIRE_THAT(f(i), Catch::Matchers::WithinRel(fp(i)));
