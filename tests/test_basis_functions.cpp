@@ -50,20 +50,20 @@ TEST_CASE( "Testing BF_Linear", "[basis_functions]" ) {
 }
 TEST_CASE( "Testing BF_Polynomial2", "[basis_functions]" ) {
   BF_Polynomial2 bf;
-  aed_type2 w(2);
+  aed_type2 w(3);
   w.random(12345);
   aed_type2 aed(2);
   aed.random(12345);
   fd_type fd(2);
   fd.random(12345);
-  double epred = 873625978525.947265625;
+  double epred = 100145490585.3138427734;
 
   REQUIRE(epred==bf.epredict(w,aed));
   REQUIRE_THAT(epred, Catch::Matchers::WithinRel(bf.epredict(w,aed),1e-10));
 
-  double fx = -1066366799294.4;
-  double fy =  1980132412494.4;
-  double fz =  1196502025274.9;
+  double fx = -1349445733748.7724609; 
+  double fy =   1034198604505.706665;
+  double fz =  2212718923559.9160156;
   force_type f = bf.fpredict(w,fd,aed);
 
   REQUIRE_THAT(fx, Catch::Matchers::WithinRel(bf.fpredict(w,fd,aed,0),1e-10));
