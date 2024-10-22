@@ -56,7 +56,7 @@ FetchContent_Declare(
     Tadah.CORE
     GIT_REPOSITORY https://git.ecdf.ed.ac.uk/tadah/core.git
     #GIT_TAG origin/develop
-    GIT_TAG origin/${GIT_BRANCH}
+    GIT_TAG ${GIT_BRANCH}
     #SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../CORE
     #PATCH_COMMAND  mkdir -p ${BUILD_DIR_NAME}
     #BINARY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../CORE/${BUILD_DIR_NAME}
