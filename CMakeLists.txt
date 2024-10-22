@@ -47,7 +47,7 @@ endif()
 include(FetchContent)
 get_filename_component(BUILD_DIR_NAME ${CMAKE_BINARY_DIR} NAME)
 execute_process(
-    COMMAND git branch --show-current
+    COMMAND git rev-parse --abbrev-ref HEAD
     OUTPUT_VARIABLE GIT_BRANCH
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
