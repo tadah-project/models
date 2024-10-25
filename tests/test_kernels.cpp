@@ -1,7 +1,7 @@
 #include "catch2/catch.hpp"
-#include "../functions/f_all.h"
-#include "../../CORE/config/config.h"
-#include "../../CORE/core_types.h"
+#include <tadah/models/functions/f_all.h>
+#include <tadah/core/config.h>
+#include <tadah/core/core_types.h>
 #include <string>
 
 
@@ -29,7 +29,7 @@ TEST_CASE( "Testing Kern_Base", "[kernels]" ) {
   REQUIRE(Kern_RBF().get_label()=="Kern_RBF");
   REQUIRE(Kern_Sigmoid().get_label()=="Kern_Sigmoid");
 
-  aed_type2 w(2);
+  aed_type2 w(3);
   w.random(123,-1e-1,1e-1);
   aed_type2 aed(2);
   aed.random(993,-1e-1,1e-1);
@@ -39,11 +39,13 @@ TEST_CASE( "Testing Kern_Base", "[kernels]" ) {
   REQUIRE_THAT(-2.6205958572365892791e-07, 
                Catch::Matchers::WithinRel(kern.epredict(w,aed)));
 
-  force_type f(-1.8492084592792111712e-06, 
-               -6.9215962664449518545e-07,
-               1.7444537090573425304e-06);
+  
+  force_type f(-1.8492084592792111712e-06,
+      -6.9215962664449518545e-07,
+      1.7444537090573425304e-06);
 
   force_type fp = kern.fpredict(w,fd,aed);
+
   for(size_t i=0;i<3;++i) {
     REQUIRE_THAT(f(i), Catch::Matchers::WithinRel(kern.fpredict(w,fd,aed,i)));
     REQUIRE_THAT(f(i), Catch::Matchers::WithinRel(fp(i)));

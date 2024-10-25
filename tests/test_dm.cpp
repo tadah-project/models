@@ -1,8 +1,8 @@
 #include "catch2/catch.hpp"
-#include "../descriptors/dm/dm_all.h"
-#include "../../CORE/maths.h"
-#include "../cutoffs/cutoffs.h"
-#include "../../CORE/core_types.h"
+#include <tadah/core/core_types.h>
+#include <tadah/models/descriptors/dm/dm_all.h>
+#include <tadah/core/maths.h>
+#include <tadah/models/cutoffs.h>
 #include <cmath>
 #include <vector>
 

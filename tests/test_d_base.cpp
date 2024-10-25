@@ -1,7 +1,7 @@
 #include "catch2/catch.hpp"
-#include "../descriptors/d_base.h"
-#include "../../CORE/config/config.h"
-#include "../../CORE/core_types.h"
+#include <tadah/models/descriptors/d_base.h>
+#include <tadah/core/config.h>
+#include <tadah/core/core_types.h>
 
 TEST_CASE( "Testing D_Base", "[D_Base]" ) {
 

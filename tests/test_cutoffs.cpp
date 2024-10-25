@@ -1,7 +1,7 @@
 #include "catch2/catch.hpp"
 #include <limits>
 #include <stdexcept>
-#include "../cutoffs/cutoffs.h"
+#include <tadah/models/cutoffs.h>
 #include <string>
 
 TEST_CASE( "Testing Cutoffs: Cut_Dummy", "[Cut_Dummy]" ) {

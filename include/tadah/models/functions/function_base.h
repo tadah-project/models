@@ -1,0 +1,42 @@
+#ifndef FUNCTION_BASE_h
+#define FUNCTION_BASE_h
+
+#include <tadah/core/core_types.h>
+#include <tadah/core/config.h>
+
+
+/** Base class for Kernels and Basis Functions */
+struct Function_Base {
+
+    private:
+        int verbose;
+
+    public:
+        Function_Base() {
+            verbose=0;
+        }
+        Function_Base(const Config &c) {
+            verbose = c.get<int>("VERBOSE");
+        }
+        void set_verbose(int v) { verbose=v; }
+        int get_verbose() { return verbose; }
+
+        // Derived classes must implement Derived() and Derived(Config)
+        virtual ~Function_Base() {};
+
+        // For Kernels
+        virtual double operator() (const aed_type2& , const aed_type2& ) { return 0.0; };
+        virtual aed_type2 derivative(const aed_type2& , const aed_type2& ) { return aed_type2(); };
+        virtual double prime(const aed_type2& , const aed_type2& ,
+                const aed_type2& ) { return 0.0; }
+        virtual void set_basis(const Matrix ) {};
+
+        /** \brief Return label of this object */
+        virtual std::string get_label() const=0;
+        virtual double epredict(const t_type &, const aed_type2& ) const=0;
+        virtual double fpredict(const t_type &, const fd_type &,
+                const aed_type2&, const size_t ) const=0;
+        virtual force_type fpredict(const t_type &, const fd_type &,
+                const aed_type2& ) const=0;
+};
+#endif

@@ -1,8 +1,8 @@
 #include "catch2/catch.hpp"
 #include <limits>
 #include <stdexcept>
-#include "../../CORE/registry.h"
-#include "../cutoffs/cutoffs.h"
+#include <tadah/core/registry.h>
+#include <tadah/models/cutoffs.h>
 #include <string>
 
 TEST_CASE( "Testing Factory: Cutoffs", "[factory_cutoffs]" ) {

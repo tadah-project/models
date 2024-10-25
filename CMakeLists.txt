@@ -14,7 +14,7 @@ if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR}
     You may need to remove CMakeCache.txt and CMakeFiles dir. ")
 endif()
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -45,49 +45,51 @@ if (BUILD_SHARED_LIBS)
 endif()
 
 include(FetchContent)
-get_filename_component(BUILD_DIR_NAME ${CMAKE_BINARY_DIR} NAME)
+
+if(DEFINED ENV{CI_COMMIT_REF_NAME})
+    set(GIT_BRANCH "$ENV{CI_COMMIT_REF_NAME}")
+else()
+    execute_process(
+    COMMAND git rev-parse --symbolic-full-name --abbrev-ref HEAD
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    OUTPUT_VARIABLE GIT_BRANCH
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+endif()
+
 FetchContent_Declare(
     Tadah.CORE
     GIT_REPOSITORY https://git.ecdf.ed.ac.uk/tadah/core.git
-    GIT_TAG origin/main
-    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../CORE
-    PATCH_COMMAND  mkdir -p ${BUILD_DIR_NAME}
-    BINARY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../CORE/${BUILD_DIR_NAME}
+    GIT_TAG origin/${GIT_BRANCH}
+    #SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../CORE
+    #PATCH_COMMAND  mkdir -p ${BUILD_DIR_NAME}
+    #BINARY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../CORE/${BUILD_DIR_NAME}
     )
 
 FetchContent_MakeAvailable(Tadah.CORE)
 
-file(GLOB MODELS_SRC CONFIGURE_DEPENDS "*.cpp" "*.h" "*.hpp")
-file(GLOB_RECURSE CUTOFFS_SRC CONFIGURE_DEPENDS 
-    "cutoffs/*.cpp" "cutoffs/*.h" "cutoffs/*.hpp")
-file(GLOB_RECURSE DESCRIPTORS_SRC CONFIGURE_DEPENDS 
-    "descriptors/*.cpp" "descriptors/*.h" "descriptors/*.hpp")
-file(GLOB_RECURSE FUNCTION_SRC CONFIGURE_DEPENDS 
-    "functions/*.cpp" "functions/*.h" "functions/*.hpp")
+file(GLOB MODELS_SRC CONFIGURE_DEPENDS "src/*.cpp")
+add_library(tadah.models ${MODELS_SRC})
+target_include_directories(tadah.models PUBLIC include)
+target_include_directories(tadah.models PUBLIC ${Tadah.CORE_SOURCE_DIR}/include)
+target_include_directories(tadah.models PUBLIC ${Tadah.CORE_SOURCE_DIR}/external/toml11)
 
-add_library(tadah.models.obj OBJECT
-    ${CUTOFFS_SRC}
-    ${FUNCTION_SRC}
-    ${DESCRIPTORS_SRC}
-    ${MODELS_SRC}
-    )
-target_link_libraries(tadah.models.obj PRIVATE config::rc)
+target_link_libraries(tadah.models PUBLIC tadah.core)
 
 if(TADAH_ENABLE_OPENMP)
     find_package(OpenMP REQUIRED)
-    target_link_libraries(tadah.models.obj PUBLIC OpenMP::OpenMP_CXX)
+    target_link_libraries(tadah.models PUBLIC OpenMP::OpenMP_CXX)
 endif()
-
-add_library(tadah.models $<TARGET_OBJECTS:tadah.models.obj>)
 
 if(TADAH_BUILD_TESTS)
     include(CTest) 
     add_subdirectory(tests)
 endif()
 
-set(TADAH_MODELS_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/include/tadah/MODELS)
-file(GLOB MODELS_H CONFIGURE_DEPENDS "*.h" "*.hpp")
-install(FILES ${MODELS_H} DESTINATION ${TADAH_MODELS_INSTALL_DIR})
-install(DIRECTORY cutoffs DESTINATION ${TADAH_MODELS_INSTALL_DIR} FILES_MATCHING REGEX "(.+.h|.+.hpp)")
-install(DIRECTORY descriptors DESTINATION ${TADAH_MODELS_INSTALL_DIR} FILES_MATCHING REGEX "(.+.h|.+.hpp)")
-install(DIRECTORY functions DESTINATION ${TADAH_MODELS_INSTALL_DIR} FILES_MATCHING REGEX "(.+.h|.+.hpp)")
+# Installation rules
+install(TARGETS tadah.models
+        RUNTIME DESTINATION bin
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib)
+install(DIRECTORY include/
+    DESTINATION include
+)
