@@ -44,7 +44,7 @@
  * \ref INITMB \ref CGRIDMB \ref SGRIDMB \ref AGRIDMB
  */
 template <typename F>
-class DM_mEAD: public DM_Base, public F {
+class DM_mEAD: public DM_Base {
     private:
         int Lmax=0;
         size_t rhoisize=0;
