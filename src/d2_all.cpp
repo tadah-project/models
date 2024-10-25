@@ -14,3 +14,5 @@ CONFIG::Registry<D2_Base,Config&>::Register<D2_Dummy> D2_Dummy_1( "D2_Dummy" );
 CONFIG::Registry<D2_Base,Config&>::Register<D2_EAM> D2_EAM_1( "D2_EAM" );
 CONFIG::Registry<D2_Base,Config&>::Register<D2_LJ> D2_LJ_1( "D2_LJ" );
 CONFIG::Registry<D2_Base,Config&>::Register<D2_MIE> D2_MIE_1( "D2_MIE" );
+
+CONFIG::Registry<DM_Base, Config&>::Register<DM_mEAD<F_RLR>> DM_mEAM_1("DM_mEAD");
