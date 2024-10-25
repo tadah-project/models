@@ -97,4 +97,6 @@ class DM_mEAD: public DM_Base {
         size_t rhoi_size();
         size_t rhoip_size();
 };
+
+#include "dm_mEAD.hpp"
 #endif
