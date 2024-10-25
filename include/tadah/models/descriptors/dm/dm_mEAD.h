@@ -2,53 +2,6 @@
 #define DM_mEAD_H
 #include <tadah/models/descriptors/dm/dm_base.h>
 
-class F_Base {
-    public:
-        virtual double calc_F(double rho, size_t c)=0;
-        virtual double calc_dF(double rho, size_t c)=0;
-};
-
-/** Embedding function of the form:  sx*log(cx)
- *
- * REQUIRED KEYS:
- *
- * SEMBFUNC, CEMBFUNC
- * control depth and x-intercept of an embedding function respectively.
- * The number of keys must match those in the mEAD descriptor.
- *
- */
-class F_RLR:  public F_Base {
-    private:
-        Config *config=nullptr;
-        v_type sgrid;   // controls depth
-        v_type cgrid;   // control x-intercep at 1/c
-    public:
-        F_RLR(Config &conf):
-            config(&conf)
-    {
-        if (!config->get<bool>("INITMB")) return;
-        D_Base::get_grid(*config,"SEMBFUNC",sgrid);
-        D_Base::get_grid(*config,"CEMBFUNC",cgrid);
-
-    }
-        F_RLR():
-            config(nullptr)
-    {
-        }
-        double calc_F(double rho,size_t c) {
-            if (rho>0)
-                return sgrid[c]*rho*log(cgrid[c]*rho);
-            return 0;
-        };
-        double calc_dF(double rho,size_t c) {
-            if (rho>0)
-                return sgrid[c]*(log(cgrid[c]*rho)+1);
-            return sgrid[c];
-        };
-        //~F_RLR() {
-            // Do not delete config!
-        //}
-};
 
 /** Modified Embedded Atom Descriptor
  *
