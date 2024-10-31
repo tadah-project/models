@@ -147,7 +147,7 @@ TEST_CASE( "Testing Kern_Quadratic", "[kernels]" ) {
   Config c;
   REQUIRE_NOTHROW(K(c));
   K kern;
-  Matrix basis(10,2);
+  Matrix basis(2,10);
   basis.random();
   kern.set_basis(basis);
 
@@ -158,8 +158,8 @@ TEST_CASE( "Testing Kern_Quadratic", "[kernels]" ) {
   fd_type fd(2);
   fd.random(12345);
 
-  for (size_t i=0; i<basis.size(); ++i) {
-    const aed_type2 &b = basis.row(i);
+  for (size_t i=0; i<basis.cols(); ++i) {
+    const aed_type2 &b = basis.col(i);
     // test operator()
     REQUIRE_THAT((b*aed)*(b*aed), 
                  Catch::Matchers::WithinRel(kern(b,aed),1e-10));
@@ -180,7 +180,7 @@ TEST_CASE( "Testing Kern_LQ", "[kernels]" ) {
   Config c;
   REQUIRE_NOTHROW(K(c));
   K kern;
-  Matrix basis(10,2);
+  Matrix basis(2,10);
   basis.random();
   kern.set_basis(basis);
 
@@ -191,8 +191,8 @@ TEST_CASE( "Testing Kern_LQ", "[kernels]" ) {
   fd_type fd(2);
   fd.random(12345);
 
-  for (size_t i=0; i<basis.size(); ++i) {
-    const aed_type2 &b = basis.row(i);
+  for (size_t i=0; i<basis.cols(); ++i) {
+    const aed_type2 &b = basis.col(i);
     // test operator()
     REQUIRE_THAT(((b*aed)*(b*aed))+(b*aed), 
                  Catch::Matchers::WithinRel(kern(b,aed),1e-10));
@@ -220,7 +220,7 @@ TEST_CASE( "Testing Kern_RBF", "[kernels]" ) {
 
   REQUIRE_NOTHROW(K(c));
   K kern(c);
-  Matrix basis(10,2);
+  Matrix basis(2,10);
   basis.random(123,-1e-1,1e-1);
   kern.set_basis(basis);
 
@@ -231,8 +231,8 @@ TEST_CASE( "Testing Kern_RBF", "[kernels]" ) {
   fd_type fd(2);
   fd.random(133,-1e-1,1e-1);
 
-  for (size_t i=0; i<basis.size(); ++i) {
-    const aed_type2 &b = basis.row(i);
+  for (size_t i=0; i<basis.cols(); ++i) {
+    const aed_type2 &b = basis.col(i);
     // test operator()
     REQUIRE_THAT(exp(-g*((aed-b)*(aed-b))), 
                  Catch::Matchers::WithinRel(kern(b,aed)));
@@ -262,7 +262,7 @@ TEST_CASE( "Testing Kern_Sigmoid", "[kernels]" ) {
 
   REQUIRE_NOTHROW(K(c));
   K kern(c);
-  Matrix basis(10,2);
+  Matrix basis(2,10);
   basis.random(123,-1e-1,1e-1);
   kern.set_basis(basis);
 
@@ -273,8 +273,8 @@ TEST_CASE( "Testing Kern_Sigmoid", "[kernels]" ) {
   fd_type fd(2);
   fd.random(133,-1e-1,1e-1);
 
-  for (size_t i=0; i<basis.size(); ++i) {
-    const aed_type2 &b = basis.row(i);
+  for (size_t i=0; i<basis.cols(); ++i) {
+    const aed_type2 &b = basis.col(i);
     // test operator()
     REQUIRE_THAT(std::tanh(g*(b*aed)+s), Catch::Matchers::WithinRel(kern(b,aed)));
     // test derivative
@@ -305,7 +305,7 @@ TEST_CASE( "Testing Kern_Polynomial", "[kernels]" ) {
 
   REQUIRE_NOTHROW(K(c));
   K kern(c);
-  Matrix basis(10,2);
+  Matrix basis(2,10); // 10 basis vectors
   basis.random(123,-1e-1,1e-1);
   kern.set_basis(basis);
 
@@ -316,8 +316,8 @@ TEST_CASE( "Testing Kern_Polynomial", "[kernels]" ) {
   fd_type fd(2);
   fd.random(133,-1e-1,1e-1);
 
-  for (size_t i=0; i<basis.size(); ++i) {
-    const aed_type2 &b = basis.row(i);
+  for (size_t i=0; i<basis.cols(); ++i) {
+    const aed_type2 &b = basis.col(i);
     // test operator()
     REQUIRE_THAT(std::pow(g*(b*aed)+s,d), Catch::Matchers::WithinRel(kern(b,aed)));
     // test derivative
