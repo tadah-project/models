@@ -29,20 +29,20 @@ TEST_CASE( "Testing Kern_Base", "[kernels]" ) {
   REQUIRE(Kern_RBF().get_label()=="Kern_RBF");
   REQUIRE(Kern_Sigmoid().get_label()=="Kern_Sigmoid");
 
-  aed_type2 w(3);
+  aed_type2 w(2);
   w.random(123,-1e-1,1e-1);
-  aed_type2 aed(2);
+  aed_type2 aed(3);
   aed.random(993,-1e-1,1e-1);
-  fd_type fd(2);
+  fd_type fd(3);
   fd.random(753,-1e-1,1e-1);
 
-  REQUIRE_THAT(-2.6205958572365892791e-07, 
+
+  REQUIRE_THAT(-1.82049009349779262e-07, 
                Catch::Matchers::WithinRel(kern.epredict(w,aed)));
 
-  
-  force_type f(-1.8492084592792111712e-06,
-      -6.9215962664449518545e-07,
-      1.7444537090573425304e-06);
+  force_type f(-1.98275464733636505e-06,
+      -2.09764072099347695e-07,
+      1.56681997348973148e-06);
 
   force_type fp = kern.fpredict(w,fd,aed);
 
@@ -74,11 +74,11 @@ TEST_CASE( "Testing Kern_Linear 1", "[kernels]" ) {
   Config c;
   REQUIRE_NOTHROW(K(c));
   K kern;
-  aed_type2 w(2);
+  aed_type2 w(4);
   w.random();
-  aed_type2 aed(2);
+  aed_type2 aed(4);
   aed.random();
-  fd_type fd(2);
+  fd_type fd(4);
   fd.random();
   double epred = w*aed;
   REQUIRE(epred==kern.epredict(w,aed));
