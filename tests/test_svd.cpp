@@ -72,11 +72,11 @@ TEST_CASE("SVD Numeric Accuracy - Column-Major Order") {
   double* S = svd.getS();
   double* VT = svd.getVT();
 
-  auto [ldu, ucol] = svd.shapeU();
-  auto [ldvt, n] = svd.shapeVT();
+  int m = svd.shapeU().first;
+  int n = svd.shapeU().second;
 
-  Matrix mU (U, ldu,ucol);
-  Matrix mVT (VT,ldvt,n);
+  Matrix mU (U, m,n);
+  Matrix mVT (VT,n,n);
 
   aed_type2 vec(S, n);
   REQUIRE_THAT(16.848103352614209, Catch::Matchers::WithinRel(S[0]));
