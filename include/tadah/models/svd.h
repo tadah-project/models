@@ -12,14 +12,7 @@ class SVD {
    */
   private:
     char jobz = 'S'; // compute the first min(M,N) columns of U
-    int m;
-    int n;
-    int lda;
-    int ldu;
-    int ldvt;
-    int ucol;
-    int lwork;
-    int info;
+    int m, n, lda, ldu, ldvt, ucol, lwork, info;
 
     // arrays
     double *a = nullptr;
@@ -46,7 +39,6 @@ class SVD {
     }
     SVD(const SVD &other)
     {
-      std::cout << "Copy-constructor" << std::endl;
       jobz = other.jobz;
       m = other.m;
       n = other.n;
@@ -68,10 +60,6 @@ class SVD {
       iwork = nullptr;
 
       work_alloc=false;
-
-      std::cout << sizeS() << std::endl;;
-      std::cout << sizeU() << std::endl;;
-      std::cout << sizeVT() << std::endl;;
 
       // hard copy
       std::memcpy(s, other.s, sizeS()*sizeof(double));
@@ -158,7 +146,6 @@ class SVD {
 
     template <typename T>
       T predict(const T &w) const {
-        std::cout << "WHAT THE HELL IS IT?" << std::endl;
         /* Return U S V^T w */
 
         double *t = new double[shapeA().first];
@@ -172,11 +159,10 @@ class SVD {
       }
     template <typename T>
       T predict(const T &w, double *t, double *x) const {
-        std::cout << "WHAT THE HELL IS IT 2?" << std::endl;
         /* Return U S V^T w */
 
-        const double *w_ptr = &w.data()[0];
         // 1. V^T w
+        const double *w_ptr = &w.data()[0];
         char trans='N';
         int m = static_cast<int>(shapeA().first);
         int n = static_cast<int>(shapeA().second);
