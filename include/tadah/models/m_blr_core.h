@@ -45,8 +45,8 @@ class M_BLR_Core:
 
         t_type get_weights_uncertainty() const{
             double lambda=config.template get<double>("LAMBDA");
-            if(lambda >= 0) throw std::runtime_error(
-                    "Sigma matrix is only computed for LAMBDA < 0");
+            if(lambda != 0) throw std::runtime_error(
+                    "Sigma matrix is only computed for LAMBDA != 0");
             return Sigma.diagonal();
         }
 
