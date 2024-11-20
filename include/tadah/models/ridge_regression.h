@@ -110,7 +110,6 @@ class RidgeRegression {
         char trans = 'T';
         double *UTb = new double[n];
         int incx = 1;
-        double *bb = b.data();
         dgemv_(&trans, &m, &n, &alpha_, U, &m, b.ptr(), &incx,
             &beta_, UTb, &incx);
 
