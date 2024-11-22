@@ -47,7 +47,6 @@ trigger_mlip:
   stage: trigger
   trigger:
     project: tadah/mlip
-    strategy: depend
 
 trigger_md:
   stage: trigger
