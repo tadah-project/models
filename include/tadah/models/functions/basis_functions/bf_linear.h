@@ -2,17 +2,60 @@
 #define BF_LINEAR_H
 #include <tadah/models/functions/basis_functions/bf_base.h>
 
-/** Linear basis function */
-struct BF_Linear: public virtual BF_Base
-{
+/**
+ * @class BF_Linear
+ * @brief Linear basis function for modeling linear relationships.
+ *
+ * This structure provides methods for predicting energy and forces using a linear basis function.
+ */
+struct BF_Linear : public virtual BF_Base {
+    
+    /**
+     * @brief Default constructor.
+     */
     BF_Linear();
+
+    /**
+     * @brief Constructor with configuration.
+     * @param c Configuration object reference.
+     */
     BF_Linear(const Config &c);
+
+    /**
+     * @brief Retrieve the label of the basis function.
+     * @return String label of the basis function.
+     */
     std::string get_label() const;
-    std::string label = "BF_Linear";
-    double epredict(const t_type &weights, const aed_type2& aed) const;
+
+    std::string label = "BF_Linear"; ///< Label identifying the basis function.
+
+    /**
+     * @brief Predicts energy using the linear basis function.
+     * @param weights Weights vector.
+     * @param aed Atomic descriptors.
+     * @return Predicted energy.
+     */
+    double epredict(const t_type &weights, const aed_type2 &aed) const;
+
+    /**
+     * @brief Predicts force for a specific dimension using the linear basis function.
+     * @param weights Weights vector.
+     * @param fdij Force descriptor between atoms.
+     * @param aedi Atomic descriptors for an individual atom.
+     * @param k Dimension index.
+     * @return Predicted force component.
+     */
     double fpredict(const t_type &weights, const fd_type &fdij,
-            const aed_type2& aedi, const size_t k) const;
+                    const aed_type2 &aedi, const size_t k) const;
+
+    /**
+     * @brief Predicts forces using the linear basis function.
+     * @param weights Weights vector.
+     * @param fdij Force descriptor between atoms.
+     * @param aedi Atomic descriptors for an individual atom.
+     * @return Predicted forces.
+     */
     force_type fpredict(const t_type &weights, const fd_type &fdij,
-            const aed_type2& aedi) const;
+                        const aed_type2 &aedi) const;
 };
 #endif

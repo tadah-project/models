@@ -13,77 +13,101 @@
 #include <iostream>
 #include <limits>
 
-template
-<class Kern=Function_Base&>
-class M_KRR_Train:
-    public M_KRR_Core<Kern>,    // MUST NOT BE VIRUAL!!
-    public M_Train
-{
+/**
+ * @class M_KRR_Train
+ * @brief Implements Kernel Ridge Regression (KRR) training.
+ *
+ * Extends KRR core and train functionalities with specific implementations.
+ *
+ * @tparam Kern Kernel type, default is Function_Base.
+ */
+template <class Kern = Function_Base&>
+class M_KRR_Train : public M_KRR_Core<Kern>, public M_Train {
+public:
+    EKM<Kern> ekm; ///< Extended Kernel Matrix object.
 
-    public:
-        EKM<Kern> ekm;
-        using M_KRR_Core<Kern>::trained;
-        using M_KRR_Core<Kern>::config;
-        using M_KRR_Core<Kern>::kernel;
-        using M_KRR_Core<Kern>::weights;
-        using M_KRR_Core<Kern>::Sigma;
+    using M_KRR_Core<Kern>::trained;
+    using M_KRR_Core<Kern>::config;
+    using M_KRR_Core<Kern>::kernel;
+    using M_KRR_Core<Kern>::weights;
+    using M_KRR_Core<Kern>::Sigma;
 
-        M_KRR_Train(Config &c):
-            M_KRR_Core<Kern>(c),
-            ekm(c)
-    {}
+    /**
+     * @brief Constructor using a configuration object.
+     *
+     * Initializes KRR core and EKM with the given configuration.
+     *
+     * @param c Configuration object reference.
+     */
+    M_KRR_Train(Config &c) : M_KRR_Core<Kern>(c), ekm(c) {}
 
-        M_KRR_Train(Kern &kernel, Config &c):
-            M_KRR_Core<Kern>(kernel, c),
-            ekm(kernel)
-    {}
+    /**
+     * @brief Constructor using a kernel and configuration object.
+     *
+     * Initializes KRR core and EKM with the given kernel and configuration.
+     *
+     * @param kernel Kernel object.
+     * @param c Configuration object reference.
+     */
+    M_KRR_Train(Kern &kernel, Config &c) : M_KRR_Core<Kern>(kernel, c), ekm(kernel) {}
 
-        void train(phi_type &Phi, t_type &T) {
-            // implementation using EKM
-            if(trained) {
-                throw std::runtime_error("This object is already trained!");
+    /**
+     * @brief Trains the model on given feature and target matrices.
+     *
+     * Uses EKM and linear regressor to perform training.
+     *
+     * @param Phi Feature matrix.
+     * @param T Target vector.
+     * @throws std::runtime_error if the object is already trained.
+     */
+    void train(phi_type &Phi, t_type &T) {
+        if (trained) {
+            throw std::runtime_error("This object is already trained!");
+        }
+        if (kernel.get_label() != "Kern_Linear") {
+            ekm.project(Phi);
+        }
+        LinearRegressor::train(config, Phi, T, weights, Sigma);
+
+        if (kernel.get_label() != "Kern_Linear") {
+            weights = ekm.EKM_mat * weights;
+        }
+        trained = true;
+    }
+
+    /**
+     * @brief Standard KRR training using covariance matrix computation.
+     *
+     * Trains the model on energies using the covariance matrix K.
+     *
+     * @param B Basis matrix.
+     * @param T Target vector.
+     * @throws std::runtime_error if lambda is negative for evidence approximation.
+     */
+    void train2(Matrix &B, t_type &T) {
+        double lambda = config.template get<double>("LAMBDA");
+
+        if (lambda < 0)
+            throw std::runtime_error("This KRR implementation cannot use LAMBDA -1 (Evidence Approximation)");
+        
+        std::cout << "Computing Kernel Matrix" << std::endl;
+        Matrix K(B.cols(), B.cols());
+
+        for (size_t i = 0; i < K.cols(); i++) {
+            for (size_t j = 0; j < K.cols(); j++) {
+                K(i, j) = kernel(B.col(i), B.col(j));
+                if (i == j) K(i, j) += lambda;
             }
-            if (kernel.get_label()!="Kern_Linear") {
-                ekm.project(Phi);
-            }
-            LinearRegressor::train(config,Phi, T,weights,Sigma);
-
-            if (kernel.get_label()!="Kern_Linear") {
-                //kernalize weights
-                weights = ekm.EKM_mat*weights;
-            }
-            trained=true;
         }
 
-        void train2(Matrix &B, t_type &T) {
-            // The standad KRR implementation where covariance
-            // matrix K is computed.
-            // The training is only done on energies.
-            // The added regularisation is adhoc
-            //double lambda=9e-11;
+        std::cout << "Solving..." << std::flush;
+        weights = solve_posv(K, T);
+        std::cout << "Done" << std::endl;
 
-            double lambda = config.template get<double>("LAMBDA");
+        std::cout << "Matrix condition number: " << condition_number(K) << std::endl;
 
-            // Imporve ill conditioned problems
-            if(lambda<0)
-                throw std::runtime_error("This KRR implementation cannot use LAMBDA -1 (Evidence Approximation)");
-            std::cout << "Computing Kernel Matrix" << std::endl;
-            Matrix K(B.cols(), B.cols()); // define covariance matrix
-            std::cout << K.rows() << "  " << K.cols() << std::endl;
-            for (size_t i=0; i<K.cols(); i++) {
-                for (size_t j=0; j<K.cols(); j++) {
-                    K(i,j) = kernel(B.col(i),B.col(j));
-                    if (i==j) K(i,j)+=lambda;
-                }
-            }
-            std::cout << "Solving..." << std::flush;
-            weights = solve_posv(K,T);
-            std::cout << "Done" << std::endl;
-
-            //bool = config.template get<bool>("MODEL")[2];
-            std::cout << "Matrix condition number: " << condition_number(K) << std::endl;
-
-            trained=true;
-        }
+        trained = true;
+    }
 };
-#endif
+
+#endif // M_KRR_TRAIN_H

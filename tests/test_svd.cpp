@@ -52,9 +52,7 @@ TEST_CASE("SVD Numeric Accuracy 2x2") {
   SVD svd(Phi);
   REQUIRE(svd.get_info() == 0);
 
-  double* U = svd.getU();
   double* S = svd.getS();
-  double* VT = svd.getVT();
 
   // S are sorted S[0] > S[1]
   REQUIRE_THAT(5.464985704219043, Catch::Matchers::WithinRel(S[0]));
