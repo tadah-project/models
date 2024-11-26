@@ -1,27 +1,72 @@
-#ifndef M_Core_H
-#define M_Core_H
+#ifndef M_CORE_H
+#define M_CORE_H
 
 #include <tadah/core/core_types.h>
 
+/**
+ * @class M_Core
+ * @brief Abstract base class for model cores.
+ *
+ * Provides common functionality and interface for model implementations, including training status
+ * and weight management.
+ */
 class M_Core {
-    public:
-        int verbose;
-        bool trained=false;
-        t_type weights;
+public:
+    int verbose; ///< Verbose level for logging.
+    bool trained = false; ///< Indicates if the model has been trained.
+    t_type weights; ///< Weights vector for the model.
 
-        virtual ~M_Core() {}
+    /**
+     * @brief Virtual destructor for polymorphic deletion.
+     */
+    virtual ~M_Core() {}
 
+    /**
+     * @brief Checks if the model has been trained.
+     *
+     * @return True if the model is trained, otherwise false.
+     */
+    bool is_trained() const {
+        return trained;
+    }
 
-        bool is_trained() const {
-            return trained;
-        }
-        const t_type &get_weights() const {
-            return weights;
-        }
-        void set_weights(const t_type w) {
-            weights=w;
-        }
-        virtual double predict(const aed_type2 &v)const=0;
-        virtual t_type get_weights_uncertainty()const=0;
+    /**
+     * @brief Retrieves the weights of the model.
+     *
+     * @return Constant reference to the weights vector.
+     */
+    const t_type &get_weights() const {
+        return weights;
+    }
+
+    /**
+     * @brief Sets the model weights.
+     *
+     * @param w New weights vector to be set.
+     */
+    void set_weights(const t_type w) {
+        weights = w;
+    }
+
+    /**
+     * @brief Pure virtual function for making predictions.
+     *
+     * Must be implemented by derived classes.
+     *
+     * @param v Input vector for prediction.
+     * @return Predicted value.
+     */
+    virtual double predict(const aed_type2 &v) const = 0;
+
+    /**
+     * @brief Pure virtual function to get weights' uncertainty.
+     *
+     * Must be implemented by derived classes.
+     *
+     * @return Vector of uncertainties for the weights.
+     */
+    virtual t_type get_weights_uncertainty() const = 0;
 };
-#endif
+
+#endif // M_CORE_H
+
