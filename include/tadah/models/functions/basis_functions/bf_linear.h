@@ -3,7 +3,6 @@
 #include <tadah/models/functions/basis_functions/bf_base.h>
 
 /**
- * @struct BF_Linear
  * @brief Linear basis function for modeling linear relationships.
  *
  * This structure provides methods for predicting energy and forces using a linear basis function.
