@@ -3,7 +3,7 @@
 #include <tadah/models/functions/basis_functions/bf_base.h>
 
 /**
- * @class BF_Polynomial2
+ * @struct BF_Polynomial2
  * @brief Polynomial order 2 basis function with coefficient c=0.
  *
  * This structure provides methods for predicting energy and forces using a second-order polynomial basis function.
