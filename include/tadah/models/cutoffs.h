@@ -18,7 +18,7 @@ class Cut_Base {
         void test_rcut(const double r);
 };
 
-/** \brief Dummy cutoff function
+/** @brief Dummy cutoff function
  * \f[
  * f_c(r) =
  * \begin{equation}
@@ -44,7 +44,7 @@ class Cut_Dummy : public Cut_Base {
         double calc_prime(double r);
 };
 
-/** \brief Cos cutoff function
+/** @brief Cos cutoff function
  *
  * \f[
  * f_c(r) =
@@ -76,7 +76,7 @@ class Cut_Cos : public Cut_Base {
         double calc_prime(double r);
 };
 
-/** \brief Tanh cutoff function.
+/** @brief Tanh cutoff function.
  * \f[
  * f_c(r) =
  * \begin{equation}
@@ -107,7 +107,7 @@ class Cut_Tanh : public Cut_Base {
         double calc_prime(double r);
 };
 
-/** \brief Polynomial-2 cutoff function.
+/** @brief Polynomial-2 cutoff function.
  *
  * \f[
  * f_c(r) =
