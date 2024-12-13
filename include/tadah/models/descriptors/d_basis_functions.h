@@ -39,6 +39,9 @@ inline double B(double x_c)
         return 0.0;
     }
 }
+inline double B(double r, double eta, double miu) {
+  return B(eta*(r-miu));
+}
 inline double B(double x_c, double f)
     // x_c = eta*(rij-r_s)
     // return B(x_c)*f
