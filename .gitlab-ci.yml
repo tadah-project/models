@@ -47,8 +47,10 @@ trigger_mlip:
   stage: trigger
   trigger:
     project: tadah/mlip
+    branch: $CI_COMMIT_REF_NAME
 
 trigger_md:
   stage: trigger
   trigger:
     project: tadah/md
+    branch: $CI_COMMIT_REF_NAME
