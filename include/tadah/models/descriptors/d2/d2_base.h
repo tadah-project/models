@@ -8,8 +8,9 @@
  * All two-body descriptors **must** inherit this class.
  */
 class D2_Base: public D_Base {
-public:
+protected:
   size_t fidx=0;    // first index in aed and fd arrays for this descriptor
+public:
   virtual ~D2_Base() {};
 
   /** \brief Calculate \ref AED
@@ -70,5 +71,7 @@ public:
     (*this).calc_aed(rp,rp*rp,fcp,aed_p);
     fd(0) = (0.5/h)*(aed_p - aed_n);
   }
+  virtual void set_fidx(size_t fidx_) { fidx=fidx_; }
+  virtual size_t get_fidx() { return fidx; }
 };
 #endif

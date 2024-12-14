@@ -15,7 +15,7 @@ class DC_Selector {
         D3_Base *d3b=nullptr;
         DM_Base *dmb=nullptr;
 
-        Config config;
+        //Config config;
 
         DC_Selector ()
         {};
@@ -25,21 +25,21 @@ class DC_Selector {
         {
             std::cout << "Copy constructor called\n";
         }
-        // Const Assignment operator
-        // Instead of deep copying
-        // we use a trick where we just copy
-        // the config file and run init()
-        // as in a costructor
-        DC_Selector& operator=(const DC_Selector& dc)
-        {
-            config=dc.config;
-            init();
-            return *this;
-        }
+         // Const Assignment operator
+         // Instead of deep copying
+         // we use a trick where we just copy
+         // the config file and run init()
+         // as in a costructor
+         // DC_Selector& operator=(const DC_Selector& dc)
+         // {
+         //     //config=dc.config;
+         //     //init();
+         //     return *this;
+         // }
         // Assignment operator
         DC_Selector& operator=(DC_Selector& dc)
         {
-            std::swap(config,dc.config);
+            //std::swap(config,dc.config);
             std::swap(c2b,dc.c2b);
             std::swap(c3b,dc.c3b);
             std::swap(cmb,dc.cmb);
@@ -49,12 +49,12 @@ class DC_Selector {
             return *this;
         }
 
-        DC_Selector (const Config &c):
-            config(c)
+        DC_Selector (Config &c)
+            //config(c)
     {
-        init();
+        init(c);
     };
-        void init() {
+        void init(Config &config) {
             double rcutzero = 0.0; // for dummies
 
             size_t bias=0;
@@ -65,12 +65,12 @@ class DC_Selector {
                 double rcut2b = config.get<double>("RCUT2B");
                 c2b = CONFIG::factory<Cut_Base,double>( config.get<std::string>("RCTYPE2B"), rcut2b );
                 d2b = CONFIG::factory<D2_Base,Config&>( config.get<std::string>("TYPE2B"), config );
-                d2b->fidx = bias;
+                d2b->set_fidx(bias);
             }
             else {
                 c2b = CONFIG::factory<Cut_Base,double>( "Cut_Dummy", rcutzero );
                 d2b = CONFIG::factory<D2_Base,Config&>( "D2_Dummy", config );
-                d2b->fidx = bias;
+                d2b->set_fidx(bias);
             }
 
             if (config.get<bool>("INIT3B")) {
@@ -89,12 +89,12 @@ class DC_Selector {
                 double rcutmb = config.get<double>("RCUTMB");
                 cmb = CONFIG::factory<Cut_Base,double>( config.get<std::string>("RCTYPEMB"), rcutmb );
                 dmb = CONFIG::factory<DM_Base,Config&>( config.get<std::string>("TYPEMB"), config );
-                dmb->fidx = bias + d2b->size();
+                dmb->set_fidx(bias + d2b->size());
             }
             else {
                 cmb = CONFIG::factory<Cut_Base,double>( "Cut_Dummy", rcutzero );
                 dmb = CONFIG::factory<DM_Base,Config&>( "DM_Dummy", config );
-                dmb->fidx = bias + d2b->size();
+                dmb->set_fidx(bias + d2b->size());
             }
         }
         ~DC_Selector()

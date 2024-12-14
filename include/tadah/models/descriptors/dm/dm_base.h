@@ -9,8 +9,9 @@
  * All many-body descriptors **must** inherit this class.
  */
 class DM_Base: public D_Base {
-public:
+protected:
   size_t fidx=0;    // first index in aed and fd arrays for this descriptor
+public:
   virtual ~DM_Base() {};
 
   /** \brief Calculate \ref AED
@@ -118,5 +119,7 @@ public:
     double r = sqrt(rsq);
     ((*this).calc_rho)(r,rsq,fc,del,rhoi);
   }
+  virtual void set_fidx(size_t fidx_) { fidx=fidx_; }
+  virtual size_t get_fidx() { return fidx; }
 };
 #endif

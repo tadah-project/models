@@ -3,7 +3,7 @@
 #include <cstdlib>
 #include <stdexcept>
 
-
+D2_Blip::D2_Blip() {}
 D2_Blip::D2_Blip(Config &c):
   verbose(c.get<int>("VERBOSE"))
 {
@@ -12,6 +12,11 @@ D2_Blip::D2_Blip(Config &c):
 
   get_grid(c,"CGRID2B",mius);
   get_grid(c,"SGRID2B",etas);
+  // update config with generated grid
+  c.remove("CGRID2B");
+  for (const auto &m: mius) c.add("CGRID2B",m);
+  c.remove("SGRID2B");
+  for (const auto &e: etas) c.add("SGRID2B",e);
 
   if (verbose) {
     std::cout << std::endl;

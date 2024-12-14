@@ -33,6 +33,7 @@ class D2_BP : public D2_Base {
         int verbose;
 
     public:
+        D2_BP();
         D2_BP(Config &config);
         void calc_aed(
                 const double rij,

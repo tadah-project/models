@@ -2,8 +2,6 @@
 #include <tadah/models/descriptors/d_basis_functions.h>
 #include <stdexcept>
 #include <vector>
-#include <iomanip>
-
 
 /* Index ii iterates rhoi array
  * rhoi array is split 50/50 into density and derivative
@@ -20,6 +18,11 @@ DM_EAD::DM_EAD(Config &config):
 
   get_grid(config,"CGRIDMB",cgrid);
   get_grid(config,"SGRIDMB",sgrid);
+  // update config with generated grid
+  config.remove("CGRIDMB");
+  for (const auto &i: cgrid) config.add("CGRIDMB",i);
+  config.remove("SGRIDMB");
+  for (const auto &i: sgrid) config.add("SGRIDMB",i);
 
   if (cgrid.size()!=sgrid.size()) {
     throw std::runtime_error("SGRID2B and CGRID2B arrays differ in size.\n");

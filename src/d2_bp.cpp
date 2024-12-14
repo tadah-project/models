@@ -1,6 +1,7 @@
 #include <tadah/models/descriptors/d2/d2_bp.h>
 #include <tadah/models/descriptors/d_basis_functions.h>
 
+D2_BP::D2_BP() {}
 D2_BP::D2_BP(Config &c):
   verbose(c.get<int>("VERBOSE"))
 {
@@ -9,6 +10,11 @@ D2_BP::D2_BP(Config &c):
 
   get_grid(c,"CGRID2B",mius);
   get_grid(c,"SGRID2B",etas);
+  // update config with generated grid
+  c.remove("CGRID2B");
+  for (const auto &m: mius) c.add("CGRID2B",m);
+  c.remove("SGRID2B");
+  for (const auto &e: etas) c.add("SGRID2B",e);
 
   if (verbose) {
     std::cout << std::endl;

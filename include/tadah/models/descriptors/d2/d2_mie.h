@@ -24,33 +24,34 @@
  * will result in Lennard-Jones type descriptor
  */
 class D2_MIE : public D2_Base {
-    private:
-        size_t s=2;
-        std::string lab="D2_MIE";
-        double m,n;
-        v_type etas;
-        int verbose;
-    public:
-        D2_MIE(Config &config);
-        void calc_aed(
-                const double,
-                const double rij_sq,
-                const double fc_ij,
-                aed_type2 &aed);
-        void calc_dXijdri(
-                const double rij,
-                const double rij_sq,
-                const double fc_ij,
-                const double fcp_ij,
-                fd_type &fd_ij);
-        void calc_all(
-                const double rij,
-                const double rij_sq,
-                const double fc_ij,
-                const double fcp_ij,
-                aed_type2 &aed,
-                fd_type &fd_ij);
-        size_t size();
-        std::string label();
+private:
+  size_t s=2;
+  std::string lab="D2_MIE";
+  double m,n;
+  v_type etas;
+  int verbose;
+public:
+  D2_MIE();
+  D2_MIE(Config &config);
+  void calc_aed(
+    const double,
+    const double rij_sq,
+    const double fc_ij,
+    aed_type2 &aed);
+  void calc_dXijdri(
+    const double rij,
+    const double rij_sq,
+    const double fc_ij,
+    const double fcp_ij,
+    fd_type &fd_ij);
+  void calc_all(
+    const double rij,
+    const double rij_sq,
+    const double fc_ij,
+    const double fcp_ij,
+    aed_type2 &aed,
+    fd_type &fd_ij);
+  size_t size();
+  std::string label();
 };
 #endif
