@@ -48,10 +48,8 @@ public:
     try {
       size_t c1_cgrid_size = c.get<double>("CGRID2B",0) < 0 ? 4 : c.get<size_t>("TYPE2B",1);
       size_t c1_sgrid_size = c.get<double>("SGRID2B",0) < 0 ? 4 : c.get<size_t>("TYPE2B",1);
-      // size_t c2_cgrid_size = c.size("CGRID2B") - c1_cgrid_size;
-      // size_t c2_sgrid_size = c.size("SGRID2B") - c1_sgrid_size;
-      size_t c2_cgrid_size = c.get<double>("CGRID2B",c1_cgrid_size) < 0 ? 4 : c.get<size_t>("TYPE2B",2);
-      size_t c2_sgrid_size = c.get<double>("SGRID2B",c1_sgrid_size) < 0 ? 4 : c.get<size_t>("TYPE2B",2);
+      size_t c2_cgrid_size = c.size("CGRID2B") - c1_cgrid_size;
+      size_t c2_sgrid_size = c.size("SGRID2B") - c1_sgrid_size;
       for (size_t i=0; i<c1_cgrid_size; ++i) {
         c1.add("CGRID2B",cgrid[i]);
       }
@@ -136,7 +134,7 @@ public:
   std::string label() override {
     return lab;
   }
-  void set_fidx(size_t fidx_) {
+  void set_fidx(size_t fidx_) override {
     d1->set_fidx(fidx_);
     d2->set_fidx(d1->size()+d1->get_fidx());
   }
