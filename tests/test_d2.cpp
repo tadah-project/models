@@ -1,8 +1,12 @@
 #include "catch2/catch.hpp"
 #include <tadah/models/descriptors/d2/d2_all.h>
 #include <tadah/core/maths.h>
+#include <tadah/core/periodic_table.h>
 #include <tadah/models/cutoffs.h>
 
+TEST_CASE("Testing Atom PeriodicTable Initialization") {
+    PeriodicTable::initialize();
+}
 template<typename D, typename C>
 void test_d2(Config &c, double r) {
   std::streambuf *orig = std::cout.rdbuf();
@@ -12,12 +16,13 @@ void test_d2(Config &c, double r) {
   std::cout.rdbuf (orig); // restore
   double rcut = c.get<double>("RCUT2B");
   C fc(rcut);
+  d.set_fcut(&fc, false);
   aed_type2 aed(d.size());
-  d.calc_aed(r,r*r,fc.calc(r),aed);
+  d.calc_aed(1,r,r*r,aed);
   fd_type fd(d.size());
-  d.calc_dXijdri(r,r*r,fc.calc(r),fc.calc_prime(r),fd);
+  d.calc_dXijdri(1,r,r*r,fd);
   fd_type fda(d.size());
-  d.calc_fd_approx(&fc, r, fda, 1e-6);
+  d.calc_fd_approx(1, r, fda, 1e-6);
 
   // Convert to std::vector, as catch2 matchers require these
   std::vector<double> fx(fd[0].data(),fd[0].data()+fd[0].size());
@@ -38,7 +43,7 @@ void test_d2(Config &c, double r) {
 
   aed_type2 aed2(d.size());
   fd_type fd2(d.size());
-  d.calc_all(r,r*r,fc.calc(r),fc.calc_prime(r),aed2,fd2);
+  d.calc_all(1,r,r*r,aed2,fd2);
   std::vector<double> fx2(fd2[0].data(),fd2[0].data()+fd2[0].size());
   std::vector<double> fy2(fd2[1].data(),fd2[1].data()+fd2[1].size());
   std::vector<double> fz2(fd2[2].data(),fd2[2].data()+fd2[2].size());
@@ -64,6 +69,8 @@ void test_D2(Config &c) {
     for (const auto &rcut: rcuts) {
       c.remove("RCUT2B");
       c.add("RCUT2B", rcut);
+      c.add("ATOMS", "H");
+      c.add("WATOMS", 1);
       test_d2<D,Cut_Dummy>(c,r);
       test_d2<D,Cut_Cos>(c,r);
       test_d2<D,Cut_Tanh>(c,r);
@@ -82,6 +89,8 @@ TEST_CASE( "Testing D2_Dummy", "[D2]" ) {
   c.remove("INIT2B");
   c.add("INIT2B", "true");
   c.add("RCUT2B", rcut);
+  c.add("ATOMS", "H");
+  c.add("WATOMS", 1);
   test_d2<D2_Dummy,Cut_Dummy>(c,1);
 
   REQUIRE_NOTHROW(D2_Dummy());
@@ -91,6 +100,8 @@ TEST_CASE( "Testing D2_LJ", "[D2]" ) {
   Config c;
   c.remove("INIT2B");
   c.add("INIT2B", "true");
+  c.add("ATOMS", "H");
+  c.add("WATOMS", 1);
   test_D2<D2_LJ>(c);
 
   D2_LJ d(c);
@@ -107,6 +118,8 @@ TEST_CASE( "Testing D2_BLIP", "[D2]" ) {
   c.add("INIT2B", "true");
   c.add("SGRID2B","0.01 0.4 5.6");
   c.add("CGRID2B","0.0 1.2 3.4");
+  c.add("ATOMS", "H");
+  c.add("WATOMS", 1);
   test_D2<D>(c);
   D d(c);
   REQUIRE(d.size()==3);
@@ -141,6 +154,8 @@ TEST_CASE( "Testing D2_BP", "[D2]" ) {
   c.add("INIT2B", "true");
   c.add("SGRID2B","0.01 0.4");
   c.add("CGRID2B","0.0 1.2");
+  c.add("ATOMS", "H");
+  c.add("WATOMS", 1);
   test_D2<D>(c);
   D d(c);
   REQUIRE(d.size()==2);
@@ -172,6 +187,8 @@ TEST_CASE( "Testing D2_EAM", "[D2]" ) {
   c.remove("INIT2B");
   c.add("INIT2B", "true");
   c.add("SETFL","tests_data/eam.alloy");
+  c.add("ATOMS", "H");
+  c.add("WATOMS", 1);
   test_D2<D2_EAM>(c);
   D2_EAM d(c);
   REQUIRE(d.size()==1);
@@ -190,6 +207,8 @@ TEST_CASE( "Testing D2_MIE", "[D2]" ) {
   c.remove("INIT2B");
   c.add("INIT2B", "true");
   c.add("SGRID2B","7 13");
+  c.add("ATOMS", "H");
+  c.add("WATOMS", 1);
   test_D2<D2_MIE>(c);
   D2_MIE d(c);
   REQUIRE(d.size()==2);
