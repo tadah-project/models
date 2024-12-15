@@ -63,7 +63,7 @@ void D2_MIE::calc_all(
   aed(fidx) -= scale*weights[Zj]*rn_inv*fc_ij;
   aed(fidx+1) += scale*weights[Zj]*rm_inv*fc_ij;
 
-  fd_ij(fidx,0) = scale*weights[Zj]*(-n*rn_inv/rij*fc_ij - fcp_ij*rn_inv);
+  fd_ij(fidx,0) = scale*weights[Zj]*(n*rn_inv/rij*fc_ij - fcp_ij*rn_inv);
   fd_ij(fidx+1,0) = scale*weights[Zj]*(-m*rm_inv/rij*fc_ij + fcp_ij*rm_inv);
 
 }

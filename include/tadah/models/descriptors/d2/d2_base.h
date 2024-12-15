@@ -12,7 +12,8 @@ class D2_Base: public D_Base {
 public:
   D2_Base() {};
   D2_Base(Config &c): D_Base(c) {
-    if (c.get<bool>("INIT2B")) {
+    //if (c.get<bool>("INIT2B")) {
+    if (c.exist("RCTYPE2B")) {
       double rcut2b = c.get<double>("RCUT2B");
       set_fcut(CONFIG::factory<Cut_Base,double>( c.get<std::string>("RCTYPE2B"), rcut2b ), true);
     }

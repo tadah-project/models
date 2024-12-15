@@ -28,7 +28,7 @@ public:
   /** \brief Return label of this descriptor.
    */
   virtual std::string label()=0;
-  double weights[119];  // ignore zero index; w[1]->H
+  double weights[119] = {1};  // ignore zero index; w[1]->H
   D_Base();
   D_Base(Config &c);
 

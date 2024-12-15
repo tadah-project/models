@@ -6,12 +6,8 @@
 #include <cmath>
 #include <vector>
 
-TEST_CASE("Testing Atom PeriodicTable Initialization") {
-    PeriodicTable::initialize();
-}
-
-template <typename DM, typename CUT>
-void central_difference_mb(DM *dm, CUT *fc, std::vector<Vec3d> &positions, 
+template <typename DM>
+void central_difference_mb(DM *dm, std::vector<Vec3d> &positions, 
                            size_t j, fd_type &fdij, double h=1e-10) {
 
   //size_t i=0;
@@ -117,6 +113,7 @@ void test_case(Config &config_mb,
 
   CUT fc(config_mb.get<double>("RCUTMB"));
   DM dm(config_mb);
+  dm.set_fcut(&fc,false);
   aed_type2 aed1(dm.size());
   aed_type2 aed2(dm.size());
   aed_type2 aed3(dm.size());
@@ -298,9 +295,9 @@ void test_case(Config &config_mb,
   fd13a.set_zero();
   fd14a.set_zero();
   double margin=1e-5;
-  central_difference_mb(&dm,&fc,positions, 1, fd12a, 1e-8);
-  central_difference_mb(&dm,&fc,positions, 2, fd13a, 1e-8);
-  central_difference_mb(&dm,&fc,positions, 3, fd14a, 1e-8);
+  central_difference_mb(&dm,positions, 1, fd12a, 1e-8);
+  central_difference_mb(&dm,positions, 2, fd13a, 1e-8);
+  central_difference_mb(&dm,positions, 3, fd14a, 1e-8);
 
   std::vector<double> fx12(fd12[0].data(),fd12[0].data()+fd12[0].size());
   std::vector<double> fy12(fd12[1].data(),fd12[1].data()+fd12[1].size());
@@ -335,119 +332,148 @@ void test_case(Config &config_mb,
   REQUIRE(dm.label() == label);
   REQUIRE(dm.size() == size);
 }
-TEST_CASE( "Testing DM_EAD 1", "[DM]" ) {
-  Config config_mb;
-  config_mb.add("RCUTMB",10);
-  config_mb.remove("INITMB");
-  config_mb.add("INITMB","true");
-  config_mb.add("AGRIDMB","2");
-  config_mb.add("CGRIDMB","1 2");
-  config_mb.add("SGRIDMB","0.1 0.2");
-  test_case<DM_EAD,Cut_Dummy>(config_mb, "DM_EAD", 3*2);
-  test_case<DM_EAD,Cut_Cos>(config_mb, "DM_EAD", 3*2);
-  test_case<DM_EAD,Cut_Tanh>(config_mb, "DM_EAD", 3*2);
-  test_case<DM_EAD,Cut_Poly2>(config_mb, "DM_EAD", 3*2);
-}
-TEST_CASE( "Testing DM_EAD 2", "[DM]" ) {
-  Config config_mb;
-  config_mb.add("RCUTMB",6);
-  config_mb.remove("INITMB");
-  config_mb.add("INITMB","true");
-  config_mb.add("AGRIDMB","3");
-  config_mb.add("CGRIDMB","1 2 3");
-  config_mb.add("SGRIDMB","0.1 0.2 0.9");
-  test_case<DM_EAD,Cut_Dummy>(config_mb, "DM_EAD", 4*3);
-  test_case<DM_EAD,Cut_Cos>(config_mb, "DM_EAD", 4*3);
-  test_case<DM_EAD,Cut_Tanh>(config_mb, "DM_EAD", 4*3);
-  test_case<DM_EAD,Cut_Poly2>(config_mb, "DM_EAD", 4*3);
-}
-TEST_CASE( "Testing DM_Blip 1", "[DM]" ) {
-  Config config_mb;
-  config_mb.add("RCUTMB",10);
-  config_mb.remove("INITMB");
-  config_mb.add("INITMB","true");
-  config_mb.add("AGRIDMB","2");
-  config_mb.add("CGRIDMB","1 2");
-  config_mb.add("SGRIDMB","0.1 0.2");
-  test_case<DM_Blip,Cut_Dummy>(config_mb, "DM_Blip", 3*2);
-  test_case<DM_Blip,Cut_Cos>(config_mb, "DM_Blip", 3*2);
-  test_case<DM_Blip,Cut_Tanh>(config_mb, "DM_Blip", 3*2);
-  test_case<DM_Blip,Cut_Poly2>(config_mb, "DM_Blip", 3*2);
-}
-TEST_CASE( "Testing DM_Blip 2", "[DM]" ) {
-  Config config_mb;
-  config_mb.add("RCUTMB",6);
-  config_mb.remove("INITMB");
-  config_mb.add("INITMB","true");
-  config_mb.add("AGRIDMB","3");
-  config_mb.add("CGRIDMB","1 2 3");
-  config_mb.add("SGRIDMB","0.1 0.2 0.9");
-  test_case<DM_Blip,Cut_Dummy>(config_mb, "DM_Blip", 4*3);
-  test_case<DM_Blip,Cut_Cos>(config_mb, "DM_Blip", 4*3);
-  test_case<DM_Blip,Cut_Tanh>(config_mb, "DM_Blip", 4*3);
-  test_case<DM_Blip,Cut_Poly2>(config_mb, "DM_Blip", 4*3);
-}
-TEST_CASE( "Testing DM_EAM 1", "[DM]" ) {
-  Config config_mb;
-  config_mb.add("RCUTMB",5.58190742024);
-  config_mb.remove("INITMB");
-  config_mb.add("INITMB","true");
-  config_mb.add("SETFL","tests_data/eam.alloy");
-  test_case<DM_EAM,Cut_Dummy>(config_mb, "DM_EAM", 1);
 
-  // throws
-  Config c_err;
-  c_err.remove("INITMB");
-  c_err.add("INITMB", "true");
-  c_err.add("SETFL","path/to/nowhere");
-  REQUIRE_THROWS(DM_EAM(c_err));
+// Fixture to initialize the PeriodicTable
+struct TestFixture {
+    TestFixture() {
+        PeriodicTable::initialize();
+    }
+};
+TEST_CASE_METHOD(TestFixture, "Testing DM_EAD 1", "[DM]") {
+    Config config_mb;
+    config_mb.add("RCUTMB", 10);
+    config_mb.remove("INITMB");
+    config_mb.add("INITMB", "true");
+    config_mb.add("AGRIDMB", "2");
+    config_mb.add("CGRIDMB", "1 2");
+    config_mb.add("SGRIDMB", "0.1 0.2");
+    config_mb.add("ATOMS", "H");
+    config_mb.add("WATOMS", 1);
+    test_case<DM_EAD, Cut_Dummy>(config_mb, "DM_EAD", 3 * 2);
+    test_case<DM_EAD, Cut_Cos>(config_mb, "DM_EAD", 3 * 2);
+    test_case<DM_EAD, Cut_Tanh>(config_mb, "DM_EAD", 3 * 2);
+    test_case<DM_EAD, Cut_Poly2>(config_mb, "DM_EAD", 3 * 2);
 }
-TEST_CASE( "Testing DM_EAM 2", "[DM]" ) {
-  Config config_mb;
-  config_mb.add("RCUTMB",5.58190742024);
-  config_mb.remove("INITMB");
-  config_mb.add("INITMB","true");
-  config_mb.add("SETFL","tests_data/eam.alloy");
-  test_case<DM_EAM,Cut_Dummy>(config_mb, "DM_EAM", 1);
+
+TEST_CASE_METHOD(TestFixture, "Testing DM_EAD 2", "[DM]") {
+    Config config_mb;
+    config_mb.add("RCUTMB", 6);
+    config_mb.remove("INITMB");
+    config_mb.add("INITMB", "true");
+    config_mb.add("AGRIDMB", "3");
+    config_mb.add("CGRIDMB", "1 2 3");
+    config_mb.add("SGRIDMB", "0.1 0.2 0.9");
+    config_mb.add("ATOMS", "H");
+    config_mb.add("WATOMS", 1);
+    test_case<DM_EAD, Cut_Dummy>(config_mb, "DM_EAD", 4 * 3);
+    test_case<DM_EAD, Cut_Cos>(config_mb, "DM_EAD", 4 * 3);
+    test_case<DM_EAD, Cut_Tanh>(config_mb, "DM_EAD", 4 * 3);
+    test_case<DM_EAD, Cut_Poly2>(config_mb, "DM_EAD", 4 * 3);
 }
-TEST_CASE( "Testing DM_Dummy 1", "[DM]" ) {
-  Config config_mb;
-  config_mb.add("RCUTMB",5.58190742024);
-  config_mb.remove("INITMB");
-  config_mb.add("INITMB","true");
-  config_mb.add("SETFL","tests_data/eam.alloy");
-  test_case<DM_EAM,Cut_Dummy>(config_mb, "DM_EAM", 1);
 
-  // throws
-  Config c_err;
-  c_err.remove("INITMB");
-  c_err.add("INITMB", "true");
-  c_err.add("SETFL","path/to/nowhere");
-  REQUIRE_THROWS(DM_EAM(c_err));
+TEST_CASE_METHOD(TestFixture, "Testing DM_Blip 1", "[DM]") {
+    Config config_mb;
+    config_mb.add("RCUTMB", 10);
+    config_mb.remove("INITMB");
+    config_mb.add("INITMB", "true");
+    config_mb.add("AGRIDMB", "2");
+    config_mb.add("CGRIDMB", "1 2");
+    config_mb.add("SGRIDMB", "0.1 0.2");
+    config_mb.add("ATOMS", "H");
+    config_mb.add("WATOMS", 1);
+    test_case<DM_Blip, Cut_Dummy>(config_mb, "DM_Blip", 3 * 2);
+    test_case<DM_Blip, Cut_Cos>(config_mb, "DM_Blip", 3 * 2);
+    test_case<DM_Blip, Cut_Tanh>(config_mb, "DM_Blip", 3 * 2);
+    test_case<DM_Blip, Cut_Poly2>(config_mb, "DM_Blip", 3 * 2);
 }
-TEST_CASE( "Testing DM_Dummy", "[DM]" ) {
-  Config c;
-  c.add("RCUTMB",5.58190742024);
-  c.remove("INITMB");
-  c.add("INITMB","true");
-  c.add("ATOMS", "H");
-  c.add("WATOMS", 1);
 
-  REQUIRE_NOTHROW(DM_Dummy());
-  REQUIRE_NOTHROW(DM_Dummy(c));
+TEST_CASE_METHOD(TestFixture, "Testing DM_Blip 2", "[DM]") {
+    Config config_mb;
+    config_mb.add("RCUTMB", 6);
+    config_mb.remove("INITMB");
+    config_mb.add("INITMB", "true");
+    config_mb.add("AGRIDMB", "3");
+    config_mb.add("CGRIDMB", "1 2 3");
+    config_mb.add("SGRIDMB", "0.1 0.2 0.9");
+    config_mb.add("ATOMS", "H");
+    config_mb.add("WATOMS", 1);
+    test_case<DM_Blip, Cut_Dummy>(config_mb, "DM_Blip", 4 * 3);
+    test_case<DM_Blip, Cut_Cos>(config_mb, "DM_Blip", 4 * 3);
+    test_case<DM_Blip, Cut_Tanh>(config_mb, "DM_Blip", 4 * 3);
+    test_case<DM_Blip, Cut_Poly2>(config_mb, "DM_Blip", 4 * 3);
+}
 
-  DM_Dummy d(c);
-  REQUIRE(d.size()==0);
-  REQUIRE(d.label()=="DM_Dummy");
-  aed_type2 aed;
-  rho_type rho1;
-  fd_type fd;
-  Vec3d del;
-  REQUIRE_NOTHROW(d.calc_aed(rho1,aed));
-  REQUIRE_NOTHROW(d.init_rhoi(rho1));
-  REQUIRE_NOTHROW(d.calc_rho(0,0,0,del,rho1));
-  REQUIRE_NOTHROW(d.calc_dXijdri(1,0,0,del,rho1,fd));
-  REQUIRE_NOTHROW(d.calc_dXijdri_dXjidri(1,1,0,0,del,rho1,rho1,fd,1));
-  REQUIRE(d.rhoi_size()==0);
-  REQUIRE(d.rhoip_size()==0);
+TEST_CASE_METHOD(TestFixture, "Testing DM_EAM 1", "[DM]") {
+    Config config_mb;
+    config_mb.add("RCUTMB", 5.58190742024);
+    config_mb.remove("INITMB");
+    config_mb.add("INITMB", "true");
+    config_mb.add("SETFL", "tests_data/eam.alloy");
+    config_mb.add("ATOMS", "H");
+    config_mb.add("WATOMS", 1);
+    test_case<DM_EAM, Cut_Dummy>(config_mb, "DM_EAM", 1);
+
+    // Throws
+    Config c_err;
+    c_err.remove("INITMB");
+    c_err.add("INITMB", "true");
+    c_err.add("SETFL", "path/to/nowhere");
+    REQUIRE_THROWS(DM_EAM(c_err));
+}
+
+TEST_CASE_METHOD(TestFixture, "Testing DM_EAM 2", "[DM]") {
+    Config config_mb;
+    config_mb.add("RCUTMB", 5.58190742024);
+    config_mb.remove("INITMB");
+    config_mb.add("INITMB", "true");
+    config_mb.add("SETFL", "tests_data/eam.alloy");
+    config_mb.add("ATOMS", "H");
+    config_mb.add("WATOMS", 1);
+    test_case<DM_EAM, Cut_Dummy>(config_mb, "DM_EAM", 1);
+}
+
+TEST_CASE_METHOD(TestFixture, "Testing DM_Dummy 1", "[DM]") {
+    Config config_mb;
+    config_mb.add("RCUTMB", 5.58190742024);
+    config_mb.remove("INITMB");
+    config_mb.add("INITMB", "true");
+    config_mb.add("SETFL", "tests_data/eam.alloy");
+    config_mb.add("ATOMS", "H");
+    config_mb.add("WATOMS", 1);
+    test_case<DM_EAM, Cut_Dummy>(config_mb, "DM_EAM", 1);
+
+    // Throws
+    Config c_err;
+    c_err.remove("INITMB");
+    c_err.add("INITMB", "true");
+    c_err.add("SETFL", "path/to/nowhere");
+    REQUIRE_THROWS(DM_EAM(c_err));
+}
+
+TEST_CASE_METHOD(TestFixture, "Testing DM_Dummy", "[DM]") {
+    Config c;
+    c.add("RCUTMB", 5.58190742024);
+    c.add("RCTYPEMB", "Cut_Cos");
+    c.remove("INITMB");
+    c.add("INITMB", "true");
+    c.add("ATOMS", "H");
+    c.add("WATOMS", 1);
+
+    REQUIRE_NOTHROW(DM_Dummy());
+    REQUIRE_NOTHROW(DM_Dummy(c));
+
+    DM_Dummy d(c);
+    REQUIRE(d.size() == 0);
+    REQUIRE(d.label() == "DM_Dummy");
+    aed_type2 aed;
+    rho_type rho1;
+    fd_type fd;
+    Vec3d del;
+    REQUIRE_NOTHROW(d.calc_aed(rho1, aed));
+    REQUIRE_NOTHROW(d.init_rhoi(rho1));
+    REQUIRE_NOTHROW(d.calc_rho(0, 0, 0, del, rho1));
+    REQUIRE_NOTHROW(d.calc_dXijdri(1, 0, 0, del, rho1, fd));
+    REQUIRE_NOTHROW(d.calc_dXijdri_dXjidri(1, 1, 0, 0, del, rho1, rho1, fd, 1));
+    REQUIRE(d.rhoi_size() == 0);
+    REQUIRE(d.rhoip_size() == 0);
 }

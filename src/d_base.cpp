@@ -41,11 +41,14 @@ D_Base::D_Base() {}
 D_Base::D_Base(Config &c):
   verbose(c.get<int>("VERBOSE"))
 {
-  for (size_t i=0; i<c.size("ATOMS"); ++i) {
-    std::string symbol = c.get<std::string>("ATOMS",i);
-    double wi = c.get<double>("WATOMS",i);
-    int Z = PeriodicTable::find_by_symbol(symbol).Z;
-    weights[Z]=wi;
+  std::fill_n(weights, 119, 1.0);
+  if (c.exist("ATOMS")) {
+    for (size_t i=0; i<c.size("ATOMS"); ++i) {
+      std::string symbol = c.get<std::string>("ATOMS",i);
+      double wi = c.get<double>("WATOMS",i);
+      int Z = PeriodicTable::find_by_symbol(symbol).Z;
+      weights[Z]=wi;
+    }
   }
 }
 void D_Base::set_fidx(size_t fidx_) { fidx=fidx_; }
