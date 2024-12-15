@@ -51,8 +51,8 @@ void D2_LJ::calc_all(
 
   double fc_ij = fcut->calc(rij);
   double fcp_ij = fcut->calc_prime(rij);
-  aed(fidx) -= r6_inv*fc_ij;
-  aed(fidx+1) += r6_inv*r6_inv*fc_ij;
+  aed(fidx) -= scale*weights[Zj]*r6_inv*fc_ij;
+  aed(fidx+1) += scale*weights[Zj]*r6_inv*r6_inv*fc_ij;
 
   fd_ij(fidx,0) = scale*weights[Zj]*(6.0*r6_inv*r2_inv*rij*fc_ij - fcp_ij*r6_inv);
   fd_ij(fidx+1,0) = scale*weights[Zj]*(-12.0*r6_inv*r6_inv*r2_inv*rij*fc_ij + fcp_ij*r6_inv*r6_inv);
