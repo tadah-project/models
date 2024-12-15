@@ -7,9 +7,9 @@
 #include <cstdlib>
 
 class F_Base {
-    public:
-        virtual double calc_F(double rho, size_t c)=0;
-        virtual double calc_dF(double rho, size_t c)=0;
+public:
+  virtual double calc_F(double rho, size_t c)=0;
+  virtual double calc_dF(double rho, size_t c)=0;
 };
 
 /**
@@ -25,17 +25,17 @@ class F_Base {
  * @note Ensure the configuration keys match the descriptor requirements.
  */
 class F_RLR:  public F_Base {
-    private:
-        Config *config=nullptr;
-        v_type sgrid;   // controls depth
-        v_type cgrid;   // control x-intercep at 1/c
-    public:
-        F_RLR(Config &conf);
-        F_RLR();
-        double calc_F(double rho,size_t c);
-        double calc_dF(double rho,size_t c);
-        //~F_RLR() {
-            // Do not delete config!
-        //}
+private:
+  Config *config=nullptr;
+  v_type sgrid;   // controls depth
+  v_type cgrid;   // control x-intercep at 1/c
+public:
+  F_RLR(Config &conf);
+  F_RLR();
+  double calc_F(double rho,size_t c);
+  double calc_dF(double rho,size_t c);
+  //~F_RLR() {
+  // Do not delete config!
+  //}
 };
 #endif

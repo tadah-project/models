@@ -35,55 +35,49 @@
  * \ref INITMB \ref CGRIDMB \ref SGRIDMB \ref AGRIDMB
  */
 class DM_EAD: public DM_Base {
-    private:
-        int Lmax=0;
-        size_t rhoisize=0;
-        size_t s=0;
-        std::string lab="DM_EAD";
-        v_type sgrid;
-        v_type cgrid;
-        std::vector<std::vector<std::vector<int>>> orbitals;
-        std::vector<std::vector<double>> fac;
-        size_t gen_atomic_orbitals(int L);
-        double fact(int n);
-        double my_pow(double,int);
-        int verbose;
-        double rc;
+private:
+  int Lmax=0;
+  std::string lab="DM_EAD";
+  v_type sgrid;
+  v_type cgrid;
+  std::vector<std::vector<std::vector<int>>> orbitals;
+  std::vector<std::vector<double>> fac;
+  size_t gen_atomic_orbitals(int L);
+  double fact(int n);
+  double my_pow(double,int);
+  double rc;
 
-    public:
-        DM_EAD(Config&);
-        void calc_aed(
-                rho_type& rho,
-                aed_type2 &aed);
-        int calc_dXijdri_dXjidri(
-                const double rij,
-                const double rij_sq,
-                const Vec3d &vec_ij,
-                const double fc_ij,
-                const double fcp_ij,
-                rho_type& rhoi,
-                rho_type& rhoj,
-                fd_type &fd_ij,
-                const double wi,
-                const double wj);
-        int calc_dXijdri(
-                const double rij,
-                const double rij_sq,
-                const Vec3d &vec_ij,
-                const double fc_ij,
-                const double fcp_ij,
-                rho_type& rhoi,
-                fd_type &fd_ij);
-        size_t size();
-        std::string label();
-        void init_rhoi(rho_type& rhoi);
-        void calc_rho(
-                const double rij,
-                const double rij_sq,
-                const double fc_ij,
-                const Vec3d &vec_ij,
-                rho_type& rho);
-        size_t rhoi_size();
-        size_t rhoip_size();
+public:
+  DM_EAD(Config&);
+  void calc_aed(
+    rho_type& rho,
+    aed_type2 &aed) override;
+  int calc_dXijdri_dXjidri(
+    const int Zi,
+    const int Zj,
+    const double rij,
+    const double rij_sq,
+    const Vec3d &vec_ij,
+    rho_type& rhoi,
+    rho_type& rhoj,
+    fd_type &fd_ij,
+    const double scale=1) override;
+  int calc_dXijdri(
+    const int Zj,
+    const double rij,
+    const double rij_sq,
+    const Vec3d &vec_ij,
+    rho_type& rhoi,
+    fd_type &fd_ij, 
+    const double scale=1) override;
+  std::string label() override;
+  void init_rhoi(rho_type& rhoi) override;
+  void calc_rho(
+    const int Zj,
+    const double rij,
+    const double rij_sq,
+    const Vec3d &vec_ij,
+    rho_type& rho,
+    const double scale=1) override;
 };
 #endif

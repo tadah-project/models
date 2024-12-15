@@ -10,20 +10,29 @@
 template<typename D1, typename D2>
 class D2_Join : public D2_Base {
 private:
-  D1 d1;
-  D2 d2;
-  size_t s=0;
+  D1 *d1 = nullptr;
+  D2 *d2 = nullptr;
   //std::string lab="D2_Join";
   std::string lab;
-  int verbose;
 public:
   D2_Join();
-  D2_Join(Config &c)
+  ~D2_Join() {
+    if (d1) delete d1;
+    if (d2) delete d2;
+  }
+  D2_Join(Config &c): D2_Base(c)
   {
     // prepare configs for d1 and d2
     // first we get joined grid and we have to split it between d1 and d2
     // we have to deal with -1 -2 algorithms and manual cases
     // TYPE2B 1st element is type followed be grid sizes (after expansion)
+    //
+    // TODO
+    // We want to be able to use this class in a recurence realtion
+    // where d1 <- any D2 but not D2_Join
+    // and d2 can be any including D2_Join
+    // This means that we trim config for d1 and pass
+    // whatever is left to d2
     v_type cgrid;
     cgrid.resize(c.size("CGRID2B"));
     c.get<v_type>("CGRID2B",cgrid);
@@ -39,6 +48,8 @@ public:
     try {
       size_t c1_cgrid_size = c.get<double>("CGRID2B",0) < 0 ? 4 : c.get<size_t>("TYPE2B",1);
       size_t c1_sgrid_size = c.get<double>("SGRID2B",0) < 0 ? 4 : c.get<size_t>("TYPE2B",1);
+      // size_t c2_cgrid_size = c.size("CGRID2B") - c1_cgrid_size;
+      // size_t c2_sgrid_size = c.size("SGRID2B") - c1_sgrid_size;
       size_t c2_cgrid_size = c.get<double>("CGRID2B",c1_cgrid_size) < 0 ? 4 : c.get<size_t>("TYPE2B",2);
       size_t c2_sgrid_size = c.get<double>("SGRID2B",c1_sgrid_size) < 0 ? 4 : c.get<size_t>("TYPE2B",2);
       for (size_t i=0; i<c1_cgrid_size; ++i) {
@@ -60,8 +71,23 @@ public:
         << "relying on a single auto grid generation for both descriptors. "
         << "Details: " << e.what() << std::endl;
     }
-    d1 = D1(c1);
-    d2 = D2(c2);
+    // deal with cutoffs
+    c1.remove("RCTYPE2B"); c2.remove("RCTYPE2B");
+    c1.remove("RCUT2B"); c2.remove("RCUT2B");
+    std::vector<std::string> rctype2b(c.size("RCTYPE2B"));
+    std::vector<std::string> rcut2b(c.size("RCUT2B"));
+    c.get("RCTYPE2B",rctype2b);
+    c.get("RCUT2B",rcut2b);
+    c1.add("RCTYPE2B", rctype2b[0]);
+    c1.add("RCUT2B", rcut2b[0]);
+    rctype2b.erase(rctype2b.begin());
+    rcut2b.erase(rcut2b.begin());
+    c2.add("RCTYPE2B", rctype2b);
+    c2.add("RCUT2B", rcut2b);
+    // std::cout << c1 << std::endl;
+    // std::cout << c2 << std::endl;
+    d1 = new D1(c1);
+    d2 = new D2(c2);
 
     // update main config file with generated grids
     cgrid.resize(c1.size("CGRID2B")+c2.size("CGRID2B"));
@@ -76,48 +102,43 @@ public:
       c.add("SGRID2B",c2.get<double>("SGRID2B",i));
     }
 
-    s=d1.size()+d2.size();
-    lab=d1.label()+d1.label();
+    s=d1->size()+d2->size();
+    lab="KUTAbezS"+d1->label()+d1->label();
   }
   void calc_aed(
+    const int Zj,
     const double rij,
     const double rij_sq,
-    const double fc_ij,
-    aed_type2 &aed) {
-    d1.calc_aed(rij,rij_sq,fc_ij,aed);
-    d2.calc_aed(rij,rij_sq,fc_ij,aed);
+    aed_type2 &aed,
+    const double scale=1) override {
+    d1->calc_aed(Zj,rij,rij_sq,aed,scale);
+    d2->calc_aed(Zj,rij,rij_sq,aed,scale);
   }
   void calc_dXijdri(
+    const int Zj,
     const double rij,
     const double rij_sq,
-    const double fc_ij,
-    const double fcp_ij,
-    fd_type &fd_ij)
-  {
-    d1.calc_dXijdri(rij,rij_sq,fc_ij,fcp_ij,fd_ij);
-    d2.calc_dXijdri(rij,rij_sq,fc_ij,fcp_ij,fd_ij);
+    fd_type &fd_ij,
+    const double scale=1) override {
+    d1->calc_dXijdri(Zj,rij,rij_sq,fd_ij,scale);
+    d2->calc_dXijdri(Zj,rij,rij_sq,fd_ij,scale);
   }
-
   void calc_all(
+    const int Zj,
     const double rij,
     const double rij_sq,
-    const double fc_ij,
-    const double fcp_ij,
     aed_type2 &aed,
-    fd_type &fd_ij)
-  {
-    d1.calc_all(rij,rij_sq,fc_ij,fcp_ij,aed,fd_ij);
-    d2.calc_all(rij,rij_sq,fc_ij,fcp_ij,aed,fd_ij);
+    fd_type &fd_ij,
+    const double scale=1) override {
+    d1->calc_all(Zj,rij,rij_sq,aed,fd_ij,scale);
+    d2->calc_all(Zj,rij,rij_sq,aed,fd_ij,scale);
   }
-  size_t size() {
-    return s;
-  }
-  std::string label() {
+  std::string label() override {
     return lab;
   }
   void set_fidx(size_t fidx_) {
-    d1.set_fidx(fidx_);
-    d2.set_fidx(d1.size()+d1.get_fidx());
+    d1->set_fidx(fidx_);
+    d2->set_fidx(d1->size()+d1->get_fidx());
   }
 };
 #endif

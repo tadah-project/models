@@ -1,13 +1,11 @@
+#include "tadah/models/descriptors/d2/d2_base.h"
 #include <tadah/models/descriptors/d2/d2_eam.h>
 
 D2_EAM::D2_EAM() {}
-D2_EAM::D2_EAM(Config &c):
-  verbose(c.get<int>("VERBOSE"))
+D2_EAM::D2_EAM(Config &c): D2_Base(c)
 {
-  if (!c.get<bool>("INIT2B")) {
-    s=0;
-    return;
-  }
+  if (!c.get<bool>("INIT2B")) return;
+  s=1;
   ef.file_path = c("SETFL")[0];
   read_setfl();
 
@@ -23,25 +21,22 @@ D2_EAM::D2_EAM(Config &c):
     c.postprocess();
   }
 
-
   frho_spline.resize(ef.nrho+1, std::vector<double>(7));
   rhor_spline.resize(ef.nr+1, std::vector<double>(7));
   z2r_spline.resize(ef.nr+1, std::vector<double>(7));
 
-
   gen_splines(ef.nrho, ef.drho, ef.frho, frho_spline);
   gen_splines(ef.nr, ef.dr, ef.rhor, rhor_spline);
   gen_splines(ef.nr, ef.dr, ef.z2r, z2r_spline);
-
 }
 
 void D2_EAM::calc_aed(
+  const int ,
   const double rij,
   const double,
-  const double,
-  aed_type2 &aed)
+  aed_type2 &aed,
+  const double scale)
 {
-
   double r = rij;
   const double recip = 1.0/r;
   double p = r*ef.rdr + 1.0;
@@ -50,17 +45,15 @@ void D2_EAM::calc_aed(
   p -= m;
   p = std::min(p,1.0);
   double z2 = ((z2r_spline[m][3]*p + z2r_spline[m][4])*p + z2r_spline[m][5])*p + z2r_spline[m][6];
-  aed(fidx) += z2*recip;
-
+  aed(fidx) += scale*z2*recip;
 }
 void D2_EAM::calc_dXijdri(
+  const int ,
   const double rij,
   const double,
-  const double,
-  const double,
-  fd_type &fd_ij)
+  fd_type &fd_ij,
+  const double scale)
 {
-
   const double r = rij;
   const double recip = 1.0/r;
   double p = r*ef.rdr + 1.0;
@@ -73,17 +66,17 @@ void D2_EAM::calc_dXijdri(
   //double phi = z2*recip;
   //double phip = z2p*recip - z2*recip*recip;
 
-  fd_ij(fidx,0) = (z2p*recip - z2*recip*recip);
+  fd_ij(fidx,0) = scale*(z2p*recip - z2*recip*recip);
   //force_fp_ij[first_idx] = 0.5*(z2p*recip - z2*recip*recip);
 
 }
 void D2_EAM::calc_all(
+  const int ,
   const double rij,
   const double,
-  const double,
-  const double,
   aed_type2 &aed,
-  fd_type &fd_ij)
+  fd_type &fd_ij,
+  const double scale)
 {
   double r = rij;
   const double recip = 1.0/r;
@@ -93,16 +86,11 @@ void D2_EAM::calc_all(
   p -= m;
   p = std::min(p,1.0);
   double z2 = ((z2r_spline[m][3]*p + z2r_spline[m][4])*p + z2r_spline[m][5])*p + z2r_spline[m][6];
-  aed(fidx) += z2*recip;
+  aed(fidx) += scale*z2*recip;
 
   double z2p = (z2r_spline[m][0]*p + z2r_spline[m][1])*p + z2r_spline[m][2];
   // 0.5 b/c full neighbour list is used TODO check
-  fd_ij(fidx,0) = (z2p*recip - z2*recip*recip);
-
-
-}
-size_t D2_EAM::size() {
-  return s;
+  fd_ij(fidx,0) = scale*(z2p*recip - z2*recip*recip);
 }
 std::string D2_EAM::label() {
   return lab;

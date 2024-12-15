@@ -7,8 +7,7 @@
  * of the embedding function
  */
 template <typename F>
-DM_mEAD<F>::DM_mEAD(Config &config):
-  verbose(config.get<int>("VERBOSE")),
+DM_mEAD<F>::DM_mEAD(Config &config): DM_Base(config),
   rc(config.get<double>("RCUTMB")),
   emb(config)
 {
@@ -66,22 +65,26 @@ void DM_mEAD<F>::calc_aed(
 }
 template <typename F>
 int DM_mEAD<F>::calc_dXijdri_dXjidri(
+  const int Zi,
+  const int Zj,
   const double rij,
   const double,
   const Vec3d &vec_ij,
-  const double fc_ij,
-  const double fcp_ij,
   rho_type& rhoi,
   rho_type& rhoj,
   fd_type &fd_ij,
-  const double wi,
-  const double wj)
+  const double scale)
 {
   const double x = vec_ij[0];
   const double y = vec_ij[1];
   const double z = vec_ij[2];
 
   size_t Lshift = 0;
+
+  double wi = weights[Zi];
+  double wj = weights[Zj];
+  double fc_ij = fcut->calc(rij);
+  double fcp_ij = fcut->calc_prime(rij);
 
   size_t ii=rhoisize;
   for (int L=0; L<=Lmax; ++L) {
@@ -135,19 +138,19 @@ int DM_mEAD<F>::calc_dXijdri_dXjidri(
         const double term1jiy = bf*tyji;
         const double term1jiz = bf*tzji;
 
-        fd_ij(c+Lshift+fidx,0) +=
+        fd_ij(c+Lshift+fidx,0) += scale*(
           rhoi(ii)*(term1ijx + term2ijx)*wj
-          -rhoj(ii)*(term1jix + term2jix)*wi
+          -rhoj(ii)*(term1jix + term2jix)*wi)
         ;
 
-        fd_ij(c+Lshift+fidx,1) +=
+        fd_ij(c+Lshift+fidx,1) += scale*(
           rhoi(ii)*(term1ijy + term2ijy)*wj
-          -rhoj(ii)*(term1jiy + term2jiy)*wi
+          -rhoj(ii)*(term1jiy + term2jiy)*wi)
         ;
 
-        fd_ij(c+Lshift+fidx,2) += 
+        fd_ij(c+Lshift+fidx,2) += scale*(
           rhoi(ii)*(term1ijz + term2ijz)*wj
-          -rhoj(ii)*(term1jiz + term2jiz)*wi
+          -rhoj(ii)*(term1jiz + term2jiz)*wi)
         ;
         ii++;
       }
@@ -156,21 +159,24 @@ int DM_mEAD<F>::calc_dXijdri_dXjidri(
   }
 
   return 1;
-
 }
 template <typename F>
 int DM_mEAD<F>::calc_dXijdri(
+  const int Zj,
   const double rij,
   const double,
   const Vec3d &vec_ij,
-  const double fc_ij,
-  const double fcp_ij,
   rho_type& rhoi,
-  fd_type &fd_ij)
+  fd_type &fd_ij,
+  const double scale)
 {
   const double x = vec_ij[0];
   const double y = vec_ij[1];
   const double z = vec_ij[2];
+
+  double wj = weights[Zj];
+  double fc_ij = scale*wj*fcut->calc(rij);
+  double fcp_ij = scale*wj*fcut->calc_prime(rij);
 
   size_t Lshift = 0;
 
@@ -230,10 +236,6 @@ int DM_mEAD<F>::calc_dXijdri(
 
 }
 template <typename F>
-size_t DM_mEAD<F>::size() {
-  return s;
-}
-template <typename F>
 std::string DM_mEAD<F>::label() {
   return lab;
 }
@@ -246,13 +248,15 @@ void DM_mEAD<F>::init_rhoi(rho_type& rhoi)
 }
 template <typename F>
 void DM_mEAD<F>::calc_rho(
+  const int Zj,
   const double rij,
   const double,
-  const double fc_ij,
   const Vec3d &vec_ij,
-  rho_type& rhoi)
+  rho_type& rhoi,
+  const double scale)
 {
   size_t ii=0;
+  double fc_ij = scale*weights[Zj]*fcut->calc(rij);
   for (int L=0; L<=Lmax; ++L) {
     for (size_t o=0; o<orbitals[L].size(); ++o) {
       const size_t lx = orbitals[L][o][0];
@@ -308,13 +312,5 @@ double DM_mEAD<F>::my_pow(double x, int n){
     --n;
   }
   return r;
-}
-template <typename F>
-size_t DM_mEAD<F>::rhoi_size() {
-  return rhoisize;
-}
-template <typename F>
-size_t DM_mEAD<F>::rhoip_size() {
-  return rhoisize;
 }
 

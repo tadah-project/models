@@ -2,8 +2,7 @@
 #include <tadah/models/descriptors/d_basis_functions.h>
 
 D2_BP::D2_BP() {}
-D2_BP::D2_BP(Config &c):
-  verbose(c.get<int>("VERBOSE"))
+D2_BP::D2_BP(Config &c): D2_Base(c)
 {
 
   if (!c.get<bool>("INIT2B")) return;
@@ -40,48 +39,50 @@ D2_BP::D2_BP(Config &c):
 }
 
 void D2_BP::calc_aed(
+  const int Zj,
   const double rij,
   const double ,
-  const double fc_ij,
-  aed_type2 &aed)
+  aed_type2 &aed,
+  const double scale)
 {
 
   size_t i=fidx;
+  double fc_ij = fcut->calc(rij);
   for (size_t c=0; c<mius.size(); c++) {         
-    aed(i++) += G(rij,etas[c],mius[c],fc_ij);
+    aed(i++) += scale*weights[Zj]*G(rij,etas[c],mius[c],fc_ij);
   }
 
 }
 void D2_BP::calc_dXijdri(
+  const int Zj,
   const double rij,
   const double ,
-  const double fc_ij,
-  const double fcp_ij,
-  fd_type &fd_ij)
+  fd_type &fd_ij,
+  const double scale)
 {
   size_t i=fidx;
+  double fc_ij = fcut->calc(rij);
+  double fcp_ij = fcut->calc_prime(rij);
   for (size_t c=0; c<mius.size(); c++) {         
-    fd_ij(i++,0) = dG(rij,etas[c],mius[c],fc_ij,fcp_ij);
+    fd_ij(i++,0) = scale*weights[Zj]*dG(rij,etas[c],mius[c],fc_ij,fcp_ij);
   }
 }
 void D2_BP::calc_all(
+  const int Zj,
   const double rij,
   const double ,
-  const double fc_ij,
-  const double fcp_ij,
   aed_type2 &aed,
-  fd_type &fd_ij)
+  fd_type &fd_ij,
+  const double scale)
 {
-
   size_t i=fidx;
+  double fc_ij = fcut->calc(rij);
+  double fcp_ij = fcut->calc_prime(rij);
   for (size_t c=0; c<mius.size(); c++) {         
-    aed(i) += G(rij,etas[c],mius[c],fc_ij);
-    fd_ij(i,0) = dG(rij,etas[c],mius[c],fc_ij,fcp_ij);
+    aed(i) += scale*weights[Zj]*G(rij,etas[c],mius[c],fc_ij);
+    fd_ij(i,0) = scale*weights[Zj]*dG(rij,etas[c],mius[c],fc_ij,fcp_ij);
     ++i;
   }
-}
-size_t D2_BP::size() {
-  return s;
 }
 std::string D2_BP::label() {
   return lab;

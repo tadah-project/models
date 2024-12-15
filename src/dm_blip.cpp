@@ -1,9 +1,9 @@
+#include "tadah/models/descriptors/dm/dm_base.h"
 #include <tadah/models/descriptors/dm/dm_blip.h>
 #include <tadah/models/descriptors/d_basis_functions.h>
 #include <vector>
 
-DM_Blip::DM_Blip(Config &c):
-  verbose(c.get<int>("VERBOSE")),
+DM_Blip::DM_Blip(Config &c): DM_Base(c),
   rc(c.get<double>("RCUTMB"))
 {
 
@@ -58,20 +58,24 @@ void DM_Blip::calc_aed(
   }
 }
 int DM_Blip::calc_dXijdri_dXjidri(
+  const int Zi,
+  const int Zj,
   const double rij,
   const double,
   const Vec3d &vec_ij,
-  const double fc_ij,
-  const double fcp_ij,
   rho_type& rhoi,
   rho_type& rhoj,
   fd_type &fd_ij,
-  const double wi,
-  const double wj)
+  const double scale)
 {
   const double x = vec_ij[0];
   const double y = vec_ij[1];
   const double z = vec_ij[2];
+
+  double wi = weights[Zi];
+  double wj = weights[Zj];
+  double fc_ij = fcut->calc(rij);
+  double fcp_ij = fcut->calc_prime(rij);
 
   size_t Lshift = 0;
 
@@ -126,19 +130,19 @@ int DM_Blip::calc_dXijdri_dXjidri(
         const double term1jiy = blip*tyji;
         const double term1jiz = blip*tzji;
 
-        fd_ij(c+Lshift+fidx,0) +=
+        fd_ij(c+Lshift+fidx,0) += scale*(
           rhoi(ii)*(term1ijx + term2ijx)*wj
-          -rhoj(ii)*(term1jix + term2jix)*wi
+          -rhoj(ii)*(term1jix + term2jix)*wi)
         ;
 
-        fd_ij(c+Lshift+fidx,1) +=
+        fd_ij(c+Lshift+fidx,1) += scale*(
           rhoi(ii)*(term1ijy + term2ijy)*wj
-          -rhoj(ii)*(term1jiy + term2jiy)*wi
+          -rhoj(ii)*(term1jiy + term2jiy)*wi)
         ;
 
-        fd_ij(c+Lshift+fidx,2) += 
+        fd_ij(c+Lshift+fidx,2) += scale*(
           rhoi(ii)*(term1ijz + term2ijz)*wj
-          -rhoj(ii)*(term1jiz + term2jiz)*wi
+          -rhoj(ii)*(term1jiz + term2jiz)*wi)
         ;
         ii++;
       }
@@ -150,17 +154,21 @@ int DM_Blip::calc_dXijdri_dXjidri(
 
 }
 int DM_Blip::calc_dXijdri(
+  const int Zj, 
   const double rij,
   const double,
   const Vec3d &vec_ij,
-  const double fc_ij,
-  const double fcp_ij,
   rho_type& rhoi,
-  fd_type &fd_ij)
+  fd_type &fd_ij,
+  const double scale)
 {
   const double x = vec_ij[0];
   const double y = vec_ij[1];
   const double z = vec_ij[2];
+
+  double wj = weights[Zj];
+  double fc_ij = scale*wj*fcut->calc(rij);
+  double fcp_ij = scale*wj*fcut->calc_prime(rij);
 
   size_t Lshift = 0;
 
@@ -219,9 +227,6 @@ int DM_Blip::calc_dXijdri(
   return 1;
 
 }
-size_t DM_Blip::size() {
-  return s;
-}
 std::string DM_Blip::label() {
   return lab;
 }
@@ -232,13 +237,15 @@ void DM_Blip::init_rhoi(rho_type& rhoi)
   rhoi.set_zero();
 }
 void DM_Blip::calc_rho(
+  const int Zj,
   const double rij,
   const double,
-  const double fc_ij,
   const Vec3d &vec_ij,
-  rho_type& rhoi)
+  rho_type& rhoi,
+  const double scale)
 {
   size_t ii=0;
+  double fc_ij = scale*weights[Zj]*fcut->calc(rij);
   for (int L=0; L<=Lmax; ++L) {
     for (size_t o=0; o<orbitals[L].size(); ++o) {
       const size_t lx = orbitals[L][o][0];
@@ -292,10 +299,4 @@ double DM_Blip::my_pow(double x, int n){
   }
 
   return r;
-}
-size_t DM_Blip::rhoi_size() {
-  return rhoisize;
-}
-size_t DM_Blip::rhoip_size() {
-  return rhoisize;
 }

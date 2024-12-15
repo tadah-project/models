@@ -41,37 +41,32 @@
  */
 class D2_Blip : public D2_Base {
 private:
-  size_t s=0;
   std::string lab="D2_Blip";
   v_type etas;
   v_type mius;
-  double get_blip(double);
-  double get_dblip(double, double);
-  v_type gen_blip_grid(double, double);
-  int verbose;
 
 public:
   D2_Blip();
   D2_Blip(Config &config);
   void calc_aed(
+    const int Zj,
     const double rij,
-    const double rij_sq,
-    const double fc_ij,
-    aed_type2 &aed);
-  void calc_dXijdri(
-    const double rij,
-    const double rij_sq,
-    const double fc_ij,
-    const double fcp_ij,
-    fd_type &fd_ij);
-  void calc_all(
-    const double rij,
-    const double rij_sq,
-    const double fc_ij,
-    const double fcp_ij,
+    const double ,
     aed_type2 &aed,
-    fd_type &fd_ij);
-  size_t size();
-  std::string label();
+    const double scale=1) override;
+  void calc_dXijdri(
+    const int Zj,
+    const double rij,
+    const double rij_sq,
+    fd_type &fd_ij,
+    const double scale=1) override;
+  void calc_all(
+    const int Zj,
+    const double rij,
+    const double rij_sq,
+    aed_type2 &aed,
+    fd_type &fd_ij,
+    const double scale=1) override;
+  std::string label() override;
 };
 #endif

@@ -9,9 +9,17 @@
  * All many-body descriptors **must** inherit this class.
  */
 class DM_Base: public D_Base {
+
 protected:
-  size_t fidx=0;    // first index in aed and fd arrays for this descriptor
+  size_t rhoisize=0;
 public:
+  DM_Base() {};
+  DM_Base(Config &c): D_Base(c) {
+    if (c.get<bool>("INITMB")) {
+      double rcutmb = c.get<double>("RCUTMB");
+      set_fcut(CONFIG::factory<Cut_Base,double>( c.get<std::string>("RCTYPEMB"), rcutmb ), true);
+    }
+  }
   virtual ~DM_Base() {};
 
   /** \brief Calculate \ref AED
@@ -36,16 +44,15 @@ public:
    * \f]
    */
   virtual int calc_dXijdri_dXjidri(
+    const int Zi,
+    const int Zj,
     const double rij,
     const double rij_sq,
     const Vec3d &vec_ij,
-    const double fc_ij,
-    const double fcp_ij,
     rho_type& rhoi,
     rho_type& rhoj,
     fd_type &fd_ij,
-    const double wi,
-    const double wj)=0;
+    const double scale=1)=0;
 
   /** \brief Calculate \ref FD
    *
@@ -63,43 +70,34 @@ public:
    * \f]
    */
   virtual int calc_dXijdri(
+    const int Zj,
     const double rij,
     const double rij_sq,
     const Vec3d &vec_ij,
-    const double fc_ij,
-    const double fcp_ij,
     rho_type& rhoi,
-    fd_type &fd_ij)=0;
+    fd_type &fd_ij,
+    const double scale=1)=0;
 
   /** \brief Resize arrays for a density and F' */
   virtual void init_rhoi(rho_type& rhoi)=0;
 
   /** \brief Calculate density */
   virtual void calc_rho(
+    const int Zj,
     const double rij,
     const double rij_sq,
-    const double fc_ij,
     const Vec3d &vec_ij,
-    rho_type& rho)=0;
+    rho_type& rho,
+    const double scale=1)=0;
 
-  /** \brief Return size of the density array */
-  virtual size_t rhoi_size()=0;
-
-  /** \brief Return size of the derivative of the embedding energy array */
-  virtual size_t rhoip_size()=0;
-  virtual size_t size()=0;
-  virtual std::string label()=0;
 
   /** \brief This is just a convenient wrapper.
-   *
-   * Note that this method should not to be used when 
-   * computational performance matter.
    */
-  void calc_dXijdri(Vec3d &del, rho_type &rhoi, fd_type &fdij, double fc=1, double fcp=0) {
+  void calc_dXijdri(const int Zj, Vec3d &del, rho_type &rhoi, fd_type &fdij, double scale=1) {
     double rsq = del*del;
     double r = sqrt(rsq);
     //(p->*func)(r,rsq,del,1.0,0.0,rhoi,fdij);
-    int mode = (*this).calc_dXijdri(r,rsq,del,fc,fcp,rhoi,fdij);
+    int mode = (*this).calc_dXijdri(Zj,r,rsq,del,rhoi,fdij,scale);
     if(mode==0) {
       fdij(1)=fdij(0);
       fdij(2)=fdij(0);
@@ -110,16 +108,23 @@ public:
   }
 
   /** \brief This is just a convenient wrapper.
-   *
-   * Note that this method should not to be used when 
-   * computational performance matter.
    */
-  void calc_rho_mb(Vec3d &del, rho_type &rhoi, double fc=1) {
+  void calc_rho_mb(const int Zj, Vec3d &del, rho_type &rhoi, double scale=1) {
     double rsq = del*del;
     double r = sqrt(rsq);
-    ((*this).calc_rho)(r,rsq,fc,del,rhoi);
+    ((*this).calc_rho)(Zj,r,rsq,del,rhoi,scale);
   }
-  virtual void set_fidx(size_t fidx_) { fidx=fidx_; }
-  virtual size_t get_fidx() { return fidx; }
+  /** \brief Return size of the density array */
+  virtual size_t rhoi_size() {
+    return rhoisize;
+  }
+  /** \brief Return size of the derivative of the embedding energy array */
+  virtual size_t rhoip_size() {
+    return rhoisize;
+  }
+  virtual size_t size() {
+    return s;
+  }
+  virtual std::string label()=0;
 };
 #endif

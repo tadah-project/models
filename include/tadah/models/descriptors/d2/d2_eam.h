@@ -46,9 +46,6 @@ private:
   std::vector<std::vector<double>> rhor_spline;
   std::vector<std::vector<double>> z2r_spline;
 
-  int verbose;
-
-  size_t s=1;
   std::string lab="D2_EAM";
   void read_setfl();
   void gen_splines(int &n, double &delta, std::vector<double> &f, std::vector<std::vector<double>> &spline);
@@ -57,24 +54,24 @@ public:
   D2_EAM();
   D2_EAM(Config &config);
   void calc_aed(
-    double rij,
-    const double rij_sq,
-    const double,
-    aed_type2 &aed);
-  void calc_dXijdri(
-    double rij,
-    const double rij_sq,
-    const double,
-    const double,
-    fd_type &fd_ij);
-  void calc_all(
-    double rij,
-    const double rij_sq,
-    const double,
-    const double,
+    const int Zj,
+    const double rij,
+    const double ,
     aed_type2 &aed,
-    fd_type &fd_ij);
-  size_t size();
-  std::string label();
+    const double scale=1) override;
+  void calc_dXijdri(
+    const int Zj,
+    const double rij,
+    const double rij_sq,
+    fd_type &fd_ij,
+    const double scale=1) override;
+  void calc_all(
+    const int Zj,
+    const double rij,
+    const double rij_sq,
+    aed_type2 &aed,
+    fd_type &fd_ij,
+    const double scale=1) override;
+  std::string label() override;
 };
 #endif

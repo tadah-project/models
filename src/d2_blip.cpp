@@ -1,13 +1,12 @@
+#include "tadah/models/descriptors/d_base.h"
 #include <tadah/models/descriptors/d2/d2_blip.h>
 #include <tadah/models/descriptors/d_basis_functions.h>
 #include <cstdlib>
 #include <stdexcept>
 
 D2_Blip::D2_Blip() {}
-D2_Blip::D2_Blip(Config &c):
-  verbose(c.get<int>("VERBOSE"))
+D2_Blip::D2_Blip(Config &c): D2_Base(c)
 {
-
   if (!c.get<bool>("INIT2B")) return;
 
   get_grid(c,"CGRID2B",mius);
@@ -42,51 +41,53 @@ D2_Blip::D2_Blip(Config &c):
 }
 
 void D2_Blip::calc_aed(
+  const int Zj,
   const double rij,
-  const double ,
-  const double fc_ij,
-  aed_type2 &aed)
+  const double,
+  aed_type2 &aed,
+  const double scale)
 {
-
   size_t i=fidx;
+  double fc_ij = fcut->calc(rij);
   for (size_t c=0; c<mius.size(); c++) {
     double t = B(etas[c]*(rij-mius[c]),fc_ij);
-    aed(i++) += t;
+    aed(i++) += scale*weights[Zj]*t;
   }
 
 }
 void D2_Blip::calc_dXijdri(
+  const int Zj,
   const double rij,
   const double ,
-  const double fc_ij,
-  const double fcp_ij,
-  fd_type &fd_ij)
+  fd_type &fd_ij,
+  const double scale)
 {
   size_t i=fidx;
+  double fc_ij = fcut->calc(rij);
+  double fcp_ij = fcut->calc_prime(rij);
   for (size_t c=0; c<mius.size(); c++) {
-    fd_ij(i++,0) = dB(etas[c]*(rij-mius[c]),etas[c],fc_ij,fcp_ij);
+    fd_ij(i++,0) = scale*weights[Zj]*dB(etas[c]*(rij-mius[c]),etas[c],fc_ij,fcp_ij);
   }
 }
 void D2_Blip::calc_all(
+  const int Zj,
   const double rij,
   const double ,
-  const double fc_ij,
-  const double fcp_ij,
   aed_type2 &aed,
-  fd_type &fd_ij)
+  fd_type &fd_ij,
+  const double scale)
 {
 
   size_t i=fidx;
+  double fc_ij = fcut->calc(rij);
+  double fcp_ij = fcut->calc_prime(rij);
   for (size_t c=0; c<mius.size(); c++) {
-    aed(i) += B(etas[c]*(rij-mius[c]),fc_ij);
-    fd_ij(i,0) = dB(etas[c]*(rij-mius[c]),etas[c],fc_ij,fcp_ij);
+    aed(i) += scale*weights[Zj]*B(etas[c]*(rij-mius[c]),fc_ij);
+    fd_ij(i,0) = scale*weights[Zj]*dB(etas[c]*(rij-mius[c]),etas[c],fc_ij,fcp_ij);
     ++i;
   }
 }
 
-size_t D2_Blip::size() {
-  return s;
-}
 std::string D2_Blip::label() {
   return lab;
 }
