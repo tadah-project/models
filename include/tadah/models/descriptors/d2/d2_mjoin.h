@@ -4,8 +4,7 @@
 #include <cstddef>
 #include <tadah/models/descriptors/d2/d2_base.h>
 
-/**
- * \brief Meta two-body descriptor for combining multiple D2 descriptors.
+/** @brief Meta two-body descriptor for combining multiple D2 descriptors.
  *
  * This descriptor provides a convenient interface for concatenating multiple two-body descriptors. 
  * The resulting descriptor can then be used by Tadah! like any standard two-body descriptor.
