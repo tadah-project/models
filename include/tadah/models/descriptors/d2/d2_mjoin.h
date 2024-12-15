@@ -3,6 +3,7 @@
 #include "tadah/core/registry.h"
 #include <cstddef>
 #include <tadah/models/descriptors/d2/d2_base.h>
+
 /**
  * @brief Meta two-body descriptor for combining multiple D2 descriptors.
  *
@@ -38,7 +39,6 @@
  * - The cutoff functions (RCTYPE2B) and distances (RCUT2B) must be defined for each descriptor.
  * - Both SGRID2B and CGRID2B should be included if relevant, with their sizes matching the given descriptors.
  */
-
 class D2_mJoin : public D2_Base {
 private:
   std::vector<D2_Base*> ds;
