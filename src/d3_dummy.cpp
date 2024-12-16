@@ -1,7 +1,11 @@
 #include <tadah/models/descriptors/d3/d3_dummy.h>
 
-D3_Dummy::D3_Dummy() {}
-D3_Dummy::D3_Dummy(Config &) {}
+D3_Dummy::D3_Dummy() {
+  init();
+}
+D3_Dummy::D3_Dummy(Config &) {
+  init();
+}
 
 void D3_Dummy::calc_aed(
         const size_t,
@@ -31,3 +35,6 @@ void D3_Dummy::calc_all(
         fd_type &) {}
 size_t D3_Dummy::size() { return s;}
 std::string D3_Dummy::label() {return lab;}
+void D3_Dummy::init() {
+  nparams=0;
+}

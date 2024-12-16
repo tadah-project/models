@@ -1,10 +1,13 @@
 #include "tadah/models/descriptors/d2/d2_base.h"
 #include <tadah/models/descriptors/d2/d2_eam.h>
 
-D2_EAM::D2_EAM() {}
+D2_EAM::D2_EAM() {
+  init();
+}
 D2_EAM::D2_EAM(Config &c): D2_Base(c)
 {
   if (!c.get<bool>("INIT2B")) return;
+  init();
   s=1;
   ef.file_path = c("SETFL")[0];
   read_setfl();
@@ -159,5 +162,8 @@ void D2_EAM::gen_splines(int &n, double &delta, std::vector<double> &f,
     spline[m][1] = 2.0*spline[m][4]/delta;
     spline[m][0] = 3.0*spline[m][3]/delta;
   }
+}
+void D2_EAM::init() {
+  nparams=1;
 }
 

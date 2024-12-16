@@ -138,5 +138,6 @@ public:
     d1->set_fidx(fidx_);
     d2->set_fidx(d1->size()+d1->get_fidx());
   }
+  void init() override {};
 };
 #endif

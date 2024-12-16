@@ -1,11 +1,15 @@
 #include "tadah/models/descriptors/dm/dm_base.h"
 #include <tadah/models/descriptors/dm/dm_eam.h>
 
+DM_EAM::DM_EAM() {
+  init();
+}
 DM_EAM::DM_EAM(Config &c): DM_Base(c)
 {
+  init();
   if (!c.get<bool>("INITMB")) return;
   s=1;
-  ef.file_path = c("SETFL")[0];
+  ef.file_path = c.get<std::string>("TYPEMB",1);
   read_setfl();
 
   if (std::abs(ef.rcut - c.get<double>("RCUTMB")) > std::numeric_limits<double>::min()) {
@@ -53,47 +57,47 @@ void DM_EAM::calc_aed(
 
 
 }
-int DM_EAM::calc_dXijdri_dXjidri(
+void DM_EAM::calc_dXijdri_dXjidri(
   const int ,
   const int ,
   const double rij,
   const double,
-  const Vec3d &,
+  const Vec3d &vec_ij,
   rho_type& rhoi,
   rho_type& rhoj,
   fd_type &fd_ij,
   const double scale)
 {
   double r = rij;
-  //double recip = 1.0/r;
+  double rinv = 1/r;
   double p = r*ef.rdr + 1.0;
   int m = static_cast<int> (p);
   m = std::min(m,ef.nr-1);
   p -= m;
   p = std::min(p,1.0);
-  //std::vector<double> coeff = rhor_spline[m];
   double rhoip = (rhor_spline[m][0]*p + rhor_spline[m][1])*p + rhor_spline[m][2];
   double rhojp = (rhor_spline[m][0]*p + rhor_spline[m][1])*p + rhor_spline[m][2];
 
   // here rho_i[1] is a derivative of rho_i at local atom, similarly for rho_j
   //double psip = rho_i[1]*rhojp + rho_j[1]*rhoip;
-  double psip = rhoi(1)*rhojp - rhoj(1)*rhoip;
+  double psip = rhoi(1)*rhojp + rhoj(1)*rhoip;
 
-  fd_ij(fidx,0) = scale*psip; // requires *delij*recip in the main loop
-  return 0;
-
+  double f = scale*psip*rinv;
+  fd_ij(fidx,0) = f*vec_ij[0]; 
+  fd_ij(fidx,1) = f*vec_ij[1]; 
+  fd_ij(fidx,2) = f*vec_ij[2]; 
 }
-int DM_EAM::calc_dXijdri(
+void DM_EAM::calc_dXijdri(
   const int ,
   const double rij,
   const double,
-  const Vec3d &,
+  const Vec3d &vec_ij,
   rho_type& rhoi,
   fd_type &fd_ij,
   const double scale)
 {
   double r = rij;
-  //double recip = 1.0/r;
+  double rinv = 1/r;
   double p = r*ef.rdr + 1.0;
   int m = static_cast<int> (p);
   m = std::min(m,ef.nr-1);
@@ -104,9 +108,10 @@ int DM_EAM::calc_dXijdri(
   // here rho_i[1] is a derivative of rho_i at local atom
   double psip = rhoi(1)*rhojp;
 
-  fd_ij(fidx,0) = scale*psip; // requires *delij*recip in the main loop
-  return 0;
-
+  double f = scale*psip*rinv;
+  fd_ij(fidx,0) = f*vec_ij[0];
+  fd_ij(fidx,1) = f*vec_ij[1];
+  fd_ij(fidx,2) = f*vec_ij[2];
 }
 std::string DM_EAM::label() {
   return lab;
@@ -202,4 +207,7 @@ void DM_EAM::calc_rho(
   std::vector<double> coeff = rhor_spline[m];
   rho(0) += scale*( ((coeff[3]*p + coeff[4])*p + coeff[5])*p + coeff[6]);
 
+}
+void DM_EAM::init() {
+  nparams=1;
 }

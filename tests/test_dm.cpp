@@ -67,49 +67,27 @@ void test_case(Config &config_mb,
   Vec3d x4(-4.11,5.33,-3.44);
   std::vector<Vec3d> positions = {x1,x2,x3,x4};
 
-  Vec3d del12 = x1-x2;
-  Vec3d del13 = x1-x3;
-  Vec3d del14 = x1-x4;
+  Vec3d del12 = x1-x2; Vec3d del21 = x2-x1;
+  Vec3d del13 = x1-x3; Vec3d del23 = x2-x3;
+  Vec3d del14 = x1-x4; Vec3d del24 = x2-x4;
 
-  Vec3d del21 = x2-x1;
-  Vec3d del23 = x2-x3;
-  Vec3d del24 = x2-x4;
+  Vec3d del31 = x3-x1; Vec3d del41 = x4-x1;
+  Vec3d del32 = x3-x2; Vec3d del42 = x4-x2;
+  Vec3d del34 = x3-x4; Vec3d del43 = x4-x3;
 
-  Vec3d del31 = x3-x1;
-  Vec3d del32 = x3-x2;
-  Vec3d del34 = x3-x4;
+  double rsq12 = del12*del12;  double rsq21 = del21*del21;
+  double rsq13 = del13*del13;  double rsq23 = del23*del23;
+  double rsq14 = del14*del14;  double rsq24 = del24*del24;
+  double r12 = sqrt(rsq12);    double r21 = sqrt(rsq21);
+  double r13 = sqrt(rsq13);    double r23 = sqrt(rsq23);
+  double r14 = sqrt(rsq14);    double r24 = sqrt(rsq24);
 
-  Vec3d del41 = x4-x1;
-  Vec3d del42 = x4-x2;
-  Vec3d del43 = x4-x3;
-
-  double rsq12 = del12*del12;
-  double rsq13 = del13*del13;
-  double rsq14 = del14*del14;
-  double r12 = sqrt(rsq12);
-  double r13 = sqrt(rsq13);
-  double r14 = sqrt(rsq14);
-
-  double rsq21 = del21*del21;
-  double rsq23 = del23*del23;
-  double rsq24 = del24*del24;
-  double r21 = sqrt(rsq21);
-  double r23 = sqrt(rsq23);
-  double r24 = sqrt(rsq24);
-
-  double rsq31 = del31*del31;
-  double rsq32 = del32*del32;
-  double rsq34 = del34*del34;
-  double r31 = sqrt(rsq31);
-  double r32 = sqrt(rsq32);
-  double r34 = sqrt(rsq34);
-
-  double rsq41 = del41*del41;
-  double rsq42 = del42*del42;
-  double rsq43 = del43*del43;
-  double r41 = sqrt(rsq41);
-  double r42 = sqrt(rsq42);
-  double r43 = sqrt(rsq43);
+  double rsq31 = del31*del31;  double rsq41 = del41*del41;
+  double rsq32 = del32*del32;  double rsq42 = del42*del42;
+  double rsq34 = del34*del34;  double rsq43 = del43*del43;
+  double r31 = sqrt(rsq31);    double r41 = sqrt(rsq41);
+  double r32 = sqrt(rsq32);    double r42 = sqrt(rsq42);
+  double r34 = sqrt(rsq34);    double r43 = sqrt(rsq43);
 
   CUT fc(config_mb.get<double>("RCUTMB"));
   DM dm(config_mb);
@@ -188,7 +166,6 @@ void test_case(Config &config_mb,
   dm.calc_aed(rho3,aed3);
   dm.calc_aed(rho4,aed4);
 
-  int mode = 
   dm.calc_dXijdri(1,r12,rsq12,del12,rho1,fd12);
   dm.calc_dXijdri(1,r13,rsq13,del13,rho1,fd13);
   dm.calc_dXijdri(1,r14,rsq14,del14,rho1,fd14);
@@ -268,25 +245,6 @@ void test_case(Config &config_mb,
   REQUIRE(FD42.isApprox(fd42-fd24,1e-6));
   REQUIRE(FD43.isApprox(fd43-fd34,1e-6));
 
-  // Do scalling just before approximation
-  if (mode==0) {
-    fd12[0] *= del12[0]/r12;
-    fd13[0] *= del13[0]/r13;
-    fd14[0] *= del14[0]/r14;
-
-    fd21[0] *= del21[0]/r21;
-    fd23[0] *= del23[0]/r23;
-    fd24[0] *= del24[0]/r24;
-
-    fd31[0] *= del31[0]/r31;
-    fd32[0] *= del32[0]/r32;
-    fd34[0] *= del34[0]/r34;
-
-    fd41[0] *= del41[0]/r41;
-    fd42[0] *= del42[0]/r42;
-    fd43[0] *= del43[0]/r43;
-  }
-
   // Calculate approximation
   fd_type fd12a(dm.size());
   fd_type fd13a(dm.size());
@@ -344,7 +302,8 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_EAD 1", "[DM]") {
     config_mb.add("RCUTMB", 10);
     config_mb.remove("INITMB");
     config_mb.add("INITMB", "true");
-    config_mb.add("AGRIDMB", "2");
+    config_mb.add("TYPEMB", "DM_EAD");
+    config_mb.add("TYPEMB", 2);
     config_mb.add("CGRIDMB", "1 2");
     config_mb.add("SGRIDMB", "0.1 0.2");
     config_mb.add("ATOMS", "H");
@@ -360,7 +319,8 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_EAD 2", "[DM]") {
     config_mb.add("RCUTMB", 6);
     config_mb.remove("INITMB");
     config_mb.add("INITMB", "true");
-    config_mb.add("AGRIDMB", "3");
+    config_mb.add("TYPEMB", "DM_EAD");
+    config_mb.add("TYPEMB", 3);
     config_mb.add("CGRIDMB", "1 2 3");
     config_mb.add("SGRIDMB", "0.1 0.2 0.9");
     config_mb.add("ATOMS", "H");
@@ -376,7 +336,8 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_Blip 1", "[DM]") {
     config_mb.add("RCUTMB", 10);
     config_mb.remove("INITMB");
     config_mb.add("INITMB", "true");
-    config_mb.add("AGRIDMB", "2");
+    config_mb.add("TYPEMB", "DM_Blip");
+    config_mb.add("TYPEMB", 2);
     config_mb.add("CGRIDMB", "1 2");
     config_mb.add("SGRIDMB", "0.1 0.2");
     config_mb.add("ATOMS", "H");
@@ -392,7 +353,8 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_Blip 2", "[DM]") {
     config_mb.add("RCUTMB", 6);
     config_mb.remove("INITMB");
     config_mb.add("INITMB", "true");
-    config_mb.add("AGRIDMB", "3");
+    config_mb.add("TYPEMB", "DM_Blip");
+    config_mb.add("TYPEMB", 3);
     config_mb.add("CGRIDMB", "1 2 3");
     config_mb.add("SGRIDMB", "0.1 0.2 0.9");
     config_mb.add("ATOMS", "H");
@@ -408,7 +370,8 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_EAM 1", "[DM]") {
     config_mb.add("RCUTMB", 5.58190742024);
     config_mb.remove("INITMB");
     config_mb.add("INITMB", "true");
-    config_mb.add("SETFL", "tests_data/eam.alloy");
+    config_mb.add("TYPEMB", "DM_EAM");
+    config_mb.add("TYPEMB", "tests_data/eam.alloy");
     config_mb.add("ATOMS", "H");
     config_mb.add("WATOMS", 1);
     test_case<DM_EAM, Cut_Dummy>(config_mb, "DM_EAM", 1);
@@ -417,7 +380,8 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_EAM 1", "[DM]") {
     Config c_err;
     c_err.remove("INITMB");
     c_err.add("INITMB", "true");
-    c_err.add("SETFL", "path/to/nowhere");
+    c_err.add("TYPEMB", "DM_EAM");
+    c_err.add("TYPEMB", "path/to/nowhere");
     REQUIRE_THROWS(DM_EAM(c_err));
 }
 
@@ -426,18 +390,20 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_EAM 2", "[DM]") {
     config_mb.add("RCUTMB", 5.58190742024);
     config_mb.remove("INITMB");
     config_mb.add("INITMB", "true");
-    config_mb.add("SETFL", "tests_data/eam.alloy");
+    config_mb.add("TYPEMB", "DM_EAM");
+    config_mb.add("TYPEMB", "tests_data/eam.alloy");
     config_mb.add("ATOMS", "H");
     config_mb.add("WATOMS", 1);
     test_case<DM_EAM, Cut_Dummy>(config_mb, "DM_EAM", 1);
 }
 
-TEST_CASE_METHOD(TestFixture, "Testing DM_Dummy 1", "[DM]") {
+TEST_CASE_METHOD(TestFixture, "Testing DM_EAM 3", "[DM]") {
     Config config_mb;
     config_mb.add("RCUTMB", 5.58190742024);
     config_mb.remove("INITMB");
     config_mb.add("INITMB", "true");
-    config_mb.add("SETFL", "tests_data/eam.alloy");
+    config_mb.add("TYPEMB", "DM_EAM");
+    config_mb.add("TYPEMB", "tests_data/eam.alloy");
     config_mb.add("ATOMS", "H");
     config_mb.add("WATOMS", 1);
     test_case<DM_EAM, Cut_Dummy>(config_mb, "DM_EAM", 1);
@@ -456,6 +422,7 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_Dummy", "[DM]") {
     c.add("RCTYPEMB", "Cut_Cos");
     c.remove("INITMB");
     c.add("INITMB", "true");
+    c.add("TYPEMB", "DM_Dummy");
     c.add("ATOMS", "H");
     c.add("WATOMS", 1);
 

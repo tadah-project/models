@@ -1,18 +1,16 @@
 #include "tadah/models/descriptors/d2/d2_base.h"
 #include <tadah/models/descriptors/d2/d2_mie.h>
 
-D2_MIE::D2_MIE() {}
+D2_MIE::D2_MIE() {
+  init();
+}
 D2_MIE::D2_MIE(Config &c): D2_Base(c)
 {
   if (!c.get<bool>("INIT2B")) return;
+  init();
   s=2;
-  get_grid(c,"SGRID2B",etas);
-  if (etas.size()!=2) {
-    throw std::runtime_error("Number of elements in SGRID2B is != 2\n\
-Mie descriptor requires SGRID2B with two positive elements.\n");
-  }
-  n=etas[1];
-  m=etas[0];
+  n = c.get<double>("TYPE2B",1);
+  m = c.get<double>("TYPE2B",2);
   if (n<0 || m<0) {
     throw std::runtime_error("Both Mie exponents must by positive\n");
   }
@@ -69,4 +67,7 @@ void D2_MIE::calc_all(
 }
 std::string D2_MIE::label() {
   return lab;
+}
+void D2_MIE::init() {
+  nparams=2;
 }

@@ -4,6 +4,9 @@
 #include <stdexcept>
 #include <vector>
 
+DM_EAD::DM_EAD() {
+  init();
+}
 /* Index ii iterates rhoi array
  * rhoi array is split 50/50 into density and derivative
  * of the embedding function
@@ -11,10 +14,10 @@
 DM_EAD::DM_EAD(Config &config): DM_Base(config),
   rc(config.get<double>("RCUTMBMAX"))
 {
-
   if (!config.get<bool>("INITMB")) {
     throw std::runtime_error("INITMB=false; cannot initialize "+label()+"\n");
   }
+  init();
 
   get_grid(config,"CGRIDMB",cgrid);
   get_grid(config,"SGRIDMB",sgrid);
@@ -28,7 +31,7 @@ DM_EAD::DM_EAD(Config &config): DM_Base(config),
     throw std::runtime_error("SGRID2B and CGRID2B arrays differ in size.\n");
   }
 
-  Lmax = config.get<int>("AGRIDMB");
+  Lmax = config.get<int>("TYPEMB",1);
   s=sgrid.size()*(Lmax+1);
   rhoisize = gen_atomic_orbitals(Lmax);
   rhoisize *= sgrid.size();
@@ -64,7 +67,7 @@ void DM_EAD::calc_aed(
     Lshift += sgrid.size();
   }
 }
-int DM_EAD::calc_dXijdri_dXjidri(
+void DM_EAD::calc_dXijdri_dXjidri(
   const int Zi,
   const int Zj,
   const double rij,
@@ -157,11 +160,8 @@ int DM_EAD::calc_dXijdri_dXjidri(
     }
     Lshift+=sgrid.size();
   }
-
-  return 1;
-
 }
-int DM_EAD::calc_dXijdri(
+void DM_EAD::calc_dXijdri(
   const int Zj,
   const double rij,
   const double,
@@ -231,9 +231,6 @@ int DM_EAD::calc_dXijdri(
     }
     Lshift+=sgrid.size();
   }
-
-  return 1;
-
 }
 std::string DM_EAD::label() {
   return lab;
@@ -306,4 +303,9 @@ double DM_EAD::my_pow(double x, int n){
     --n;
   }
   return r;
+}
+void DM_EAD::init() {
+  keys.push_back("CGRIDMB");
+  keys.push_back("SGRIDMB");
+  nparams=3;
 }

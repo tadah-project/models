@@ -1,9 +1,11 @@
 #include <tadah/models/descriptors/d2/d2_bp.h>
 #include <tadah/models/descriptors/d_basis_functions.h>
 
-D2_BP::D2_BP() {}
-D2_BP::D2_BP(Config &c): D2_Base(c)
-{
+D2_BP::D2_BP() {
+  init();
+}
+D2_BP::D2_BP(Config &c): D2_Base(c) {
+  init();
 
   if (!c.get<bool>("INIT2B")) return;
 
@@ -86,4 +88,9 @@ void D2_BP::calc_all(
 }
 std::string D2_BP::label() {
   return lab;
+}
+void D2_BP::init() {
+  keys.push_back("CGRID2B");
+  keys.push_back("SGRID2B");
+  nparams=2;
 }

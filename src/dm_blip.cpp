@@ -3,11 +3,14 @@
 #include <tadah/models/descriptors/d_basis_functions.h>
 #include <vector>
 
+DM_Blip::DM_Blip() {
+  init();
+}
 DM_Blip::DM_Blip(Config &c): DM_Base(c),
   rc(c.get<double>("RCUTMBMAX"))
 {
-
   if (!c.get<bool>("INITMB")) return;
+  init();
 
   get_grid(c,"CGRIDMB",cgrid);
   get_grid(c,"SGRIDMB",sgrid);
@@ -21,7 +24,7 @@ DM_Blip::DM_Blip(Config &c): DM_Base(c),
     throw std::runtime_error("SGRID2B and CGRID2B arrays differ in size.\n");
   }
 
-  Lmax = c.get<int>("AGRIDMB");
+  Lmax = c.get<int>("TYPEMB",1);
   s=sgrid.size()*(Lmax+1);
   rhoisize = gen_atomic_orbitals(Lmax);
   rhoisize *= sgrid.size();
@@ -57,7 +60,7 @@ void DM_Blip::calc_aed(
     Lshift += sgrid.size();
   }
 }
-int DM_Blip::calc_dXijdri_dXjidri(
+void DM_Blip::calc_dXijdri_dXjidri(
   const int Zi,
   const int Zj,
   const double rij,
@@ -149,11 +152,8 @@ int DM_Blip::calc_dXijdri_dXjidri(
     }
     Lshift+=sgrid.size();
   }
-
-  return 1;
-
 }
-int DM_Blip::calc_dXijdri(
+void DM_Blip::calc_dXijdri(
   const int Zj, 
   const double rij,
   const double,
@@ -223,9 +223,6 @@ int DM_Blip::calc_dXijdri(
     }
     Lshift+=sgrid.size();
   }
-
-  return 1;
-
 }
 std::string DM_Blip::label() {
   return lab;
@@ -299,4 +296,9 @@ double DM_Blip::my_pow(double x, int n){
   }
 
   return r;
+}
+void DM_Blip::init() {
+  keys.push_back("CGRIDMB");
+  keys.push_back("SGRIDMB");
+  nparams=3;
 }

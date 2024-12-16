@@ -18,7 +18,7 @@ public:
   void calc_aed(
     rho_type& rho,
     aed_type2 &aed) override;
-  int calc_dXijdri_dXjidri(
+  void calc_dXijdri_dXjidri(
     const int Zi,
     const int Zj,
     const double rij,
@@ -28,7 +28,7 @@ public:
     rho_type& rhoj,
     fd_type &fd_ij,
     const double scale=1) override;
-  int calc_dXijdri(
+  void calc_dXijdri(
     const int Zj,
     const double rij,
     const double rij_sq,
@@ -45,5 +45,6 @@ public:
     const Vec3d &vec_ij,
     rho_type& rho,
     const double scale=1) override;
+  void init() override;
 };
 #endif

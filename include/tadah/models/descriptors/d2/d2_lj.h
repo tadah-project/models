@@ -56,5 +56,6 @@ public:
     fd_type &fd_ij,
     const double scale=1) override;
   std::string label() override;
+  void init() override;
 };
 #endif

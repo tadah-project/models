@@ -1,4 +1,7 @@
+#include "tadah/core/core_types.h"
+#include <string>
 #include <tadah/models/descriptors/d_base.h>
+#include <vector>
 void D_Base::get_grid(const Config &c, std::string key, v_type &v) {
   if (c.get<double>(key) < 0) {
     // generate grid automatically if first element
@@ -30,6 +33,34 @@ void D_Base::get_grid(const Config &c, std::string key, v_type &v) {
     v.resize(c.size(key));
     c.get<v_type>(key,v);
   }
+}
+v_type D_Base::get_grid(std::vector<std::string>&vold) {
+  v_type vnew;
+  auto it = vold.begin();
+  while (it != vold.end()) {
+    std::string token = *it++;
+    if (token == "-1") {
+      size_t cg = std::stoul(*it++);
+      double cgmin = std::stod(*it++);
+      double cgmax = std::stod(*it++);
+      v_type v = linspace(cgmin, cgmax, cg);
+      vnew.insert(vnew.end(), v.begin(), v.end());
+    }
+    else if (token == "-2") {
+      size_t cg = std::stoul(*it++);
+      double cgmin = std::stod(*it++);
+      double cgmax = std::stod(*it++);
+      v_type v = logspace(cgmin, cgmax, cg, exp(1));
+      vnew.insert(vnew.end(), v.begin(), v.end());
+    }
+    else if (std::stod(token) < -2) {
+        throw std::runtime_error("Either algorithm is not supported or negative value was encountered in a grid: " + token);
+    }
+    else {
+      vnew.push_back(std::stod(token));
+    }
+  }
+  return vnew;
 }
 D_Base::~D_Base() {
   if (this->manage_memory && fcut) {

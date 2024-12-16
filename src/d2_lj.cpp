@@ -1,10 +1,13 @@
 #include "tadah/models/descriptors/d2/d2_base.h"
 #include <tadah/models/descriptors/d2/d2_lj.h>
 
-D2_LJ::D2_LJ() {}
+D2_LJ::D2_LJ() {
+  init();
+}
 D2_LJ::D2_LJ(Config &c): D2_Base(c)
 {
   if (!c.get<bool>("INIT2B")) return;
+  init();
   s=2;
 }
 
@@ -59,4 +62,7 @@ void D2_LJ::calc_all(
 }
 std::string D2_LJ::label() {
   return lab;
+}
+void D2_LJ::init() {
+  nparams=0;
 }

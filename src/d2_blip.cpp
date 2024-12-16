@@ -4,10 +4,13 @@
 #include <cstdlib>
 #include <stdexcept>
 
-D2_Blip::D2_Blip() {}
+D2_Blip::D2_Blip() {
+  init();
+}
 D2_Blip::D2_Blip(Config &c): D2_Base(c)
 {
   if (!c.get<bool>("INIT2B")) return;
+  init();
 
   get_grid(c,"CGRID2B",mius);
   get_grid(c,"SGRID2B",etas);
@@ -90,4 +93,9 @@ void D2_Blip::calc_all(
 
 std::string D2_Blip::label() {
   return lab;
+}
+void D2_Blip::init() {
+  keys.push_back("CGRID2B");
+  keys.push_back("SGRID2B");
+  nparams=2;
 }

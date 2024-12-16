@@ -2,17 +2,23 @@
 #include <tadah/models/descriptors/dm/dm_mEAD.h>
 #include <tadah/models/descriptors/d_basis_functions.h>
 
+template <typename F>
+DM_mEAD<F>::DM_mEAD() {
+  init();
+}
+
 /* Index ii iterates rhoi array
  * rhoi array is split 50/50 into density and derivative
  * of the embedding function
  */
 template <typename F>
 DM_mEAD<F>::DM_mEAD(Config &config): DM_Base(config),
-  rc(config.get<double>("RCUTMB")),
+  rc(config.get<double>("RCUTMBMAX")),
   emb(config)
 {
 
   if (!config.get<bool>("INITMB")) return;
+  init();
 
   get_grid(config,"CGRIDMB",cgrid);
   get_grid(config,"SGRIDMB",sgrid);
@@ -26,7 +32,7 @@ DM_mEAD<F>::DM_mEAD(Config &config): DM_Base(config),
     throw std::runtime_error("SGRID2B and CGRID2B arrays differ in size.\n");
   }
 
-  Lmax = config.get<int>("AGRIDMB");
+  Lmax = config.get<int>("TYPEMB",1);
   s=sgrid.size()*(Lmax+1);
   rhoisize = gen_atomic_orbitals(Lmax);
   rhoisize *= sgrid.size();
@@ -64,7 +70,7 @@ void DM_mEAD<F>::calc_aed(
   }
 }
 template <typename F>
-int DM_mEAD<F>::calc_dXijdri_dXjidri(
+void DM_mEAD<F>::calc_dXijdri_dXjidri(
   const int Zi,
   const int Zj,
   const double rij,
@@ -157,11 +163,9 @@ int DM_mEAD<F>::calc_dXijdri_dXjidri(
     }
     Lshift+=sgrid.size();
   }
-
-  return 1;
 }
 template <typename F>
-int DM_mEAD<F>::calc_dXijdri(
+void DM_mEAD<F>::calc_dXijdri(
   const int Zj,
   const double rij,
   const double,
@@ -231,9 +235,6 @@ int DM_mEAD<F>::calc_dXijdri(
     }
     Lshift+=sgrid.size();
   }
-
-  return 1;
-
 }
 template <typename F>
 std::string DM_mEAD<F>::label() {
@@ -313,4 +314,11 @@ double DM_mEAD<F>::my_pow(double x, int n){
   }
   return r;
 }
-
+template <typename F>
+void DM_mEAD<F>::init() {
+  keys.push_back("CGRIDMB");
+  keys.push_back("SGRIDMB");
+  keys.push_back("CEMBFUNC");
+  keys.push_back("SEMBFUNC");
+  nparams=5;
+}

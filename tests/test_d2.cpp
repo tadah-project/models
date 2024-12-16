@@ -227,7 +227,9 @@ TEST_CASE_METHOD(TestFixture, "Testing D2_MIE", "[D2]") {
     Config c;
     c.remove("INIT2B");
     c.add("INIT2B", "true");
-    c.add("SGRID2B", "7 13");
+    c.add("TYPE2B", "D2_MIE");
+    c.add("TYPE2B", 7);
+    c.add("TYPE2B", 13);
     c.add("ATOMS", "H");
     c.add("WATOMS", 1);
     test_D2<D2_MIE>(c);
@@ -237,19 +239,21 @@ TEST_CASE_METHOD(TestFixture, "Testing D2_MIE", "[D2]") {
     REQUIRE(d.label() == "D2_MIE");
 
     // Test throws
-    c.remove("SGRID2B");
-    c.add("SGRID2B", "7");
+    c.remove("TYPE2B");
+    c.add("TYPE2B", "D2_MIE");
+    c.add("TYPE2B", 7);
     REQUIRE_THROWS(D2_MIE(c));
 
-    c.remove("SGRID2B");
-    c.add("SGRID2B", "7 8 9");
+    c.remove("TYPE2B");
+    c.add("TYPE2B", "D2_MIE");
+    c.add("TYPE2B", 7);
+    c.add("TYPE2B", -8);
     REQUIRE_THROWS(D2_MIE(c));
 
-    c.remove("SGRID2B");
-    c.add("SGRID2B", "-8 9");
+    c.remove("TYPE2B");
+    c.add("TYPE2B", "D2_MIE");
+    c.add("TYPE2B", -7);
+    c.add("TYPE2B", 8);
     REQUIRE_THROWS(D2_MIE(c));
 
-    c.remove("SGRID2B");
-    c.add("SGRID2B", "8 -9");
-    REQUIRE_THROWS(D2_MIE(c));
 }

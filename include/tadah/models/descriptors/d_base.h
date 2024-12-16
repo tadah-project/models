@@ -1,11 +1,13 @@
 #ifndef D_BASE_H
 #define D_BASE_H
 
+#include <string>
 #include <tadah/core/config.h>
 #include <tadah/core/core_types.h>
 #include <tadah/core/periodic_table.h>
 #include <tadah/core/registry.h>
 #include <tadah/models/cut_all.h>
+#include <vector>
 
 /** \brief Base class for all descriptor types.
  *
@@ -17,7 +19,10 @@ protected:
   Cut_Base *fcut=nullptr;
 
 public:
+  std::vector<std::string> keys;    // keys required by this descriptor
+  size_t nparams;  // number of params which follow TYPExB
   static void get_grid(const Config &c, std::string key, v_type &v);
+  static v_type get_grid(std::vector<std::string>&);  // expand joined grids
   int verbose;
   virtual ~D_Base();
 
@@ -34,6 +39,20 @@ public:
 
   virtual void set_fidx(size_t fidx_);
   virtual size_t get_fidx();
+
+  /**
+ * @brief Initialize the descriptor.
+ *
+ * This method sets up the required keys names and number of parameters for the descriptor.
+ *
+ * Note: The implementation of the descriptor should not rely on these initial values,
+ * allowing for greater flexibility in how the Config file is parsed.
+ *
+ * The keys and parameters are utilized by other classes inheriting from this implementation,
+ * such as meta-descriptors.
+ *
+ */
+  virtual void init() = 0;
 
   virtual void set_fcut(Cut_Base* cut, bool manage_memory);
 

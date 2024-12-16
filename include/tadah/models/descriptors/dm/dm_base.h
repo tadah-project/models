@@ -44,7 +44,7 @@ public:
    * \frac{\partial \mathbf{X}_{ji}}{\partial \mathbf{r}_i}
    * \f]
    */
-  virtual int calc_dXijdri_dXjidri(
+  virtual void calc_dXijdri_dXjidri(
     const int Zi,
     const int Zj,
     const double rij,
@@ -70,7 +70,7 @@ public:
    * \frac{\partial \mathbf{X}_{ij}}{\partial \mathbf{r}_i}
    * \f]
    */
-  virtual int calc_dXijdri(
+  virtual void calc_dXijdri(
     const int Zj,
     const double rij,
     const double rij_sq,
@@ -98,14 +98,7 @@ public:
     double rsq = del*del;
     double r = sqrt(rsq);
     //(p->*func)(r,rsq,del,1.0,0.0,rhoi,fdij);
-    int mode = (*this).calc_dXijdri(Zj,r,rsq,del,rhoi,fdij,scale);
-    if(mode==0) {
-      fdij(1)=fdij(0);
-      fdij(2)=fdij(0);
-      fdij(0)*=del[0]/r;
-      fdij(1)*=del[1]/r;
-      fdij(2)*=del[2]/r;
-    }
+    (*this).calc_dXijdri(Zj,r,rsq,del,rhoi,fdij,scale);
   }
 
   /** \brief This is just a convenient wrapper.

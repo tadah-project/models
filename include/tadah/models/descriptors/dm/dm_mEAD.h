@@ -28,7 +28,6 @@
  *
  * \ref SGRIDMB parameters control width \f$ \eta \f$ of the gaussian basis function.
  *
- * \ref AGRIDMB parameter specify maximum value for the angular momentum \f$L_{max}\f$.
  *
  * e.g. \f$L_{max}=2\f$ will calculate descriptors with \f$ L=0,1,2 \f$ (s,p,d orbitals).
  *
@@ -41,7 +40,7 @@
  * 4962–4967. https://doi.org/10.1021/acs.jpclett.9b02037</div>
  *
  * Required Config keys:
- * \ref INITMB \ref CGRIDMB \ref SGRIDMB \ref AGRIDMB
+ * \ref INITMB \ref CGRIDMB \ref SGRIDMB
  */
 template <typename F>
 class DM_mEAD: public DM_Base {
@@ -59,11 +58,12 @@ private:
   F emb;
 
 public:
+  DM_mEAD();
   DM_mEAD(Config&);
   void calc_aed(
     rho_type& rho,
     aed_type2 &aed) override;
-  int calc_dXijdri_dXjidri(
+  void calc_dXijdri_dXjidri(
     const int Zi,
     const int Zj,
     const double rij,
@@ -73,7 +73,7 @@ public:
     rho_type& rhoj,
     fd_type &fd_ij,
     const double scale=1) override;
-  int calc_dXijdri(
+  void calc_dXijdri(
     const int Zj,
     const double rij,
     const double rij_sq,
@@ -90,6 +90,7 @@ public:
     const Vec3d &vec_ij,
     rho_type& rho,
     const double scale=1) override;
+  void init() override;
 };
 
 #include "dm_mEAD.hpp"
