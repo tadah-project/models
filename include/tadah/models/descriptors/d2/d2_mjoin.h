@@ -16,7 +16,6 @@
  * that indicate the sizes of the CGRID2B and SGRID2B respectively. In some cases, these numbers can be zero. 
  * The numbers must correspond to the lengths of the provided grids/parameters in the configuration file.
  *
- * \example 
  * Here is an example of how to configure these descriptors:
  * 
  * ```
