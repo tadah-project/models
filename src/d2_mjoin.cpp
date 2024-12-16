@@ -26,6 +26,10 @@ D2_mJoin::D2_mJoin(Config &c) : D2_Base(c) {
   c.get("RCTYPE2B", rctype2b);
   c.get("RCUT2B", rcut2b);
 
+  std::cout << "D2_mJoin RCUT: " << fcut->get_rcut() << std::endl;
+  fcut->set_rcut(c.get<double>("RCUT2BMAX"));
+  std::cout << "D2_mJoin RCUT: " << fcut->get_rcut() << std::endl;
+
   for (size_t i = 0; i < N; ++i) {
     Config c1 = c;
     c1.remove("CGRID2B"); c1.remove("SGRID2B"); c1.remove("TYPE2B");

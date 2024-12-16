@@ -4,7 +4,7 @@
 #include <vector>
 
 DM_Blip::DM_Blip(Config &c): DM_Base(c),
-  rc(c.get<double>("RCUTMB"))
+  rc(c.get<double>("RCUTMBMAX"))
 {
 
   if (!c.get<bool>("INITMB")) return;

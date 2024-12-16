@@ -9,7 +9,7 @@
  * of the embedding function
  */
 DM_EAD::DM_EAD(Config &config): DM_Base(config),
-  rc(config.get<double>("RCUTMB"))
+  rc(config.get<double>("RCUTMBMAX"))
 {
 
   if (!config.get<bool>("INITMB")) {

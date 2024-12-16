@@ -62,7 +62,7 @@ class DC_Selector {
                 bias++;
 
             if (config.get<bool>("INIT2B")) {
-                double rcut2b = config.get<double>("RCUT2B");
+                double rcut2b = config.get<double>("RCUT2BMAX");
                 c2b = CONFIG::factory<Cut_Base,double>( config.get<std::string>("RCTYPE2B"), rcut2b );
                 d2b = CONFIG::factory<D2_Base,Config&>( config.get<std::string>("TYPE2B"), config );
                 d2b->set_fidx(bias);
@@ -74,7 +74,7 @@ class DC_Selector {
             }
 
             if (config.get<bool>("INIT3B")) {
-                double rcut3b = config.get<double>("RCUT3B");
+                double rcut3b = config.get<double>("RCUT3BMAX");
                 c3b = CONFIG::factory<Cut_Base,double>( config.get<std::string>("RCTYPE3B"), rcut3b );
                 d3b = CONFIG::factory<D3_Base,Config&>( config.get<std::string>("TYPE3B"), config );
                 // d3b->fidx = bias;
@@ -86,7 +86,7 @@ class DC_Selector {
             }
 
             if (config.get<bool>("INITMB")) {
-                double rcutmb = config.get<double>("RCUTMB");
+                double rcutmb = config.get<double>("RCUTMBMAX");
                 cmb = CONFIG::factory<Cut_Base,double>( config.get<std::string>("RCTYPEMB"), rcutmb );
                 dmb = CONFIG::factory<DM_Base,Config&>( config.get<std::string>("TYPEMB"), config );
                 dmb->set_fidx(bias + d2b->size());
