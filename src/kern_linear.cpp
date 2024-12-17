@@ -2,7 +2,7 @@
 
 Kern_Linear::Kern_Linear() {}
 Kern_Linear::Kern_Linear (const Config &c):
-    Function_Base(c)
+    Kern_Base(c)
 {}
 double Kern_Linear::operator() (const aed_type2& b, const aed_type2& af) const
 {

@@ -1,5 +1,7 @@
 #include <tadah/models/functions/kernels/kern_base.h>
 
+Kern_Base::Kern_Base() {}
+Kern_Base::Kern_Base(const Config &c): Function_Base(c) {}
 Kern_Base::~Kern_Base() {}
 void Kern_Base::set_basis(const Matrix b)
 {

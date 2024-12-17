@@ -2,7 +2,7 @@
 
 Kern_Quadratic::Kern_Quadratic () {}
 Kern_Quadratic::Kern_Quadratic (const Config &c):
-    Function_Base(c)
+    Kern_Base(c)
 {
     if (get_verbose()) std::cout << std::endl << label << std::endl;
 

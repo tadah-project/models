@@ -2,7 +2,7 @@
 
 Kern_LQ::Kern_LQ () {}
 Kern_LQ::Kern_LQ (const Config &c):
-    Function_Base(c)
+    Kern_Base(c)
 {
     if (get_verbose()) std::cout << std::endl << label << std::endl;
     read_basis_from_config(c,basis);

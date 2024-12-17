@@ -1,8 +1,7 @@
 #include <tadah/models/functions/basis_functions/bf_polynomial2.h>
 
-
 BF_Polynomial2::BF_Polynomial2() {}
-BF_Polynomial2::BF_Polynomial2(const Config &c): Function_Base(c)
+BF_Polynomial2::BF_Polynomial2(const Config &c): BF_Base(c)
 {}
 std::string BF_Polynomial2::get_label() const
 {

@@ -16,22 +16,24 @@
 class Kern_Base: public virtual Function_Base {
     public:
         Matrix basis;
+        Kern_Base();
+        Kern_Base(const Config &c);
         virtual ~Kern_Base();
 
-        /**
-         * Calculate kernel value given two vectors
-         *
-         * - b = basis vector
-         * - af = atomic energy descriptor
-         */
+        // /**
+        //  * Calculate kernel value given two vectors
+        //  *
+        //  * - b = basis vector
+        //  * - af = atomic energy descriptor
+        //  */
         virtual double operator() (const aed_type2 &b, const aed_type2 &af) const=0;
-
-        /**
-         * Calculate the kernel derivative wrt to the second argument
-         *
-         * - b = basis vector
-         * - af = atomic energy descriptor
-         */
+        //
+        // /**
+        //  * Calculate the kernel derivative wrt to the second argument
+        //  *
+        //  * - b = basis vector
+        //  * - af = atomic energy descriptor
+        //  */
         virtual aed_type2 derivative(const aed_type2 &b, const aed_type2 &af) const=0;
 
         /**

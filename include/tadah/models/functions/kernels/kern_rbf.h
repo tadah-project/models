@@ -25,10 +25,10 @@ class Kern_RBF : public virtual Kern_Base {
         Kern_RBF ();
         Kern_RBF (const Config &c);
         std::string label = "Kern_RBF";
-        double operator() (const aed_type2& b, const aed_type2& af) const;
-        aed_type2 derivative(const aed_type2& b, const aed_type2& af) const;
-        double prime(const aed_type2& b, const aed_type2& af, const aed_type2& ff) const;
-        std::string get_label() const;
+        double operator() (const aed_type2& b, const aed_type2& af) const override;
+        aed_type2 derivative(const aed_type2& b, const aed_type2& af) const override;
+        double prime(const aed_type2& b, const aed_type2& af, const aed_type2& ff) const override;
+        std::string get_label() const override;
 
     private:
         double gamma;
