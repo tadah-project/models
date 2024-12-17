@@ -12,9 +12,11 @@
  */
 class M_Core {
 public:
-    int verbose; ///< Verbose level for logging.
+    int verbose = 0; ///< Verbose level for logging.
     bool trained = false; ///< Indicates if the model has been trained.
     t_type weights; ///< Weights vector for the model.
+
+  int is_verbose() {return verbose;}
 
     /**
      * @brief Virtual destructor for polymorphic deletion.

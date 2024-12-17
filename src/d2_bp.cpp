@@ -80,11 +80,15 @@ void D2_BP::calc_all(
   size_t i=fidx;
   double fc_ij = fcut->calc(rij);
   double fcp_ij = fcut->calc_prime(rij);
+  std::cout << "BEFORE: " << std::endl; 
   for (size_t c=0; c<mius.size(); c++) {         
     aed(i) += scale*weights[Zj]*G(rij,etas[c],mius[c],fc_ij);
     fd_ij(i,0) = scale*weights[Zj]*dG(rij,etas[c],mius[c],fc_ij,fcp_ij);
+    std::cout << fd_ij(i,0) << " " ;
     ++i;
   }
+    std::cout << " " << std::endl;
+  std::cout << "AFTER: "  << fd_ij(0) << std::endl; 
 }
 std::string D2_BP::label() {
   return lab;

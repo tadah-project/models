@@ -31,15 +31,24 @@ D2_mJoin::D2_mJoin(Config &c) : D2_Base(c) {
 }
 
 void D2_mJoin::calc_aed(const int Zj, const double rij, const double rij_sq, aed_type2 &aed, const double scale) {
-  for (auto d : ds) d->calc_aed(Zj, rij, rij_sq, aed, scale);
+  for (auto d : ds) {
+    if (rij > d->get_rcut()) return;
+    d->calc_aed(Zj, rij, rij_sq, aed, scale);
+  }
 }
 
 void D2_mJoin::calc_dXijdri(const int Zj, const double rij, const double rij_sq, fd_type &fd_ij, const double scale) {
-  for (auto d : ds) d->calc_dXijdri(Zj, rij, rij_sq, fd_ij, scale);
+  for (auto d : ds) {
+    if (rij > d->get_rcut()) return;
+    d->calc_dXijdri(Zj, rij, rij_sq, fd_ij, scale);
+  }
 }
 
 void D2_mJoin::calc_all(const int Zj, const double rij, const double rij_sq, aed_type2 &aed, fd_type &fd_ij, const double scale) {
-  for (auto d : ds) d->calc_all(Zj, rij, rij_sq, aed, fd_ij, scale);
+  for (auto d : ds) {
+    if (rij > d->get_rcut()) return;
+    d->calc_all(Zj, rij, rij_sq, aed, fd_ij, scale);
+  }
 }
 
 std::string D2_mJoin::label() {

@@ -16,15 +16,15 @@ double Kern_Quadratic::operator() (const aed_type2& b, const aed_type2& af) cons
 }
 aed_type2 Kern_Quadratic::derivative(const aed_type2& b, const aed_type2& af) const
 {
-    double temp = 2.0 * b*af;
-    return b*temp;;
+    double temp = 2*(b*af);
+    return b*temp;
 }
 double Kern_Quadratic::prime(const aed_type2& b, const aed_type2& af, const aed_type2& ff) const
 {
     //return dot(derivative(b, af), ff);
     // it is faster this way
-    double scale = 2.0*b*af;
-    return scale*ff*b;
+    double scale = 2.0*(b*af);
+    return scale*(ff*b);
 }
 std::string Kern_Quadratic::get_label() const
 {

@@ -16,9 +16,12 @@ public:
   DM_Base() {};
   DM_Base(Config &c): D_Base(c) {
     //if (c.get<bool>("INITMB")) {
-    if (c.exist("RCTYPEMB")) {
+    if (c.exist("RCUTMBMAX") && c.exist("RCTYPEMB")) {
       double rcutmb = c.get<double>("RCUTMBMAX");
       set_fcut(CONFIG::factory<Cut_Base,double>( c.get<std::string>("RCTYPEMB"), rcutmb ), true);
+    }
+    else {
+      set_fcut(new Cut_Dummy(0), true);
     }
   }
   virtual ~DM_Base() {};

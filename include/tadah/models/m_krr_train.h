@@ -90,7 +90,7 @@ public:
         if (lambda < 0)
             throw std::runtime_error("This KRR implementation cannot use LAMBDA -1 (Evidence Approximation)");
         
-        std::cout << "Computing Kernel Matrix" << std::endl;
+        if (M_KRR_Core<Kern>::is_verbose()) std::cout << "Computing Kernel Matrix" << std::endl;
         Matrix K(B.cols(), B.cols());
 
         for (size_t i = 0; i < K.cols(); i++) {
@@ -99,12 +99,12 @@ public:
                 if (i == j) K(i, j) += lambda;
             }
         }
+        if (M_KRR_Core<Kern>::is_verbose()) std::cout << "Matrix condition number: " << condition_number(K) << std::endl;
 
-        std::cout << "Solving..." << std::flush;
+        if (M_KRR_Core<Kern>::is_verbose()) std::cout << "Solving..." << std::flush;
         weights = solve_posv(K, T);
-        std::cout << "Done" << std::endl;
+        if (M_KRR_Core<Kern>::is_verbose()) std::cout << "Done" << std::endl;
 
-        std::cout << "Matrix condition number: " << condition_number(K) << std::endl;
 
         trained = true;
     }
