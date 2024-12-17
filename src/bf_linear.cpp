@@ -1,7 +1,9 @@
 #include <tadah/models/functions/basis_functions/bf_linear.h>
 
 BF_Linear::BF_Linear() {}
-BF_Linear::BF_Linear(const Config &c): BF_Base(c) {}
+BF_Linear::BF_Linear(const Config &c):
+  Function_Base(c),
+  BF_Base(c) {}
 std::string BF_Linear::get_label() const {
     return label;
 }

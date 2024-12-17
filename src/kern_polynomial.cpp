@@ -2,6 +2,7 @@
 
 Kern_Polynomial::Kern_Polynomial () {}
 Kern_Polynomial::Kern_Polynomial (const Config &config):
+    Function_Base(config),
     Kern_Base(config),
     d(config.get<int>("MPARAMS",0)),
     gamma(config.get<double>("MPARAMS",1)),

@@ -2,6 +2,7 @@
 
 Kern_RBF::Kern_RBF () {}
 Kern_RBF::Kern_RBF (const Config &c):
+    Function_Base(c),
     Kern_Base(c),
     sigma(c.get<double>("MPARAMS")),
     gamma(1.0/(2.0*sigma*sigma))

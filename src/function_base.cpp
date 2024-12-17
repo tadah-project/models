@@ -8,10 +8,10 @@ Function_Base::Function_Base(const Config &c) {
 void Function_Base::set_verbose(int v) { verbose=v; }
 int Function_Base::get_verbose() { return verbose; }
 
-Function_Base::~Function_Base() {};
+Function_Base::~Function_Base() {}
 
-double Function_Base::operator() (const aed_type2& , const aed_type2& ) const {std::cout << "FB" <<std::endl; return 0.0; };
-aed_type2 Function_Base::derivative(const aed_type2& , const aed_type2& ) const { return aed_type2(); };
+double Function_Base::operator() (const aed_type2& , const aed_type2& ) const { return 0.0; }
+aed_type2 Function_Base::derivative(const aed_type2& , const aed_type2& ) const { return aed_type2(); }
 double Function_Base::prime(const aed_type2& , const aed_type2& ,
                             const aed_type2& ) const { return 0.0; }
-void Function_Base::set_basis(const Matrix ) {};
+void Function_Base::set_basis(const Matrix ) {}
