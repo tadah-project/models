@@ -65,8 +65,8 @@ TEST_CASE( "Testing Kern_Base", "[kernels]" ) {
 
   for(size_t i=0;i<2;++i)
     for(size_t j=0;j<3;++j) {
-      REQUIRE_THAT(matbas(i,j), 
-                   Catch::Matchers::WithinAbs(test_basis(i,j),1e-12));
+      REQUIRE_THAT(matbas(j,i), 
+                   Catch::Matchers::WithinAbs(test_basis(j,i),1e-12));
     }
 }
 TEST_CASE( "Testing Kern_Linear 1", "[kernels]" ) {
