@@ -31,7 +31,7 @@ public:
     const int Zj,
     const double rij,
     const double rij_sq,
-    aed_type2& aed,
+    aed_type& aed,
     const double scale=1)=0;
 
   /** \brief Calculate \ref FD
@@ -53,7 +53,7 @@ public:
     const int Zj,
     const double rij,
     const double rij_sq,
-    aed_type2& aed,
+    aed_type& aed,
     fd_type &fd_ij,
     const double scale=1)=0;
 
@@ -68,8 +68,8 @@ public:
    * h: central difference parameter
    */
   void calc_fd_approx(const int Zj, double r, fd_type &fd, double h=1e-8) {
-    aed_type2 aed_n((*this).size()); // r+h
-    aed_type2 aed_p((*this).size()); // r-h
+    aed_type aed_n((*this).size()); // r+h
+    aed_type aed_p((*this).size()); // r-h
     aed_n.set_zero();
     aed_p.set_zero();
     double rn = r-h;

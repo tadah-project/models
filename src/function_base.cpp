@@ -10,8 +10,8 @@ int Function_Base::get_verbose() { return verbose; }
 
 Function_Base::~Function_Base() {}
 
-double Function_Base::operator() (const aed_type2& , const aed_type2& ) const { return 0.0; }
-aed_type2 Function_Base::derivative(const aed_type2& , const aed_type2& ) const { return aed_type2(); }
-double Function_Base::prime(const aed_type2& , const aed_type2& ,
-                            const aed_type2& ) const { return 0.0; }
+double Function_Base::operator() (const aed_type& , const aed_type& ) const { return 0.0; }
+aed_type Function_Base::derivative(const aed_type& , const aed_type& ) const { return aed_type(); }
+double Function_Base::prime(const aed_type& , const aed_type& ,
+                            const aed_type& ) const { return 0.0; }
 void Function_Base::set_basis(const Matrix ) {}

@@ -8,17 +8,17 @@ Kern_LQ::Kern_LQ (const Config &c):
     if (get_verbose()) std::cout << std::endl << label << std::endl;
     read_basis_from_config(c,basis);
 }
-double Kern_LQ::operator() (const aed_type2& b, const aed_type2& af) const
+double Kern_LQ::operator() (const aed_type& b, const aed_type& af) const
 {
     double x = b*af;
     return x*x + x;
 }
-aed_type2 Kern_LQ::derivative(const aed_type2& b, const aed_type2& af) const
+aed_type Kern_LQ::derivative(const aed_type& b, const aed_type& af) const
 {
     double temp = 2.0 * b*af;
     return temp*b + b;
 }
-double Kern_LQ::prime(const aed_type2& b, const aed_type2& af, const aed_type2& ff) const
+double Kern_LQ::prime(const aed_type& b, const aed_type& af, const aed_type& ff) const
 {
     return derivative(b, af)*ff;
 }

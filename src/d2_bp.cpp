@@ -44,7 +44,7 @@ void D2_BP::calc_aed(
   const int Zj,
   const double rij,
   const double ,
-  aed_type2 &aed,
+  aed_type &aed,
   const double scale)
 {
 
@@ -73,7 +73,7 @@ void D2_BP::calc_all(
   const int Zj,
   const double rij,
   const double ,
-  aed_type2 &aed,
+  aed_type &aed,
   fd_type &fd_ij,
   const double scale)
 {

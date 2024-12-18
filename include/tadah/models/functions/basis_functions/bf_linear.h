@@ -34,7 +34,7 @@ struct BF_Linear : public virtual BF_Base {
      * @param aed Atomic descriptors.
      * @return Predicted energy.
      */
-    double epredict(const t_type &weights, const aed_type2 &aed) const override;
+    double epredict(const t_type &weights, const aed_type &aed) const override;
 
     /**
      * @brief Predicts force for a specific dimension using the linear basis function.
@@ -45,7 +45,7 @@ struct BF_Linear : public virtual BF_Base {
      * @return Predicted force component.
      */
     double fpredict(const t_type &weights, const fd_type &fdij,
-                    const aed_type2 &aedi, const size_t k) const override;
+                    const aed_type &aedi, const size_t k) const override;
 
     /**
      * @brief Predicts forces using the linear basis function.
@@ -55,6 +55,6 @@ struct BF_Linear : public virtual BF_Base {
      * @return Predicted forces.
      */
     force_type fpredict(const t_type &weights, const fd_type &fdij,
-                        const aed_type2 &aedi) const override;
+                        const aed_type &aedi) const override;
 };
 #endif

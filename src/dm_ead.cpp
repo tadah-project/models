@@ -51,7 +51,7 @@ DM_EAD::DM_EAD(Config &config): DM_Base(config),
 
 void DM_EAD::calc_aed(
   rho_type& rhoi,
-  aed_type2 &aed)
+  aed_type &aed)
 {
   size_t Lshift = 0;
   size_t ii=0;

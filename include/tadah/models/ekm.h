@@ -126,8 +126,8 @@ class EKM {
             delete[] c;
 
         }
-        aed_type2 project(aed_type2 &aed, Matrix &basis) {
-            aed_type2 temp(basis.cols());
+        aed_type project(aed_type &aed, Matrix &basis) {
+            aed_type temp(basis.cols());
             for (size_t b=0; b<basis.cols(); b++) {
                 temp(b) = kernel(aed,basis[b]);
             }

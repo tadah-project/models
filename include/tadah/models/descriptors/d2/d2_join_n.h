@@ -32,11 +32,11 @@
 //
 //   template<size_t Index = 0>
 //   typename std::enable_if<Index == sizeof...(Descriptors), void>::type
-//   calc_aed_impl(const double, const double, const double, aed_type2 &) {}
+//   calc_aed_impl(const double, const double, const double, aed_type &) {}
 //
 //   template<size_t Index = 0>
 //   typename std::enable_if<Index < sizeof...(Descriptors), void>::type
-//   calc_aed_impl(const double rij, const double rij_sq, const double fc_ij, aed_type2 &aed) {
+//   calc_aed_impl(const double rij, const double rij_sq, const double fc_ij, aed_type &aed) {
 //     std::get<Index>(descriptors).calc_aed(rij, rij_sq, fc_ij, aed);
 //     calc_aed_impl<Index + 1>(rij, rij_sq, fc_ij, aed);
 //   }
@@ -54,11 +54,11 @@
 //
 //   template<size_t Index = 0>
 //   typename std::enable_if<Index == sizeof...(Descriptors), void>::type
-//   calc_all_impl(const double, const double, const double, const double, aed_type2 &, fd_type &) {}
+//   calc_all_impl(const double, const double, const double, const double, aed_type &, fd_type &) {}
 //
 //   template<size_t Index = 0>
 //   typename std::enable_if<Index < sizeof...(Descriptors), void>::type
-//   calc_all_impl(const double rij, const double rij_sq, const double fc_ij, const double fcp_ij, aed_type2 &aed, fd_type &fd_ij) {
+//   calc_all_impl(const double rij, const double rij_sq, const double fc_ij, const double fcp_ij, aed_type &aed, fd_type &fd_ij) {
 //     std::get<Index>(descriptors).calc_all(rij, rij_sq, fc_ij, fcp_ij, aed, fd_ij);
 //     calc_all_impl<Index + 1>(rij, rij_sq, fc_ij, fcp_ij, aed, fd_ij);
 //   }
@@ -84,7 +84,7 @@
 //     calculate_sizes<0>();
 //   }
 //
-//   void calc_aed(const double rij, const double rij_sq, const double fc_ij, aed_type2 &aed) override {
+//   void calc_aed(const double rij, const double rij_sq, const double fc_ij, aed_type &aed) override {
 //     calc_aed_impl<0>(rij, rij_sq, fc_ij, aed);
 //   }
 //
@@ -92,7 +92,7 @@
 //     calc_dXijdri_impl<0>(rij, rij_sq, fc_ij, fcp_ij, fd_ij);
 //   }
 //
-//   void calc_all(const double rij, const double rij_sq, const double fc_ij, const double fcp_ij, aed_type2 &aed, fd_type &fd_ij) override {
+//   void calc_all(const double rij, const double rij_sq, const double fc_ij, const double fcp_ij, aed_type &aed, fd_type &fd_ij) override {
 //     calc_all_impl<0>(rij, rij_sq, fc_ij, fcp_ij, aed, fd_ij);
 //   }
 //   

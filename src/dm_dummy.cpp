@@ -9,7 +9,7 @@ DM_Dummy::DM_Dummy(Config&c): DM_Base(c) {
 }
 void DM_Dummy::calc_aed(
   rho_type&,
-  aed_type2 & ) {}
+  aed_type & ) {}
 void DM_Dummy::calc_dXijdri_dXjidri(
   const int,
   const int,

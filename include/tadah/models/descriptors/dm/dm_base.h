@@ -32,7 +32,7 @@ public:
    */
   virtual void calc_aed(
     rho_type& rho,
-    aed_type2 &aed)=0;
+    aed_type &aed)=0;
 
   /** \brief Calculate \ref FD
    *

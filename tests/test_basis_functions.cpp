@@ -16,9 +16,9 @@
 
 TEST_CASE( "Testing BF_Linear", "[basis_functions]" ) {
   BF_Linear bf;
-  aed_type2 w(2);
+  aed_type w(2);
   w.random();
-  aed_type2 aed(2);
+  aed_type aed(2);
   aed.random();
   fd_type fd(2);
   fd.random();
@@ -32,7 +32,7 @@ TEST_CASE( "Testing BF_Linear", "[basis_functions]" ) {
   double fy = -1*(w*fd(1));
   double fz = -1*(w*fd(2));
   //central_difference<
-  //  aed_type2, aed_type2,BF_Linear, &BF_Linear::epredict>
+  //  aed_type, aed_type,BF_Linear, &BF_Linear::epredict>
   //  ();
   force_type f = bf.fpredict(w,fd,aed);
   REQUIRE_THAT(fx, Catch::Matchers::WithinRel(bf.fpredict(w,fd,aed,0)));
@@ -50,9 +50,9 @@ TEST_CASE( "Testing BF_Linear", "[basis_functions]" ) {
 }
 TEST_CASE( "Testing BF_Polynomial2", "[basis_functions]" ) {
   BF_Polynomial2 bf;
-  aed_type2 w(3);
+  aed_type w(3);
   w.random(12345);
-  aed_type2 aed(2);
+  aed_type aed(2);
   aed.random(12345);
   fd_type fd(2);
   fd.random(12345);

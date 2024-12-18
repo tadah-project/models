@@ -107,7 +107,7 @@ public:
     const int Zj,
     const double rij,
     const double rij_sq,
-    aed_type2 &aed,
+    aed_type &aed,
     const double scale=1) override {
     d1->calc_aed(Zj,rij,rij_sq,aed,scale);
     d2->calc_aed(Zj,rij,rij_sq,aed,scale);
@@ -125,7 +125,7 @@ public:
     const int Zj,
     const double rij,
     const double rij_sq,
-    aed_type2 &aed,
+    aed_type &aed,
     fd_type &fd_ij,
     const double scale=1) override {
     d1->calc_all(Zj,rij,rij_sq,aed,fd_ij,scale);

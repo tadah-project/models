@@ -13,7 +13,7 @@ class D3_Base: public D_Base {
                 const double rik,
                 const double fc_ij,
                 const double fc_ik,
-                aed_type2& aed)=0;
+                aed_type& aed)=0;
         virtual void calc_fd(
                 const size_t fidx,
                 const double rij,
@@ -31,7 +31,7 @@ class D3_Base: public D_Base {
                 const double fc_ik,
                 const double fcp_ij,
                 const double fcp_ik,
-                aed_type2& aed,
+                aed_type& aed,
                 fd_type &fd_ij)=0;
         virtual size_t size()=0;
         virtual std::string label()=0;

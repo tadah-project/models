@@ -36,7 +36,7 @@ DM_mJoin::DM_mJoin(Config &c) : DM_Base(c) {
 }
 
 
-void DM_mJoin::calc_aed(rho_type& rho, aed_type2 &aed) {
+void DM_mJoin::calc_aed(rho_type& rho, aed_type &aed) {
   size_t rho_fidx = 0;
   for (auto d : ds) {
     size_t rho_size = 2 * d->rhoi_size();

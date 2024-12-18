@@ -58,7 +58,7 @@ public:
      * @param v Input vector for prediction.
      * @return Predicted value.
      */
-    virtual double predict(const aed_type2 &v) const = 0;
+    virtual double predict(const aed_type &v) const = 0;
 
     /**
      * @brief Pure virtual function to get weights' uncertainty.

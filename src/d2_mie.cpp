@@ -20,7 +20,7 @@ void D2_MIE::calc_aed(
   const int Zj,
   const double rij,
   const double,
-  aed_type2 &aed,
+  aed_type &aed,
   const double scale)
 {
   double rn_inv = 1.0/pow(rij,n);
@@ -47,7 +47,7 @@ void D2_MIE::calc_all(
   const int Zj,
   const double rij,
   const double,
-  aed_type2 &aed,
+  aed_type &aed,
   fd_type &fd_ij,
   const double scale)
 {

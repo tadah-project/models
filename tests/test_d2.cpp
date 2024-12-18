@@ -14,7 +14,7 @@ void test_d2(Config &c, double r) {
   double rcut = c.get<double>("RCUT2B");
   C fc(rcut);
   d.set_fcut(&fc, false);
-  aed_type2 aed(d.size());
+  aed_type aed(d.size());
   d.calc_aed(1,r,r*r,aed);
   fd_type fd(d.size());
   d.calc_dXijdri(1,r,r*r,fd);
@@ -38,7 +38,7 @@ void test_d2(Config &c, double r) {
   REQUIRE_THAT(fya, Catch::Matchers::Approx(fy));
   REQUIRE_THAT(fza, Catch::Matchers::Approx(fz));
 
-  aed_type2 aed2(d.size());
+  aed_type aed2(d.size());
   fd_type fd2(d.size());
   d.calc_all(1,r,r*r,aed2,fd2);
   std::vector<double> fx2(fd2[0].data(),fd2[0].data()+fd2[0].size());

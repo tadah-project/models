@@ -47,7 +47,7 @@ void D2_Blip::calc_aed(
   const int Zj,
   const double rij,
   const double,
-  aed_type2 &aed,
+  aed_type &aed,
   const double scale)
 {
   size_t i=fidx;
@@ -76,7 +76,7 @@ void D2_Blip::calc_all(
   const int Zj,
   const double rij,
   const double ,
-  aed_type2 &aed,
+  aed_type &aed,
   fd_type &fd_ij,
   const double scale)
 {

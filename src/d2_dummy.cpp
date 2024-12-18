@@ -13,7 +13,7 @@ void D2_Dummy::calc_aed(
   const int,
   const double,
   const double,
-  aed_type2&,
+  aed_type&,
   const double) {}
 
 void D2_Dummy::calc_dXijdri(
@@ -26,7 +26,7 @@ void D2_Dummy::calc_all(
   const int,
   const double,
   const double,
-  aed_type2 & ,
+  aed_type & ,
   fd_type &,
   const double) {}
 std::string D2_Dummy::label() { return lab; }

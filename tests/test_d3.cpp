@@ -13,7 +13,7 @@ TEST_CASE( "Testing D3_Dummy", "[D3]" ) {
   D3_Dummy d(c);
   REQUIRE(d.size()==0);
   REQUIRE(d.label()=="D3_Dummy");
-  aed_type2 aed;
+  aed_type aed;
   fd_type fd;
   REQUIRE_NOTHROW(d.calc_aed(0,0,0,0,0,aed));
   REQUIRE_NOTHROW(d.calc_all(0,0,0,0,0,0.0,0.0,aed,fd));

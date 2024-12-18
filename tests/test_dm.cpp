@@ -30,8 +30,8 @@ void central_difference_mb(DM *dm, std::vector<Vec3d> &positions,
 
     Vec3d del12n = x1-xjn;
     Vec3d del12p = x1-xjp;
-    aed_type2 rhoip;
-    aed_type2 rhoin;
+    aed_type rhoip;
+    aed_type rhoin;
 
     dm->init_rhoi(rhoip);
     dm->init_rhoi(rhoin);
@@ -44,8 +44,8 @@ void central_difference_mb(DM *dm, std::vector<Vec3d> &positions,
     dm->calc_rho_mb(1,del13, rhoin ); 
     dm->calc_rho_mb(1,del14, rhoin );
 
-    aed_type2 aedip(fdij.rows());
-    aed_type2 aedin(fdij.rows());
+    aed_type aedip(fdij.rows());
+    aed_type aedin(fdij.rows());
     aedip.set_zero();
     aedin.set_zero();
     dm->calc_aed(rhoip, aedip);
@@ -92,10 +92,10 @@ void test_case(Config &config_mb,
   CUT fc(config_mb.get<double>("RCUTMB"));
   DM dm(config_mb);
   dm.set_fcut(&fc,false);
-  aed_type2 aed1(dm.size());
-  aed_type2 aed2(dm.size());
-  aed_type2 aed3(dm.size());
-  aed_type2 aed4(dm.size());
+  aed_type aed1(dm.size());
+  aed_type aed2(dm.size());
+  aed_type aed3(dm.size());
+  aed_type aed4(dm.size());
   aed1.set_zero();
   aed2.set_zero();
   aed3.set_zero();
@@ -432,7 +432,7 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_Dummy", "[DM]") {
     DM_Dummy d(c);
     REQUIRE(d.size() == 0);
     REQUIRE(d.label() == "DM_Dummy");
-    aed_type2 aed;
+    aed_type aed;
     rho_type rho1;
     fd_type fd;
     Vec3d del;

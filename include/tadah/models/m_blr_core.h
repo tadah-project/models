@@ -59,7 +59,7 @@ public:
      * @param v Input vector for prediction.
      * @return Predicted value.
      */
-    double predict(const aed_type2 &v) const {
+    double predict(const aed_type &v) const {
         return bf.epredict(get_weights(), v);
     }
 

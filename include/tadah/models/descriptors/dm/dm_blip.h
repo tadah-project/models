@@ -51,7 +51,7 @@ public:
   DM_Blip(Config&);
   void calc_aed(
     rho_type& rho,
-    aed_type2 &aed) override;
+    aed_type &aed) override;
   void calc_dXijdri_dXjidri(
     const int Zi,
     const int Zj,

@@ -49,9 +49,9 @@ public:
   ~D2_mJoin();
   D2_mJoin(Config &c);
   
-  void calc_aed(const int Zj, const double rij, const double rij_sq, aed_type2 &aed, const double scale=1) override;
+  void calc_aed(const int Zj, const double rij, const double rij_sq, aed_type &aed, const double scale=1) override;
   void calc_dXijdri(const int Zj, const double rij, const double rij_sq, fd_type &fd_ij, const double scale=1) override;
-  void calc_all(const int Zj, const double rij, const double rij_sq, aed_type2 &aed, fd_type &fd_ij, const double scale=1) override;
+  void calc_all(const int Zj, const double rij, const double rij_sq, aed_type &aed, fd_type &fd_ij, const double scale=1) override;
   std::string label() override;
   void set_fidx(size_t fidx_) override;
   void init() override;
