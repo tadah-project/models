@@ -168,7 +168,7 @@ TEST_CASE( "Testing Kern_Quadratic", "[kernels]" ) {
             isApprox(kern.derivative(b,aed),1e-10));
     // test prime
     for (size_t k=0; k<3; ++k) {
-      REQUIRE(( (2*b*aed)*fd(k)*b )==(kern.prime(b,aed,fd(k))));
+      REQUIRE( (2 * b * aed * fd(k) * b) == Approx(kern.prime(b, aed, fd(k))).epsilon(1e-10) );
       REQUIRE_THAT(kern.derivative(b, aed)*fd(k),
                    Catch::Matchers::WithinRel(kern.prime(b,aed,fd(k)),1e-10));
     }

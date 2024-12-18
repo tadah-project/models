@@ -91,7 +91,7 @@ std::vector<Config> D_mJoin::parse_config(Config &c, std::string type_str) {
     for (const auto& k : d->keys) {
       int n = std::stoi(*it++);
       for (int j = 0; j < n; ++j) {
-        c1.add(k,*(data_map[k]++));
+        c1.add(k,*(data_map[k]++));     /// Problem?
       } 
     }
 
