@@ -66,6 +66,7 @@ void DM_mJoin::calc_dXijdri_dXjidri(
   }
 }
 void DM_mJoin::calc_dXijdri(
+  const int Zi,
   const int Zj,
   const double rij,
   const double rij_sq,
@@ -78,7 +79,7 @@ void DM_mJoin::calc_dXijdri(
     if (rij > d->get_rcut()) return;
     size_t rho_size = 2 * d->rhoi_size();
     rho_type rhoi_ptr(&rhoi[rho_fidx],rho_size);
-    d->calc_dXijdri(Zj,rij,rij_sq,vec_ij,rhoi_ptr,fd_ij,scale);
+    d->calc_dXijdri(Zi,Zj,rij,rij_sq,vec_ij,rhoi_ptr,fd_ij,scale);
     rho_fidx += rho_size;
   }
 }
@@ -87,6 +88,7 @@ void DM_mJoin::init_rhoi(rho_type& rhoi) {
   rhoi.set_zero();
 }
 void DM_mJoin::calc_rho(
+  const int Zi,
   const int Zj,
   const double rij,
   const double rij_sq,
@@ -98,7 +100,7 @@ void DM_mJoin::calc_rho(
     if (rij > d->get_rcut()) return;
     size_t rho_size = 2 * d->rhoi_size();
     rho_type rho_ptr(&rho[rho_fidx],rho_size);
-    d->calc_rho(Zj,rij,rij_sq,vec_ij,rho_ptr,scale);
+    d->calc_rho(Zi,Zj,rij,rij_sq,vec_ij,rho_ptr,scale);
     rho_fidx += rho_size;
   }
 }

@@ -15,11 +15,11 @@ void test_d2(Config &c, double r) {
   C fc(rcut);
   d.set_fcut(&fc, false);
   aed_type aed(d.size());
-  d.calc_aed(1,r,r*r,aed);
+  d.calc_aed(1,1,r,r*r,aed);
   fd_type fd(d.size());
-  d.calc_dXijdri(1,r,r*r,fd);
+  d.calc_dXijdri(1,1,r,r*r,fd);
   fd_type fda(d.size());
-  d.calc_fd_approx(1, r, fda, 1e-6);
+  d.calc_fd_approx(1,1, r, fda, 1e-6);
 
   // Convert to std::vector, as catch2 matchers require these
   std::vector<double> fx(fd[0].data(),fd[0].data()+fd[0].size());
@@ -40,7 +40,7 @@ void test_d2(Config &c, double r) {
 
   aed_type aed2(d.size());
   fd_type fd2(d.size());
-  d.calc_all(1,r,r*r,aed2,fd2);
+  d.calc_all(1,1,r,r*r,aed2,fd2);
   std::vector<double> fx2(fd2[0].data(),fd2[0].data()+fd2[0].size());
   std::vector<double> fy2(fd2[1].data(),fd2[1].data()+fd2[1].size());
   std::vector<double> fz2(fd2[2].data(),fd2[2].data()+fd2[2].size());

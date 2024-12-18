@@ -30,24 +30,27 @@ D2_mJoin::D2_mJoin(Config &c) : D2_Base(c) {
   }
 }
 
-void D2_mJoin::calc_aed(const int Zj, const double rij, const double rij_sq, aed_type &aed, const double scale) {
+void D2_mJoin::calc_aed(const int Zi, const int Zj, const double rij,
+                        const double rij_sq, aed_type &aed, const double scale) {
   for (auto d : ds) {
     if (rij > d->get_rcut()) return;
-    d->calc_aed(Zj, rij, rij_sq, aed, scale);
+    d->calc_aed(Zi, Zj, rij, rij_sq, aed, scale);
   }
 }
 
-void D2_mJoin::calc_dXijdri(const int Zj, const double rij, const double rij_sq, fd_type &fd_ij, const double scale) {
+void D2_mJoin::calc_dXijdri(const int Zi, const int Zj, const double rij,
+                            const double rij_sq, fd_type &fd_ij, const double scale) {
   for (auto d : ds) {
     if (rij > d->get_rcut()) return;
-    d->calc_dXijdri(Zj, rij, rij_sq, fd_ij, scale);
+    d->calc_dXijdri(Zi, Zj, rij, rij_sq, fd_ij, scale);
   }
 }
 
-void D2_mJoin::calc_all(const int Zj, const double rij, const double rij_sq, aed_type &aed, fd_type &fd_ij, const double scale) {
+void D2_mJoin::calc_all(const int Zi, const int Zj, const double rij,
+                        const double rij_sq, aed_type &aed, fd_type &fd_ij, const double scale) {
   for (auto d : ds) {
     if (rij > d->get_rcut()) return;
-    d->calc_all(Zj, rij, rij_sq, aed, fd_ij, scale);
+    d->calc_all(Zi, Zj, rij, rij_sq, aed, fd_ij, scale);
   }
 }
 

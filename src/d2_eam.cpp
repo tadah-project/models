@@ -35,6 +35,7 @@ D2_EAM::D2_EAM(Config &c): D2_Base(c)
 
 void D2_EAM::calc_aed(
   const int ,
+  const int ,
   const double rij,
   const double,
   aed_type &aed,
@@ -51,6 +52,7 @@ void D2_EAM::calc_aed(
   aed(fidx) += scale*z2*recip;
 }
 void D2_EAM::calc_dXijdri(
+  const int ,
   const int ,
   const double rij,
   const double,
@@ -74,6 +76,7 @@ void D2_EAM::calc_dXijdri(
 
 }
 void D2_EAM::calc_all(
+  const int ,
   const int ,
   const double rij,
   const double,

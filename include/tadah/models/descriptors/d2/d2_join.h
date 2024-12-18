@@ -104,32 +104,35 @@ public:
     lab="KUTAbezS"+d1->label()+d1->label();
   }
   void calc_aed(
+    const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
     aed_type &aed,
     const double scale=1) override {
-    d1->calc_aed(Zj,rij,rij_sq,aed,scale);
-    d2->calc_aed(Zj,rij,rij_sq,aed,scale);
+    d1->calc_aed(Zi,Zj,rij,rij_sq,aed,scale);
+    d2->calc_aed(Zi,Zj,rij,rij_sq,aed,scale);
   }
   void calc_dXijdri(
+    const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
     fd_type &fd_ij,
     const double scale=1) override {
-    d1->calc_dXijdri(Zj,rij,rij_sq,fd_ij,scale);
-    d2->calc_dXijdri(Zj,rij,rij_sq,fd_ij,scale);
+    d1->calc_dXijdri(Zi,Zj,rij,rij_sq,fd_ij,scale);
+    d2->calc_dXijdri(Zi,Zj,rij,rij_sq,fd_ij,scale);
   }
   void calc_all(
+    const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
     aed_type &aed,
     fd_type &fd_ij,
     const double scale=1) override {
-    d1->calc_all(Zj,rij,rij_sq,aed,fd_ij,scale);
-    d2->calc_all(Zj,rij,rij_sq,aed,fd_ij,scale);
+    d1->calc_all(Zi,Zj,rij,rij_sq,aed,fd_ij,scale);
+    d2->calc_all(Zi,Zj,rij,rij_sq,aed,fd_ij,scale);
   }
   std::string label() override {
     return lab;

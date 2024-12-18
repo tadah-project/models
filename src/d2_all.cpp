@@ -9,6 +9,7 @@ CONFIG::Registry<D_Base>::Register<D2_Dummy> D2_Dummy_0( "D2_Dummy" );
 CONFIG::Registry<D_Base>::Register<D2_EAM> D2_EAM_0( "D2_EAM" );
 CONFIG::Registry<D_Base>::Register<D2_LJ> D2_LJ_0( "D2_LJ" );
 CONFIG::Registry<D_Base>::Register<D2_MIE> D2_MIE_0( "D2_MIE" );
+CONFIG::Registry<D_Base>::Register<D2_ZBL> D2_ZBL_0( "D2_ZBL" );
 CONFIG::Registry<D_Base>::Register<D2_mJoin> D2_mJoin_0( "D2_mJoin" );
 
 CONFIG::Registry<D2_Base,Config&>::Register<D2_Blip> D2_Blip_1( "D2_Blip" );
@@ -17,6 +18,7 @@ CONFIG::Registry<D2_Base,Config&>::Register<D2_Dummy> D2_Dummy_1( "D2_Dummy" );
 CONFIG::Registry<D2_Base,Config&>::Register<D2_EAM> D2_EAM_1( "D2_EAM" );
 CONFIG::Registry<D2_Base,Config&>::Register<D2_LJ> D2_LJ_1( "D2_LJ" );
 CONFIG::Registry<D2_Base,Config&>::Register<D2_MIE> D2_MIE_1( "D2_MIE" );
+CONFIG::Registry<D2_Base,Config&>::Register<D2_ZBL> D2_ZBL_1( "D2_ZBL" );
 CONFIG::Registry<D2_Base,Config&>::Register<D2_mJoin> D2_mJoin_1( "D2_mJoin" );
 
 

@@ -74,6 +74,7 @@ public:
    * \f]
    */
   virtual void calc_dXijdri(
+    const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
@@ -87,6 +88,7 @@ public:
 
   /** \brief Calculate density */
   virtual void calc_rho(
+    const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
@@ -97,19 +99,19 @@ public:
 
   /** \brief This is just a convenient wrapper.
    */
-  void calc_dXijdri(const int Zj, Vec3d &del, rho_type &rhoi, fd_type &fdij, double scale=1) {
+  void calc_dXijdri(const int Zi, const int Zj, Vec3d &del, rho_type &rhoi, fd_type &fdij, double scale=1) {
     double rsq = del*del;
     double r = sqrt(rsq);
     //(p->*func)(r,rsq,del,1.0,0.0,rhoi,fdij);
-    (*this).calc_dXijdri(Zj,r,rsq,del,rhoi,fdij,scale);
+    (*this).calc_dXijdri(Zi, Zj,r,rsq,del,rhoi,fdij,scale);
   }
 
   /** \brief This is just a convenient wrapper.
    */
-  void calc_rho_mb(const int Zj, Vec3d &del, rho_type &rhoi, double scale=1) {
+  void calc_rho_mb(const int Zi, const int Zj, Vec3d &del, rho_type &rhoi, double scale=1) {
     double rsq = del*del;
     double r = sqrt(rsq);
-    ((*this).calc_rho)(Zj,r,rsq,del,rhoi,scale);
+    ((*this).calc_rho)(Zi, Zj,r,rsq,del,rhoi,scale);
   }
   /** \brief Return size of the density array */
   virtual size_t rhoi_size() {

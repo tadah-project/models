@@ -28,6 +28,7 @@ public:
    * Calculate Atomic Energy Descriptor for the atom local environment.
    */
   virtual void calc_aed(
+    const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
@@ -42,6 +43,7 @@ public:
    * The resulting vector must be scaled by the unit directional vector delij/rij
    */
   virtual void calc_dXijdri(
+    const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
@@ -50,6 +52,7 @@ public:
 
   /** \brief Calculate \ref AED + \ref FD */
   virtual void calc_all(
+    const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
@@ -67,15 +70,15 @@ public:
    * fd: appropriate size container to store computation
    * h: central difference parameter
    */
-  void calc_fd_approx(const int Zj, double r, fd_type &fd, double h=1e-8) {
+  void calc_fd_approx(const int Zi, const int Zj, double r, fd_type &fd, double h=1e-8) {
     aed_type aed_n((*this).size()); // r+h
     aed_type aed_p((*this).size()); // r-h
     aed_n.set_zero();
     aed_p.set_zero();
     double rn = r-h;
     double rp = r+h;
-    (*this).calc_aed(Zj, rn,rn*rn,aed_n);
-    (*this).calc_aed(Zj, rp,rp*rp,aed_p);
+    (*this).calc_aed(Zi,Zj,rn,rn*rn,aed_n);
+    (*this).calc_aed(Zi,Zj,rp,rp*rp,aed_p);
     fd(0) = (0.5/h)*(aed_p - aed_n);
   }
 };

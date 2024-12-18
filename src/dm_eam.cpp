@@ -89,6 +89,7 @@ void DM_EAM::calc_dXijdri_dXjidri(
 }
 void DM_EAM::calc_dXijdri(
   const int ,
+  const int ,
   const double rij,
   const double,
   const Vec3d &vec_ij,
@@ -191,6 +192,7 @@ void DM_EAM::init_rhoi(rho_type& rhoi)
   rhoi.set_zero();
 }
 void DM_EAM::calc_rho(
+  const int ,
   const int ,
   const double rij,
   const double,

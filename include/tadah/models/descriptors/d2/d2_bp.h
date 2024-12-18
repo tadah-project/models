@@ -34,18 +34,21 @@ public:
   D2_BP();
   D2_BP(Config &config);
   void calc_aed(
+    const int Zi,
     const int Zj,
     const double rij,
     const double ,
     aed_type &aed,
     const double scale=1) override;
   void calc_dXijdri(
+    const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
     fd_type &fd_ij,
     const double scale=1) override;
   void calc_all(
+    const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,

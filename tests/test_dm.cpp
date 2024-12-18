@@ -36,13 +36,13 @@ void central_difference_mb(DM *dm, std::vector<Vec3d> &positions,
     dm->init_rhoi(rhoip);
     dm->init_rhoi(rhoin);
 
-    dm->calc_rho_mb(1,del12p, rhoip);
-    dm->calc_rho_mb(1,del13,  rhoip);
-    dm->calc_rho_mb(1,del14,  rhoip);
+    dm->calc_rho_mb(1,1,del12p, rhoip);
+    dm->calc_rho_mb(1,1,del13,  rhoip);
+    dm->calc_rho_mb(1,1,del14,  rhoip);
 
-    dm->calc_rho_mb(1,del12n, rhoin);
-    dm->calc_rho_mb(1,del13, rhoin ); 
-    dm->calc_rho_mb(1,del14, rhoin );
+    dm->calc_rho_mb(1,1,del12n, rhoin);
+    dm->calc_rho_mb(1,1,del13, rhoin ); 
+    dm->calc_rho_mb(1,1,del14, rhoin );
 
     aed_type aedip(fdij.rows());
     aed_type aedin(fdij.rows());
@@ -145,42 +145,42 @@ void test_case(Config &config_mb,
   dm.init_rhoi(rho3);
   dm.init_rhoi(rho4);
 
-  dm.calc_rho_mb(1,del12, rho1);
-  dm.calc_rho_mb(1,del13, rho1);
-  dm.calc_rho_mb(1,del14, rho1);
+  dm.calc_rho_mb(1,1,del12, rho1);
+  dm.calc_rho_mb(1,1,del13, rho1);
+  dm.calc_rho_mb(1,1,del14, rho1);
 
-  dm.calc_rho_mb(1,del21, rho2);
-  dm.calc_rho_mb(1,del23, rho2);
-  dm.calc_rho_mb(1,del24, rho2);
+  dm.calc_rho_mb(1,1,del21, rho2);
+  dm.calc_rho_mb(1,1,del23, rho2);
+  dm.calc_rho_mb(1,1,del24, rho2);
 
-  dm.calc_rho_mb(1,del31, rho3);
-  dm.calc_rho_mb(1,del32, rho3);
-  dm.calc_rho_mb(1,del34, rho3);
+  dm.calc_rho_mb(1,1,del31, rho3);
+  dm.calc_rho_mb(1,1,del32, rho3);
+  dm.calc_rho_mb(1,1,del34, rho3);
 
-  dm.calc_rho_mb(1,del41, rho4);
-  dm.calc_rho_mb(1,del42, rho4);
-  dm.calc_rho_mb(1,del43, rho4);
+  dm.calc_rho_mb(1,1,del41, rho4);
+  dm.calc_rho_mb(1,1,del42, rho4);
+  dm.calc_rho_mb(1,1,del43, rho4);
 
   dm.calc_aed(rho1,aed1);
   dm.calc_aed(rho2,aed2);
   dm.calc_aed(rho3,aed3);
   dm.calc_aed(rho4,aed4);
 
-  dm.calc_dXijdri(1,r12,rsq12,del12,rho1,fd12);
-  dm.calc_dXijdri(1,r13,rsq13,del13,rho1,fd13);
-  dm.calc_dXijdri(1,r14,rsq14,del14,rho1,fd14);
+  dm.calc_dXijdri(1,1,r12,rsq12,del12,rho1,fd12);
+  dm.calc_dXijdri(1,1,r13,rsq13,del13,rho1,fd13);
+  dm.calc_dXijdri(1,1,r14,rsq14,del14,rho1,fd14);
 
-  dm.calc_dXijdri(1,r21,rsq21,del21,rho2,fd21);
-  dm.calc_dXijdri(1,r23,rsq23,del23,rho2,fd23);
-  dm.calc_dXijdri(1,r24,rsq24,del24,rho2,fd24);
+  dm.calc_dXijdri(1,1,r21,rsq21,del21,rho2,fd21);
+  dm.calc_dXijdri(1,1,r23,rsq23,del23,rho2,fd23);
+  dm.calc_dXijdri(1,1,r24,rsq24,del24,rho2,fd24);
 
-  dm.calc_dXijdri(1,r31,rsq31,del31,rho3,fd31);
-  dm.calc_dXijdri(1,r32,rsq32,del32,rho3,fd32);
-  dm.calc_dXijdri(1,r34,rsq34,del34,rho3,fd34);
+  dm.calc_dXijdri(1,1,r31,rsq31,del31,rho3,fd31);
+  dm.calc_dXijdri(1,1,r32,rsq32,del32,rho3,fd32);
+  dm.calc_dXijdri(1,1,r34,rsq34,del34,rho3,fd34);
 
-  dm.calc_dXijdri(1,r41,rsq41,del41,rho4,fd41);
-  dm.calc_dXijdri(1,r42,rsq42,del42,rho4,fd42);
-  dm.calc_dXijdri(1,r43,rsq43,del43,rho4,fd43);
+  dm.calc_dXijdri(1,1,r41,rsq41,del41,rho4,fd41);
+  dm.calc_dXijdri(1,1,r42,rsq42,del42,rho4,fd42);
+  dm.calc_dXijdri(1,1,r43,rsq43,del43,rho4,fd43);
 
   fd_type FD12(dm.size());
   fd_type FD13(dm.size());
@@ -438,8 +438,8 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_Dummy", "[DM]") {
     Vec3d del;
     REQUIRE_NOTHROW(d.calc_aed(rho1, aed));
     REQUIRE_NOTHROW(d.init_rhoi(rho1));
-    REQUIRE_NOTHROW(d.calc_rho(0, 0, 0, del, rho1));
-    REQUIRE_NOTHROW(d.calc_dXijdri(1, 0, 0, del, rho1, fd));
+    REQUIRE_NOTHROW(d.calc_rho(0,0, 0, 0, del, rho1));
+    REQUIRE_NOTHROW(d.calc_dXijdri(1,1, 0, 0, del, rho1, fd));
     REQUIRE_NOTHROW(d.calc_dXijdri_dXjidri(1, 1, 0, 0, del, rho1, rho1, fd, 1));
     REQUIRE(d.rhoi_size() == 0);
     REQUIRE(d.rhoip_size() == 0);

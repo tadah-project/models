@@ -66,6 +66,7 @@ public:
     fd_type &fd_ij,
     const double scale=1) override;
   void calc_dXijdri(
+    const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
@@ -76,6 +77,7 @@ public:
   std::string label() override;
   void init_rhoi(rho_type& rhoi) override;
   void calc_rho(
+    const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,

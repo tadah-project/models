@@ -41,6 +41,7 @@ D2_BP::D2_BP(Config &c): D2_Base(c) {
 }
 
 void D2_BP::calc_aed(
+  const int Zi,
   const int Zj,
   const double rij,
   const double ,
@@ -56,6 +57,7 @@ void D2_BP::calc_aed(
 
 }
 void D2_BP::calc_dXijdri(
+  const int Zi,
   const int Zj,
   const double rij,
   const double ,
@@ -70,6 +72,7 @@ void D2_BP::calc_dXijdri(
   }
 }
 void D2_BP::calc_all(
+  const int Zi,
   const int Zj,
   const double rij,
   const double ,

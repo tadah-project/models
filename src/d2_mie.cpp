@@ -17,6 +17,7 @@ D2_MIE::D2_MIE(Config &c): D2_Base(c)
 }
 
 void D2_MIE::calc_aed(
+  const int Zi,
   const int Zj,
   const double rij,
   const double,
@@ -31,6 +32,7 @@ void D2_MIE::calc_aed(
   aed(fidx+1) += scale*weights[Zj]*rm_inv*fc_ij;
 }
 void D2_MIE::calc_dXijdri(
+  const int Zi,
   const int Zj,
   const double rij,
   const double,
@@ -44,6 +46,7 @@ void D2_MIE::calc_dXijdri(
   fd_ij(fidx+1,0) = scale*weights[Zj]*(-m/pow(rij,m+1)*fc_ij + fcp_ij/pow(rij,m));
 }
 void D2_MIE::calc_all(
+  const int Zi,
   const int Zj,
   const double rij,
   const double,

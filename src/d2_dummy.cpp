@@ -11,6 +11,7 @@ D2_Dummy::D2_Dummy(Config &c): D2_Base(c)
 
 void D2_Dummy::calc_aed(
   const int,
+  const int,
   const double,
   const double,
   aed_type&,
@@ -18,11 +19,13 @@ void D2_Dummy::calc_aed(
 
 void D2_Dummy::calc_dXijdri(
   const int,
+  const int,
   const double,
   const double,
   fd_type &,
   const double) {}
 void D2_Dummy::calc_all(
+  const int,
   const int,
   const double,
   const double,

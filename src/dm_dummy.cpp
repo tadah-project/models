@@ -22,6 +22,7 @@ void DM_Dummy::calc_dXijdri_dXjidri(
   const double) {}
 void DM_Dummy::calc_dXijdri(
   const int,
+  const int,
   const double,
   const double,
   const Vec3d &,
@@ -31,6 +32,7 @@ void DM_Dummy::calc_dXijdri(
 std::string DM_Dummy::label() {return lab;}
 void DM_Dummy::init_rhoi(rho_type&) {}
 void DM_Dummy::calc_rho(
+  const int,
   const int,
   const double,
   const double,

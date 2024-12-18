@@ -162,6 +162,7 @@ void DM_EAD::calc_dXijdri_dXjidri(
   }
 }
 void DM_EAD::calc_dXijdri(
+  const int Zi,
   const int Zj,
   const double rij,
   const double,
@@ -242,6 +243,7 @@ void DM_EAD::init_rhoi(rho_type& rhoi)
   rhoi.set_zero();
 }
 void DM_EAD::calc_rho(
+  const int Zi,
   const int Zj,
   const double rij,
   const double,

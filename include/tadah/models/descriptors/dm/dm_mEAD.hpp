@@ -166,6 +166,7 @@ void DM_mEAD<F>::calc_dXijdri_dXjidri(
 }
 template <typename F>
 void DM_mEAD<F>::calc_dXijdri(
+  const int Zi,
   const int Zj,
   const double rij,
   const double,
@@ -249,6 +250,7 @@ void DM_mEAD<F>::init_rhoi(rho_type& rhoi)
 }
 template <typename F>
 void DM_mEAD<F>::calc_rho(
+  const int Zi,
   const int Zj,
   const double rij,
   const double,

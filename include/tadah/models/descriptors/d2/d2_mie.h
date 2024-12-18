@@ -17,9 +17,9 @@
  *
  * Any cutoff can be used
  *
- * Required Config Key: \ref INIT2B \ref SGRID2B
+ * Required Config Key: \ref INIT2B \ref TYPE2B
  *
- * e.g. SGID2B 12 6
+ * TYPE2B D2_MIE 12 6
  *
  * will result in Lennard-Jones type descriptor
  */
@@ -32,18 +32,21 @@ public:
   D2_MIE();
   D2_MIE(Config &config);
   void calc_aed(
+    const int Zi,
     const int Zj,
     const double rij,
     const double ,
     aed_type &aed,
     const double scale=1) override;
   void calc_dXijdri(
+    const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
     fd_type &fd_ij,
     const double scale=1) override;
   void calc_all(
+    const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
