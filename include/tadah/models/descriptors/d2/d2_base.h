@@ -39,8 +39,14 @@ public:
    *
    * Calculate Force Descriptor for the atom local environment.
    *
+   * For two body this is essentiall df/dr where f is a descriptor function.
+   * Do not include negative sign (as you mifht think E=-df/dr). The negative sign 
+   * is included elsewhere in the code.
+   *
    * Computes x-direction only.
+   *
    * The resulting vector must be scaled by the unit directional vector delij/rij
+   * where delij = r_i - r_j, and rij is |r_i - r_j|
    */
   virtual void calc_dXijdri(
     const int Zi,

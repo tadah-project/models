@@ -257,3 +257,38 @@ TEST_CASE_METHOD(TestFixture, "Testing D2_MIE", "[D2]") {
     REQUIRE_THROWS(D2_MIE(c));
 
 }
+TEST_CASE_METHOD(TestFixture, "Testing D2_ZBL", "[D2]") {
+    Config c;
+    c.remove("INIT2B");
+    c.add("INIT2B", "true");
+    c.add("TYPE2B", "D2_ZBL");
+    c.add("TYPE2B", -1);
+    c.add("TYPE2B", -1);
+    c.add("TYPE2B", -1);
+    c.add("TYPE2B", -1);
+    test_D2<D2_ZBL>(c);
+
+    D2_ZBL d(c);
+    REQUIRE(d.size() == 1);
+    REQUIRE(d.label() == "D2_ZBL");
+
+    // Test throws
+    c.remove("TYPE2B");
+    c.add("TYPE2B", "D2_ZBL");
+    c.add("TYPE2B", 7);
+    REQUIRE_THROWS(D2_ZBL(c));
+
+    c.remove("TYPE2B");
+    c.add("TYPE2B", "D2_ZBL");
+    c.add("TYPE2B", -7);
+    c.add("TYPE2B", -8);
+    REQUIRE_THROWS(D2_ZBL(c));
+
+    c.remove("TYPE2B");
+    c.add("TYPE2B", "D2_ZBL");
+    c.add("TYPE2B", 7);
+    c.add("TYPE2B", 8);
+    c.add("TYPE2B", 9);
+    REQUIRE_THROWS(D2_ZBL(c));
+
+}

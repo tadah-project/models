@@ -58,7 +58,7 @@ private:
   double p0=0.23; // bohr radius
   double p1=0.23; // bohr radius
   double **a = nullptr; // precomputed screening length
-  int *types; // local index of Zi
+  int types[119]; // local index of Zi
   int ntypes=0; // number of elements for this calc
 public:
   D2_ZBL();

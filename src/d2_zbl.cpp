@@ -17,21 +17,24 @@ D2_ZBL::D2_ZBL(Config &c): D2_Base(c)
   if (temp!=-1) p0=temp;
   temp = c.get<double>("TYPE2B",4);
   if (temp!=-1) p1=temp;
+  
+  if (verbose) 
+    std::cout << label() << ": " << a0 << " "
+      << s0 << " " << p0 << " " << p1 << std::endl;
 
   ntypes = c.size("ATOMS");
-  types = new int[ntypes];
   a = new double*[ntypes];
   for (int i = 0; i < ntypes; ++i) {
     a[i] = new double[ntypes];
   }
   for (int i=0; i<ntypes; ++i) {
-    std::string symbol = c.get<std::string>("ATOMS",i);
-    int Zi = PeriodicTable::find_by_symbol(symbol).Z;
-    types[i] = Zi;
-  }
-  for (int i=0; i<ntypes; ++i) {
+    std::string symboli = c.get<std::string>("ATOMS",i);
+    int Zi = PeriodicTable::find_by_symbol(symboli).Z;
+    types[Zi] = i;
     for (int j=0; j<ntypes; ++j) {
-      a[i][j] = screening_length(types[i],types[j]);
+      std::string symbolj = c.get<std::string>("ATOMS",j);
+      int Zj = PeriodicTable::find_by_symbol(symbolj).Z;
+      a[i][j] = screening_length(Zi,Zj);
     }
   }
 }
@@ -41,9 +44,7 @@ D2_ZBL::~D2_ZBL() {
       delete[] a[i];  
     }
     delete[] a;        
-    delete[] types;        
     a = nullptr;       
-    types = nullptr;       
   }
 }
 
@@ -74,13 +75,12 @@ void D2_ZBL::calc_dXijdri(
   double x = rij / a_;
   double p = phi(x);
   double dp = dphi(x);
-
   double fc_ij = fcut->calc(rij);
   double fcp_ij = fcut->calc_prime(rij);
-  double E_ZBL = (Zi * Zj / rij) * p;
-  double dE_ZBL_r = -((Zi * Zj *r_inv*r_inv)*p + (Zi * Zj * r_inv) / a_ * dp);
 
-  fd_ij(fidx,0) = -scale*weights[Zj]*(E_ZBL*fcp_ij + dE_ZBL_r*fc_ij);
+  double E_ZBL = (Zi * Zj * r_inv) * p;
+  double dE_ZBL_r = -(Zi * Zj * r_inv*r_inv)*p + dp*(Zi * Zj * r_inv) / a_ ;
+  fd_ij(fidx,0) = scale*weights[Zj]*(E_ZBL*fcp_ij + dE_ZBL_r*fc_ij);
 }
 void D2_ZBL::calc_all(
   const int Zi,
@@ -99,11 +99,11 @@ void D2_ZBL::calc_all(
 
   double fc_ij = fcut->calc(rij);
   double fcp_ij = fcut->calc_prime(rij);
-  double E_ZBL = (Zi * Zj / rij) * p;
-  double dE_ZBL_r = -((Zi * Zj *r_inv*r_inv)*p + (Zi * Zj * r_inv) / a_ * dp);
 
   aed(fidx) += scale*weights[Zj]*(Zi * Zj * r_inv) * p * fc_ij;
-  fd_ij(fidx,0) = -scale*weights[Zj]*(E_ZBL*fcp_ij + dE_ZBL_r*fc_ij);
+  double E_ZBL = (Zi * Zj * r_inv) * p;
+  double dE_ZBL_r = -(Zi * Zj * r_inv*r_inv)*p + dp*(Zi * Zj * r_inv) / a_ ;
+  fd_ij(fidx,0) = scale*weights[Zj]*(E_ZBL*fcp_ij + dE_ZBL_r*fc_ij);
 }
 std::string D2_ZBL::label() {
   return lab;
