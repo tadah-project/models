@@ -1,5 +1,6 @@
 #include "tadah/core/registry.h"
 #include <cstddef>
+#include <iostream>
 #include <string>
 #include <tadah/models/descriptors/d_mjoin.h>
 #include <tadah/models/descriptors/d_base.h>
@@ -22,6 +23,51 @@ std::vector<std::string> convert_to_strings(const v_type& vec, int precision) {
   return result;
 }
 
+void D_mJoin::expand_grids(Config &c) {
+  std::vector<Config> configs1 = parse_config(c, "TYPE2B");
+  expand_grids(c,configs1,"TYPE2B");
+  std::vector<Config> configs2 = parse_config(c, "TYPEMB");
+  expand_grids(c,configs2,"TYPEMB");
+}
+void D_mJoin::expand_grids(Config &c, std::string type_str) {
+  std::vector<Config> configs = parse_config(c, type_str);
+  expand_grids(c,configs,type_str);
+}
+void D_mJoin::expand_grids(Config &c, std::vector<Config> &configs,std::string type_str) {
+  if (type_str=="TYPE2B") {
+    c.remove("CGRID2B"); c.remove("SGRID2B");
+    for (auto &c1 : configs) {
+      if (c1.exist("CGRID2B"))
+        for (size_t i = 0; i < c1.size("CGRID2B"); ++i)
+          c.add("CGRID2B", c1.get<double>("CGRID2B", i));
+      if (c1.exist("SGRID2B"))
+        for (size_t i = 0; i < c1.size("SGRID2B"); ++i)
+          c.add("SGRID2B", c1.get<double>("SGRID2B", i));
+    }
+  }
+  else if (type_str=="TYPEMB") {
+    c.remove("CGRIDMB"); c.remove("SGRIDMB");
+    c.remove("CEMBFUNC"); c.remove("SEMBFUNC");
+
+    for (auto &c1 : configs) {
+      if (c1.exist("CGRIDMB"))
+        for (size_t i = 0; i < c1.size("CGRIDMB"); ++i)
+          c.add("CGRIDMB", c1.get<double>("CGRIDMB", i));
+      if (c1.exist("SGRIDMB"))
+        for (size_t i = 0; i < c1.size("SGRIDMB"); ++i)
+          c.add("SGRIDMB", c1.get<double>("SGRIDMB", i));
+      if (c1.exist("CEMBFUNC"))
+        for (size_t i = 0; i < c1.size("CEMBFUNC"); ++i)
+          c.add("CEMBFUNC", c1.get<double>("CEMBFUNC", i));
+      if (c1.exist("SEMBFUNC"))
+        for (size_t i = 0; i < c1.size("SEMBFUNC"); ++i)
+          c.add("SEMBFUNC", c1.get<double>("SEMBFUNC", i));
+    }
+  }
+  else {
+    std::cerr << "Cannot expand config grid: wrong keyword: " << type_str << std::endl;
+  }
+}
 std::vector<Config> D_mJoin::parse_config(Config &c, std::string type_str) {
   std::string prefix = type_str=="TYPE2B" ? "D2_" : "DM_";
   std::string rctypekey = "RC" + type_str;

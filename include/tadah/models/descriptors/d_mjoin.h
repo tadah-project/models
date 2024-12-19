@@ -19,7 +19,11 @@ protected:
 public:
   virtual ~D_mJoin();
   D_mJoin();
-  virtual std::vector<Config> parse_config(Config &c, std::string type_str);
+  static std::vector<Config> parse_config(Config &c, std::string type_str);
+
+  static void expand_grids(Config &c, std::vector<Config> &configs, std::string type_str);
+  static void expand_grids(Config &c, std::string type_str);
+  static void expand_grids(Config &c);
 };
 #endif
 

@@ -11,30 +11,14 @@ DM_mJoin::~DM_mJoin() {
 DM_mJoin::DM_mJoin(Config &c) : DM_Base(c) {
   init();
   configs = parse_config(c, "TYPEMB");
-  c.remove("CGRIDMB"); c.remove("SGRIDMB");
-  c.remove("CEMBFUNC"); c.remove("SEMBFUNC");
+  expand_grids(c, configs, "TYPEMB");
 
   for (auto &c1 : configs) {
     ds.push_back(CONFIG::factory<DM_Base, Config&>(c1.get<std::string>("TYPEMB"), c1));
     s += ds.back()->size();
     rhoisize += ds.back()->rhoi_size();
-
-    // update main grid with expanded grid
-    if (c1.exist("CGRIDMB"))
-      for (size_t i = 0; i < c1.size("CGRIDMB"); ++i)
-        c.add("CGRIDMB", c1.get<double>("CGRIDMB", i));
-    if (c1.exist("SGRIDMB"))
-      for (size_t i = 0; i < c1.size("SGRIDMB"); ++i)
-        c.add("SGRIDMB", c1.get<double>("SGRIDMB", i));
-    if (c1.exist("CEMBFUNC"))
-      for (size_t i = 0; i < c1.size("CEMBFUNC"); ++i)
-        c.add("CEMBFUNC", c1.get<double>("CEMBFUNC", i));
-    if (c1.exist("SEMBFUNC"))
-      for (size_t i = 0; i < c1.size("SEMBFUNC"); ++i)
-        c.add("SEMBFUNC", c1.get<double>("SEMBFUNC", i));
   }
 }
-
 
 void DM_mJoin::calc_aed(rho_type& rho, aed_type &aed) {
   size_t rho_fidx = 0;

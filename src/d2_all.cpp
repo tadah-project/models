@@ -1,7 +1,17 @@
 #include "tadah/models/descriptors/d2/d2_all.h"
 
 template<> CONFIG::Registry<D_Base>::Map CONFIG::Registry<D_Base>::registry{};
+template<> CONFIG::Registry<D_Base,Config&>::Map CONFIG::Registry<D_Base,Config&>::registry{};
 template<> CONFIG::Registry<D2_Base,Config&>::Map CONFIG::Registry<D2_Base,Config&>::registry{};
+
+CONFIG::Registry<D_Base,Config&>::Register<D2_Blip> D2_Blip_00( "D2_Blip" );
+CONFIG::Registry<D_Base,Config&>::Register<D2_BP> D2_BP_00( "D2_BP" );
+CONFIG::Registry<D_Base,Config&>::Register<D2_Dummy> D2_Dummy_00( "D2_Dummy" );
+CONFIG::Registry<D_Base,Config&>::Register<D2_EAM> D2_EAM_00( "D2_EAM" );
+CONFIG::Registry<D_Base,Config&>::Register<D2_LJ> D2_LJ_00( "D2_LJ" );
+CONFIG::Registry<D_Base,Config&>::Register<D2_MIE> D2_MIE_00( "D2_MIE" );
+CONFIG::Registry<D_Base,Config&>::Register<D2_ZBL> D2_ZBL_00( "D2_ZBL" );
+CONFIG::Registry<D_Base,Config&>::Register<D2_mJoin> D2_mJoin_00( "D2_mJoin" );
 
 CONFIG::Registry<D_Base>::Register<D2_Blip> D2_Blip_0( "D2_Blip" );
 CONFIG::Registry<D_Base>::Register<D2_BP> D2_BP_0( "D2_BP" );
