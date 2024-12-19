@@ -79,7 +79,14 @@ std::vector<Config> D_mJoin::parse_config(Config &c, std::string type_str) {
 
   std::vector<std::string> types(c.size(type_str)); // including params TYPE2B D2_Blip 7 7
   c.get(type_str, types);
-  types.erase(types.begin()); // remove D2_mJoin or DM_mJoin
+  //types.erase(types.begin()); // remove D2_mJoin or DM_mJoin
+  std::string pattern="mJoin";
+  types.erase(
+    std::remove_if(types.begin(), types.end(), [&pattern](const std::string& s) {
+      return s.find(pattern) != std::string::npos;
+    }),
+    types.end()
+  );
   
   std::vector<std::string> rctypes(c.size(rctypekey));
   c.get(rctypekey, rctypes);
