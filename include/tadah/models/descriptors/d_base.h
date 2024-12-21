@@ -26,6 +26,10 @@ public:
   int verbose;
   virtual ~D_Base();
 
+  // return position of an argument given to TYPExB for a given key
+  // if key is not used, returns -1
+  int get_arg_pos(const std::string &key) const;
+
   /** \brief Return dimension of the descriptor.
   */
   virtual size_t size() { return s; };

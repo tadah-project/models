@@ -91,3 +91,10 @@ void D_Base::set_fcut(Cut_Base* cut, bool manage_memory) {
   fcut = cut;
   this->manage_memory = manage_memory;
 }
+int D_Base::get_arg_pos(const std::string &key) const {
+  auto it = std::find(keys.begin(), keys.end(), key);
+
+  if (it == keys.end()) return -1;
+
+  return std::distance(keys.begin(), it)+(nparams-keys.size());
+}
