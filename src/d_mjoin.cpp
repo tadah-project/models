@@ -24,10 +24,14 @@ std::vector<std::string> convert_to_strings(const v_type& vec, int precision) {
 }
 
 void D_mJoin::expand_grids(Config &c) {
-  std::vector<Config> configs1 = parse_config(c, "TYPE2B");
-  expand_grids(c,configs1,"TYPE2B");
-  std::vector<Config> configs2 = parse_config(c, "TYPEMB");
-  expand_grids(c,configs2,"TYPEMB");
+  if (c.exist("TYPE2B")) {
+    std::vector<Config> configs1 = parse_config(c, "TYPE2B");
+    expand_grids(c,configs1,"TYPE2B");
+  }
+  if (c.exist("TYPEMB")) {
+    std::vector<Config> configs2 = parse_config(c, "TYPEMB");
+    expand_grids(c,configs2,"TYPEMB");
+  }
 }
 void D_mJoin::expand_grids(Config &c, std::string type_str) {
   std::vector<Config> configs = parse_config(c, type_str);
