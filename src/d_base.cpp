@@ -79,6 +79,7 @@ D_Base::D_Base(Config &c):
       double wi = c.get<double>("WATOMS",i);
       int Z = PeriodicTable::find_by_symbol(symbol).Z;
       weights[Z]=wi;
+      init_for_atom(Z);
     }
   }
 }
@@ -97,4 +98,20 @@ int D_Base::get_arg_pos(const std::string &key) const {
   if (it == keys.end()) return -1;
 
   return std::distance(keys.begin(), it)+(nparams-keys.size());
+}
+size_t D_Base::size() { return s; };
+double D_Base::get_rcut() { 
+  return fcut->get_rcut(); 
+}
+bool D_Base::is_init_for_atom(int Z) {
+  return init_for_atoms[Z];
+}
+bool D_Base::is_init_for_atoms(int Zi, int Zj) {
+  return init_for_atoms[Zi] && init_for_atoms[Zj];
+}
+void D_Base::init_for_atom(int Z) {
+  init_for_atoms.set(Z);
+}
+void D_Base::uninit_for_atom(int Z) {
+  init_for_atoms.reset(Z);
 }

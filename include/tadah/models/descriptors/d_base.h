@@ -8,6 +8,7 @@
 #include <tadah/core/registry.h>
 #include <tadah/models/cut_all.h>
 #include <vector>
+#include <bitset>
 
 /** \brief Base class for all descriptor types.
  *
@@ -30,9 +31,6 @@ public:
   // if key is not used, returns -1
   int get_arg_pos(const std::string &key) const;
 
-  /** \brief Return dimension of the descriptor.
-  */
-  virtual size_t size() { return s; };
 
   /** \brief Return label of this descriptor.
    */
@@ -60,10 +58,19 @@ public:
 
   virtual void set_fcut(Cut_Base* cut, bool manage_memory);
 
-  double get_rcut() { 
-    return fcut->get_rcut(); }
+  double get_rcut();
+
+  /** \brief Return dimension of the descriptor.
+  */
+  virtual size_t size();
+
+  virtual bool is_init_for_atom(int Z);
+  virtual bool is_init_for_atoms(int Zi, int Zj);
+  virtual void init_for_atom(int Zi);
+  virtual void uninit_for_atom(int Zi);
 
 private:
   bool manage_memory=false; // who owns fcut
+  std::bitset<119> init_for_atoms;
 };
 #endif
