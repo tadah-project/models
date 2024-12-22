@@ -115,10 +115,32 @@ void D_Base::init_for_atoms(const std::vector<std::string> &Zs) {
   if (Zs.size() % 2 != 0) {
     throw std::invalid_argument("The vector size must be even.");
   }
-  for (size_t i=0; i< Zs.size(); i+=2) {
-    int Zi = PeriodicTable::find_by_symbol(Zs[i]).Z;
-    int Zj = PeriodicTable::find_by_symbol(Zs[i+1]).Z;
-    init_for_atoms(Zi, Zj);
+  
+  for (size_t i = 0; i < Zs.size(); i += 2) {
+    if (Zs[i] == "*" && is_number(Zs[i+1])) {
+      int Zj = PeriodicTable::find_by_symbol(Zs[i+1]).Z;
+      for (int Zi = 1; Zi < 119; ++Zi) {
+        init_for_atoms(Zi, Zj);
+      }
+    } 
+    else if (Zs[i+1] == "*" && is_number(Zs[i])) {
+      int Zi = PeriodicTable::find_by_symbol(Zs[i]).Z;
+      for (int Zj = 1; Zj < 119; ++Zj) {
+        init_for_atoms(Zi, Zj);
+      }
+    } 
+    else if (Zs[i] == "*" && Zs[i+1] == "*") {
+      for (int Zi = 1; Zi < 119; ++Zi) {
+        for (int Zj = Zi; Zj < 119; ++Zj) {
+          init_for_atoms(Zi, Zj);
+        }
+      }
+    } 
+    else {
+      int Zi = PeriodicTable::find_by_symbol(Zs[i]).Z;
+      int Zj = PeriodicTable::find_by_symbol(Zs[i+1]).Z;
+      init_for_atoms(Zi, Zj);
+    }
   }
 }
 std::vector<std::string> D_Base::get_init_atoms(Config &c, std::string type) {
