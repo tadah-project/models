@@ -58,8 +58,8 @@ void DM_EAM::calc_aed(
 
 }
 void DM_EAM::calc_dXijdri_dXjidri(
-  const int ,
-  const int ,
+  const int Zi,
+  const int Zj,
   const double rij,
   const double,
   const Vec3d &vec_ij,
@@ -68,6 +68,7 @@ void DM_EAM::calc_dXijdri_dXjidri(
   fd_type &fd_ij,
   const double scale)
 {
+  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   double r = rij;
   double rinv = 1/r;
   double p = r*ef.rdr + 1.0;
@@ -88,8 +89,8 @@ void DM_EAM::calc_dXijdri_dXjidri(
   fd_ij(fidx,2) = f*vec_ij[2]; 
 }
 void DM_EAM::calc_dXijdri(
-  const int ,
-  const int ,
+  const int Zi,
+  const int Zj,
   const double rij,
   const double,
   const Vec3d &vec_ij,
@@ -97,6 +98,7 @@ void DM_EAM::calc_dXijdri(
   fd_type &fd_ij,
   const double scale)
 {
+  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   double r = rij;
   double rinv = 1/r;
   double p = r*ef.rdr + 1.0;
@@ -192,14 +194,15 @@ void DM_EAM::init_rhoi(rho_type& rhoi)
   rhoi.set_zero();
 }
 void DM_EAM::calc_rho(
-  const int ,
-  const int ,
+  const int Zi,
+  const int Zj,
   const double rij,
   const double,
   const Vec3d &,
   rho_type& rho,
   const double scale)
 {
+  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   double r = rij;
   double p = r*ef.rdr + 1.0;
   int m = static_cast<int> (p);

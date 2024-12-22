@@ -81,6 +81,7 @@ void DM_mEAD<F>::calc_dXijdri_dXjidri(
   fd_type &fd_ij,
   const double scale)
 {
+  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   const double x = vec_ij[0];
   const double y = vec_ij[1];
   const double z = vec_ij[2];
@@ -175,6 +176,7 @@ void DM_mEAD<F>::calc_dXijdri(
   fd_type &fd_ij,
   const double scale)
 {
+  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   const double x = vec_ij[0];
   const double y = vec_ij[1];
   const double z = vec_ij[2];
@@ -258,6 +260,7 @@ void DM_mEAD<F>::calc_rho(
   rho_type& rhoi,
   const double scale)
 {
+  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   size_t ii=rfidx;
   double fc_ij = scale*weights[Zj]*fcut->calc(rij);
   for (int L=0; L<=Lmax; ++L) {

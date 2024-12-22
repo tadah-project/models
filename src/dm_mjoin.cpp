@@ -37,9 +37,7 @@ void DM_mJoin::calc_dXijdri_dXjidri(
   fd_type &fd_ij,
   const double scale) {
   for (auto d : ds) {
-    if (d->is_init_for_atoms(Zi,Zj) && rij < d->get_rcut()) {
-      d->calc_dXijdri_dXjidri(Zi,Zj,rij,rij_sq,vec_ij,rhoi,rhoj,fd_ij,scale); 
-    }
+    d->calc_dXijdri_dXjidri(Zi,Zj,rij,rij_sq,vec_ij,rhoi,rhoj,fd_ij,scale); 
   }
 }
 void DM_mJoin::calc_dXijdri(
@@ -52,9 +50,7 @@ void DM_mJoin::calc_dXijdri(
   fd_type &fd_ij, 
   const double scale) {
   for (auto d : ds) { 
-    if (d->is_init_for_atoms(Zi,Zj) && rij < d->get_rcut()) {
-      d->calc_dXijdri(Zi,Zj,rij,rij_sq,vec_ij,rhoi,fd_ij,scale);
-    }
+    d->calc_dXijdri(Zi,Zj,rij,rij_sq,vec_ij,rhoi,fd_ij,scale);
   }
 }
 void DM_mJoin::init_rhoi(rho_type& rhoi) {
@@ -70,9 +66,7 @@ void DM_mJoin::calc_rho(
   rho_type& rho,
   const double scale) {
   for (auto d : ds) {
-    if (d->is_init_for_atoms(Zi,Zj) && rij < d->get_rcut()) {
       d->calc_rho(Zi,Zj,rij,rij_sq,vec_ij,rho,scale);
-    }
   }
 }
 std::string DM_mJoin::label() {

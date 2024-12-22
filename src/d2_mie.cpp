@@ -24,6 +24,7 @@ void D2_MIE::calc_aed(
   aed_type &aed,
   const double scale)
 {
+  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   double rn_inv = 1.0/pow(rij,n);
   double rm_inv = 1.0/pow(rij,m);
   double fc_ij = fcut->calc(rij);
@@ -39,6 +40,7 @@ void D2_MIE::calc_dXijdri(
   fd_type &fd_ij,
   const double scale)
 {
+  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   double fc_ij = fcut->calc(rij);
   double fcp_ij = fcut->calc_prime(rij);
 
@@ -54,6 +56,7 @@ void D2_MIE::calc_all(
   fd_type &fd_ij,
   const double scale)
 {
+  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
 
   double rn_inv = 1.0/pow(rij,n);
   double rm_inv = 1.0/pow(rij,m);

@@ -48,6 +48,7 @@ void D2_BP::calc_aed(
   aed_type &aed,
   const double scale)
 {
+  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
 
   size_t i=fidx;
   double fc_ij = fcut->calc(rij);
@@ -64,6 +65,7 @@ void D2_BP::calc_dXijdri(
   fd_type &fd_ij,
   const double scale)
 {
+  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   size_t i=fidx;
   double fc_ij = fcut->calc(rij);
   double fcp_ij = fcut->calc_prime(rij);
@@ -80,6 +82,7 @@ void D2_BP::calc_all(
   fd_type &fd_ij,
   const double scale)
 {
+  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   size_t i=fidx;
   double fc_ij = fcut->calc(rij);
   double fcp_ij = fcut->calc_prime(rij);

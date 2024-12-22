@@ -34,13 +34,14 @@ D2_EAM::D2_EAM(Config &c): D2_Base(c)
 }
 
 void D2_EAM::calc_aed(
-  const int ,
-  const int ,
+  const int Zi,
+  const int Zj,
   const double rij,
   const double,
   aed_type &aed,
   const double scale)
 {
+  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   double r = rij;
   const double recip = 1.0/r;
   double p = r*ef.rdr + 1.0;
@@ -52,13 +53,14 @@ void D2_EAM::calc_aed(
   aed(fidx) += scale*z2*recip;
 }
 void D2_EAM::calc_dXijdri(
-  const int ,
-  const int ,
+  const int Zi,
+  const int Zj,
   const double rij,
   const double,
   fd_type &fd_ij,
   const double scale)
 {
+  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   const double r = rij;
   const double recip = 1.0/r;
   double p = r*ef.rdr + 1.0;
@@ -76,14 +78,15 @@ void D2_EAM::calc_dXijdri(
 
 }
 void D2_EAM::calc_all(
-  const int ,
-  const int ,
+  const int Zi,
+  const int Zj,
   const double rij,
   const double,
   aed_type &aed,
   fd_type &fd_ij,
   const double scale)
 {
+  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   double r = rij;
   const double recip = 1.0/r;
   double p = r*ef.rdr + 1.0;

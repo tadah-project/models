@@ -56,6 +56,7 @@ void D2_ZBL::calc_aed(
   aed_type &aed,
   const double scale)
 {
+  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   double fc_ij = fcut->calc(rij);
   double a_ = a[types[Zi]][types[Zj]];
   double x = rij / a_;
@@ -70,6 +71,7 @@ void D2_ZBL::calc_dXijdri(
   fd_type &fd_ij,
   const double scale)
 {
+  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   double r_inv = 1.0/rij;
   double a_ = a[types[Zi]][types[Zj]];
   double x = rij / a_;
@@ -91,6 +93,7 @@ void D2_ZBL::calc_all(
   fd_type &fd_ij,
   const double scale)
 {
+  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   double r_inv = 1.0/rij;
   double a_ = a[types[Zi]][types[Zj]];
   double x = rij / a_;

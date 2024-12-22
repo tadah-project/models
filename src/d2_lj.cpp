@@ -19,6 +19,7 @@ void D2_LJ::calc_aed(
   aed_type &aed,
   const double scale)
 {
+  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   double r2_inv = 1.0/rij_sq;
   double r6_inv = r2_inv*r2_inv*r2_inv;
   double fc_ij = fcut->calc(rij);
@@ -34,6 +35,7 @@ void D2_LJ::calc_dXijdri(
   fd_type &fd_ij,
   const double scale)
 {
+  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
 
   double r2_inv = 1.0/rij_sq;
   double r6_inv = r2_inv*r2_inv*r2_inv;
@@ -52,6 +54,7 @@ void D2_LJ::calc_all(
   fd_type &fd_ij,
   const double scale)
 {
+  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   double r2_inv = 1.0/rij_sq;
   double r6_inv = r2_inv*r2_inv*r2_inv;
 
