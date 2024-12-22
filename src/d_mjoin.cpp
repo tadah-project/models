@@ -147,9 +147,38 @@ std::vector<Config> D_mJoin::parse_config(Config &c, std::string type_str) {
 
     for (const auto& k : d->keys) {
       int n = std::stoi(*it++);
+      c1.add(type_str,n);
       for (int j = 0; j < n; ++j) {
-        c1.add(k,*(data_map[k]++));     /// Problem?
+        c1.add(k,*(data_map[k]++));
       } 
+    }
+
+    // read init atoms
+    size_t found_init_atoms=0;
+    while (it != types.end()) {
+      if (it->find(prefix) == 0) {
+        break;
+      }
+      c1.add(type_str,*it++);
+      found_init_atoms++;
+    }
+    // if (it != types.end() && it != types.begin()) {
+    //   --it;
+    // }
+    if (!found_init_atoms) {
+      throw std::runtime_error(
+        "Error: No element types specified. "
+        "Please provide element types for this calculator. "
+        "For example: '"+token+" Ti Ti Ti Nb' sets the calculator to compute Ti-Ti and Ti-Nb interactions. "
+        "Token: " + token);
+    }
+
+    if (found_init_atoms % 2 != 0) {
+      throw std::runtime_error(
+        "Error: Element types must be provided in pairs. "
+        "Ensure each element is paired correctly. "
+        "For instance, '" + token + " Ti * Nb Zr' means that interactions of Ti with any atom, as well as Nb-Zr, will be computed. "
+        "Token: " + token);
     }
 
     configs.push_back(c1);

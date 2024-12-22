@@ -1,1 +1,8 @@
 #include <tadah/models/descriptors/d2/d2_base.h>
+
+std::vector<std::string> D2_Base::get_init_atoms(Config &c) {
+  std::vector<std::string> init_atoms(c.size("TYPE2B"));
+  c.get("TYPE2B", init_atoms);
+  init_atoms.erase(init_atoms.begin(), init_atoms.begin() + nparams+1);
+  return init_atoms;
+}

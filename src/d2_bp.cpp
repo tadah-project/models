@@ -37,7 +37,9 @@ D2_BP::D2_BP(Config &c): D2_Base(c) {
       throw std::runtime_error("At least one of SGRID2B values is zero.\n");
   }
 
-  s=mius.size();
+  s = mius.size();
+  auto init_atoms = get_init_atoms(c);
+  init_for_atoms(init_atoms);
 }
 
 void D2_BP::calc_aed(

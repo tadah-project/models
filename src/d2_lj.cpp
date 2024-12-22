@@ -9,6 +9,9 @@ D2_LJ::D2_LJ(Config &c): D2_Base(c)
   if (!c.get<bool>("INIT2B")) return;
   init();
   s=2;
+
+  auto init_atoms = get_init_atoms(c);
+  init_for_atoms(init_atoms);
 }
 
 void D2_LJ::calc_aed(

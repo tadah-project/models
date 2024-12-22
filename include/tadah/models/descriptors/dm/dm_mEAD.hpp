@@ -48,6 +48,8 @@ DM_mEAD<F>::DM_mEAD(Config &config): DM_Base(config),
     std::cout << std::endl;
     std::cout << "rhoisize: " << rhoisize << std::endl;
   }
+  auto init_atoms = get_init_atoms(config);
+  init_for_atoms(init_atoms);
 }
 
 template <typename F>

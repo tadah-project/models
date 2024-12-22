@@ -37,6 +37,8 @@ D2_ZBL::D2_ZBL(Config &c): D2_Base(c)
       a[i][j] = screening_length(Zi,Zj);
     }
   }
+  auto init_atoms = get_init_atoms(c);
+  init_for_atoms(init_atoms);
 }
 D2_ZBL::~D2_ZBL() {
   if (a) {

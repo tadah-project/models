@@ -79,7 +79,6 @@ D_Base::D_Base(Config &c):
       double wi = c.get<double>("WATOMS",i);
       int Z = PeriodicTable::find_by_symbol(symbol).Z;
       weights[Z]=wi;
-      init_for_atom(Z);
     }
   }
 }
@@ -104,14 +103,28 @@ double D_Base::get_rcut() {
   return fcut->get_rcut(); 
 }
 bool D_Base::is_init_for_atom(int Z) {
-  return init_for_atoms[Z];
+  return init_for_atoms_map[Z];
 }
 bool D_Base::is_init_for_atoms(int Zi, int Zj) {
-  return init_for_atoms[Zi] && init_for_atoms[Zj];
+  return init_for_atoms_map[Zi] && init_for_atoms_map[Zj];
 }
 void D_Base::init_for_atom(int Z) {
-  init_for_atoms.set(Z);
+  init_for_atoms_map.set(Z);
+}
+void D_Base::init_for_atoms(const std::vector<std::string> &Zs) {
+  for (const auto &Z_str : Zs){
+  int Z = PeriodicTable::find_by_symbol(Z_str).Z;
+  init_for_atom(Z);
+  }
 }
 void D_Base::uninit_for_atom(int Z) {
-  init_for_atoms.reset(Z);
+  init_for_atoms_map.reset(Z);
+}
+std::vector<std::string> D_Base::get_init_atoms(Config &c, std::string type) {
+  std::vector<std::string> init_atoms(c.size(type));
+  c.get(type, init_atoms);
+  std::unique_ptr<D_Base> d(CONFIG::factory<D_Base>(init_atoms[0]));
+  size_t nparams = d->nparams;
+  init_atoms.erase(init_atoms.begin(), init_atoms.begin() + nparams);
+  return init_atoms;
 }

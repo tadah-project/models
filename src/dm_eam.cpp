@@ -32,6 +32,8 @@ DM_EAM::DM_EAM(Config &c): DM_Base(c)
   gen_splines(ef.nr, ef.dr, ef.z2r, z2r_spline);
 
   rhoisize = 1;
+  auto init_atoms = get_init_atoms(c);
+  init_for_atoms(init_atoms);
 }
 
 void DM_EAM::calc_aed(

@@ -40,6 +40,8 @@ DM_Blip::DM_Blip(Config &c): DM_Base(c),
     std::cout << std::endl;
     std::cout << "rhoisize: " << rhoisize << std::endl;
   }
+  auto init_atoms = get_init_atoms(c);
+  init_for_atoms(init_atoms);
 }
 
 void DM_Blip::calc_aed(

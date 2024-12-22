@@ -41,6 +41,9 @@ D2_Blip::D2_Blip(Config &c): D2_Base(c)
   }
 
   s=mius.size();
+
+  auto init_atoms = get_init_atoms(c);
+  init_for_atoms(init_atoms);
 }
 
 void D2_Blip::calc_aed(

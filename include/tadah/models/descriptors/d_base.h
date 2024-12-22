@@ -67,10 +67,13 @@ public:
   virtual bool is_init_for_atom(int Z);
   virtual bool is_init_for_atoms(int Zi, int Zj);
   virtual void init_for_atom(int Zi);
+  virtual void init_for_atoms(const std::vector<std::string> &Zs);
   virtual void uninit_for_atom(int Zi);
+  static std::vector<std::string> get_init_atoms(Config &c, std::string type);
+  virtual std::vector<std::string> get_init_atoms(Config &c)=0;
 
 private:
   bool manage_memory=false; // who owns fcut
-  std::bitset<119> init_for_atoms;
+  std::bitset<119> init_for_atoms_map;
 };
 #endif

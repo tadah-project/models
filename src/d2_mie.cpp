@@ -14,6 +14,8 @@ D2_MIE::D2_MIE(Config &c): D2_Base(c)
   if (n<0 || m<0) {
     throw std::runtime_error("Both Mie exponents must by positive\n");
   }
+  auto init_atoms = get_init_atoms(c);
+  init_for_atoms(init_atoms);
 }
 
 void D2_MIE::calc_aed(

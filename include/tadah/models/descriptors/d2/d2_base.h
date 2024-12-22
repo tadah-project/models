@@ -22,6 +22,7 @@ public:
     }
   }
   virtual ~D2_Base() {};
+  virtual std::vector<std::string> get_init_atoms(Config &c) override;
 
   /** \brief Calculate \ref AED
    *

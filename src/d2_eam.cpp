@@ -31,6 +31,9 @@ D2_EAM::D2_EAM(Config &c): D2_Base(c)
   gen_splines(ef.nrho, ef.drho, ef.frho, frho_spline);
   gen_splines(ef.nr, ef.dr, ef.rhor, rhor_spline);
   gen_splines(ef.nr, ef.dr, ef.z2r, z2r_spline);
+
+  auto init_atoms = get_init_atoms(c);
+  init_for_atoms(init_atoms);
 }
 
 void D2_EAM::calc_aed(
