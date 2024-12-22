@@ -59,6 +59,10 @@ template<typename DM, typename CUT>
 void test_case(Config &config_mb, 
                std::string label,
                size_t size) {
+  config_mb.add("ATOMS", "H");
+  config_mb.add("WATOMS", 1);
+  config_mb.add("TYPEMB", "H");
+  config_mb.add("TYPEMB", "H");
   // Define a simple system of 4 atoms
   // Will calculate forces acting on the first atom
   Vec3d x1(0.0,0.0,0.0);
@@ -304,10 +308,10 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_EAD 1", "[DM]") {
     config_mb.add("INITMB", "true");
     config_mb.add("TYPEMB", "DM_EAD");
     config_mb.add("TYPEMB", 2);
+    config_mb.add("TYPEMB", 2);
+    config_mb.add("TYPEMB", 2);
     config_mb.add("CGRIDMB", "1 2");
     config_mb.add("SGRIDMB", "0.1 0.2");
-    config_mb.add("ATOMS", "H");
-    config_mb.add("WATOMS", 1);
     test_case<DM_EAD, Cut_Dummy>(config_mb, "DM_EAD", 3 * 2);
     test_case<DM_EAD, Cut_Cos>(config_mb, "DM_EAD", 3 * 2);
     test_case<DM_EAD, Cut_Tanh>(config_mb, "DM_EAD", 3 * 2);
@@ -321,10 +325,10 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_EAD 2", "[DM]") {
     config_mb.add("INITMB", "true");
     config_mb.add("TYPEMB", "DM_EAD");
     config_mb.add("TYPEMB", 3);
+    config_mb.add("TYPEMB", 3);
+    config_mb.add("TYPEMB", 3);
     config_mb.add("CGRIDMB", "1 2 3");
     config_mb.add("SGRIDMB", "0.1 0.2 0.9");
-    config_mb.add("ATOMS", "H");
-    config_mb.add("WATOMS", 1);
     test_case<DM_EAD, Cut_Dummy>(config_mb, "DM_EAD", 4 * 3);
     test_case<DM_EAD, Cut_Cos>(config_mb, "DM_EAD", 4 * 3);
     test_case<DM_EAD, Cut_Tanh>(config_mb, "DM_EAD", 4 * 3);
@@ -338,10 +342,10 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_Blip 1", "[DM]") {
     config_mb.add("INITMB", "true");
     config_mb.add("TYPEMB", "DM_Blip");
     config_mb.add("TYPEMB", 2);
+    config_mb.add("TYPEMB", 2);
+    config_mb.add("TYPEMB", 2);
     config_mb.add("CGRIDMB", "1 2");
     config_mb.add("SGRIDMB", "0.1 0.2");
-    config_mb.add("ATOMS", "H");
-    config_mb.add("WATOMS", 1);
     test_case<DM_Blip, Cut_Dummy>(config_mb, "DM_Blip", 3 * 2);
     test_case<DM_Blip, Cut_Cos>(config_mb, "DM_Blip", 3 * 2);
     test_case<DM_Blip, Cut_Tanh>(config_mb, "DM_Blip", 3 * 2);
@@ -355,10 +359,10 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_Blip 2", "[DM]") {
     config_mb.add("INITMB", "true");
     config_mb.add("TYPEMB", "DM_Blip");
     config_mb.add("TYPEMB", 3);
+    config_mb.add("TYPEMB", 3);
+    config_mb.add("TYPEMB", 3);
     config_mb.add("CGRIDMB", "1 2 3");
     config_mb.add("SGRIDMB", "0.1 0.2 0.9");
-    config_mb.add("ATOMS", "H");
-    config_mb.add("WATOMS", 1);
     test_case<DM_Blip, Cut_Dummy>(config_mb, "DM_Blip", 4 * 3);
     test_case<DM_Blip, Cut_Cos>(config_mb, "DM_Blip", 4 * 3);
     test_case<DM_Blip, Cut_Tanh>(config_mb, "DM_Blip", 4 * 3);
@@ -372,8 +376,6 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_EAM 1", "[DM]") {
     config_mb.add("INITMB", "true");
     config_mb.add("TYPEMB", "DM_EAM");
     config_mb.add("TYPEMB", "tests_data/eam.alloy");
-    config_mb.add("ATOMS", "H");
-    config_mb.add("WATOMS", 1);
     test_case<DM_EAM, Cut_Dummy>(config_mb, "DM_EAM", 1);
 
     // Throws
@@ -392,8 +394,6 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_EAM 2", "[DM]") {
     config_mb.add("INITMB", "true");
     config_mb.add("TYPEMB", "DM_EAM");
     config_mb.add("TYPEMB", "tests_data/eam.alloy");
-    config_mb.add("ATOMS", "H");
-    config_mb.add("WATOMS", 1);
     test_case<DM_EAM, Cut_Dummy>(config_mb, "DM_EAM", 1);
 }
 
@@ -404,8 +404,6 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_EAM 3", "[DM]") {
     config_mb.add("INITMB", "true");
     config_mb.add("TYPEMB", "DM_EAM");
     config_mb.add("TYPEMB", "tests_data/eam.alloy");
-    config_mb.add("ATOMS", "H");
-    config_mb.add("WATOMS", 1);
     test_case<DM_EAM, Cut_Dummy>(config_mb, "DM_EAM", 1);
 
     // Throws
@@ -423,8 +421,6 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_Dummy", "[DM]") {
     c.remove("INITMB");
     c.add("INITMB", "true");
     c.add("TYPEMB", "DM_Dummy");
-    c.add("ATOMS", "H");
-    c.add("WATOMS", 1);
 
     REQUIRE_NOTHROW(DM_Dummy());
     REQUIRE_NOTHROW(DM_Dummy(c));

@@ -6,12 +6,16 @@
 
 template<typename D, typename C>
 void test_d2(Config &c, double r) {
-  std::streambuf *orig = std::cout.rdbuf();
+  // std::streambuf *orig = std::cout.rdbuf();
   std::stringstream ss;
-  std::cout.rdbuf (ss.rdbuf()); // redirect cout
+  // std::cout.rdbuf (ss.rdbuf()); // redirect cout
+  c.add("TYPE2B","H");
+  c.add("TYPE2B","H");
+  std::cout << c << std::endl;
   D d(c);
-  std::cout.rdbuf (orig); // restore
+  // std::cout.rdbuf (orig); // restore
   double rcut = c.get<double>("RCUT2B");
+  // d.init_for_atoms(1,1);
   C fc(rcut);
   d.set_fcut(&fc, false);
   aed_type aed(d.size());
@@ -52,9 +56,9 @@ void test_d2(Config &c, double r) {
 
 template<typename D>
 void test_D2(Config &c) {
-  std::streambuf *orig = std::cout.rdbuf();
+  // std::streambuf *orig = std::cout.rdbuf();
   std::stringstream ss;
-  std::cout.rdbuf (ss.rdbuf()); // redirect cout
+  // std::cout.rdbuf (ss.rdbuf()); // redirect cout
   c.remove("VERBOSE");
   c.add("VERBOSE", 1);
   c.add("ATOMS", "H");
@@ -77,7 +81,7 @@ void test_D2(Config &c) {
   Config c2; // INIT2B=false
   D d(c2);
   REQUIRE(d.size()==0);
-  std::cout.rdbuf (orig); // restore
+  // std::cout.rdbuf (orig); // restore
 }
 
 // Fixture for initialization
@@ -93,8 +97,6 @@ TEST_CASE_METHOD(TestFixture, "Testing D2_Dummy", "[D2]") {
     c.remove("INIT2B");
     c.add("INIT2B", "true");
     c.add("RCUT2B", rcut);
-    c.add("ATOMS", "H");
-    c.add("WATOMS", 1);
     test_d2<D2_Dummy, Cut_Dummy>(c, 1);
 
     REQUIRE_NOTHROW(D2_Dummy());
@@ -105,8 +107,7 @@ TEST_CASE_METHOD(TestFixture, "Testing D2_LJ", "[D2]") {
     Config c;
     c.remove("INIT2B");
     c.add("INIT2B", "true");
-    c.add("ATOMS", "H");
-    c.add("WATOMS", 1);
+    c.add("TYPE2B", "D2_LJ");
     test_D2<D2_LJ>(c);
 
     D2_LJ d(c);
@@ -115,18 +116,19 @@ TEST_CASE_METHOD(TestFixture, "Testing D2_LJ", "[D2]") {
 }
 
 TEST_CASE_METHOD(TestFixture, "Testing D2_BLIP", "[D2]") {
-    std::streambuf *orig = std::cout.rdbuf();
+    // std::streambuf *orig = std::cout.rdbuf();
     std::stringstream ss;
-    std::cout.rdbuf(ss.rdbuf()); // redirect cout
+    // std::cout.rdbuf(ss.rdbuf()); // redirect cout
     using D = D2_Blip;
 
     Config c;
     c.remove("INIT2B");
     c.add("INIT2B", "true");
     c.add("SGRID2B", "0.01 0.4 5.6");
-    c.add("CGRID2B", "0.0 1.2 3.4");
-    c.add("ATOMS", "H");
-    c.add("WATOMS", 1);
+  c.add("CGRID2B", "0.0 1.2 3.4");
+  c.add("TYPE2B", "D2_Blip");
+  c.add("TYPE2B", 3);
+  c.add("TYPE2B", 3);
     test_D2<D>(c);
     
     D d(c);
@@ -152,13 +154,13 @@ TEST_CASE_METHOD(TestFixture, "Testing D2_BLIP", "[D2]") {
     c.add("CGRID2B", "0.0 1.2 3.4");
     REQUIRE_THROWS(D(c));
     
-    std::cout.rdbuf(orig); // restore
+    // std::cout.rdbuf(orig); // restore
 }
 
 TEST_CASE_METHOD(TestFixture, "Testing D2_BP", "[D2]") {
-    std::streambuf *orig = std::cout.rdbuf();
+    // std::streambuf *orig = std::cout.rdbuf();
     std::stringstream ss;
-    std::cout.rdbuf(ss.rdbuf()); // redirect cout
+    // std::cout.rdbuf(ss.rdbuf()); // redirect cout
     using D = D2_BP;
 
     Config c;
@@ -166,8 +168,9 @@ TEST_CASE_METHOD(TestFixture, "Testing D2_BP", "[D2]") {
     c.add("INIT2B", "true");
     c.add("SGRID2B", "0.01 0.4");
     c.add("CGRID2B", "0.0 1.2");
-    c.add("ATOMS", "H");
-    c.add("WATOMS", 1);
+  c.add("TYPE2B", "D2_BP");
+  c.add("TYPE2B", 2);
+  c.add("TYPE2B", 2);
     test_D2<D>(c);
     
     D d(c);
@@ -193,20 +196,18 @@ TEST_CASE_METHOD(TestFixture, "Testing D2_BP", "[D2]") {
     c.add("CGRID2B", "0.0 1.2");
     REQUIRE_THROWS(D(c));
     
-    std::cout.rdbuf(orig); // restore
+    // std::cout.rdbuf(orig); // restore
 }
 
 TEST_CASE_METHOD(TestFixture, "Testing D2_EAM", "[D2]") {
-    std::streambuf *orig = std::cout.rdbuf();
+    // std::streambuf *orig = std::cout.rdbuf();
     std::stringstream ss;
-    std::cout.rdbuf(ss.rdbuf()); // redirect cout
+    // std::cout.rdbuf(ss.rdbuf()); // redirect cout
     
     Config c;
     c.remove("INIT2B");
     c.add("INIT2B", "true");
     c.add("SETFL", "tests_data/eam.alloy");
-    c.add("ATOMS", "H");
-    c.add("WATOMS", 1);
     test_D2<D2_EAM>(c);
 
     D2_EAM d(c);
@@ -220,7 +221,7 @@ TEST_CASE_METHOD(TestFixture, "Testing D2_EAM", "[D2]") {
     c_err.add("SETFL", "path/to/nowhere");
     REQUIRE_THROWS(D2_EAM(c_err));
     
-    std::cout.rdbuf(orig); // restore
+    // std::cout.rdbuf(orig); // restore
 }
 
 TEST_CASE_METHOD(TestFixture, "Testing D2_MIE", "[D2]") {
@@ -230,8 +231,6 @@ TEST_CASE_METHOD(TestFixture, "Testing D2_MIE", "[D2]") {
     c.add("TYPE2B", "D2_MIE");
     c.add("TYPE2B", 7);
     c.add("TYPE2B", 13);
-    c.add("ATOMS", "H");
-    c.add("WATOMS", 1);
     test_D2<D2_MIE>(c);
 
     D2_MIE d(c);
