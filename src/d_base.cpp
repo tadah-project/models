@@ -54,7 +54,7 @@ v_type D_Base::get_grid(std::vector<std::string>&vold) {
       vnew.insert(vnew.end(), v.begin(), v.end());
     }
     else if (std::stod(token) < -2) {
-        throw std::runtime_error("Either algorithm is not supported or negative value was encountered in a grid: " + token);
+      throw std::runtime_error("Either algorithm is not supported or negative value was encountered in a grid: " + token);
     }
     else {
       vnew.push_back(std::stod(token));
@@ -102,23 +102,24 @@ size_t D_Base::size() { return s; };
 double D_Base::get_rcut() { 
   return fcut->get_rcut(); 
 }
-bool D_Base::is_init_for_atom(int Z) {
-  return init_for_atoms_map[Z];
-}
 bool D_Base::is_init_for_atoms(int Zi, int Zj) {
-  return init_for_atoms_map[Zi] && init_for_atoms_map[Zj];
+  return init_for_atoms_map.is_init(Zi,Zj) ;
 }
-void D_Base::init_for_atom(int Z) {
-  init_for_atoms_map.set(Z);
+void D_Base::init_for_atoms(int Zi, int Zj) {
+  init_for_atoms_map.init(Zi,Zj);
+}
+void D_Base::uninit_for_atoms(int Zi, int Zj) {
+  init_for_atoms_map.uninit(Zi,Zj);
 }
 void D_Base::init_for_atoms(const std::vector<std::string> &Zs) {
-  for (const auto &Z_str : Zs){
-  int Z = PeriodicTable::find_by_symbol(Z_str).Z;
-  init_for_atom(Z);
+  if (Zs.size() % 2 != 0) {
+    throw std::invalid_argument("The vector size must be even.");
   }
-}
-void D_Base::uninit_for_atom(int Z) {
-  init_for_atoms_map.reset(Z);
+  for (size_t i=0; i< Zs.size(); i+=2) {
+    int Zi = PeriodicTable::find_by_symbol(Zs[i]).Z;
+    int Zj = PeriodicTable::find_by_symbol(Zs[i+1]).Z;
+    init_for_atoms(Zi, Zj);
+  }
 }
 std::vector<std::string> D_Base::get_init_atoms(Config &c, std::string type) {
   std::vector<std::string> init_atoms(c.size(type));

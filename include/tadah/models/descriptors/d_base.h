@@ -10,6 +10,25 @@
 #include <vector>
 #include <bitset>
 
+class Bitset2D {
+  static constexpr size_t N = 119;
+  std::bitset<N * N> data;
+
+public:
+  void init(size_t i, size_t j) {
+    data[i * N + j] = true;
+    data[j * N + i] = true;
+
+  }
+  void uninit(size_t i, size_t j) {
+    data[i * N + j] = false;
+    data[j * N + i] = false;
+  }
+  bool is_init(size_t i, size_t j) const {
+    return data[i * N + j];
+  }
+};
+
 /** \brief Base class for all descriptor types.
  *
  */
@@ -64,16 +83,15 @@ public:
   */
   virtual size_t size();
 
-  virtual bool is_init_for_atom(int Z);
   virtual bool is_init_for_atoms(int Zi, int Zj);
-  virtual void init_for_atom(int Zi);
+  virtual void init_for_atoms(int Zi, int Zj);
   virtual void init_for_atoms(const std::vector<std::string> &Zs);
-  virtual void uninit_for_atom(int Zi);
+  virtual void uninit_for_atoms(int Zi, int Zj);
   static std::vector<std::string> get_init_atoms(Config &c, std::string type);
   virtual std::vector<std::string> get_init_atoms(Config &c)=0;
 
 private:
   bool manage_memory=false; // who owns fcut
-  std::bitset<119> init_for_atoms_map;
+  Bitset2D init_for_atoms_map;  // 0th is unused
 };
 #endif
