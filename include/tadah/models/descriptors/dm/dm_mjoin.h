@@ -85,6 +85,7 @@ public:
     rho_type& rho,
     const double scale=1) override;
   void set_fidx(size_t fidx_) override;
+  void set_rfidx(size_t rfidx_) override;
   void init() override;
 };
 

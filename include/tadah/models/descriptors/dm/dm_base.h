@@ -11,6 +11,7 @@
 class DM_Base: public D_Base {
 
 protected:
+  size_t rfidx=0;
   size_t rhoisize=0;
 public:
   DM_Base() {};
@@ -125,5 +126,7 @@ public:
     return s;
   }
   virtual std::string label()=0;
+  virtual size_t get_rfidx();
+  virtual void set_rfidx(size_t fidx_);
 };
 #endif

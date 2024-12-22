@@ -54,7 +54,7 @@ void DM_EAD::calc_aed(
   aed_type &aed)
 {
   size_t Lshift = 0;
-  size_t ii=0;
+  size_t ii=rfidx;
   for (int L=0; L<=Lmax; ++L) {
     for (size_t o=0; o<orbitals[L].size(); ++o) {
       const double f = fac[L][o];
@@ -89,7 +89,7 @@ void DM_EAD::calc_dXijdri_dXjidri(
 
   size_t Lshift = 0;
 
-  size_t ii=rhoisize;
+  size_t ii=rhoisize+rfidx;
   for (int L=0; L<=Lmax; ++L) {
     for (size_t o=0; o<orbitals[L].size(); ++o) {
       const int lx = orbitals[L][o][0];
@@ -181,7 +181,7 @@ void DM_EAD::calc_dXijdri(
 
   size_t Lshift = 0;
 
-  size_t ii=rhoisize;
+  size_t ii=rhoisize+rfidx;
   for (int L=0; L<=Lmax; ++L) {
     for (size_t o=0; o<orbitals[L].size(); ++o) {
       const int lx = orbitals[L][o][0];
@@ -251,7 +251,7 @@ void DM_EAD::calc_rho(
   rho_type& rhoi,
   const double scale)
 {
-  size_t ii=0;
+  size_t ii=rfidx;
   double fc_ij = scale*weights[Zj]*fcut->calc(rij);
   for (int L=0; L<=Lmax; ++L) {
     for (size_t o=0; o<orbitals[L].size(); ++o) {

@@ -18,15 +18,12 @@ DM_mJoin::DM_mJoin(Config &c) : DM_Base(c) {
     s += ds.back()->size();
     rhoisize += ds.back()->rhoi_size();
   }
+  set_rfidx(0);
 }
 
 void DM_mJoin::calc_aed(rho_type& rho, aed_type &aed) {
-  size_t rho_fidx = 0;
   for (auto d : ds) {
-    size_t rho_size = 2 * d->rhoi_size();
-    rho_type rho_ptr(&rho[rho_fidx], rho_size, 1);
-    d->calc_aed(rho_ptr, aed);
-    rho_fidx += rho_size;
+    d->calc_aed(rho, aed);
   }
 }
 void DM_mJoin::calc_dXijdri_dXjidri(
@@ -39,15 +36,10 @@ void DM_mJoin::calc_dXijdri_dXjidri(
   rho_type& rhoj,
   fd_type &fd_ij,
   const double scale) {
-  size_t rho_fidx = 0;
   for (auto d : ds) {
-    size_t rho_size = 2 * d->rhoi_size();
     if (d->is_init_for_atoms(Zi,Zj) && rij < d->get_rcut()) {
-      rho_type rhoi_ptr(&rhoi[rho_fidx],rho_size);
-      rho_type rhoj_ptr(&rhoj[rho_fidx],rho_size);
-      d->calc_dXijdri_dXjidri(Zi,Zj,rij,rij_sq,vec_ij,rhoi_ptr,rhoj_ptr,fd_ij,scale); 
+      d->calc_dXijdri_dXjidri(Zi,Zj,rij,rij_sq,vec_ij,rhoi,rhoj,fd_ij,scale); 
     }
-    rho_fidx += rho_size;
   }
 }
 void DM_mJoin::calc_dXijdri(
@@ -59,14 +51,10 @@ void DM_mJoin::calc_dXijdri(
   rho_type& rhoi,
   fd_type &fd_ij, 
   const double scale) {
-  size_t rho_fidx = 0;
   for (auto d : ds) { 
-    size_t rho_size = 2 * d->rhoi_size();
     if (d->is_init_for_atoms(Zi,Zj) && rij < d->get_rcut()) {
-      rho_type rhoi_ptr(&rhoi[rho_fidx],rho_size);
-      d->calc_dXijdri(Zi,Zj,rij,rij_sq,vec_ij,rhoi_ptr,fd_ij,scale);
+      d->calc_dXijdri(Zi,Zj,rij,rij_sq,vec_ij,rhoi,fd_ij,scale);
     }
-    rho_fidx += rho_size;
   }
 }
 void DM_mJoin::init_rhoi(rho_type& rhoi) {
@@ -81,14 +69,10 @@ void DM_mJoin::calc_rho(
   const Vec3d &vec_ij,
   rho_type& rho,
   const double scale) {
-  size_t rho_fidx = 0;
   for (auto d : ds) {
-    size_t rho_size = 2 * d->rhoi_size();
     if (d->is_init_for_atoms(Zi,Zj) && rij < d->get_rcut()) {
-      rho_type rho_ptr(&rho[rho_fidx],rho_size);
-      d->calc_rho(Zi,Zj,rij,rij_sq,vec_ij,rho_ptr,scale);
+      d->calc_rho(Zi,Zj,rij,rij_sq,vec_ij,rho,scale);
     }
-    rho_fidx += rho_size;
   }
 }
 std::string DM_mJoin::label() {
@@ -96,11 +80,22 @@ std::string DM_mJoin::label() {
 }
 
 void DM_mJoin::set_fidx(size_t fidx_) {
+  fidx = fidx_;
   ds[0]->set_fidx(fidx_);
   size_t s = 0;
   for (size_t i = 1; i < ds.size(); ++i) {
     s += ds[i - 1]->size();
     ds[i]->set_fidx(fidx_ + s);
+  }
+}
+void DM_mJoin::set_rfidx(size_t rfidx_) {
+  rfidx = rfidx_;
+  ds[0]->set_rfidx(rfidx_);
+  size_t s = 0;
+  for (size_t i = 1; i < ds.size(); ++i) {
+    s += ds[i - 1]->rhoi_size();
+    s += ds[i - 1]->rhoip_size();
+    ds[i]->set_rfidx(rfidx_ + s);
   }
 }
 
