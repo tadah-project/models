@@ -1,4 +1,5 @@
 #include "tadah/core/core_types.h"
+#include "tadah/core/utils.h"
 #include <string>
 #include <tadah/models/descriptors/d_base.h>
 #include <vector>
@@ -117,13 +118,13 @@ void D_Base::init_for_atoms(const std::vector<std::string> &Zs) {
   }
   
   for (size_t i = 0; i < Zs.size(); i += 2) {
-    if (Zs[i] == "*" && is_number(Zs[i+1])) {
+    if (Zs[i] == "*" && Zs[i+1] != "*") {
       int Zj = PeriodicTable::find_by_symbol(Zs[i+1]).Z;
       for (int Zi = 1; Zi < 119; ++Zi) {
         init_for_atoms(Zi, Zj);
       }
     } 
-    else if (Zs[i+1] == "*" && is_number(Zs[i])) {
+    else if (Zs[i] != "*" && Zs[i+1] == "*") {
       int Zi = PeriodicTable::find_by_symbol(Zs[i]).Z;
       for (int Zj = 1; Zj < 119; ++Zj) {
         init_for_atoms(Zi, Zj);
