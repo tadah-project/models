@@ -41,6 +41,7 @@ protected:
 public:
   std::vector<std::string> keys;    // keys required by this descriptor
   size_t nparams;  // number of params which follow TYPExB
+  std::vector<bool> is_optimizable;
   static void get_grid(const Config &c, std::string key, v_type &v);
   static v_type get_grid(std::vector<std::string>&);  // expand joined grids
   int verbose;

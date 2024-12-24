@@ -5,6 +5,7 @@
 
 template<> CONFIG::Registry<Cut_Base,double>::Map CONFIG::Registry<Cut_Base,double>::registry{};
 CONFIG::Registry<Cut_Base,double>::Register<Cut_Cos> Cut_Cos_1( "Cut_Cos" );
+CONFIG::Registry<Cut_Base,double>::Register<Cut_Cos_S> Cut_Cos_S_1( "Cut_Cos_S" );
 CONFIG::Registry<Cut_Base,double>::Register<Cut_Tanh> Cut_Tanh_1( "Cut_Tanh" );
 CONFIG::Registry<Cut_Base,double>::Register<Cut_Poly2> Cut_Poly_1( "Cut_Poly2" );
 CONFIG::Registry<Cut_Base,double>::Register<Cut_Dummy> Cut_Dummy_1( "Cut_Dummy" );
@@ -164,4 +165,45 @@ double Cut_Poly2::calc_prime(double r) {
     else if (r<= rcut_inner) return 0.0;
     double rs=r-rcut_inner;
     return -30.0*(rs-1.0)*(rs-1.0)*rs*rs;
+}
+
+Cut_Cos_S::Cut_Cos_S() {}
+Cut_Cos_S::Cut_Cos_S(double rcut)
+{
+    set_rcut(rcut);
+    test_rcut(rcut);
+}
+
+std::string Cut_Cos_S::label() {
+    return lab;
+}
+
+void Cut_Cos_S::set_rcut(const double r) {
+    test_rcut(r);
+    rcut=r;
+    rcut_sq=r*r;
+    rcut_inv= r<=0 ? 0.0 : 1.0/r;
+    rcut_inner=rcut-1.0;
+}
+double Cut_Cos_S::get_rcut() {
+    return rcut;
+}
+
+double Cut_Cos_S::get_rcut_sq() {
+    return rcut_sq;
+}
+
+double Cut_Cos_S::calc(double r) {
+  if (r>=rcut) return 0.0;
+  else if (r<= rcut_inner) return 1.0;
+  double rs = (r-rcut_inner)/(rcut-rcut_inner);
+  return 0.5*(1+std::cos(M_PI*rs));
+}
+double Cut_Cos_S::calc_prime(double r) {
+  if (r>=rcut || r<= rcut_inner) return 0.0;
+  else {
+    double rs = (r - rcut_inner) / (rcut - rcut_inner);
+    double drs_dr = 1.0 / (rcut - rcut_inner);
+    return -0.5 * M_PI * std::sin(M_PI * rs) * drs_dr;
+  }
 }

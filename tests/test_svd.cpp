@@ -1,7 +1,6 @@
 #include "catch2/catch.hpp"
 #include <tadah/core/maths.h>
 #include <tadah/models/svd.h>
-#include <iomanip>
 
 void multiplyMatrices(const double* A, const double* B, double* C, int m, int n, int p) {
   // C = A * B

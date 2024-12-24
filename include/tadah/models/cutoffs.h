@@ -139,5 +139,20 @@ class Cut_Poly2 : public Cut_Base {
         double calc(double r);
         double calc_prime(double r);
 };
+class Cut_Cos_S : public Cut_Base {
+    private:
+        std::string lab = "Cut_Cos_S";
+        double rcut, rcut_sq, rcut_inv;
+        double rcut_inner;
+    public:
+        Cut_Cos_S();
+        Cut_Cos_S(double rcut);
+        std::string label() ;
+        void set_rcut(const double r);
+        double get_rcut();
+        double get_rcut_sq();
+        double calc(double r);
+        double calc_prime(double r);
+};
 //template<> inline Registry<Cut_Base,double>::Map Registry<Cut_Base,double>::registry{};
 #endif
