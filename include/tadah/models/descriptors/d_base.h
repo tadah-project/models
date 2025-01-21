@@ -1,56 +1,98 @@
 #ifndef D_BASE_H
 #define D_BASE_H
 
+#include <string>
 #include <tadah/core/config.h>
 #include <tadah/core/core_types.h>
+#include <tadah/core/periodic_table.h>
 #include <tadah/core/registry.h>
+#include <tadah/models/cut_all.h>
+#include <vector>
+#include <bitset>
+
+class Bitset2D {
+  static constexpr size_t N = 119;
+  std::bitset<N * N> data;
+
+public:
+  void init(size_t i, size_t j) {
+    data[i * N + j] = true;
+    data[j * N + i] = true;
+
+  }
+  void uninit(size_t i, size_t j) {
+    data[i * N + j] = false;
+    data[j * N + i] = false;
+  }
+  bool is_init(size_t i, size_t j) const {
+    return data[i * N + j];
+  }
+};
 
 /** \brief Base class for all descriptor types.
  *
  */
 class D_Base {
-    public:
-        static void get_grid(const Config &c, std::string key, v_type &v) {
-            if (c.get<double>(key) < 0) {
-                // generate grid automatically if first element
-                // is<zero and int. If it is double than assume that
-                // grid is provided manually and min value is just smaller
-                // than zero.
-                double int_part;
-                if (std::modf ( c.get<double>(key), &int_part ) == 0.0) {
-                    // automatic generation
-                    size_t cg = abs(c.get<int>(key,1));
-                    double cgmin = c.get<double>(key,2);
-                    double cgmax = c.get<double>(key,3);
-                    if (c.get<int>(key) == -1) {
-                        v = linspace(cgmin, cgmax, cg);
-                    }
-                    else if (c.get<int>(key) == -2) {
-                        v = logspace(cgmin, cgmax, cg, exp(1));
-                    }
-                    else {
-                        throw std::runtime_error(key+" algorithm not supported\n");
-                    }
-                }
-                else {
-                    v.resize(c.size(key));
-                    c.get<v_type>(key,v);
-                }
-            }
-            else {
-                v.resize(c.size(key));
-                c.get<v_type>(key,v);
-            }
-        }
-        int verbose;
-        virtual ~D_Base() {};
+protected:
+  size_t fidx=0;    // first index in aed and fd arrays for this descriptor
+  size_t s=0;
+  Cut_Base *fcut=nullptr;
 
-        /** \brief Return dimension of the descriptor.
-         */
-        virtual size_t size()=0;
+public:
+  std::vector<std::string> keys;    // keys required by this descriptor
+  size_t nparams;  // number of params which follow TYPExB
+  std::vector<bool> is_optimizable;
+  static void get_grid(const Config &c, std::string key, v_type &v);
+  static v_type get_grid(std::vector<std::string>&);  // expand joined grids
+  int verbose;
+  virtual ~D_Base();
 
-        /** \brief Return label of this descriptor.
-         */
-        virtual std::string label()=0;
+  // return position of an argument given to TYPExB for a given key
+  // if key is not used, returns -1
+  int get_arg_pos(const std::string &key) const;
+
+
+  /** \brief Return label of this descriptor.
+   */
+  virtual std::string label()=0;
+  double weights[119] = {1};  // ignore zero index; w[1]->H
+  D_Base();
+  D_Base(Config &c);
+
+  virtual void set_fidx(size_t fidx_);
+  virtual size_t get_fidx();
+
+  /**
+ * @brief Initialize the descriptor.
+ *
+ * This method sets up the required keys names and number of parameters for the descriptor.
+ *
+ * Note: The implementation of the descriptor should not rely on these initial values,
+ * allowing for greater flexibility in how the Config file is parsed.
+ *
+ * The keys and parameters are utilized by other classes inheriting from this implementation,
+ * such as meta-descriptors.
+ *
+ */
+  virtual void init() = 0;
+
+  virtual void set_fcut(Cut_Base* cut, bool manage_memory);
+
+  double get_rcut();
+
+  /** \brief Return dimension of the descriptor.
+  */
+  virtual size_t size();
+
+  virtual bool is_init_for_atoms(int Zi, int Zj);
+  virtual void init_for_atoms(int Zi, int Zj);
+  virtual void init_for_atoms(const std::vector<std::string> &Zs);
+  virtual void uninit_for_atoms(int Zi, int Zj);
+  static std::vector<std::string> get_init_atoms(Config &c, std::string type);
+  virtual std::vector<std::string> get_init_atoms(Config &c)=0;
+
+private:
+  bool manage_memory=false; // who owns fcut
+  Bitset2D init_for_atoms_map;  // 0th is unused
 };
 #endif

@@ -4,5 +4,6 @@
 #include <tadah/models/descriptors/dm/dm_ead.h>
 #include <tadah/models/descriptors/dm/dm_blip.h>
 #include <tadah/models/descriptors/dm/dm_mEAD.h>
+#include <tadah/models/descriptors/dm/dm_mjoin.h>
 
 #include <tadah/models/descriptors/dm/dm_func.h>

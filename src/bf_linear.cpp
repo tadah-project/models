@@ -1,21 +1,23 @@
 #include <tadah/models/functions/basis_functions/bf_linear.h>
 
 BF_Linear::BF_Linear() {}
-BF_Linear::BF_Linear(const Config &c): Function_Base(c) {}
+BF_Linear::BF_Linear(const Config &c):
+  Function_Base(c),
+  BF_Base(c) {}
 std::string BF_Linear::get_label() const {
     return label;
 }
-double BF_Linear::epredict(const t_type &weights, const aed_type2& aed) const
+double BF_Linear::epredict(const t_type &weights, const aed_type& aed) const
 {
     return weights*aed;
 }
 double BF_Linear::fpredict(const t_type &weights, const fd_type &fdij,
-        const aed_type2& , const size_t k) const
+        const aed_type& , const size_t k) const
 {
     return -1*(fdij(k) * weights);
 }
 force_type BF_Linear::fpredict(const t_type &weights, const fd_type &fdij,
-        const aed_type2& ) const
+        const aed_type& ) const
 {
     return -1*(fdij * weights);
 }

@@ -31,31 +31,34 @@
  * Required Config Key: \ref INIT2B
  */
 class D2_LJ : public D2_Base {
-    private:
-        size_t s=2;
-        std::string lab="D2_LJ";
-        int verbose;
-    public:
-        D2_LJ(Config &config);
-        void calc_aed(
-                const double,
-                const double rij_sq,
-                const double fc_ij,
-                aed_type2 &aed);
-        void calc_dXijdri(
-                const double rij,
-                const double rij_sq,
-                const double fc_ij,
-                const double fcp_ij,
-                fd_type &fd_ij);
-        void calc_all(
-                const double rij,
-                const double rij_sq,
-                const double fc_ij,
-                const double fcp_ij,
-                aed_type2 &aed,
-                fd_type &fd_ij);
-        size_t size();
-        std::string label();
+private:
+  std::string lab="D2_LJ";
+public:
+  D2_LJ();
+  D2_LJ(Config &config);
+  void calc_aed(
+    const int Zi,
+    const int Zj,
+    const double rij,
+    const double ,
+    aed_type &aed,
+    const double scale=1) override;
+  void calc_dXijdri(
+    const int Zi,
+    const int Zj,
+    const double rij,
+    const double rij_sq,
+    fd_type &fd_ij,
+    const double scale=1) override;
+  void calc_all(
+    const int Zi,
+    const int Zj,
+    const double rij,
+    const double rij_sq,
+    aed_type &aed,
+    fd_type &fd_ij,
+    const double scale=1) override;
+  std::string label() override;
+  void init() override;
 };
 #endif

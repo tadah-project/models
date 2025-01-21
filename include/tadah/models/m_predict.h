@@ -17,13 +17,13 @@ class M_Predict {
          *  If aed contains sum over all nearest neighbours than the result is
          *  a local atomic energy \f$ E_i \f$.
          * */
-        virtual double epredict(const aed_type2 &aed) const=0;
+        virtual double epredict(const aed_type &aed) const=0;
 
         /** \brief Predict force between a pair of atoms in a k-direction. */
-        virtual double fpredict(const fd_type &fdij, const aed_type2 &aedi, size_t k) const=0;
+        virtual double fpredict(const fd_type &fdij, const aed_type &aedi, size_t k) const=0;
 
         /** \brief Predict force between a pair of atoms. */
         virtual force_type fpredict(const fd_type &fdij,
-                const aed_type2 &aedi) const=0;
+                const aed_type &aedi) const=0;
 };
 #endif

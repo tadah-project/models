@@ -5,3 +5,7 @@
 #include <tadah/models/descriptors/d2/d2_eam.h>
 #include <tadah/models/descriptors/d2/d2_lj.h>
 #include <tadah/models/descriptors/d2/d2_mie.h>
+#include <tadah/models/descriptors/d2/d2_zbl.h>
+
+#include <tadah/models/descriptors/d2/d2_join.h>
+#include <tadah/models/descriptors/d2/d2_mjoin.h>

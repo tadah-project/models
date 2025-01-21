@@ -1,7 +1,6 @@
 #include "catch2/catch.hpp"
 #include <tadah/core/maths.h>
 #include <tadah/models/svd.h>
-#include <iomanip>
 
 void multiplyMatrices(const double* A, const double* B, double* C, int m, int n, int p) {
   // C = A * B
@@ -76,7 +75,7 @@ TEST_CASE("SVD Numeric Accuracy - Column-Major Order") {
   Matrix mU (U, m,n);
   Matrix mVT (VT,n,n);
 
-  aed_type2 vec(S, n);
+  aed_type vec(S, n);
   REQUIRE_THAT(16.848103352614209, Catch::Matchers::WithinRel(S[0]));
   REQUIRE_THAT(1.068369514554709, Catch::Matchers::WithinRel(S[1]));
   REQUIRE_THAT(0, Catch::Matchers::WithinAbs(S[2],1e-15));

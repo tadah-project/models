@@ -1,31 +1,37 @@
+#include "tadah/models/descriptors/dm/dm_base.h"
 #include <tadah/models/descriptors/dm/dm_ead.h>
 #include <tadah/models/descriptors/d_basis_functions.h>
 #include <stdexcept>
 #include <vector>
-#include <iomanip>
 
-
+DM_EAD::DM_EAD() {
+  init();
+}
 /* Index ii iterates rhoi array
  * rhoi array is split 50/50 into density and derivative
  * of the embedding function
  */
-DM_EAD::DM_EAD(Config &config):
-  verbose(config.get<int>("VERBOSE")),
-  rc(config.get<double>("RCUTMB"))
+DM_EAD::DM_EAD(Config &config): DM_Base(config),
+  rc(config.get<double>("RCUTMBMAX"))
 {
-
   if (!config.get<bool>("INITMB")) {
     throw std::runtime_error("INITMB=false; cannot initialize "+label()+"\n");
   }
+  init();
 
   get_grid(config,"CGRIDMB",cgrid);
   get_grid(config,"SGRIDMB",sgrid);
+  // update config with generated grid
+  config.remove("CGRIDMB");
+  for (const auto &i: cgrid) config.add("CGRIDMB",i);
+  config.remove("SGRIDMB");
+  for (const auto &i: sgrid) config.add("SGRIDMB",i);
 
   if (cgrid.size()!=sgrid.size()) {
     throw std::runtime_error("SGRID2B and CGRID2B arrays differ in size.\n");
   }
 
-  Lmax = config.get<int>("AGRIDMB");
+  Lmax = config.get<int>("TYPEMB",1);
   s=sgrid.size()*(Lmax+1);
   rhoisize = gen_atomic_orbitals(Lmax);
   rhoisize *= sgrid.size();
@@ -41,14 +47,16 @@ DM_EAD::DM_EAD(Config &config):
     std::cout << std::endl;
     std::cout << "rhoisize: " << rhoisize << std::endl;
   }
+  auto init_atoms = get_init_atoms(config);
+  init_for_atoms(init_atoms);
 }
 
 void DM_EAD::calc_aed(
   rho_type& rhoi,
-  aed_type2 &aed)
+  aed_type &aed)
 {
   size_t Lshift = 0;
-  size_t ii=0;
+  size_t ii=rfidx;
   for (int L=0; L<=Lmax; ++L) {
     for (size_t o=0; o<orbitals[L].size(); ++o) {
       const double f = fac[L][o];
@@ -61,25 +69,30 @@ void DM_EAD::calc_aed(
     Lshift += sgrid.size();
   }
 }
-int DM_EAD::calc_dXijdri_dXjidri(
+void DM_EAD::calc_dXijdri_dXjidri(
+  const int Zi,
+  const int Zj,
   const double rij,
   const double,
   const Vec3d &vec_ij,
-  const double fc_ij,
-  const double fcp_ij,
   rho_type& rhoi,
   rho_type& rhoj,
   fd_type &fd_ij,
-  const double wi,
-  const double wj)
+  const double scale)
 {
+  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   const double x = vec_ij[0];
   const double y = vec_ij[1];
   const double z = vec_ij[2];
 
+  double wi = weights[Zi];
+  double wj = weights[Zj];
+  double fc_ij = fcut->calc(rij);
+  double fcp_ij = fcut->calc_prime(rij);
+
   size_t Lshift = 0;
 
-  size_t ii=rhoisize;
+  size_t ii=rhoisize+rfidx;
   for (int L=0; L<=Lmax; ++L) {
     for (size_t o=0; o<orbitals[L].size(); ++o) {
       const int lx = orbitals[L][o][0];
@@ -131,45 +144,48 @@ int DM_EAD::calc_dXijdri_dXjidri(
         const double term1jiy = gauss*tyji;
         const double term1jiz = gauss*tzji;
 
-        fd_ij(c+Lshift+fidx,0) +=
+        fd_ij(c+Lshift+fidx,0) += scale*(
           rhoi(ii)*(term1ijx + term2ijx)*wj
-          -rhoj(ii)*(term1jix + term2jix)*wi
+          -rhoj(ii)*(term1jix + term2jix)*wi)
         ;
 
-        fd_ij(c+Lshift+fidx,1) +=
+        fd_ij(c+Lshift+fidx,1) += scale*(
           rhoi(ii)*(term1ijy + term2ijy)*wj
-          -rhoj(ii)*(term1jiy + term2jiy)*wi
+          -rhoj(ii)*(term1jiy + term2jiy)*wi)
         ;
 
-        fd_ij(c+Lshift+fidx,2) += 
+        fd_ij(c+Lshift+fidx,2) += scale*(
           rhoi(ii)*(term1ijz + term2ijz)*wj
-          -rhoj(ii)*(term1jiz + term2jiz)*wi
+          -rhoj(ii)*(term1jiz + term2jiz)*wi)
         ;
         ii++;
       }
     }
     Lshift+=sgrid.size();
   }
-
-  return 1;
-
 }
-int DM_EAD::calc_dXijdri(
+void DM_EAD::calc_dXijdri(
+  const int Zi,
+  const int Zj,
   const double rij,
   const double,
   const Vec3d &vec_ij,
-  const double fc_ij,
-  const double fcp_ij,
   rho_type& rhoi,
-  fd_type &fd_ij)
+  fd_type &fd_ij,
+  const double scale)
 {
+  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   const double x = vec_ij[0];
   const double y = vec_ij[1];
   const double z = vec_ij[2];
 
+  double wj = weights[Zj];
+  double fc_ij = scale*wj*fcut->calc(rij);
+  double fcp_ij = scale*wj*fcut->calc_prime(rij);
+
   size_t Lshift = 0;
 
-  size_t ii=rhoisize;
+  size_t ii=rhoisize+rfidx;
   for (int L=0; L<=Lmax; ++L) {
     for (size_t o=0; o<orbitals[L].size(); ++o) {
       const int lx = orbitals[L][o][0];
@@ -220,12 +236,6 @@ int DM_EAD::calc_dXijdri(
     }
     Lshift+=sgrid.size();
   }
-
-  return 1;
-
-}
-size_t DM_EAD::size() {
-  return s;
 }
 std::string DM_EAD::label() {
   return lab;
@@ -237,13 +247,17 @@ void DM_EAD::init_rhoi(rho_type& rhoi)
   rhoi.set_zero();
 }
 void DM_EAD::calc_rho(
+  const int Zi,
+  const int Zj,
   const double rij,
   const double,
-  const double fc_ij,
   const Vec3d &vec_ij,
-  rho_type& rhoi)
+  rho_type& rhoi,
+  const double scale)
 {
-  size_t ii=0;
+  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
+  size_t ii=rfidx;
+  double fc_ij = scale*weights[Zj]*fcut->calc(rij);
   for (int L=0; L<=Lmax; ++L) {
     for (size_t o=0; o<orbitals[L].size(); ++o) {
       const size_t lx = orbitals[L][o][0];
@@ -297,9 +311,8 @@ double DM_EAD::my_pow(double x, int n){
   }
   return r;
 }
-size_t DM_EAD::rhoi_size() {
-  return rhoisize;
-}
-size_t DM_EAD::rhoip_size() {
-  return rhoisize;
+void DM_EAD::init() {
+  keys.push_back("CGRIDMB");
+  keys.push_back("SGRIDMB");
+  nparams=3;
 }

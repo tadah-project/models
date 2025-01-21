@@ -22,72 +22,71 @@
  * \ref INITMB \ref SETFL
  */
 class DM_EAM: public DM_Base {
-    private:
-        int verbose;
-        struct eam_file {
-            std::string file_path;
-            std::vector<double> frho;
-            std::vector<double> rhor;
-            std::vector<double> z2r;
-            int nrho=0;
-            double drho=0;
-            int nr;
-            double dr;
-            double rdr;
-            double rdrho;
-            double rcut;
-            int atomic_number;
-            double atomic_mass;
-            double lattice_param;
-            std::string lattice;
-            double rhomax;
+private:
+  struct eam_file {
+    std::string file_path;
+    std::vector<double> frho;
+    std::vector<double> rhor;
+    std::vector<double> z2r;
+    int nrho=0;
+    double drho=0;
+    int nr;
+    double dr;
+    double rdr;
+    double rdrho;
+    double rcut;
+    int atomic_number;
+    double atomic_mass;
+    double lattice_param;
+    std::string lattice;
+    double rhomax;
 
-        };
-        eam_file ef;
+  };
+  eam_file ef;
 
-        std::vector<std::vector<double>> frho_spline;
-        std::vector<std::vector<double>> rhor_spline;
-        std::vector<std::vector<double>> z2r_spline;
+  std::vector<std::vector<double>> frho_spline;
+  std::vector<std::vector<double>> rhor_spline;
+  std::vector<std::vector<double>> z2r_spline;
 
-        size_t s=1;
-        std::string lab="DM_EAM";
-        void read_setfl();
-        void gen_splines(int &n, double &delta, std::vector<double> &f, std::vector<std::vector<double>> &spline);
+  std::string lab="DM_EAM";
+  void read_setfl();
+  void gen_splines(int &n, double &delta, std::vector<double> &f, std::vector<std::vector<double>> &spline);
 
-    public:
-        DM_EAM(Config&);
-        void calc_aed(
-                rho_type& rho,
-                aed_type2 &aed);
-        int calc_dXijdri_dXjidri(
-                const double rij,
-                const double rij_sq,
-                const Vec3d &vec_ij,
-                const double fc_ij,
-                const double fcp_ij,
-                rho_type& rhoi,
-                rho_type& rhoj,
-                fd_type &fd_ij,
-                const double wi,
-                const double wj);
-        int calc_dXijdri(
-                const double rij,
-                const double rij_sq,
-                const Vec3d &vec_ij,
-                const double fc_ij,
-                const double fcp_ij,
-                rho_type& rhoi,
-                fd_type &fd_ij);
-        size_t size();
-        std::string label();
-        void init_rhoi(rho_type& rhoi);
-        void calc_rho(
-                const double rij,
-                const double rij_sq,
-                const double fc_ij,
-                const Vec3d &vec_ij,
-                rho_type& rho);
-        size_t rhoi_size();
-        size_t rhoip_size();
+public:
+  DM_EAM();
+  DM_EAM(Config&);
+  void calc_aed(
+    rho_type& rho,
+    aed_type &aed) override;
+  void calc_dXijdri_dXjidri(
+    const int Zi,
+    const int Zj,
+    const double rij,
+    const double rij_sq,
+    const Vec3d &vec_ij,
+    rho_type& rhoi,
+    rho_type& rhoj,
+    fd_type &fd_ij,
+    const double scale=1) override;
+  void calc_dXijdri(
+    const int Zi,
+    const int Zj,
+    const double rij,
+    const double rij_sq,
+    const Vec3d &vec_ij,
+    rho_type& rhoi,
+    fd_type &fd_ij, 
+    const double scale=1) override;
+  std::string label() override;
+  void init_rhoi(rho_type& rhoi) override;
+  void calc_rho(
+    const int Zi,
+    const int Zj,
+    const double rij,
+    const double rij_sq,
+    const Vec3d &vec_ij,
+    rho_type& rho,
+    const double scale=1) override;
+  void init() override;
 };
 #endif

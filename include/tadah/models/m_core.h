@@ -12,9 +12,11 @@
  */
 class M_Core {
 public:
-    int verbose; ///< Verbose level for logging.
+    int verbose = 0; ///< Verbose level for logging.
     bool trained = false; ///< Indicates if the model has been trained.
     t_type weights; ///< Weights vector for the model.
+
+  int is_verbose() {return verbose;}
 
     /**
      * @brief Virtual destructor for polymorphic deletion.
@@ -56,7 +58,7 @@ public:
      * @param v Input vector for prediction.
      * @return Predicted value.
      */
-    virtual double predict(const aed_type2 &v) const = 0;
+    virtual double predict(const aed_type &v) const = 0;
 
     /**
      * @brief Pure virtual function to get weights' uncertainty.

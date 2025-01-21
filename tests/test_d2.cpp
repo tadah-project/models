@@ -1,23 +1,29 @@
 #include "catch2/catch.hpp"
 #include <tadah/models/descriptors/d2/d2_all.h>
 #include <tadah/core/maths.h>
+#include <tadah/core/periodic_table.h>
 #include <tadah/models/cutoffs.h>
 
 template<typename D, typename C>
 void test_d2(Config &c, double r) {
-  std::streambuf *orig = std::cout.rdbuf();
+  // std::streambuf *orig = std::cout.rdbuf();
   std::stringstream ss;
-  std::cout.rdbuf (ss.rdbuf()); // redirect cout
+  // std::cout.rdbuf (ss.rdbuf()); // redirect cout
+  c.add("TYPE2B","H");
+  c.add("TYPE2B","H");
+  std::cout << c << std::endl;
   D d(c);
-  std::cout.rdbuf (orig); // restore
+  // std::cout.rdbuf (orig); // restore
   double rcut = c.get<double>("RCUT2B");
+  // d.init_for_atoms(1,1);
   C fc(rcut);
-  aed_type2 aed(d.size());
-  d.calc_aed(r,r*r,fc.calc(r),aed);
+  d.set_fcut(&fc, false);
+  aed_type aed(d.size());
+  d.calc_aed(1,1,r,r*r,aed);
   fd_type fd(d.size());
-  d.calc_dXijdri(r,r*r,fc.calc(r),fc.calc_prime(r),fd);
+  d.calc_dXijdri(1,1,r,r*r,fd);
   fd_type fda(d.size());
-  d.calc_fd_approx(&fc, r, fda, 1e-6);
+  d.calc_fd_approx(1,1, r, fda, 1e-6);
 
   // Convert to std::vector, as catch2 matchers require these
   std::vector<double> fx(fd[0].data(),fd[0].data()+fd[0].size());
@@ -36,9 +42,9 @@ void test_d2(Config &c, double r) {
   REQUIRE_THAT(fya, Catch::Matchers::Approx(fy));
   REQUIRE_THAT(fza, Catch::Matchers::Approx(fz));
 
-  aed_type2 aed2(d.size());
+  aed_type aed2(d.size());
   fd_type fd2(d.size());
-  d.calc_all(r,r*r,fc.calc(r),fc.calc_prime(r),aed2,fd2);
+  d.calc_all(1,1,r,r*r,aed2,fd2);
   std::vector<double> fx2(fd2[0].data(),fd2[0].data()+fd2[0].size());
   std::vector<double> fy2(fd2[1].data(),fd2[1].data()+fd2[1].size());
   std::vector<double> fz2(fd2[2].data(),fd2[2].data()+fd2[2].size());
@@ -50,11 +56,13 @@ void test_d2(Config &c, double r) {
 
 template<typename D>
 void test_D2(Config &c) {
-  std::streambuf *orig = std::cout.rdbuf();
+  // std::streambuf *orig = std::cout.rdbuf();
   std::stringstream ss;
-  std::cout.rdbuf (ss.rdbuf()); // redirect cout
+  // std::cout.rdbuf (ss.rdbuf()); // redirect cout
   c.remove("VERBOSE");
   c.add("VERBOSE", 1);
+  c.add("ATOMS", "H");
+  c.add("WATOMS", 1);
   // We cannot test r=rcut as finite difference will fail
   // but we can test r slightly smaller than rcut
   std::vector<double> rs = {2,2.0001,2.0123,5,11};
@@ -73,143 +81,213 @@ void test_D2(Config &c) {
   Config c2; // INIT2B=false
   D d(c2);
   REQUIRE(d.size()==0);
-  std::cout.rdbuf (orig); // restore
+  // std::cout.rdbuf (orig); // restore
 }
 
-TEST_CASE( "Testing D2_Dummy", "[D2]" ) {
-  Config c;
-  double rcut=5.1;
-  c.remove("INIT2B");
-  c.add("INIT2B", "true");
-  c.add("RCUT2B", rcut);
-  test_d2<D2_Dummy,Cut_Dummy>(c,1);
+// Fixture for initialization
+struct TestFixture {
+    TestFixture() {
+        PeriodicTable::initialize();
+    }
+};
 
-  REQUIRE_NOTHROW(D2_Dummy());
-  REQUIRE(D2_Dummy().label()=="D2_Dummy");
+TEST_CASE_METHOD(TestFixture, "Testing D2_Dummy", "[D2]") {
+    Config c;
+    double rcut = 5.1;
+    c.remove("INIT2B");
+    c.add("INIT2B", "true");
+    c.add("RCUT2B", rcut);
+    test_d2<D2_Dummy, Cut_Dummy>(c, 1);
+
+    REQUIRE_NOTHROW(D2_Dummy());
+    REQUIRE(D2_Dummy().label() == "D2_Dummy");
 }
-TEST_CASE( "Testing D2_LJ", "[D2]" ) {
-  Config c;
-  c.remove("INIT2B");
-  c.add("INIT2B", "true");
-  test_D2<D2_LJ>(c);
 
-  D2_LJ d(c);
-  REQUIRE(d.size()==2);
-  REQUIRE(d.label()=="D2_LJ");
+TEST_CASE_METHOD(TestFixture, "Testing D2_LJ", "[D2]") {
+    Config c;
+    c.remove("INIT2B");
+    c.add("INIT2B", "true");
+    c.add("TYPE2B", "D2_LJ");
+    test_D2<D2_LJ>(c);
+
+    D2_LJ d(c);
+    REQUIRE(d.size() == 2);
+    REQUIRE(d.label() == "D2_LJ");
 }
-TEST_CASE( "Testing D2_BLIP", "[D2]" ) {
-  std::streambuf *orig = std::cout.rdbuf();
-  std::stringstream ss;
-  std::cout.rdbuf (ss.rdbuf()); // redirect cout
-  using D = D2_Blip;
-  Config c;
-  c.remove("INIT2B");
-  c.add("INIT2B", "true");
-  c.add("SGRID2B","0.01 0.4 5.6");
-  c.add("CGRID2B","0.0 1.2 3.4");
-  test_D2<D>(c);
-  D d(c);
-  REQUIRE(d.size()==3);
-  REQUIRE(d.label()=="D2_Blip");
 
-  // test throws
-  c.remove("SGRID2B");
-  c.remove("CGRID2B");
-  c.add("SGRID2B","0.4 5.6");
-  c.add("CGRID2B","0.0 1.2 3.4");
-  REQUIRE_THROWS(D(c));
-  c.remove("SGRID2B");
-  c.remove("CGRID2B");
-  c.add("SGRID2B","0.4 5.6");
-  c.add("CGRID2B","0.0");
-  REQUIRE_THROWS(D(c));
+TEST_CASE_METHOD(TestFixture, "Testing D2_BLIP", "[D2]") {
+    // std::streambuf *orig = std::cout.rdbuf();
+    std::stringstream ss;
+    // std::cout.rdbuf(ss.rdbuf()); // redirect cout
+    using D = D2_Blip;
 
-  c.remove("SGRID2B");
-  c.remove("CGRID2B");
-  c.add("SGRID2B","0.0 0.4 5.6");
-  c.add("CGRID2B","0.0 1.2 3.4");
-  REQUIRE_THROWS(D(c));
-  std::cout.rdbuf (orig); // restore
+    Config c;
+    c.remove("INIT2B");
+    c.add("INIT2B", "true");
+    c.add("SGRID2B", "0.01 0.4 5.6");
+  c.add("CGRID2B", "0.0 1.2 3.4");
+  c.add("TYPE2B", "D2_Blip");
+  c.add("TYPE2B", 3);
+  c.add("TYPE2B", 3);
+    test_D2<D>(c);
+    
+    D d(c);
+    REQUIRE(d.size() == 3);
+    REQUIRE(d.label() == "D2_Blip");
+
+    // Test throws
+    c.remove("SGRID2B");
+    c.remove("CGRID2B");
+    c.add("SGRID2B", "0.4 5.6");
+    c.add("CGRID2B", "0.0 1.2 3.4");
+    REQUIRE_THROWS(D(c));
+    
+    c.remove("SGRID2B");
+    c.remove("CGRID2B");
+    c.add("SGRID2B", "0.4 5.6");
+    c.add("CGRID2B", "0.0");
+    REQUIRE_THROWS(D(c));
+
+    c.remove("SGRID2B");
+    c.remove("CGRID2B");
+    c.add("SGRID2B", "0.0 0.4 5.6");
+    c.add("CGRID2B", "0.0 1.2 3.4");
+    REQUIRE_THROWS(D(c));
+    
+    // std::cout.rdbuf(orig); // restore
 }
-TEST_CASE( "Testing D2_BP", "[D2]" ) {
-  std::streambuf *orig = std::cout.rdbuf();
-  std::stringstream ss;
-  std::cout.rdbuf (ss.rdbuf()); // redirect cout
-  using D = D2_BP;
-  Config c;
-  c.remove("INIT2B");
-  c.add("INIT2B", "true");
-  c.add("SGRID2B","0.01 0.4");
-  c.add("CGRID2B","0.0 1.2");
-  test_D2<D>(c);
-  D d(c);
-  REQUIRE(d.size()==2);
-  REQUIRE(d.label()=="D2_BP");
-  // test throws
-  c.remove("SGRID2B");
-  c.remove("CGRID2B");
-  c.add("SGRID2B","0.4 5.6");
-  c.add("CGRID2B","0.0 1.2 3.4");
-  REQUIRE_THROWS(D(c));
-  c.remove("SGRID2B");
-  c.remove("CGRID2B");
-  c.add("SGRID2B","0.4 5.6");
-  c.add("CGRID2B","0.0");
-  REQUIRE_THROWS(D(c));
 
-  c.remove("SGRID2B");
-  c.remove("CGRID2B");
-  c.add("SGRID2B","0.0 0.4");
-  c.add("CGRID2B","0.0 1.2");
-  REQUIRE_THROWS(D(c));
-  std::cout.rdbuf (orig); // restore
+TEST_CASE_METHOD(TestFixture, "Testing D2_BP", "[D2]") {
+    // std::streambuf *orig = std::cout.rdbuf();
+    std::stringstream ss;
+    // std::cout.rdbuf(ss.rdbuf()); // redirect cout
+    using D = D2_BP;
+
+    Config c;
+    c.remove("INIT2B");
+    c.add("INIT2B", "true");
+    c.add("SGRID2B", "0.01 0.4");
+    c.add("CGRID2B", "0.0 1.2");
+  c.add("TYPE2B", "D2_BP");
+  c.add("TYPE2B", 2);
+  c.add("TYPE2B", 2);
+    test_D2<D>(c);
+    
+    D d(c);
+    REQUIRE(d.size() == 2);
+    REQUIRE(d.label() == "D2_BP");
+
+    // Test throws
+    c.remove("SGRID2B");
+    c.remove("CGRID2B");
+    c.add("SGRID2B", "0.4 5.6");
+    c.add("CGRID2B", "0.0 1.2 3.4");
+    REQUIRE_THROWS(D(c));
+    
+    c.remove("SGRID2B");
+    c.remove("CGRID2B");
+    c.add("SGRID2B", "0.4 5.6");
+    c.add("CGRID2B", "0.0");
+    REQUIRE_THROWS(D(c));
+
+    c.remove("SGRID2B");
+    c.remove("CGRID2B");
+    c.add("SGRID2B", "0.0 0.4");
+    c.add("CGRID2B", "0.0 1.2");
+    REQUIRE_THROWS(D(c));
+    
+    // std::cout.rdbuf(orig); // restore
 }
-TEST_CASE( "Testing D2_EAM", "[D2]" ) {
-  std::streambuf *orig = std::cout.rdbuf();
-  std::stringstream ss;
-  std::cout.rdbuf (ss.rdbuf()); // redirect cout
-  Config c;
-  c.remove("INIT2B");
-  c.add("INIT2B", "true");
-  c.add("SETFL","tests_data/eam.alloy");
-  test_D2<D2_EAM>(c);
-  D2_EAM d(c);
-  REQUIRE(d.size()==1);
-  REQUIRE(d.label()=="D2_EAM");
 
-  // thors
-  Config c_err;
-  c_err.remove("INIT2B");
-  c_err.add("INIT2B", "true");
-  c_err.add("SETFL","path/to/nowhere");
-  REQUIRE_THROWS(D2_EAM(c_err));
-  std::cout.rdbuf (orig); // restore
+TEST_CASE_METHOD(TestFixture, "Testing D2_EAM", "[D2]") {
+    // std::streambuf *orig = std::cout.rdbuf();
+    std::stringstream ss;
+    // std::cout.rdbuf(ss.rdbuf()); // redirect cout
+    
+    Config c;
+    c.remove("INIT2B");
+    c.add("INIT2B", "true");
+    c.add("SETFL", "tests_data/eam.alloy");
+    test_D2<D2_EAM>(c);
+
+    D2_EAM d(c);
+    REQUIRE(d.size() == 1);
+    REQUIRE(d.label() == "D2_EAM");
+
+    // Test throws
+    Config c_err;
+    c_err.remove("INIT2B");
+    c_err.add("INIT2B", "true");
+    c_err.add("SETFL", "path/to/nowhere");
+    REQUIRE_THROWS(D2_EAM(c_err));
+    
+    // std::cout.rdbuf(orig); // restore
 }
-TEST_CASE( "Testing D2_MIE", "[D2]" ) {
-  Config c;
-  c.remove("INIT2B");
-  c.add("INIT2B", "true");
-  c.add("SGRID2B","7 13");
-  test_D2<D2_MIE>(c);
-  D2_MIE d(c);
-  REQUIRE(d.size()==2);
-  REQUIRE(d.label()=="D2_MIE");
 
-  // test throws
-  c.remove("SGRID2B");
-  c.add("SGRID2B","7");
-  REQUIRE_THROWS(D2_MIE(c));
+TEST_CASE_METHOD(TestFixture, "Testing D2_MIE", "[D2]") {
+    Config c;
+    c.remove("INIT2B");
+    c.add("INIT2B", "true");
+    c.add("TYPE2B", "D2_MIE");
+    c.add("TYPE2B", 7);
+    c.add("TYPE2B", 13);
+    test_D2<D2_MIE>(c);
 
-  c.remove("SGRID2B");
-  c.add("SGRID2B","7 8 9");
-  REQUIRE_THROWS(D2_MIE(c));
+    D2_MIE d(c);
+    REQUIRE(d.size() == 2);
+    REQUIRE(d.label() == "D2_MIE");
 
-  c.remove("SGRID2B");
-  c.add("SGRID2B","-8 9");
-  REQUIRE_THROWS(D2_MIE(c));
+    // Test throws
+    c.remove("TYPE2B");
+    c.add("TYPE2B", "D2_MIE");
+    c.add("TYPE2B", 7);
+    REQUIRE_THROWS(D2_MIE(c));
 
-  c.remove("SGRID2B");
-  c.add("SGRID2B","8 -9");
-  REQUIRE_THROWS(D2_MIE(c));
+    c.remove("TYPE2B");
+    c.add("TYPE2B", "D2_MIE");
+    c.add("TYPE2B", 7);
+    c.add("TYPE2B", -8);
+    REQUIRE_THROWS(D2_MIE(c));
+
+    c.remove("TYPE2B");
+    c.add("TYPE2B", "D2_MIE");
+    c.add("TYPE2B", -7);
+    c.add("TYPE2B", 8);
+    REQUIRE_THROWS(D2_MIE(c));
+
+}
+TEST_CASE_METHOD(TestFixture, "Testing D2_ZBL", "[D2]") {
+    Config c;
+    c.remove("INIT2B");
+    c.add("INIT2B", "true");
+    c.add("TYPE2B", "D2_ZBL");
+    c.add("TYPE2B", -1);
+    c.add("TYPE2B", -1);
+    c.add("TYPE2B", -1);
+    c.add("TYPE2B", -1);
+    test_D2<D2_ZBL>(c);
+
+    D2_ZBL d(c);
+    REQUIRE(d.size() == 1);
+    REQUIRE(d.label() == "D2_ZBL");
+
+    // Test throws
+    c.remove("TYPE2B");
+    c.add("TYPE2B", "D2_ZBL");
+    c.add("TYPE2B", 7);
+    REQUIRE_THROWS(D2_ZBL(c));
+
+    c.remove("TYPE2B");
+    c.add("TYPE2B", "D2_ZBL");
+    c.add("TYPE2B", -7);
+    c.add("TYPE2B", -8);
+    REQUIRE_THROWS(D2_ZBL(c));
+
+    c.remove("TYPE2B");
+    c.add("TYPE2B", "D2_ZBL");
+    c.add("TYPE2B", 7);
+    c.add("TYPE2B", 8);
+    c.add("TYPE2B", 9);
+    REQUIRE_THROWS(D2_ZBL(c));
 
 }

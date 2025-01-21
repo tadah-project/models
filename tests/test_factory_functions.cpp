@@ -51,5 +51,6 @@ TEST_CASE( "Testing Factory: Functions", "[factory_functions]" ) {
     //REQUIRE( c2b->calc_prime(rcut2b) < std::numeric_limits<double>::min() );
     //REQUIRE( std::abs(c2b->get_rcut()-rcut2b)<std::numeric_limits<double>::min() );
     //REQUIRE( std::abs(c2b->get_rcut_sq()-rcut2bsq)<std::numeric_limits<double>::min() );
+    if (fb) delete fb;
   }
 }

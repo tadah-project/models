@@ -10,32 +10,34 @@
  *
  */
 class D2_Dummy : public D2_Base {
-    private:
-        size_t s=0;
-        std::string lab="D2_Dummy";
-        int verbose;
-    public:
-        D2_Dummy();
-        D2_Dummy(Config &);
-        void calc_aed(
-                const double,
-                const double,
-                const double,
-                aed_type2 &aed);
-        void calc_dXijdri(
-                const double,
-                const double,
-                const double,
-                const double,
-                fd_type &fd_ij);
-        void calc_all(
-                const double,
-                const double,
-                const double,
-                const double,
-                aed_type2 &aed,
-                fd_type &fd_ij);
-        size_t size();
-        std::string label();
+private:
+  std::string lab="D2_Dummy";
+public:
+  D2_Dummy();
+  D2_Dummy(Config &);
+  void calc_aed(
+    const int Zi,
+    const int Zj,
+    const double rij,
+    const double ,
+    aed_type &aed,
+    const double scale=1) override;
+  void calc_dXijdri(
+    const int Zi,
+    const int Zj,
+    const double rij,
+    const double rij_sq,
+    fd_type &fd_ij,
+    const double scale=1) override;
+  void calc_all(
+    const int Zi,
+    const int Zj,
+    const double rij,
+    const double rij_sq,
+    aed_type &aed,
+    fd_type &fd_ij,
+    const double scale=1) override;
+  std::string label() override;
+  void init() override;
 };
 #endif
