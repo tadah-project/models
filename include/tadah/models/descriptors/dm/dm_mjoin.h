@@ -21,13 +21,13 @@
  * 
  * ```
  * TYPEMB    DM_mJoin         # Meta descriptor for concatenating many-body descriptors
- * TYPEMB    DM_EAD 1 5 5     # L number, cgrid, sgrid
+ * TYPEMB    DM_EAD 1 5 5 * *    # L number, cgrid, sgrid, list of element pairs
  * RCTYPEMB  Cut_Cos
  * RCUTMB    3.0
  * CGRIDMB   -1 5 0 3.0       # Grid for DM_EAD, blips centers, auto-generated
  * SGRIDMB   -2 5 1.0 10.0    # Grid for DM_EAD, blips widths, auto-generated
  * 
- * TYPEMB    DM_Blip 0 7 7    # L number, cgrid, sgrid
+ * TYPEMB    DM_Blip 0 7 7  Ta Ta   # L number, cgrid, sgrid, list of element pairs
  * RCTYPEMB  Cut_Tanh
  * RCUTMB    7.5
  * SGRIDMB   -2 7 0.1 10      # Grid for DM_Blip, blips widths, auto-generated
