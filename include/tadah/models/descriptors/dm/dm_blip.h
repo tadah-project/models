@@ -13,7 +13,7 @@
  * (expansion in the Blip basis instead of usual Gaussians):
  * \f[
  * \rho_i^{\eta,r_s,l_x,l_y,l_z} = \sum_{j \neq i} x_{ij}^{l_x}y_{ij}^{l_y}z_{ij}^{l_z}
- * \B{\Big(-\eta(r_{ij}-r_s)^2\Big)}f_c(r_{ij})
+ * \mathcal{B}{\Big(-\eta(r_{ij}-r_s)^2\Big)}f_c(r_{ij})
  * \f]
  *
  * \ref CGRIDMB parameters control position \f$ r_s \f$ of the gaussian basis function.
