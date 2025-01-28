@@ -19,11 +19,11 @@
  * 
  * ```
  * TYPE2B    D2_mJoin     # <-- Meta descriptor for concatenating two-body descriptors
- * TYPE2B    D2_MIE 11 6    # <-- MIE exponents
+ * TYPE2B    D2_MIE 11 6 Ti Ti   # <-- MIE exponents
  * RCTYPE2B  Cut_Cos
  * RCUT2B    3.0
  *
- * TYPE2B    D2_Blip 6 6    # <-- grid sizes
+ * TYPE2B    D2_Blip 6 6 Ti Nb Nb Nb   # <-- grid sizes
  * RCTYPE2B  Cut_Tanh
  * RCUT2B    7.5
  * SGRID2B   -2 6 0.1 10   # Grid for D2_Blip, blips widths, auto generated
