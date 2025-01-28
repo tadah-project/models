@@ -19,7 +19,7 @@
  *
  * Required Config Key: \ref INIT2B \ref TYPE2B
  *
- * TYPE2B D2_MIE 12 6
+ * TYPE2B D2_MIE 12 6 ELEMENT1 ELEMENT2
  *
  * will result in Lennard-Jones type descriptor
  */
