@@ -5,33 +5,32 @@
 
 /** Modified Embedded Atom Descriptor
  *
- * REQUIRED KEYS: SGRIDMB, CGRIDMB + KEYS OF THE THE EMBEDDING FUNCTION
- 
- * This descriptor has mathematical form very similar to DM_EAD.
- * but allow usage of custom defined embedding function, \f$ \mathcal{F} \f$, in place of default quadratic one.
+ * REQUIRED KEYS: SGRIDMB, CGRIDMB, and KEYS OF THE EMBEDDING FUNCTION
+ *
+ * This descriptor has a mathematical form very similar to DM_EAD
+ * but allows the usage of a custom-defined embedding function, \f$ \mathcal{F} \f$, in place of the default quadratic one.
  *
  * \f[
  * V_i^{L,\eta,r_s} = \sum_{l_x,l_y,l_z}^{l_x+l_y+l_z=L} \frac{L!}{l_x!l_y!l_z!}
  * \mathcal{F}\Big( \rho_i^{\eta,r_s,l_x,l_y,l_z} \Big)
  * \f]
  *
- * where density \f$ \rho \f$ is calculated using Gaussian Type Orbitals:
+ * where the density \f$ \rho \f$ is calculated using Gaussian Type Orbitals:
  * \f[
- * \rho_i^{\eta,r_s,l_x,l_y,l_z} = \sum_{j \neq i} x_{ij}^{l_x}y_{ij}^{l_y}z_{ij}^{l_z}
- * \exp{\Big(-\eta(r_{ij}-r_s)^2\Big)}f_c(r_{ij})
+ * \rho_i^{\eta,r_s,l_x,l_y,l_z} = \sum_{j \neq i} x_{ij}^{l_x} y_{ij}^{l_y} z_{ij}^{l_z}
+ * \exp{\Big(-\eta(r_{ij}-r_s)^2\Big)} f_c(r_{ij})
  * \f]
  *
- * \ref CGRIDMB parameters control position \f$ r_s \f$ of the gaussian basis function.
+ * \ref CGRIDMB parameters control the position \f$ r_s \f$ of the Gaussian basis function.
  *
- * \ref SGRIDMB parameters control width \f$ \eta \f$ of the gaussian basis function.
+ * \ref SGRIDMB parameters control the width \f$ \eta \f$ of the Gaussian basis function.
  *
- *
- * e.g. \f$L_{max}=2\f$ will calculate descriptors with \f$ L=0,1,2 \f$ (s,p,d orbitals).
- *
+ * e.g., \f$L_{max}=2\f$ will calculate descriptors with \f$ L=0,1,2 \f$ (s, p, d orbitals).
  *
  * Required Config keys:
  * \ref INITMB \ref CGRIDMB \ref SGRIDMB
  */
+
 template <typename F>
 class DM_mEAD: public DM_Base {
 private:
