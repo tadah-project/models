@@ -14,11 +14,11 @@ public:
 
 /**
  * @class F_RLR
- * @brief Implements an embedding function of the form: \( s \cdot x \cdot \log(c \cdot x) \)
+ * @brief Implements an embedding function of the form: \f$ s \cdot x \cdot \log(c \cdot x) \f$
  *
  * This class supports embedding functions characterized by two main parameters:
- * - **SEMBFUNC**: Controls the depth of the embedding function.
- * - **CEMBFUNC**: Determines the x-intercept, with the x-intercept at \( 1/c \).
+ * - **SEMBFUNC**: Controls the depth, \f$ s \f$, of the embedding function.
+ * - **CEMBFUNC**: Determines the x-intercept, with the x-intercept at \f$ 1/c \f$.
  * 
  * The number of keys for these parameters must match the entries in the mEAD descriptor.
  *
