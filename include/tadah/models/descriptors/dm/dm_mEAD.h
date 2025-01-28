@@ -5,17 +5,14 @@
 
 /** Modified Embedded Atom Descriptor
  *
- * REQUIRED KEYS: SCGRIDMB, CGRIDMB
- * + REQUIRED KEYS BY THE EMBEDDING FUNCTION
- *
- *
- * TODO Below description is for EAD not mEAD
- * This descriptor has mathematical form very similar to EAD.
- * It allow: for different embedding functions to be used.
+ * REQUIRED KEYS: SGRIDMB, CGRIDMB + KEYS OF THE THE EMBEDDING FUNCTION
+ 
+ * This descriptor has mathematical form very similar to DM_EAD.
+ * but allow usage of custom defined embedding function, \f$ \mathcal{F} \f$, in place of default quadratic one.
  *
  * \f[
  * V_i^{L,\eta,r_s} = \sum_{l_x,l_y,l_z}^{l_x+l_y+l_z=L} \frac{L!}{l_x!l_y!l_z!}
- * \Big( \rho_i^{\eta,r_s,l_x,l_y,l_z} \Big)^2
+ * \mathcal{F}\Big( \rho_i^{\eta,r_s,l_x,l_y,l_z} \Big)
  * \f]
  *
  * where density \f$ \rho \f$ is calculated using Gaussian Type Orbitals:
@@ -31,13 +28,6 @@
  *
  * e.g. \f$L_{max}=2\f$ will calculate descriptors with \f$ L=0,1,2 \f$ (s,p,d orbitals).
  *
- * More information about this descriptor:
- *
- * <div class="csl-entry">Zhang, Y., Hu, C.,Jiang, B.
- * (2019). Embedded atom neural network potentials: efficient and accurate
- * machine learning with a physically inspired representation.
- * <i>Journal of Physical Chemistry Letters</i>, <i>10</i>(17),
- * 4962–4967. https://doi.org/10.1021/acs.jpclett.9b02037</div>
  *
  * Required Config keys:
  * \ref INITMB \ref CGRIDMB \ref SGRIDMB
