@@ -8,7 +8,7 @@
  *
  * The ZBL (Ziegler-Biersack-Littmark) potential is an empirical potential used to model short-range interactions between atoms.
  *
- * The constant term \f$ \frac{4 \pi \varepsilon_0 e^2}{1} \f$ is set to 1 and will be fitted as needed.
+ * The constant term \f$ \frac{e^2}{4 \pi \varepsilon_0 } \f$ is set to 1 and will be fitted as needed.
  *
  * The simplified expression for the ZBL potential is given by:
  *
@@ -18,7 +18,7 @@
  *
  * where \f$ a \f$ is the screening length, expressed as:
  * \f[
- * a = \frac{s_0 \cdot a_0}{Z_1^{p_0} + Z_2^{p_1}}
+ * a = \frac{s_0 a_0}{Z_1^{p_0} + Z_2^{p_1}}
  * \f]
  *
  * Here, \f$ a_0 \f$, \f$ s_0 \f$, \f$ p_0 \f$, and \f$ p_1 \f$ are adjustable hyperparameters.
@@ -36,7 +36,7 @@
  *
  * Required Config Key: \ref INIT2B \ref TYPE2B
  *
- * - TYPE2B D2_ZBL \f$ a_0 \f$ \f$ s_0 \f$ \f$ p_0 \f$ \f$ p_1 \f$
+ * - TYPE2B D2_ZBL \f$ a_0 \f$ \f$ s_0 \f$ \f$ p_0 \f$ \f$ p_1 \f$ ELEMENT1 ELEMENT2
  *
  * Examples:
  *
