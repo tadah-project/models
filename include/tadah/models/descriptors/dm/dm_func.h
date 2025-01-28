@@ -14,7 +14,7 @@ public:
 
 /**
  * @class F_RLR
- * @brief Implements an embedding function of the form: \f$ s \cdot x \cdot \log(c \cdot x) \f$
+ * @brief Implements an embedding function of the form: \f$ s x \log(c x) \f$
  *
  * This class supports embedding functions characterized by two main parameters:
  * - **SEMBFUNC**: Controls the depth, \f$ s \f$, of the embedding function.
