@@ -5,10 +5,10 @@
 /** \brief Blip two-body descriptor.
  *
  * \f[
- * V_i^{\eta,r_s} =\sum_{j \neq i} B(\eta(r_{ij}-r_s))f_c(r_{ij})
+ * V_i^{\eta,r_s} =\sum_{j \neq i} \mathcal{B}(\eta(r_{ij}-r_s))f_c(r_{ij})
  * \f]
  *
- * where \f$ f_c \f$ is a cutoff function and \f$ B \f$ is a blip
+ * where \f$ f_c \f$ is a cutoff function and \f$ \mathcal{B} \f$ is a blip
  * basis function centered at \f$r_s\f$ of width \f$4/\eta\f$.
  *
  * \ref CGRID2B parameters control position \f$ r_s \f$ of blip centres.
@@ -20,7 +20,7 @@
  *
  * \f[
 	\begin{equation}
-	  B(r) =
+	  \mathcal{B}(r) =
 		\begin{cases}
 		  1-\frac{3}{2}r^2+\frac{3}{4}|r|^3 & \text{if} \qquad 0<|r|<1\\
 		  \frac{1}{4}(2-|r|)^3 & \text{if} \qquad 1<|r|<2\\

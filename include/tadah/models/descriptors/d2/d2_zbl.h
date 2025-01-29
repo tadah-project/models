@@ -8,42 +8,41 @@
  *
  * The ZBL (Ziegler-Biersack-Littmark) potential is an empirical potential used to model short-range interactions between atoms.
  *
- * The constant term \( \frac{4 \pi \varepsilon_0 e^2}{1} \) is set to 1 and will be fitted as needed.
+ * The constant term \f$ \frac{e^2}{4 \pi \varepsilon_0 } \f$ is set to 1 and will be fitted as needed.
  *
  * The simplified expression for the ZBL potential is given by:
  *
  * \f[
- * V(r) = \frac{Z_1 Z_2 }{r} \phi\left(\frac{r}{a}\right)
+ * V(r) = \frac{Z_1 Z_2}{r} \phi\left(\frac{r}{a}\right)
  * \f]
  *
- * where \( a \) is the screening length, expressed as:
+ * where \f$ a \f$ is the screening length, expressed as:
  * \f[
- * a = \frac{s_0 \cdot a_0}{Z_1^{p_0} + Z_2^{p_1}}
+ * a = \frac{s_0 a_0}{Z_1^{p_0} + Z_2^{p_1}}
  * \f]
  *
- * Here, \( a_0 \), \( s_0 \), \( p_0 \), and \( p_1 \) are adjustable hyperparameters. 
+ * Here, \f$ a_0 \f$, \f$ s_0 \f$, \f$ p_0 \f$, and \f$ p_1 \f$ are adjustable hyperparameters.
  * Setting any of these to -1 uses the default values:
  *
- * - \( a_0 = 0.52917721067 \) Å
- * - \( s_0 = 0.88534 \)
- * - \( p_0 = 0.23 \)
- * - \( p_1 = 0.23 \)
+ * - \f$ a_0 = 0.52917721067 \, \text{Å} \f$
+ * - \f$ s_0 = 0.88534 \f$
+ * - \f$ p_0 = 0.23 \f$
+ * - \f$ p_1 = 0.23 \f$
  *
- *
- * The screening function \(\phi\) is defined as:
+ * The screening function \f$ \phi \f$ is defined as:
  * \f[
  * \phi(x) = 0.1818 e^{-3.2x} + 0.5099 e^{-0.9423x} + 0.2802 e^{-0.4029x} + 0.02817 e^{-0.2016x}
  * \f]
  *
  * Required Config Key: \ref INIT2B \ref TYPE2B
  *
- * - TYPE2B D2_ZBL \( a_0 \) \( s_0 \) \( p_0 \) \( p_1 \)
+ * - TYPE2B D2_ZBL \f$ a_0 \f$ \f$ s_0 \f$ \f$ p_0 \f$ \f$ p_1 \f$ ELEMENT1 ELEMENT2
  *
  * Examples:
  *
- * - TYPE2B D2_ZBL 0.53 0.90 0.23 0.23   # Custom parameters
- * - TYPE2B D2_ZBL -1 -1 -1 -1   # Default values
- * - TYPE2B D2_ZBL 0.53 -1 -1 -1   # Mix of default and custom
+ * - TYPE2B D2_ZBL 0.53 0.90 0.23 0.23 Kr Kr  # Custom parameters
+ * - TYPE2B D2_ZBL -1 -1 -1 -1 Kr Kr  # Default values
+ * - TYPE2B D2_ZBL 0.53 -1 -1 -1 Kr Kr  # Mix of default and custom
  *
  */
 class D2_ZBL : public D2_Base {
