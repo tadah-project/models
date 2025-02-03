@@ -36,18 +36,18 @@ force_type Kern_Base::fpredict(const t_type &kweights, const fd_type &fdij,
   }
   return v;
 }
-void Kern_Base::read_basis_from_config(const Config &config, Matrix &b) {
+void Kern_Base::read_basis_from_config(const Config &config, Matrix &basis) {
   // storage is in column-major order
   if (!(config.exist("SBASIS") && config.exist("BASIS"))) return;
   size_t sbasis = config.get<size_t>("SBASIS");
   size_t vlen = config("BASIS").size()/sbasis;
   std::vector<double> temp(sbasis*vlen);
   config.get<std::vector<double>>("BASIS",temp);
-  b.resize(vlen,sbasis);  // aeds are in column-major order
+  basis.resize(vlen,sbasis);  // aeds are in column-major order
   size_t ii=0;
   for (size_t i=0;i<sbasis; ++i) {
     for (size_t j=0;j<vlen; ++j) {
-      b(j,i) = temp[ii++];
+      basis(j,i) = temp[ii++];
     }
   }
 }
