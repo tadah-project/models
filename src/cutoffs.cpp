@@ -9,6 +9,7 @@ CONFIG::Registry<Cut_Base,double>::Register<Cut_Cos_S> Cut_Cos_S_1( "Cut_Cos_S" 
 CONFIG::Registry<Cut_Base,double>::Register<Cut_Tanh> Cut_Tanh_1( "Cut_Tanh" );
 CONFIG::Registry<Cut_Base,double>::Register<Cut_Poly2> Cut_Poly_1( "Cut_Poly2" );
 CONFIG::Registry<Cut_Base,double>::Register<Cut_Dummy> Cut_Dummy_1( "Cut_Dummy" );
+CONFIG::Registry<Cut_Base,double>::Register<Cut_PT> Cut_PT_1( "Cut_PT" );
 
 
 Cut_Base::~Cut_Base() {}
@@ -206,4 +207,45 @@ double Cut_Cos_S::calc_prime(double r) {
     double drs_dr = 1.0 / (rcut - rcut_inner);
     return -0.5 * M_PI * std::sin(M_PI * rs) * drs_dr;
   }
+}
+
+Cut_PT::Cut_PT() {}
+Cut_PT::Cut_PT(double rcut) {
+  set_rcut(rcut);
+  test_rcut(rcut);
+}
+std::string Cut_PT::label() {
+  return lab;
+}
+
+// Set the outer cutoff radius
+void Cut_PT::set_rcut(const double r) {
+    test_rcut(r);
+    rcut=r;
+    rcut_sq=r*r;
+    rcut_inv= r<=0 ? 0.0 : 1.0/r;
+    rcut_inner=-rcut/2;
+}
+double Cut_PT::get_rcut() {
+  return rcut;
+}
+double Cut_PT::get_rcut_sq() {
+  return rcut_sq;
+}
+double Cut_PT::calc(double r) {
+  if (r>=rcut) return 0.0;
+  double u = 0.5 * ((rcut / (r - rcut_inner)) + (rcut / (r - rcut)));
+  return 0.5 + 0.5 * tanh(u);
+}
+double Cut_PT::calc_prime(double r) {
+  if (r>=rcut) return 0.0;
+  double u = 0.5 * ((rcut / (r - rcut_inner)) + (rcut / (r - rcut)));
+  double cosh_u = cosh(u);
+  double sech2_u = 1.0 / (cosh_u * cosh_u);
+
+  double term1 = 1.0 / ((r - rcut_inner) * (r - rcut_inner));
+  double term2 = 1.0 / ((r - rcut) * (r - rcut));
+  double sum_terms = term1 + term2;
+
+  return - (rcut / 4.0) * sech2_u * sum_terms;
 }

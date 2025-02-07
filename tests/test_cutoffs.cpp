@@ -205,3 +205,46 @@ TEST_CASE( "Testing Cutoffs: Cut_Cos_s", "[Cut_Cos_S]" ) {
                Catch::Matchers::WithinAbs(-1.4939160824, 1e-10));
     delete c2b;
 }
+TEST_CASE( "Testing Cutoffs: Cut_PT", "[Cut_PT]" ) {
+
+    REQUIRE_NOTHROW(Cut_PT());
+    double rcut2b = 6.2;
+    double rcut2bsq = rcut2b*rcut2b;
+    using Cut = Cut_PT;
+    std::string cuttype = "Cut_PT";
+    Cut_Base *c2b = new Cut( rcut2b );
+
+    REQUIRE( c2b->label() == cuttype );
+
+    REQUIRE( c2b->calc(rcut2b) < std::numeric_limits<double>::min() );
+    REQUIRE( c2b->calc_prime(rcut2b) < std::numeric_limits<double>::min() );
+    REQUIRE( std::abs(c2b->get_rcut()-rcut2b)<std::numeric_limits<double>::min() );
+    REQUIRE( std::abs(c2b->get_rcut_sq()-rcut2bsq)<std::numeric_limits<double>::min() );
+
+    // cutoff cannot be negative
+    double temp = -0.1;
+    REQUIRE_THROWS(Cut( temp ));
+    REQUIRE_THROWS_AS(c2b->set_rcut(temp), std::runtime_error);
+    REQUIRE_THROWS_AS(c2b->test_rcut(temp), std::runtime_error);
+
+    // recheck after resetting cutoff
+    rcut2b=3.4;
+    rcut2bsq=rcut2b*rcut2b;
+    c2b->set_rcut(100000);
+    c2b->set_rcut(rcut2b);
+    REQUIRE( c2b->calc(rcut2b) < std::numeric_limits<double>::min() );
+    REQUIRE( c2b->calc_prime(rcut2b) < std::numeric_limits<double>::min() );
+    REQUIRE( std::abs(c2b->get_rcut()-rcut2b)<std::numeric_limits<double>::min() );
+    REQUIRE( std::abs(c2b->get_rcut_sq()-rcut2bsq)<std::numeric_limits<double>::min() );
+
+  REQUIRE_THAT(c2b->calc(2.0),
+               Catch::Matchers::WithinAbs(0.180990296913, 1e-12));
+  REQUIRE_THAT(c2b->calc_prime(2.0),
+               Catch::Matchers::WithinAbs(-0.293953123268, 1e-12));
+
+  REQUIRE_THAT(c2b->calc(3.0),
+               Catch::Matchers::WithinAbs(0.000419261765536, 1e-10));
+  REQUIRE_THAT(c2b->calc_prime(3.0),
+               Catch::Matchers::WithinAbs(-0.00897008113779, 1e-10));
+    delete c2b;
+}

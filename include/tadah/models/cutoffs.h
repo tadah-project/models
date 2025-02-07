@@ -154,5 +154,45 @@ class Cut_Cos_S : public Cut_Base {
         double calc(double r);
         double calc_prime(double r);
 };
+/**
+ * @class Cut_PT
+ * @brief Represents a smooth cutoff function using hyperbolic tangent smoothing.
+ *
+ * This class implements a smooth cutoff function defined by:
+ * \f[
+ * f(r) = \frac{1}{2} + \frac{1}{2} \tanh\left( \frac{1}{2} \left( \frac{b}{r - a} + \frac{b}{r - R} \right) \right)
+ * \f]
+ * and its derivative:
+ * \f[
+ * f'(r) = -\frac{b}{4} \left( \frac{1}{\cosh\left( \dfrac{b}{2} \left( \dfrac{1}{r - a} + \dfrac{1}{r - R} \right) \right)} \right)^2 \left( \dfrac{1}{(r - a)^2} + \dfrac{1}{(r - R)^2} \right)
+ * \f]
+ * where:
+ * - \( r \) is the radial distance.
+ * - \( a \) is the inner cutoff radius (`rcut_inner`).
+ * - \( R \) is the outer cutoff radius (`rcut`).
+ * - \( b \) is the smoothing parameter.
+ *
+ * The function smoothly transitions from 0 to 1 between the inner cutoff radius \( a \) and the outer cutoff radius \( R \).
+ *
+ */
+class Cut_PT : public Cut_Base {
+    private:
+        std::string lab="Cut_PT";
+        double rcut;
+        double rcut_sq;
+        double rcut_inv;
+        double rcut_inner;
+
+    public:
+        Cut_PT();
+        Cut_PT(double rcut_value);
+        std::string label();
+        void set_rcut(const double r);
+        double get_rcut();
+        double get_rcut_sq();
+        double calc(double r);
+        double calc_prime(double r);
+};
+
 //template<> inline Registry<Cut_Base,double>::Map Registry<Cut_Base,double>::registry{};
 #endif
