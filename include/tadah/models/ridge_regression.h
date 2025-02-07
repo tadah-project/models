@@ -46,7 +46,7 @@ class RidgeRegression {
      * @param lambda Regularization parameter.
      */
     template <typename V, typename W>
-    static void solve(const SVD &svd, V b, W &weights, const double lambda) {
+    static void solve(const SVD &svd, V b, W &weights, double lambda) {
       double *U = svd.getU(); // Matrix U from SVD (m x m)
       double *s = svd.getS(); // Singular values (as a vector)
       double *VT = svd.getVT(); // Matrix V^T from SVD (n x n)

@@ -14,7 +14,7 @@ TEST_CASE("Testing OLS") {
   aed_type w(3);
   aed_type b2=b1;
 
-  OLS::solve(Phi1,b1,w);
+  OLS::solve(Phi1,b1,w, 1e-8);
   aed_type p= Phi2*w;
   REQUIRE_THAT(p[0], Catch::Matchers::WithinRel(b2[0]));
   REQUIRE_THAT(p[1], Catch::Matchers::WithinRel(b2[1]));
