@@ -7,7 +7,8 @@ template<> CONFIG::Registry<Cut_Base,double>::Map CONFIG::Registry<Cut_Base,doub
 CONFIG::Registry<Cut_Base,double>::Register<Cut_Cos> Cut_Cos_1( "Cut_Cos" );
 CONFIG::Registry<Cut_Base,double>::Register<Cut_Cos_S> Cut_Cos_S_1( "Cut_Cos_S" );
 CONFIG::Registry<Cut_Base,double>::Register<Cut_Tanh> Cut_Tanh_1( "Cut_Tanh" );
-CONFIG::Registry<Cut_Base,double>::Register<Cut_Poly2> Cut_Poly_1( "Cut_Poly2" );
+CONFIG::Registry<Cut_Base,double>::Register<Cut_Poly1> Cut_Poly_1( "Cut_Poly1" );
+CONFIG::Registry<Cut_Base,double>::Register<Cut_Poly2> Cut_Poly_2( "Cut_Poly2" );
 CONFIG::Registry<Cut_Base,double>::Register<Cut_Dummy> Cut_Dummy_1( "Cut_Dummy" );
 CONFIG::Registry<Cut_Base,double>::Register<Cut_PT> Cut_PT_1( "Cut_PT" );
 
@@ -92,7 +93,6 @@ Cut_Tanh::Cut_Tanh() {}
 Cut_Tanh::Cut_Tanh(double rcut)
 {
     set_rcut(rcut);
-    test_rcut(rcut);
 }
 
 std::string Cut_Tanh::label() {
@@ -248,4 +248,45 @@ double Cut_PT::calc_prime(double r) {
   double sum_terms = term1 + term2;
 
   return - (rcut / 4.0) * sech2_u * sum_terms;
+}
+Cut_Poly1::Cut_Poly1() {}
+Cut_Poly1::Cut_Poly1(double rcut_value) {
+  set_rcut(rcut_value);
+}
+std::string Cut_Poly1::label() {
+    return lab;
+}
+void Cut_Poly1::set_rcut(const double r) {
+    test_rcut(r);
+    rcut = r;
+    rcut_sq = r * r;
+    rcut_inv= r<=0 ? 0.0 : 1.0/r;
+}
+double Cut_Poly1::get_rcut() {
+    return rcut;
+}
+double Cut_Poly1::get_rcut_sq() {
+    return rcut_sq;
+}
+double Cut_Poly1::calc(double r) {
+    if (r >= rcut) {
+        return 0.0;
+    } else {
+        double x = r * rcut_inv; // x = r / rcut
+        double x3 = x * x * x;
+        double x4 = x3 * x;
+        double x5 = x4 * x;
+        return 1.0 - 10.0 * x3 + 15.0 * x4 - 6.0 * x5;
+    }
+}
+double Cut_Poly1::calc_prime(double r) {
+    if (r >= rcut) {
+        return 0.0;
+    } else {
+        double x = r * rcut_inv; // x = r / rcut
+        double x2 = x * x;
+        double x3 = x2 * x;
+        double x4 = x3 * x;
+        return (-30.0 * x2 + 60.0 * x3 - 30.0 * x4) * rcut_inv;
+    }
 }
