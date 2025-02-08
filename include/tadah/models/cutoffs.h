@@ -74,7 +74,7 @@ class Cut_Dummy : public Cut_Base {
  * \end{cases}
  * \f]
  *
- * This function smoothly transitions from 1 to 0 over the interval \( 0 \leq r \leq r_c \).
+ * This function smoothly transitions from 1 to 0 over the interval \f$ 0 \leq r \leq r_c \f$.
  * It is commonly used in molecular simulations to smoothly truncate interactions without introducing discontinuities in the potential energy or its derivatives.
  *
  * **Reference:**
@@ -109,7 +109,7 @@ class Cut_Cos : public Cut_Base {
  * \end{cases}
  * \f]
  *
- * This function smoothly transitions from 1 to 0 over the interval \( 0 \leq r \leq r_c \), with the transition shape controlled by the cubic power of the hyperbolic tangent. It is particularly useful in constructing atom-centered symmetry functions for high-dimensional neural network potentials.
+ * This function smoothly transitions from 1 to 0 over the interval \f$ 0 \leq r \leq r_c \f$, with the transition shape controlled by the cubic power of the hyperbolic tangent. It is particularly useful in constructing atom-centered symmetry functions for high-dimensional neural network potentials.
  *
  * **Reference:**
  *
@@ -146,11 +146,11 @@ class Cut_Tanh : public Cut_Base {
  * \f]
 
  * where:
- * - \( r \) is the radial distance.
- * - \( r_c \) is the cutoff radius.
- * - \( r_{\text{inner}} = r_c - 1 \) is the inner cutoff radius.
+ * - \f$ r \f$ is the radial distance.
+ * - \f$ r_c \f$ is the cutoff radius.
+ * - \f$ r_{\text{inner}} = r_c - 1 \f$ is the inner cutoff radius.
 
- * This function provides a smooth transition from 1 to 0 between \( r_{\text{inner}} \) and \( r_c \), ensuring continuity and smoothness in the potential and its derivatives up to the second order.
+ * This function provides a smooth transition from 1 to 0 between \f$ r_{\text{inner}} \f$ and \f$ r_c \f$, ensuring continuity and smoothness in the potential and its derivatives up to the second order.
 
  * **Reference:**
 
@@ -195,7 +195,7 @@ class Cut_Poly2 : public Cut_Base {
  * - \( r \) is the radial distance.
  * - \( r_{\text{cut}} \) is the cutoff radius.
  *
- * The function smoothly transitions from 1 to 0 within the cutoff radius \( r_{\text{cut}} \), ensuring that the function and its first and second derivatives are zero at \( r \geq r_{\text{cut}} \).
+ * The function smoothly transitions from 1 to 0 within the cutoff radius \f$ r_{\text{cut}} \f$, ensuring that the function and its first and second derivatives are zero at \f$ r \geq r_{\text{cut}} \f$.
  *
  */
 class Cut_Poly1 : public Cut_Base {
@@ -233,19 +233,17 @@ class Cut_Cos_S : public Cut_Base {
  *
  * This class implements a smooth cutoff function defined by:
  * \f[
- * f(r) = \frac{1}{2} + \frac{1}{2} \tanh\left( \frac{1}{2} \left( \frac{b}{r - a} + \frac{b}{r - R} \right) \right)
+ * f(r) = \dfrac{1}{2} + \dfrac{1}{2} \tanh\left( \dfrac{1}{2} \left( \dfrac{r_c}{r + \dfrac{r_c}{2}} + \dfrac{r_c}{r - r_c} \right) \right)
  * \f]
  * and its derivative:
  * \f[
- * f'(r) = -\frac{b}{4} \left( \frac{1}{\cosh\left( \dfrac{b}{2} \left( \dfrac{1}{r - a} + \dfrac{1}{r - R} \right) \right)} \right)^2 \left( \dfrac{1}{(r - a)^2} + \dfrac{1}{(r - R)^2} \right)
+ * f'(r) = -\dfrac{r_c}{4} \left( \dfrac{1}{\cosh\left( \dfrac{r_c}{2} \left( \dfrac{1}{r + \dfrac{r_c}{2}} + \dfrac{1}{r - r_c} \right) \right)} \right)^2 \left( \dfrac{1}{\left( r + \dfrac{r_c}{2} \right)^2} + \dfrac{1}{\left( r - r_c \right)^2} \right)
  * \f]
  * where:
- * - \( r \) is the radial distance.
- * - \( a \) is the inner cutoff radius (`rcut_inner`).
- * - \( R \) is the outer cutoff radius (`rcut`).
- * - \( b \) is the smoothing parameter.
+ * - \f$ r \f$ is the radial distance.
+ * - \f$ r_c \f$ is the cutoff radius.
  *
- * The function smoothly transitions from 0 to 1 between the inner cutoff radius \( a \) and the outer cutoff radius \( R \).
+ * The function smoothly transitions from 0 to 1 between \f$ r = -\dfrac{r_c}{2} \f$ and \f$ r = r_c \f$.
  *
  */
 class Cut_PT : public Cut_Base {
@@ -267,5 +265,4 @@ class Cut_PT : public Cut_Base {
         double calc_prime(double r);
 };
 
-//template<> inline Registry<Cut_Base,double>::Map Registry<Cut_Base,double>::registry{};
 #endif
