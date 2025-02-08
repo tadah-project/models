@@ -109,7 +109,7 @@ class Cut_Cos : public Cut_Base {
  * \end{cases}
  * \f]
  *
- * This function smoothly transitions from 1 to 0 over the interval \f$ 0 \leq r \leq r_c \f$, with the transition shape controlled by the cubic power of the hyperbolic tangent. It is particularly useful in constructing atom-centered symmetry functions for high-dimensional neural network potentials.
+ * This function smoothly transitions from 1 to 0 over the interval \f$ 0 \leq r \leq r_c \f$, with the transition shape controlled by the cubic power of the hyperbolic tangent.
  *
  * **Reference:**
  *
