@@ -212,6 +212,45 @@ class Cut_Poly1 : public Cut_Base {
         double calc(double r);
         double calc_prime(double r);
 };
+/**
+ * @class Cut_Cos_S
+ * @brief Smooth cosine cutoff function with a smoothing interval.
+ *
+ * The `Cut_Cos_S` class implements a smooth cosine cutoff function that transitions smoothly from 1 to 0 over a specified smoothing interval between the inner cutoff radius \f$ r_{\text{inner}} \f$ and the outer cutoff radius \f$ r_{\text{cut}} \f$ The function is defined as:
+ *
+ * \f[
+ * f(r) =
+ * \begin{cases}
+ * 1, & \text{if } r \leq r_{\text{inner}} \\
+ * \dfrac{1}{2}\left[1 + \cos\left( \dfrac{\pi (r - r_{\text{inner}})}{r_{\text{cut}} - r_{\text{inner}}} \right) \right], & \text{if } r_{\text{inner}} < r < r_{\text{cut}} \\
+ * 0, & \text{if } r \geq r_{\text{cut}}
+ * \end{cases}
+ * \f]
+ *
+ * and its derivative:
+ *
+ * \f[
+ * f'(r) =
+ * \begin{cases}
+ * 0, & \text{if } r \leq r_{\text{inner}} \text{ or } r \geq r_{\text{cut}} \\
+ * -\dfrac{\pi}{2 (r_{\text{cut}} - r_{\text{inner}})} \sin\left( \dfrac{\pi (r - r_{\text{inner}})}{r_{\text{cut}} - r_{\text{inner}}} \right), & \text{if } r_{\text{inner}} < r < r_{\text{cut}}
+ * \end{cases}
+ * \f]
+ *
+ * where:
+ *
+ * - \f$ r \f$ is the radial distance.
+ * - \f$ r_{\text{cut}} \f$ is the outer cutoff radius (`rcut`).
+ * - \f$ r_{\text{inner}} \f$ is the inner cutoff radius (`rcut_inner`), defined as \f$ r_{\text{inner}} = r_{\text{cut}} - 1.0 \f$.
+ *
+ * **Characteristics:**
+ *
+ * - For \f$ r \leq r_{\text{inner}} \f$ the function \f$ f(r) = 1 \f$ and \f$ f'(r) = 0 \f$
+ * - For \f$ r_{\text{inner}} < r < r_{\text{cut}} \f$, the function transitions smoothly from 1 to 0.
+ * - For \f$ r \geq r_{\text{cut}} \f$, the function \f$ f(r) = 0 \f$ and \f$ f'(r) = 0 \f$.
+ *
+ * **Note:** The function ensures continuity and smoothness in simulations or calculations where a smooth cutoff is required.
+ */
 class Cut_Cos_S : public Cut_Base {
     private:
         std::string lab = "Cut_Cos_S";
