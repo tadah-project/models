@@ -37,14 +37,14 @@ class Cut_Base {
  * \f]
  *
  * where:
- * - \( r \) is the radial distance.
- * - \( r_{\text{cut}} \) is the cutoff radius.
+ * - \f$ r \f$ is the radial distance.
+ * - \f$ r_{\text{cut}} \f$ is the cutoff radius.
  *
  * **Characteristics:**
  * - The function value is constant (1) within the cutoff radius and zero beyond it.
- * - The derivative of the function is zero everywhere except at \( r = r_{\text{cut}} \), where it is undefined due to the discontinuity.
+ * - The derivative of the function is zero everywhere except at \f$ r = r_{\text{cut}} \f$ where it is undefined due to the discontinuity.
  *
- * **Note:** Since the function is discontinuous at \( r = r_{\text{cut}} \), its derivative is not defined at that point. In practical computations, the derivative function `calc_prime` returns `0.0` for all \( r \).
+ * **Note:** Since the function is discontinuous at \f$ r = r_{\text{cut}} \f$ its derivative is not defined at that point. In practical computations, the derivative function `calc_prime` returns `0.0` for all \f$ r \f$
  */
 class Cut_Dummy : public Cut_Base {
     private:
@@ -192,8 +192,8 @@ class Cut_Poly2 : public Cut_Base {
  * \end{cases}
  * \f]
  * where:
- * - \( r \) is the radial distance.
- * - \( r_{\text{cut}} \) is the cutoff radius.
+ * - \f$ r \f$ is the radial distance.
+ * - \f$ r_{\text{cut}} \f$ is the cutoff radius.
  *
  * The function smoothly transitions from 1 to 0 within the cutoff radius \f$ r_{\text{cut}} \f$, ensuring that the function and its first and second derivatives are zero at \f$ r \geq r_{\text{cut}} \f$.
  *
@@ -243,7 +243,7 @@ class Cut_Cos_S : public Cut_Base {
  * - \f$ r \f$ is the radial distance.
  * - \f$ r_c \f$ is the cutoff radius.
  *
- * The function smoothly transitions from 0 to 1 between \f$ r = -\dfrac{r_c}{2} \f$ and \f$ r = r_c \f$.
+ * The cutoff function smoothly transitions from 1 to 0 between \f$ r = -\dfrac{r_c}{2} \f$ and \f$ r = r_c \f$.
  *
  */
 class Cut_PT : public Cut_Base {
