@@ -155,6 +155,7 @@ public:
         if (M_KRR_Core<Kern>::is_verbose()) std::cout << "Matrix condition number: " << condition_number(K) << std::endl;
 
         if (M_KRR_Core<Kern>::is_verbose()) std::cout << "Solving..." << std::flush;
+        //double rcond = config.template size("LAMBDA")==2 ? config.template get<double>("LAMBDA",1) : 1e-8;
         weights = solve_posv(K, T);
         if (M_KRR_Core<Kern>::is_verbose()) std::cout << "Done" << std::endl;
 

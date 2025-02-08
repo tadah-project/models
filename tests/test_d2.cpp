@@ -75,7 +75,7 @@ void test_D2(Config &c) {
       test_d2<D,Cut_Dummy>(c,r);
       test_d2<D,Cut_Cos>(c,r);
       test_d2<D,Cut_Tanh>(c,r);
-      test_d2<D,Cut_Poly2>(c,r);
+      test_d2<D,Cut_PolyS>(c,r);
     }
   }
   Config c2; // INIT2B=false

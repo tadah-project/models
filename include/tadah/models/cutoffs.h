@@ -18,16 +18,33 @@ class Cut_Base {
         void test_rcut(const double r);
 };
 
-/** @brief Dummy cutoff function
+/**
+ * @class Cut_Dummy
+ * @brief Represents a basic cutoff function with a sharp transition at the cutoff radius.
+ *
+ * The `Cut_Dummy` class implements a simple cutoff function defined by:
  * \f[
  * f_c(r) =
- * \begin{equation}
  * \begin{cases}
- *  1 & \text{if  } r \leq r_c\\
- *  0 & \text{otherwise}\\
+ * 1, & \text{if } r \leq r_{\text{cut}} \\
+ * 0, & \text{if } r > r_{\text{cut}}
  * \end{cases}
- * \end{equation}
  * \f]
+ *
+ * and its derivative:
+ * \f[
+ * f_c'(r) = 0
+ * \f]
+ *
+ * where:
+ * - \f$ r \f$ is the radial distance.
+ * - \f$ r_{\text{cut}} \f$ is the cutoff radius.
+ *
+ * **Characteristics:**
+ * - The function value is constant (1) within the cutoff radius and zero beyond it.
+ * - The derivative of the function is zero everywhere except at \f$ r = r_{\text{cut}} \f$ where it is undefined due to the discontinuity.
+ *
+ * **Note:** Since the function is discontinuous at \f$ r = r_{\text{cut}} \f$ its derivative is not defined at that point. In practical computations, the derivative function `calc_prime` returns `0.0` for all \f$ r \f$
  */
 class Cut_Dummy : public Cut_Base {
     private:
@@ -44,22 +61,25 @@ class Cut_Dummy : public Cut_Base {
         double calc_prime(double r);
 };
 
-/** @brief Cos cutoff function
+/**
+ * @class Cut_Cos
+ * @brief Cosine cutoff function.
  *
+ * The `Cut_Cos` class implements a smooth cosine cutoff function defined by:
  * \f[
  * f_c(r) =
- * \begin{equation}
  * \begin{cases}
- *  \frac{1}{2}\big[ \cos\big( \frac{\pi r}{r_c} \big)+1 \big] & \text{if  } r \leq r_c\\
- *  0 & \text{otherwise}\\
+ *  \dfrac{1}{2}\left[ \cos\left( \dfrac{\pi r}{r_c} \right) + 1 \right], & \text{if } r \leq r_c \\
+ *  0, & \text{if } r > r_c
  * \end{cases}
- * \end{equation}
  * \f]
  *
- * <div class="csl-entry">Behler, J., Parrinello, M. (2007).
- * Generalized neural-network representation of high-dimensional
- * potential-energy surfaces. <i>Physical Review Letters</i>,
- * <i>98</i>(14), 146401. https://doi.org/10.1103/PhysRevLett.98.146401</div>
+ * This function smoothly transitions from 1 to 0 over the interval \f$ 0 \leq r \leq r_c \f$.
+ * It is commonly used in molecular simulations to smoothly truncate interactions without introducing discontinuities in the potential energy or its derivatives.
+ *
+ * **Reference:**
+ *
+ * Behler, J., & Parrinello, M. (2007). *Generalized neural-network representation of high-dimensional potential-energy surfaces*. Physical Review Letters, 98(14), 146401. [DOI:10.1103/PhysRevLett.98.146401](https://doi.org/10.1103/PhysRevLett.98.146401)
  */
 class Cut_Cos : public Cut_Base {
     private:
@@ -76,21 +96,24 @@ class Cut_Cos : public Cut_Base {
         double calc_prime(double r);
 };
 
-/** @brief Tanh cutoff function.
+/**
+ * @class Cut_Tanh
+ * @brief Hyperbolic tangent cutoff function.
+ *
+ * The `Cut_Tanh` class implements a smooth cutoff function using the hyperbolic tangent, defined by:
  * \f[
  * f_c(r) =
- * \begin{equation}
- *  \begin{cases}
- *   \tanh^3\big( 1 -\frac{r}{r_c} \big)  & \text{if  } r \leq r_c\\
- *   0 & \text{otherwise}\\
- *  \end{cases}
- * \end{equation}
+ * \begin{cases}
+ *  \tanh^3\left( 1 - \dfrac{r}{r_c} \right), & \text{if } r \leq r_c \\
+ *  0, & \text{if } r > r_c
+ * \end{cases}
  * \f]
  *
- * <div class="csl-entry">Behler, J. (2011). Atom-centered symmetry
- * functions for constructing high-dimensional neural network potentials.
- * <i>J. Chem. Phys.</i>, <i>134</i>(7), 074106.
- * https://doi.org/10.1063/1.3553717</div>
+ * This function smoothly transitions from 1 to 0 over the interval \f$ 0 \leq r \leq r_c \f$, with the transition shape controlled by the cubic power of the hyperbolic tangent.
+ *
+ * **Reference:**
+ *
+ * Behler, J. (2011). Atom-centered symmetry functions for constructing high-dimensional neural network potentials. *Journal of Chemical Physics*, 134(7), 074106. [DOI:10.1063/1.3553717](https://doi.org/10.1063/1.3553717)
  */
 class Cut_Tanh : public Cut_Base {
     private:
@@ -107,31 +130,40 @@ class Cut_Tanh : public Cut_Base {
         double calc_prime(double r);
 };
 
-/** @brief Polynomial-2 cutoff function.
+/**
+ * @class Cut_PolyS
+ * @brief Polynomial cutoff function ensuring smoothness up to the second derivative.
  *
+ * The `Cut_PolyS` class implements a polynomial cutoff function defined as:
+
  * \f[
  * f_c(r) =
- * \begin{equation}
- *  \begin{cases}
- *   1 & \text{if  } r \leq (r_c-1)\\
- *   r^3(r(15-6r)-10)+1  & \text{if  } (r_c-1) < r \leq r_c\\
- *   0 & \text{otherwise}\\
- *  \end{cases}
- * \end{equation}
+ * \begin{cases}
+ * 1, & \text{if } r \leq r_{\text{inner}} \\
+ * \left( r - r_c + 1 \right )^3 \left[ r \left( 15 - 6 r \right ) - 10 \right ] + 1, & \text{if } r_{\text{inner}} < r \leq r_c \\
+ * 0, & \text{if } r > r_c
+ * \end{cases}
  * \f]
 
- *<div class="csl-entry">Singraber, A., Rg Behler, J., Dellago, C. (2019).
- Library-Based LAMMPS Implementation of High-Dimensional
- Neural Network Potentials. https://doi.org/10.1021/acs.jctc.8b00770</div>
+ * where:
+ * - \f$ r \f$ is the radial distance.
+ * - \f$ r_c \f$ is the cutoff radius.
+ * - \f$ r_{\text{inner}} = r_c - 1 \f$ is the inner cutoff radius.
+
+ * This function provides a smooth transition from 1 to 0 between \f$ r_{\text{inner}} \f$ and \f$ r_c \f$, ensuring continuity and smoothness in the potential and its derivatives up to the second order.
+
+ * **Reference:**
+
+ * Singraber, A., Behler, J., & Dellago, C. (2019). *Library-Based LAMMPS Implementation of High-Dimensional Neural Network Potentials*. Journal of Chemical Theory and Computation, 15(1), 182–190. [DOI:10.1021/acs.jctc.8b00770](https://doi.org/10.1021/acs.jctc.8b00770)
  */
-class Cut_Poly2 : public Cut_Base {
+class Cut_PolyS : public Cut_Base {
     private:
-        std::string lab = "Cut_Poly2";
+        std::string lab = "Cut_PolyS";
         double rcut, rcut_sq, rcut_inv;
         double rcut_inner;
     public:
-        Cut_Poly2();
-        Cut_Poly2(double rcut);
+        Cut_PolyS();
+        Cut_PolyS(double rcut);
         std::string label() ;
         void set_rcut(const double r);
         double get_rcut();
@@ -139,14 +171,40 @@ class Cut_Poly2 : public Cut_Base {
         double calc(double r);
         double calc_prime(double r);
 };
-class Cut_Cos_S : public Cut_Base {
+/**
+ * @class Cut_Poly
+ * @brief Represents a 5th order polynomial cutoff function with zero first and second derivatives at the cutoff radius.
+ *
+ * This class implements a smooth cutoff function defined by:
+ * \f[
+ * f(r) =
+ * \begin{cases}
+ * 1 - 10 \left( \dfrac{r}{r_{\text{cut}}} \right)^3 + 15 \left( \dfrac{r}{r_{\text{cut}}} \right)^4 - 6 \left( \dfrac{r}{r_{\text{cut}}} \right)^5, & \text{for } r \leq r_{\text{cut}} \\
+ * 0, & \text{for } r > r_{\text{cut}}
+ * \end{cases}
+ * \f]
+ * and its derivative:
+ * \f[
+ * f'(r) =
+ * \begin{cases}
+ * \left( -30 \left( \dfrac{r}{r_{\text{cut}}} \right)^2 + 60 \left( \dfrac{r}{r_{\text{cut}}} \right)^3 - 30 \left( \dfrac{r}{r_{\text{cut}}} \right)^4 \right) \dfrac{1}{r_{\text{cut}}}, & \text{for } r \leq r_{\text{cut}} \\
+ * 0, & \text{for } r > r_{\text{cut}}
+ * \end{cases}
+ * \f]
+ * where:
+ * - \f$ r \f$ is the radial distance.
+ * - \f$ r_{\text{cut}} \f$ is the cutoff radius.
+ *
+ * The function smoothly transitions from 1 to 0 within the cutoff radius \f$ r_{\text{cut}} \f$, ensuring that the function and its first and second derivatives are zero at \f$ r \geq r_{\text{cut}} \f$.
+ *
+ */
+class Cut_Poly : public Cut_Base {
     private:
-        std::string lab = "Cut_Cos_S";
+        std::string lab = "Cut_Poly";
         double rcut, rcut_sq, rcut_inv;
-        double rcut_inner;
     public:
-        Cut_Cos_S();
-        Cut_Cos_S(double rcut);
+        Cut_Poly();
+        Cut_Poly(double rcut);
         std::string label() ;
         void set_rcut(const double r);
         double get_rcut();
@@ -154,5 +212,96 @@ class Cut_Cos_S : public Cut_Base {
         double calc(double r);
         double calc_prime(double r);
 };
-//template<> inline Registry<Cut_Base,double>::Map Registry<Cut_Base,double>::registry{};
+/**
+ * @class Cut_CosS
+ * @brief Smooth cosine cutoff function with a smoothing interval.
+ *
+ * The `Cut_CosS` class implements a smooth cosine cutoff function that transitions smoothly from 1 to 0 over a specified smoothing interval between the inner cutoff radius \f$ r_{\text{inner}} \f$ and the outer cutoff radius \f$ r_{\text{cut}} \f$ The function is defined as:
+ *
+ * \f[
+ * f(r) =
+ * \begin{cases}
+ * 1, & \text{if } r \leq r_{\text{inner}} \\
+ * \dfrac{1}{2}\left[1 + \cos\left( \dfrac{\pi (r - r_{\text{inner}})}{r_{\text{cut}} - r_{\text{inner}}} \right) \right], & \text{if } r_{\text{inner}} < r < r_{\text{cut}} \\
+ * 0, & \text{if } r \geq r_{\text{cut}}
+ * \end{cases}
+ * \f]
+ *
+ * and its derivative:
+ *
+ * \f[
+ * f'(r) =
+ * \begin{cases}
+ * 0, & \text{if } r \leq r_{\text{inner}} \text{ or } r \geq r_{\text{cut}} \\
+ * -\dfrac{\pi}{2 (r_{\text{cut}} - r_{\text{inner}})} \sin\left( \dfrac{\pi (r - r_{\text{inner}})}{r_{\text{cut}} - r_{\text{inner}}} \right), & \text{if } r_{\text{inner}} < r < r_{\text{cut}}
+ * \end{cases}
+ * \f]
+ *
+ * where:
+ *
+ * - \f$ r \f$ is the radial distance.
+ * - \f$ r_{\text{cut}} \f$ is the outer cutoff radius (`rcut`).
+ * - \f$ r_{\text{inner}} \f$ is the inner cutoff radius (`rcut_inner`), defined as \f$ r_{\text{inner}} = r_{\text{cut}} - 1.0 \f$.
+ *
+ * **Characteristics:**
+ *
+ * - For \f$ r \leq r_{\text{inner}} \f$ the function \f$ f(r) = 1 \f$ and \f$ f'(r) = 0 \f$
+ * - For \f$ r_{\text{inner}} < r < r_{\text{cut}} \f$, the function transitions smoothly from 1 to 0.
+ * - For \f$ r \geq r_{\text{cut}} \f$, the function \f$ f(r) = 0 \f$ and \f$ f'(r) = 0 \f$.
+ *
+ * **Note:** The function ensures continuity and smoothness in simulations or calculations where a smooth cutoff is required.
+ */
+class Cut_CosS : public Cut_Base {
+    private:
+        std::string lab = "Cut_CosS";
+        double rcut, rcut_sq, rcut_inv;
+        double rcut_inner;
+    public:
+        Cut_CosS();
+        Cut_CosS(double rcut);
+        std::string label() ;
+        void set_rcut(const double r);
+        double get_rcut();
+        double get_rcut_sq();
+        double calc(double r);
+        double calc_prime(double r);
+};
+/**
+ * @class Cut_PT
+ * @brief Represents a smooth cutoff function using hyperbolic tangent smoothing.
+ *
+ * This class implements a smooth cutoff function defined by:
+ * \f[
+ * f(r) = \dfrac{1}{2} + \dfrac{1}{2} \tanh\left( \dfrac{1}{2} \left( \dfrac{r_c}{r + \dfrac{r_c}{2}} + \dfrac{r_c}{r - r_c} \right) \right)
+ * \f]
+ * and its derivative:
+ * \f[
+ * f'(r) = -\dfrac{r_c}{4} \left( \dfrac{1}{\cosh\left( \dfrac{r_c}{2} \left( \dfrac{1}{r + \dfrac{r_c}{2}} + \dfrac{1}{r - r_c} \right) \right)} \right)^2 \left( \dfrac{1}{\left( r + \dfrac{r_c}{2} \right)^2} + \dfrac{1}{\left( r - r_c \right)^2} \right)
+ * \f]
+ * where:
+ * - \f$ r \f$ is the radial distance.
+ * - \f$ r_c \f$ is the cutoff radius.
+ *
+ * The cutoff function smoothly transitions from 1 to 0 between \f$ r = -\dfrac{r_c}{2} \f$ and \f$ r = r_c \f$.
+ *
+ */
+class Cut_PT : public Cut_Base {
+    private:
+        std::string lab="Cut_PT";
+        double rcut;
+        double rcut_sq;
+        double rcut_inv;
+        double rcut_inner;
+
+    public:
+        Cut_PT();
+        Cut_PT(double rcut_value);
+        std::string label();
+        void set_rcut(const double r);
+        double get_rcut();
+        double get_rcut_sq();
+        double calc(double r);
+        double calc_prime(double r);
+};
+
 #endif

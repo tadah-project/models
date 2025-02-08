@@ -35,9 +35,10 @@ class LinearRegressor {
 
       int verbose = config.get<int>("VERBOSE");
       double lambda = config.get<double>("LAMBDA");
+      double rcond = config.size("LAMBDA")==2 ? config.get<double>("LAMBDA",1) : 1e-8;
 
       if (lambda == 0) {
-        OLS::solve(Phi, T, weights);
+        OLS::solve(Phi, T, weights, rcond);
       } else {
         double alpha = config.get<double>("ALPHA");
         double beta = config.get<double>("BETA");

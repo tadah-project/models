@@ -26,7 +26,7 @@ class OLS {
      * @param weights Output vector containing the computed weights.
      */
     template <typename M, typename V>
-    static void solve(M &A, V &B, V &weights) {
+    static void solve(M &A, V &B, V &weights, double rcond) {
         // Resize B if necessary to match A's column count.
         if (B.size() < A.cols())
             B.resize(A.cols());
@@ -40,7 +40,6 @@ class OLS {
         double *b = B.ptr();
         int ldb = std::max(m, n);
         double *s = new double[std::min(m, n)]; // Singular values
-        double rcond = 1e-8; // Condition for singularity
         int rank;
         double *work;
         int lwork = -1; // Workspace query
