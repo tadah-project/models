@@ -315,7 +315,7 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_EAD 1", "[DM]") {
     test_case<DM_EAD, Cut_Dummy>(config_mb, "DM_EAD", 3 * 2);
     test_case<DM_EAD, Cut_Cos>(config_mb, "DM_EAD", 3 * 2);
     test_case<DM_EAD, Cut_Tanh>(config_mb, "DM_EAD", 3 * 2);
-    test_case<DM_EAD, Cut_Poly2>(config_mb, "DM_EAD", 3 * 2);
+    test_case<DM_EAD, Cut_PolyS>(config_mb, "DM_EAD", 3 * 2);
 }
 
 TEST_CASE_METHOD(TestFixture, "Testing DM_EAD 2", "[DM]") {
@@ -332,7 +332,7 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_EAD 2", "[DM]") {
     test_case<DM_EAD, Cut_Dummy>(config_mb, "DM_EAD", 4 * 3);
     test_case<DM_EAD, Cut_Cos>(config_mb, "DM_EAD", 4 * 3);
     test_case<DM_EAD, Cut_Tanh>(config_mb, "DM_EAD", 4 * 3);
-    test_case<DM_EAD, Cut_Poly2>(config_mb, "DM_EAD", 4 * 3);
+    test_case<DM_EAD, Cut_PolyS>(config_mb, "DM_EAD", 4 * 3);
 }
 
 TEST_CASE_METHOD(TestFixture, "Testing DM_Blip 1", "[DM]") {
@@ -349,7 +349,7 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_Blip 1", "[DM]") {
     test_case<DM_Blip, Cut_Dummy>(config_mb, "DM_Blip", 3 * 2);
     test_case<DM_Blip, Cut_Cos>(config_mb, "DM_Blip", 3 * 2);
     test_case<DM_Blip, Cut_Tanh>(config_mb, "DM_Blip", 3 * 2);
-    test_case<DM_Blip, Cut_Poly2>(config_mb, "DM_Blip", 3 * 2);
+    test_case<DM_Blip, Cut_PolyS>(config_mb, "DM_Blip", 3 * 2);
 }
 
 TEST_CASE_METHOD(TestFixture, "Testing DM_Blip 2", "[DM]") {
@@ -366,7 +366,7 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_Blip 2", "[DM]") {
     test_case<DM_Blip, Cut_Dummy>(config_mb, "DM_Blip", 4 * 3);
     test_case<DM_Blip, Cut_Cos>(config_mb, "DM_Blip", 4 * 3);
     test_case<DM_Blip, Cut_Tanh>(config_mb, "DM_Blip", 4 * 3);
-    test_case<DM_Blip, Cut_Poly2>(config_mb, "DM_Blip", 4 * 3);
+    test_case<DM_Blip, Cut_PolyS>(config_mb, "DM_Blip", 4 * 3);
 }
 
 TEST_CASE_METHOD(TestFixture, "Testing DM_EAM 1", "[DM]") {

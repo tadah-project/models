@@ -119,13 +119,13 @@ TEST_CASE( "Testing Cutoffs: Cut_Tanh", "[Cut_Tanh]" ) {
 
     delete c2b;
 }
-TEST_CASE( "Testing Cutoffs: Cut_Poly2", "[Cut_Poly2]" ) {
+TEST_CASE( "Testing Cutoffs: Cut_PolyS", "[Cut_PolyS]" ) {
 
-    REQUIRE_NOTHROW(Cut_Poly2());
+    REQUIRE_NOTHROW(Cut_PolyS());
     double rcut2b = 6.2;
     double rcut2bsq = rcut2b*rcut2b;
-    using Cut = Cut_Poly2;
-    std::string cuttype = "Cut_Poly2";
+    using Cut = Cut_PolyS;
+    std::string cuttype = "Cut_PolyS";
     Cut_Base *c2b = new Cut( rcut2b );
 
     REQUIRE( c2b->label() == cuttype );
@@ -162,13 +162,13 @@ TEST_CASE( "Testing Cutoffs: Cut_Poly2", "[Cut_Poly2]" ) {
                Catch::Matchers::WithinAbs(-1.728, 1e-12));
     delete c2b;
 }
-TEST_CASE( "Testing Cutoffs: Cut_Cos_s", "[Cut_Cos_S]" ) {
+TEST_CASE( "Testing Cutoffs: Cut_CosS", "[Cut_CosS]" ) {
 
-    REQUIRE_NOTHROW(Cut_Cos_S());
+    REQUIRE_NOTHROW(Cut_CosS());
     double rcut2b = 6.2;
     double rcut2bsq = rcut2b*rcut2b;
-    using Cut = Cut_Cos_S;
-    std::string cuttype = "Cut_Cos_S";
+    using Cut = Cut_CosS;
+    std::string cuttype = "Cut_CosS";
     Cut_Base *c2b = new Cut( rcut2b );
 
     REQUIRE( c2b->label() == cuttype );

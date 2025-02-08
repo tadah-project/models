@@ -131,10 +131,10 @@ class Cut_Tanh : public Cut_Base {
 };
 
 /**
- * @class Cut_Poly2
+ * @class Cut_PolyS
  * @brief Polynomial cutoff function ensuring smoothness up to the second derivative.
  *
- * The `Cut_Poly2` class implements a polynomial cutoff function defined as:
+ * The `Cut_PolyS` class implements a polynomial cutoff function defined as:
 
  * \f[
  * f_c(r) =
@@ -156,14 +156,14 @@ class Cut_Tanh : public Cut_Base {
 
  * Singraber, A., Behler, J., & Dellago, C. (2019). *Library-Based LAMMPS Implementation of High-Dimensional Neural Network Potentials*. Journal of Chemical Theory and Computation, 15(1), 182–190. [DOI:10.1021/acs.jctc.8b00770](https://doi.org/10.1021/acs.jctc.8b00770)
  */
-class Cut_Poly2 : public Cut_Base {
+class Cut_PolyS : public Cut_Base {
     private:
-        std::string lab = "Cut_Poly2";
+        std::string lab = "Cut_PolyS";
         double rcut, rcut_sq, rcut_inv;
         double rcut_inner;
     public:
-        Cut_Poly2();
-        Cut_Poly2(double rcut);
+        Cut_PolyS();
+        Cut_PolyS(double rcut);
         std::string label() ;
         void set_rcut(const double r);
         double get_rcut();
@@ -172,7 +172,7 @@ class Cut_Poly2 : public Cut_Base {
         double calc_prime(double r);
 };
 /**
- * @class Cut_Poly1
+ * @class Cut_Poly
  * @brief Represents a 5th order polynomial cutoff function with zero first and second derivatives at the cutoff radius.
  *
  * This class implements a smooth cutoff function defined by:
@@ -198,13 +198,13 @@ class Cut_Poly2 : public Cut_Base {
  * The function smoothly transitions from 1 to 0 within the cutoff radius \f$ r_{\text{cut}} \f$, ensuring that the function and its first and second derivatives are zero at \f$ r \geq r_{\text{cut}} \f$.
  *
  */
-class Cut_Poly1 : public Cut_Base {
+class Cut_Poly : public Cut_Base {
     private:
-        std::string lab = "Cut_Poly1";
+        std::string lab = "Cut_Poly";
         double rcut, rcut_sq, rcut_inv;
     public:
-        Cut_Poly1();
-        Cut_Poly1(double rcut);
+        Cut_Poly();
+        Cut_Poly(double rcut);
         std::string label() ;
         void set_rcut(const double r);
         double get_rcut();
@@ -213,10 +213,10 @@ class Cut_Poly1 : public Cut_Base {
         double calc_prime(double r);
 };
 /**
- * @class Cut_Cos_S
+ * @class Cut_CosS
  * @brief Smooth cosine cutoff function with a smoothing interval.
  *
- * The `Cut_Cos_S` class implements a smooth cosine cutoff function that transitions smoothly from 1 to 0 over a specified smoothing interval between the inner cutoff radius \f$ r_{\text{inner}} \f$ and the outer cutoff radius \f$ r_{\text{cut}} \f$ The function is defined as:
+ * The `Cut_CosS` class implements a smooth cosine cutoff function that transitions smoothly from 1 to 0 over a specified smoothing interval between the inner cutoff radius \f$ r_{\text{inner}} \f$ and the outer cutoff radius \f$ r_{\text{cut}} \f$ The function is defined as:
  *
  * \f[
  * f(r) =
@@ -251,14 +251,14 @@ class Cut_Poly1 : public Cut_Base {
  *
  * **Note:** The function ensures continuity and smoothness in simulations or calculations where a smooth cutoff is required.
  */
-class Cut_Cos_S : public Cut_Base {
+class Cut_CosS : public Cut_Base {
     private:
-        std::string lab = "Cut_Cos_S";
+        std::string lab = "Cut_CosS";
         double rcut, rcut_sq, rcut_inv;
         double rcut_inner;
     public:
-        Cut_Cos_S();
-        Cut_Cos_S(double rcut);
+        Cut_CosS();
+        Cut_CosS(double rcut);
         std::string label() ;
         void set_rcut(const double r);
         double get_rcut();
