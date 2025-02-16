@@ -38,7 +38,7 @@ class LinearRegressor {
       double rcond = config.size("LAMBDA")==2 ? config.get<double>("LAMBDA",1) : 1e-8;
 
       if (lambda == 0) {
-        OLS::solve(Phi, T, weights, rcond);
+        OLS::solve(Phi, T, weights, rcond, OLS::Algorithm::GELSD);
       } else {
         double alpha = config.get<double>("ALPHA");
         double beta = config.get<double>("BETA");
