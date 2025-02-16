@@ -36,6 +36,7 @@ class LinearRegressor {
       int verbose = config.get<int>("VERBOSE");
       double lambda = config.get<double>("LAMBDA");
       double rcond = config.size("LAMBDA")==2 ? config.get<double>("LAMBDA",1) : 1e-8;
+    weights.resize(Phi.cols());
 
       if (lambda == 0) {
         OLS::solve(Phi, T, weights, rcond, OLS::Algorithm::GELSD);
