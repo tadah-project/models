@@ -15,7 +15,7 @@ TEST_CASE("Testing RR") {
 
   SECTION("lambda zero") {
     double lambda = 0;
-    RidgeRegression::solve(Phi1,b1,w, lambda);
+    RidgeRegression::solve(Phi1,b1,w, lambda, 1e-8);
     aed_type p= Phi2*w;
     REQUIRE_THAT(p[0], Catch::Matchers::WithinRel(b2[0]));
     REQUIRE_THAT(p[1], Catch::Matchers::WithinRel(b2[1]));
@@ -23,7 +23,7 @@ TEST_CASE("Testing RR") {
   }
   SECTION("small lambda ") {
     double lambda = 1e-10;
-    RidgeRegression::solve(Phi1,b1,w, lambda);
+    RidgeRegression::solve(Phi1,b1,w, lambda, 1e-8);
     aed_type p= Phi2*w;
     REQUIRE(p.isApprox(b2,lambda));
   }

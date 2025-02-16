@@ -2,210 +2,154 @@
 #include <cmath>
 #include <stdexcept>
 #include <cstdlib> // For malloc and free
+#include <algorithm> // For std::max
 
-// Ensure that LAPACK functions are declared in the global namespace
-// If not, include the necessary headers or declarations
+// Implementation of non-template methods
 
+// Constructor
 OLS::Workspace::Workspace()
-    : s(nullptr), iwork(nullptr), work(nullptr), lwork(0), m(0), n(0), algo(Algorithm::GELSD)
-{
+  : work(nullptr), lwork(-1), m(0), n(0), algo(Algorithm::GELSD),
+  s(nullptr), iwork(nullptr), U(nullptr), S(nullptr), VT(nullptr),
+  AtA(nullptr), Atb(nullptr) {
 }
 
-OLS::Workspace::~Workspace()
-{
-    release();
+// Destructor
+OLS::Workspace::~Workspace() {
+  release();
 }
 
-void OLS::Workspace::allocate(int m_, int n_, Algorithm algorithm)
-{
-    // Check for valid algorithm
-    if (algorithm != Algorithm::GELSD && algorithm != Algorithm::GELS) {
-        throw std::invalid_argument("Invalid algorithm specified in Workspace::allocate().");
-    }
+// allocate method
+void OLS::Workspace::allocate(int m_, int n_, Algorithm algorithm) {
+  release(); // Release any existing memory
 
-    // Release existing memory if allocated
-    release();
+  m = m_;
+  n = n_;
+  algo = algorithm;
 
-    m = m_;
-    n = n_;
-    algo = algorithm;
+  int info;
 
-    if (algorithm == Algorithm::GELSD) {
-        int minmn = std::min(m, n);
+  if (algorithm == Algorithm::GELSD) {
+    // Allocate workspace for DGELSD
+    int minmn = std::min(m, n);
+    int maxmn = std::max(m, n);
+    int nlvl = std::max(0, static_cast<int>(std::log2(minmn / 25.0)) + 1);
 
-        // Allocate s for singular values
-        s = reinterpret_cast<double*>(malloc(minmn * sizeof(double)));
-        if (!s) throw std::bad_alloc();
+    // Allocate s (singular values)
+    s = new double[minmn];
 
-        // Compute nlvl and allocate iwork
-        int smlsiz = 25;
-        int nlvl = std::max(0, int(std::log2(static_cast<double>(minmn) / (smlsiz + 1))) + 1);
-        int iwork_size = 3 * minmn * nlvl + 11 * minmn;
-        iwork = reinterpret_cast<int*>(malloc(iwork_size * sizeof(int)));
-        if (!iwork) {
-            release();
-            throw std::bad_alloc();
-        }
-    } else {
-        // For DGELS
-        s = nullptr;
-        iwork = nullptr;
-    }
+    // Allocate iwork
+    int liwork = 3 * minmn * nlvl + 11 * minmn;
+    iwork = new int[liwork];
 
-    // Query for optimal work array size
-    double wkopt;
+    // Workspace query
+    double work_query;
     int lwork_query = -1;
     int nrhs = 1;
-    int lda = m;
-    int ldb = std::max(m, n);
+    double* a_dummy = nullptr;
+    double* b_dummy = nullptr;
+    ::dgelsd_(&m, &n, &nrhs, a_dummy, &m, b_dummy, &maxmn, s, nullptr,
+              nullptr, &work_query, &lwork_query, iwork, &info);
+    lwork = static_cast<int>(work_query);
+    work = new double[lwork];
+  } else if (algorithm == Algorithm::GELS) {
+    // Allocate workspace for DGELS
+    double work_query;
+    int lwork_query = -1;
+    int nrhs = 1;
+    double* a_dummy = nullptr;
+    double* b_dummy = nullptr;
+    char trans = 'N';
+    ::dgels_(&trans, &m, &n, &nrhs, a_dummy, &m, b_dummy, &m, &work_query, &lwork_query, &info);
+    lwork = static_cast<int>(work_query);
+    work = new double[lwork];
+  } else if (algorithm == Algorithm::SVD) {
+    // Allocate workspace for custom SVD implementation using DGESDD
+    int minmn = std::min(m, n);
+    int maxmn = std::max(m, n);
 
-    // Allocate minimal dummy arrays for A and B
-    double* adummy = reinterpret_cast<double*>(malloc(m * n * sizeof(double)));
-    double* bdummy = reinterpret_cast<double*>(malloc(ldb * nrhs * sizeof(double)));
-    if (!adummy || !bdummy) {
-        if (adummy) ::free(adummy);
-        if (bdummy) ::free(bdummy);
-        release();
-        throw std::bad_alloc();
-    }
+    // Set jobz parameter to compute singular vectors
+    char jobz = 'S'; // Compute the first min(m,n) singular vectors
 
+    // Leading dimensions
+    int lda = m;      // Leading dimension of A
+    int ldu = m;      // Leading dimension of U
+    int ldvt = minmn; // Leading dimension of VT
+
+    // Allocate arrays for U, S, and VT
+    U = new double[ldu * minmn];       // U is m x min(m,n)
+    S = new double[minmn];             // Singular values vector
+    VT = new double[ldvt * n];         // VT is min(m,n) x n
+
+    // Allocate integer workspace for DGESDD
+    int* iwork = new int[8 * minmn];
+
+    // Workspace query for DGESDD
+    double work_query;
+    int lwork = -1;
     int info;
 
-    if (algorithm == Algorithm::GELSD) {
-        int rank;
-        double rcond_query = -1;  // Use default rcond
+    // Create a dummy A matrix for the workspace query
+    double* a_dummy = nullptr;
 
-        // Set up dummy LAPACK call
-        ::dgelsd_(&m, &n, &nrhs, adummy, &lda, bdummy, &ldb, s, &rcond_query, &rank,
-                &wkopt, &lwork_query, iwork, &info);
-    } else { // Algorithm::GELS
-        char trans = 'N';
-        ::dgels_(&trans, &m, &n, &nrhs, adummy, &lda, bdummy, &ldb, &wkopt, &lwork_query, &info);
-    }
+    // Perform the workspace query
+    ::dgesdd_(&jobz, &m, &n, a_dummy, &lda, S, U, &ldu, VT, &ldvt,
+              &work_query, &lwork, iwork, &info);
 
-    // Free dummy arrays
-    ::free(adummy);
-    ::free(bdummy);
-
+    // Check for errors
     if (info != 0) {
-        release();
-        throw std::runtime_error("Error in workspace query: info = " + std::to_string(info));
+      delete[] iwork;
+      throw std::runtime_error("Error in DGESDD workspace query: INFO = " + std::to_string(info));
     }
 
-    lwork = static_cast<int>(wkopt);
-    work = reinterpret_cast<double*>(malloc(lwork * sizeof(double)));
-    if (!work) {
-        release();
-        throw std::bad_alloc();
-    }
-}
+    // Allocate the optimal workspace
+    lwork = static_cast<int>(work_query);
+    work = new double[lwork];
 
-void OLS::Workspace::release()
-{
-    if (s) ::free(s);
-    if (iwork) ::free(iwork);
-    if (work) ::free(work);
-    s = nullptr;
-    iwork = nullptr;
+  } else if (algorithm == Algorithm::Cholesky) {
+    // Allocate space for AtA (n x n) and Atb (n)
+    AtA = new double[n * n];
+    Atb = new double[n];
+
+    // No additional workspace required for Cholesky decomposition
     work = nullptr;
     lwork = 0;
-    m = 0;
-    n = 0;
-    algo = Algorithm::GELSD;
+  } else {
+    throw std::invalid_argument("Invalid algorithm specified in Workspace::allocate().");
+  }
 }
 
-bool OLS::Workspace::is_sufficient(int m_, int n_, Algorithm algorithm) const
-{
-    // Check for valid algorithm
-    if (algorithm != Algorithm::GELSD && algorithm != Algorithm::GELS) {
-        throw std::invalid_argument("Invalid algorithm specified in Workspace::is_sufficient().");
-    }
+// release method
+void OLS::Workspace::release() {
+  delete[] s;
+  delete[] iwork;
+  delete[] work;
+  delete[] U;
+  delete[] S;
+  delete[] VT;
+  delete[] AtA;
+  delete[] Atb;
 
-    // Check if current workspace dimensions and algorithm are sufficient
-    if (algo != algorithm || m < m_ || n < n_) {
-        return false;
-    }
+  s = nullptr;
+  iwork = nullptr;
+  work = nullptr;
+  U = nullptr;
+  S = nullptr;
+  VT = nullptr;
+  AtA = nullptr;
+  Atb = nullptr;
 
-    int maxmn = std::max(m_, n_);
-
-    if (algorithm == Algorithm::GELSD) {
-        // Check if s is allocated
-        if (!s) return false;
-
-        // For work size, check if lwork is sufficient
-        // We can perform a workspace query to find the required lwork
-        double wkopt;
-        int lwork_query = -1;
-        int nrhs = 1;
-        int lda = m_;
-        int ldb = maxmn;
-
-        // Allocate minimal dummy arrays for A and B
-        double* adummy = reinterpret_cast<double*>(malloc(m_ * n_ * sizeof(double)));
-        double* bdummy = reinterpret_cast<double*>(malloc(ldb * nrhs * sizeof(double)));
-        if (!adummy || !bdummy) {
-            if (adummy) ::free(adummy);
-            if (bdummy) ::free(bdummy);
-            throw std::bad_alloc();
-        }
-        int rank;
-        int info;
-
-        // Query optimal lwork
-        double rcond_query = -1;  // Use default rcond
-        ::dgelsd_(&m_, &n_, &nrhs, adummy, &lda, bdummy, &ldb, s, &rcond_query, &rank,
-                &wkopt, &lwork_query, iwork, &info);
-
-        // Free dummy arrays
-        ::free(adummy);
-        ::free(bdummy);
-
-        if (info != 0) {
-            throw std::runtime_error("Error in workspace sufficiency check: info = " + std::to_string(info));
-        }
-
-        int required_lwork = static_cast<int>(wkopt);
-
-        if (lwork < required_lwork) {
-            return false;
-        }
-
-    } else { // Algorithm::GELS
-        // For DGELS
-        // Query optimal lwork
-        double wkopt;
-        int lwork_query = -1;
-        int nrhs = 1;
-        int lda = m_;
-        int ldb = maxmn;
-        int info;
-        char trans = 'N';
-
-        // Allocate minimal dummy arrays for A and B
-        double* adummy = reinterpret_cast<double*>(malloc(m_ * n_ * sizeof(double)));
-        double* bdummy = reinterpret_cast<double*>(malloc(ldb * nrhs * sizeof(double)));
-        if (!adummy || !bdummy) {
-            if (adummy) ::free(adummy);
-            if (bdummy) ::free(bdummy);
-            throw std::bad_alloc();
-        }
-
-        ::dgels_(&trans, &m_, &n_, &nrhs, adummy, &lda, bdummy, &ldb, &wkopt, &lwork_query, &info);
-
-        // Free dummy arrays
-        ::free(adummy);
-        ::free(bdummy);
-
-        if (info != 0) {
-            throw std::runtime_error("Error in workspace sufficiency check: info = " + std::to_string(info));
-        }
-
-        int required_lwork = static_cast<int>(wkopt);
-        if (lwork < required_lwork) {
-            return false;
-        }
-    }
-
-    // All checks passed
-    return true;
+  lwork = -1;
+  m = 0;
+  n = 0;
+  algo = Algorithm::GELSD;
 }
+
+// is_sufficient method
+bool OLS::Workspace::is_sufficient(int m_, int n_, Algorithm algorithm) const {
+  if (m != m_ || n != n_ || algo != algorithm) {
+    return false;
+  }
+  // Additional checks can be added here if necessary
+  return true;
+}
+

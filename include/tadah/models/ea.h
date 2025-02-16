@@ -51,10 +51,11 @@ class EA {
       double *t = new double[svd.shapeA().first];
       double *x = new double[svd.shapeA().second];
       t_type m_n((size_t)svd.sizeS());
+    double rcond = config.size("OALGO")==2 ? config.get<double>("OALGO",1) : 1e-8;
       while (test1>EPS2 || test2>EPS2) {
 
         // regularised least square problem (Tikhonov Regularization):
-        RidgeRegression::solve(svd,T,m_n,lambda);
+        RidgeRegression::solve(svd,T,m_n,lambda,rcond);
 
         double gamma = 0.0;
         for (size_t j=0; j<svd.sizeS(); j++) {

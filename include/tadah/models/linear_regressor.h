@@ -1,6 +1,8 @@
 #ifndef LINEAR_REGRESSOR_H
 #define LINEAR_REGRESSOR_H
 
+#include <cstddef>
+#include <limits>
 #include <tadah/core/config.h>
 #include <tadah/core/core_types.h>
 #include <tadah/models/ea.h>
@@ -29,42 +31,73 @@ class LinearRegressor {
    * @param weights Vector to store the resultant weights.
    * @param Sigma Matrix to store the covariance matrix.
    */
-  public:
-    static void train(Config &config, phi_type &Phi, t_type &T,
-                      t_type &weights, Matrix &Sigma) {
+public:
+  static void train(Config &config, phi_type &Phi, t_type &T,
+                    t_type &weights, Matrix &Sigma) {
 
-      int verbose = config.get<int>("VERBOSE");
-      double lambda = config.get<double>("LAMBDA");
-      double rcond = config.size("LAMBDA")==2 ? config.get<double>("LAMBDA",1) : 1e-8;
+    int verbose = config.get<int>("VERBOSE");
+    double lambda = config.get<double>("LAMBDA",0);
+    int oalgo =  config.get<int>("OALGO",0);
+    double rcond = config.size("OALGO")==2 ? config.get<double>("OALGO",1) : 1e-8;
     weights.resize(Phi.cols());
 
-      if (lambda == 0) {
-        OLS::solve(Phi, T, weights, rcond, OLS::Algorithm::GELSD);
-      } else {
-        double alpha = config.get<double>("ALPHA");
-        double beta = config.get<double>("BETA");
-
-        SVD svd(Phi);
-
-        if (lambda < 0) {
-          EA ea(config, svd, T);
-          ea.run(alpha, beta);
-          lambda = alpha / beta;
-          config.remove("ALPHA");
-          config.remove("BETA");
-          config.add("ALPHA", alpha);
-          config.add("BETA", beta);
-        }
-
-        Sigma = get_sigma(svd, lambda);
-        config_add_sigma(config, Sigma);
-
-        if (verbose) std::cout << std::endl << "REG LAMBDA: " << lambda << std::endl;
-        RidgeRegression::solve(svd, T, weights, lambda);
-      }
+    if (std::abs(lambda+1) < std::numeric_limits<double>::min() && oalgo != 3) {
+      throw std::runtime_error("LAMBDA -1 requires OALGO 3");
     }
 
-    /** 
+    if (oalgo==1) {
+      size_t j=0;
+      if (lambda>0) {
+        for (size_t i=Phi.rows()-Phi.cols(); i<Phi.rows();++i) {
+          Phi(i,j++) = std::sqrt(lambda);
+        }
+      }
+      OLS::solve(Phi, T, weights, rcond, OLS::Algorithm::GELSD);
+    }
+    else if (oalgo==2) {
+      size_t j=0;
+      if (lambda>0) {
+        for (size_t i=Phi.rows()-Phi.cols(); i<Phi.rows();++i) {
+          Phi(i,j++) = std::sqrt(lambda);
+        }
+      }
+      OLS::solve(Phi, T, weights, rcond, OLS::Algorithm::GELS);
+    }
+    else if (oalgo==3) {
+      SVD svd = SVD(Phi);;
+      //OLS::Workspace ws;
+      if (lambda < 0) {
+        double alpha = config.get<double>("ALPHA");
+        double beta = config.get<double>("BETA");
+        EA ea(config, svd, T);
+        ea.run(alpha, beta);
+        lambda = alpha / beta;
+        config.remove("ALPHA");
+        config.remove("BETA");
+        config.add("ALPHA", alpha);
+        config.add("BETA", beta);
+      }
+
+      //ws.U = svd.getU();
+      //ws.S = svd.getS();
+      //ws.VT = svd.getVT();
+
+      Sigma = get_sigma(svd, lambda);
+      //std::cout << "Sigma: " << Sigma << std::endl;
+      config_add_sigma(config, Sigma);
+
+      if (verbose) std::cout << std::endl << "REG LAMBDA: " << lambda << std::endl;
+      //OLS::solve_with_workspace(Phi, T, weights, ws, rcond, OLS::Algorithm::SVD);
+      RidgeRegression::solve(svd, T, weights, lambda, rcond);
+      //Sigma = get_sigma(svd, lambda);
+      //std::cout << "Sigma: " << Sigma << std::endl;
+    }
+    else {
+      throw std::runtime_error("Unsupported OALGO: " + std::to_string(oalgo));
+    }
+  }
+
+  /** 
      * @brief Compute and return the covariance matrix.
      * 
      * Uses the SVD to calculate the covariance matrix with regularization.
@@ -73,27 +106,27 @@ class LinearRegressor {
      * @param lambda Regularization parameter.
      * @return Covariance matrix.
      */
-    static Matrix get_sigma(SVD &svd, double lambda) {
-      double *VT = svd.getVT();
-      double *S = svd.getS();
-      int n = static_cast<int>(svd.shapeVT().first);
+  static Matrix get_sigma(SVD &svd, double lambda) {
+    double *VT = svd.getVT();
+    double *S = svd.getS();
+    int n = static_cast<int>(svd.shapeVT().first);
 
-      Matrix Sigma((size_t)n, (size_t)n);
-      Sigma.set_zero();
-      double *sigma = &Sigma.data()[0];
+    Matrix Sigma((size_t)n, (size_t)n);
+    Sigma.set_zero();
+    double *sigma = &Sigma.data()[0];
 
-      for (int i = 0; i < n; ++i) {
-        double ridge = 1.0 / (S[i] * S[i] + lambda);
-        for (int j = 0; j < n; ++j) {
-          for (int k = 0; k < n; ++k) {
-            sigma[j + k * n] += VT[j + i * n] * ridge * VT[k + i * n]; // Column-major
-          }
+    for (int i = 0; i < n; ++i) {
+      double ridge = 1.0 / (S[i] * S[i] + lambda);
+      for (int j = 0; j < n; ++j) {
+        for (int k = 0; k < n; ++k) {
+          sigma[j + k * n] += VT[j + i * n] * ridge * VT[k + i * n]; // Column-major
         }
       }
-      return Sigma;
     }
+    return Sigma;
+  }
 
-    /**
+  /**
      * @brief Add the covariance matrix to the configuration.
      * 
      * Converts the Sigma matrix to a vector and stores it in the configuration.
@@ -101,13 +134,13 @@ class LinearRegressor {
      * @param config Configuration object.
      * @param Sigma Covariance matrix to be added.
      */
-    static void config_add_sigma(Config &config, Matrix &Sigma) {
-      t_type Sigma_as_vector(Sigma.data(), Sigma.cols() * Sigma.rows());
-      config.add("SIGMA", Sigma.rows());
-      config.add<t_type>("SIGMA", Sigma_as_vector);
-    }
+  static void config_add_sigma(Config &config, Matrix &Sigma) {
+    t_type Sigma_as_vector(Sigma.data(), Sigma.cols() * Sigma.rows());
+    config.add("SIGMA", Sigma.rows());
+    config.add<t_type>("SIGMA", Sigma_as_vector);
+  }
 
-    /**
+  /**
      * @brief Read and reconstruct the covariance matrix from the configuration.
      * 
      * Retrieves the Sigma matrix stored in the configuration.
@@ -116,22 +149,22 @@ class LinearRegressor {
      * @param Sigma Matrix to store the reconstructed Sigma.
      * @throws std::runtime_error if Sigma is not computed.
      */
-    static void read_sigma(Config &config, Matrix &Sigma) {
-      using V = std::vector<double>;
-      size_t N;
-      try {
-        N = config.get<size_t>("SIGMA");
-      } catch (const std::runtime_error& error) {
-        throw std::runtime_error("\nSigma matrix is not computed.\nHint: It is only computed for LAMBDA != 0.\n");
-      }
-
-      V Sigma_as_vector(N * N + 1);
-      config.get<V>("SIGMA", Sigma_as_vector);
-      Sigma_as_vector.erase(Sigma_as_vector.begin());
-      Sigma.resize(N, N);
-      for (size_t c = 0; c < N; ++c)
-        for (size_t r = 0; r < N; ++r)
-          Sigma(r, c) = Sigma_as_vector.at(N * c + r);
+  static void read_sigma(Config &config, Matrix &Sigma) {
+    using V = std::vector<double>;
+    size_t N;
+    try {
+      N = config.get<size_t>("SIGMA");
+    } catch (const std::runtime_error& error) {
+      throw std::runtime_error("\nSigma matrix is not computed.\nHint: It is only computed for LAMBDA != 0.\n");
     }
+
+    V Sigma_as_vector(N * N + 1);
+    config.get<V>("SIGMA", Sigma_as_vector);
+    Sigma_as_vector.erase(Sigma_as_vector.begin());
+    Sigma.resize(N, N);
+    for (size_t c = 0; c < N; ++c)
+      for (size_t r = 0; r < N; ++r)
+        Sigma(r, c) = Sigma_as_vector.at(N * c + r);
+  }
 };
 #endif

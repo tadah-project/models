@@ -5,6 +5,7 @@
 #include <tadah/core/maths.h>
 #include <tadah/core/lapack.h>
 #include <tadah/models/svd.h>
+#include <algorithm> // For std::max_element
 
 /**
  * @class RidgeRegression
@@ -16,25 +17,45 @@
 class RidgeRegression {
   public:
     /**
-     * @brief Inverts and multiplies sigma values by lambda for regularization.
+     * @brief Inverts and multiplies sigma values by lambda for regularization,
+     *        considering the rcond threshold.
      *
      * Performs an element-wise operation on the sigma values to handle regularization.
+     * Singular values below the threshold are discarded (set to zero).
      *
      * @tparam V Vector type for sigma and result.
      * @param sigma Input vector of sigma values.
      * @param result Output vector for inverted and multiplied results.
      * @param n Size of the vectors.
      * @param lambda Regularization parameter.
+     * @param rcond Reciprocal of the condition number; threshold for singular values.
      */
     template <typename V>
-    static void invertMultiplySigmaLambda(const V& sigma, V& result, int n, double lambda) {
+    static void invertMultiplySigmaLambdaRcond(const V& sigma, V& result, int n, double lambda, double rcond) {
+      // Find the maximum singular value
+      double smax = 0.0;
       for (int i = 0; i < n; ++i) {
-        result[i] = sigma[i] != 0.0 ? sigma[i] / (sigma[i] * sigma[i] + lambda) : 0.0;
+        if (sigma[i] > smax) {
+          smax = sigma[i];
+        }
+      }
+
+      // Threshold for singular values
+      double thresh = rcond > 0.0 ? rcond * smax : 0.0;
+
+      for (int i = 0; i < n; ++i) {
+        if (sigma[i] > thresh) {
+          result[i] = sigma[i] / (sigma[i] * sigma[i] + lambda);
+        } else {
+          // Singular value is too small; set result to zero
+          result[i] = 0.0;
+        }
       }
     }
 
     /**
-     * @brief Solves the ridge regression problem using SVD components.
+     * @brief Solves the ridge regression problem using SVD components,
+     *        incorporating rcond for singular value thresholding.
      *
      * Computes the weights that minimize the regularized least squares error.
      *
@@ -44,38 +65,41 @@ class RidgeRegression {
      * @param b Vector of target values.
      * @param weights Output vector for computed weights.
      * @param lambda Regularization parameter.
+     * @param rcond Reciprocal of the condition number; threshold for singular values.
      */
     template <typename V, typename W>
-    static void solve(const SVD &svd, V b, W &weights, double lambda) {
-      double *U = svd.getU(); // Matrix U from SVD (m x m)
-      double *s = svd.getS(); // Singular values (as a vector)
-      double *VT = svd.getVT(); // Matrix V^T from SVD (n x n)
-
-      // Dynamic memory allocation for intermediate calculations
-      double *d = new double[svd.sizeS()];
+    static void solve(const SVD &svd, V b, W &weights, double lambda, double rcond) {
+      double *U = svd.getU();    // Matrix U from SVD (m x n)
+      double *s = svd.getS();    // Singular values (as a vector)
+      double *VT = svd.getVT();  // Matrix V^T from SVD (n x n)
 
       int m = svd.shapeA().first;
       int n = svd.shapeA().second;
 
-      double alpha_ = 1.0;  // Scalar used in calculations
-      double beta_ = 0.0;   // Scalar used in calculations
+      // Allocate memory for intermediate calculations
+      double *d = new double[n];   // For inverted singular values
+      double *UTb = new double[n]; // For U^T * b
 
       // Step 1: Compute U^T * b
       char trans = 'T';
-      double *UTb = new double[n];
+      double alpha_ = 1.0;  // Scalar for multiplication
+      double beta_ = 0.0;   // Scalar for addition
       int incx = 1;
-      dgemv_(&trans, &m, &n, &alpha_, U, &m, b.ptr(), &incx, &beta_, UTb, &incx);
+      int incy = 1;
+      dgemv_(&trans, &m, &n, &alpha_, U, &m, b.ptr(), &incx, &beta_, UTb, &incy);
 
-      // Step 2: Element-wise multiply and invert sigma in result
-      invertMultiplySigmaLambda(s, d, n, lambda);
+      // Step 2: Invert and multiply sigma values, applying rcond threshold
+      invertMultiplySigmaLambdaRcond(s, d, n, lambda, rcond);
+
+      // Element-wise multiplication: d[i] = d[i] * (U^T * b)[i]
       for (int i = 0; i < n; ++i) {
         d[i] *= UTb[i];
       }
 
-      // Step 3: Compute V * (D * (U^T * b))
-      trans = 'T';
+      // Step 3: Compute weights = V * d
+      trans = 'T'; // Since VT is V^T, transposing VT gives V
       weights.resize(n);
-      dgemv_(&trans, &n, &n, &alpha_, VT, &n, d, &incx, &beta_, weights.ptr(), &incx);
+      dgemv_(&trans, &n, &n, &alpha_, VT, &n, d, &incx, &beta_, weights.ptr(), &incy);
 
       // Cleanup dynamic memory
       delete[] d;

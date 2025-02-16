@@ -107,12 +107,23 @@ class SVD {
       dgesdd_(&jobz, &m, &n, a, &lda, s, u, &ldu, vt, &ldvt,
           work, &lwork, iwork, &info);
 
-      // Filter out very small singular values
-      for (size_t i = 0; i < sizeS(); ++i) {
-        if (s[i] < std::numeric_limits<double>::min()) {
-          s[i] = 0.0;
-        }
-      }
+    //   // Find the maximum singular value
+    //   double smax = 0.0;
+    //   for (int i = 0; i < n; ++i) {
+    //     if (s[i] > smax) {
+    //       smax = s[i];
+    //     }
+    //   }
+    //
+    //   // Threshold for singular values
+    //   double thresh = rcond > 0.0 ? rcond * smax : 0.0;
+    //
+    // for (int i = 0; i < n; ++i) {
+    //   if (s[i] < thresh) {
+    //     // Singular value is too small; set result to zero
+    //     s[i] = 0.0;
+    //   }
+    // }
     }
 
     /**
