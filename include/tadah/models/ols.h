@@ -73,6 +73,12 @@ public:
     double* U;    // U matrix from SVD (m x n)
     double* S;    // Singular values array (size min(m,n))
     double* VT;   // V^T matrix from SVD (n x n)
+    int* iwork_svd; // Integer workspace array for SVD
+
+    // Ownership flags for U, S, VT
+    bool owns_U;
+    bool owns_S;
+    bool owns_VT;
 
     // For Cholesky algorithm
     double* AtA;  // A^T * A matrix (n x n)
@@ -179,14 +185,75 @@ void OLS::solve_with_workspace(M& A, V& B, V& weights, Workspace& ws, double rco
       weights[i] = b[i];
     }
   } else if (algorithm == Algorithm::SVD) {
+
     // Custom SVD-based solution
-    // Implementation can be provided or left as an exercise
-    //throw std::runtime_error("SVD algorithm is not implemented in this version.");
-    // Allocate memory for intermediate calculations
+    int min_mn = std::min(m, n);
+
+    // Check if U, S, VT are provided
+    bool have_svd_matrices = (ws.U != nullptr) && (ws.S != nullptr) && (ws.VT != nullptr);
+
+    if (!have_svd_matrices) {
+      // Perform SVD
+
+      // Ensure workspace is allocated
+      if (!ws.is_sufficient(m, n, algorithm)) {
+        ws.allocate(m, n, algorithm);
+      }
+
+      char jobz = 'S'; // Compute the first min(m,n) singular values and vectors
+      int lda = m;
+      int ldu = m;
+      int ldvt = min_mn;
+
+      // Now perform SVD
+      ::dgesdd_(&jobz, &m, &n, A.ptr(), &lda, ws.S, ws.U, &ldu, ws.VT, &ldvt, ws.work, &ws.lwork, ws.iwork_svd, &info);
 
 
+      if (info != 0) {
+        throw std::runtime_error("Error in DGESDD: info = " + std::to_string(info));
+      }
+    }
+
+    // Now compute x = V * S⁻¹ * Uᵗ * b
+
+    // Compute Uᵗ * b
+    std::vector<double> U_t_b(min_mn, 0.0);
+    char trans = 'T'; // Transpose U
+    double alpha = 1.0;
+    double beta = 0.0;
+    int incx = 1;
+    int incy = 1;
+    int m_u = m;
+    int n_u = min_mn;
+    ::dgemv_(&trans, &m_u, &n_u, &alpha, ws.U, &m_u, B.ptr(), &incx, &beta, U_t_b.data(), &incy);
+
+    // Find the maximum singular value
+    double smax = 0.0;
+    for (int i = 0; i < min_mn; ++i) {
+      if (ws.S[i] > smax) {
+        smax = ws.S[i];
+      }
+    }
+
+    // Threshold for singular values
+    double thresh = rcond > 0.0 ? rcond * smax : 0.0;
+
+    for (int i = 0; i < min_mn; ++i) {
+      if (ws.S[i] > thresh) {
+        U_t_b[i] /= ws.S[i];
+        //U_t_b[i] /= ws.S[i] / (ws.S[i] * ws.S[i] + ws.lambda);
+      } else {
+        // Singular value is too small; set result to zero
+        U_t_b[i] = 0.0;
+      }
+    }
 
 
+    // Compute x = V * (Uᵗ * b / S)
+    trans = 'T'; // Transpose VT to get V
+    int m_vt = min_mn;
+    int n_vt = n;
+    ::dgemv_(&trans, &m_vt, &n_vt, &alpha, ws.VT, &m_vt, U_t_b.data(), &incx, &beta, weights.ptr(), &incy);
 
 
   } else if (algorithm == Algorithm::Cholesky) {

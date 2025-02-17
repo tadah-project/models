@@ -9,8 +9,10 @@
 // Constructor
 OLS::Workspace::Workspace()
   : work(nullptr), lwork(-1), m(0), n(0), algo(Algorithm::GELSD),
-  s(nullptr), iwork(nullptr), U(nullptr), S(nullptr), VT(nullptr),
-  AtA(nullptr), Atb(nullptr) {
+    s(nullptr), iwork(nullptr),
+    U(nullptr), S(nullptr), VT(nullptr), iwork_svd(nullptr),
+    owns_U(false), owns_S(false), owns_VT(false),
+    AtA(nullptr), Atb(nullptr) {
 }
 
 // Destructor
@@ -63,47 +65,37 @@ void OLS::Workspace::allocate(int m_, int n_, Algorithm algorithm) {
     lwork = static_cast<int>(work_query);
     work = new double[lwork];
   } else if (algorithm == Algorithm::SVD) {
-    // Allocate workspace for custom SVD implementation using DGESDD
-    int minmn = std::min(m, n);
-    int maxmn = std::max(m, n);
 
-    // Set jobz parameter to compute singular vectors
-    char jobz = 'S'; // Compute the first min(m,n) singular vectors
+    // Allocate U, S, VT, and iwork_svd
+    int min_mn = std::min(m, n);
 
-    // Leading dimensions
-    int lda = m;      // Leading dimension of A
-    int ldu = m;      // Leading dimension of U
-    int ldvt = minmn; // Leading dimension of VT
+    U = new double[m * min_mn];      // U is m x min(m,n)
+    S = new double[min_mn];          // Singular values
+    VT = new double[min_mn * n];     // VT is min(m,n) x n
+    iwork_svd = new int[8 * min_mn]; // Workspace for dgesdd_
 
-    // Allocate arrays for U, S, and VT
-    U = new double[ldu * minmn];       // U is m x min(m,n)
-    S = new double[minmn];             // Singular values vector
-    VT = new double[ldvt * n];         // VT is min(m,n) x n
+    owns_U = true;
+    owns_S = true;
+    owns_VT = true;
 
-    // Allocate integer workspace for DGESDD
-    int* iwork = new int[8 * minmn];
-
-    // Workspace query for DGESDD
-    double work_query;
-    int lwork = -1;
-    int info;
-
-    // Create a dummy A matrix for the workspace query
+    // Query for optimal workspace size
+    char jobz = 'S';
+    int lda = m;
+    int ldu = m;
+    int ldvt = min_mn;
+    lwork = -1;
+    double wkopt;
+    int info_query;
     double* a_dummy = nullptr;
+    ::dgesdd_(&jobz, &m, &n, a_dummy, &lda, S, U, &ldu, VT, &ldvt, &wkopt, &lwork, iwork_svd, &info_query);
 
-    // Perform the workspace query
-    ::dgesdd_(&jobz, &m, &n, a_dummy, &lda, S, U, &ldu, VT, &ldvt,
-              &work_query, &lwork, iwork, &info);
-
-    // Check for errors
-    if (info != 0) {
-      delete[] iwork;
-      throw std::runtime_error("Error in DGESDD workspace query: INFO = " + std::to_string(info));
+    if (info_query != 0) {
+      throw std::runtime_error("Error in DGESDD (workspace query): info = " + std::to_string(info_query));
     }
 
-    // Allocate the optimal workspace
-    lwork = static_cast<int>(work_query);
+    lwork = static_cast<int>(wkopt);
     work = new double[lwork];
+
 
   } else if (algorithm == Algorithm::Cholesky) {
     // Allocate space for AtA (n x n) and Atb (n)
@@ -120,21 +112,32 @@ void OLS::Workspace::allocate(int m_, int n_, Algorithm algorithm) {
 
 // release method
 void OLS::Workspace::release() {
+  if (owns_U) {
+    delete[] U;
+    U = nullptr;
+    owns_U = false;
+  }
+  if (owns_S) {
+    delete[] S;
+    S = nullptr;
+    owns_S = false;
+  }
+  if (owns_VT) {
+    delete[] VT;
+    VT = nullptr;
+    owns_VT = false;
+  }
   delete[] s;
   delete[] iwork;
+  delete[] iwork_svd;
   delete[] work;
-  delete[] U;
-  delete[] S;
-  delete[] VT;
   delete[] AtA;
   delete[] Atb;
 
   s = nullptr;
   iwork = nullptr;
+  iwork_svd = nullptr;
   work = nullptr;
-  U = nullptr;
-  S = nullptr;
-  VT = nullptr;
   AtA = nullptr;
   Atb = nullptr;
 
@@ -152,4 +155,3 @@ bool OLS::Workspace::is_sufficient(int m_, int n_, Algorithm algorithm) const {
   // Additional checks can be added here if necessary
   return true;
 }
-
