@@ -65,7 +65,6 @@ public:
     }
     else if (oalgo==3) {
       SVD svd = SVD(Phi);;
-      // OLS::Workspace ws;
       if (lambda < 0) {
         double alpha = config.get<double>("ALPHA");
         double beta = config.get<double>("BETA");
@@ -78,22 +77,11 @@ public:
         config.add("BETA", beta);
       }
 
-
       Sigma = get_sigma(svd, lambda);
-      //std::cout << "Sigma: " << Sigma << std::endl;
       config_add_sigma(config, Sigma);
 
       if (verbose) std::cout << std::endl << "REG LAMBDA: " << lambda << std::endl;
-      // ws.U = svd.getU();
-      // ws.S = svd.getS();
-      // ws.VT = svd.getVT();
-
-      // std::cout << "own_U: " << ws.owns_U << std::endl;
-      //OLS::solve_with_workspace(Phi, T, weights, ws, rcond, OLS::Algorithm::SVD);
-      // OLS::solve(Phi, T, weights, rcond, OLS::Algorithm::SVD);
-      RidgeRegression::solve(svd, T, weights, lambda, rcond);
-      //Sigma = get_sigma(svd, lambda);
-      //std::cout << "Sigma: " << Sigma << std::endl;
+      OLS::solve_with_svd(Phi.rows(), Phi.cols(), T, weights, svd, rcond, lambda);
     }
     else {
       throw std::runtime_error("Unsupported OALGO: " + std::to_string(oalgo));

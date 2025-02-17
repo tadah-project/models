@@ -4,6 +4,7 @@
 #include <tadah/core/config.h>
 #include <tadah/models/svd.h>
 #include <tadah/models/ridge_regression.h>
+#include <tadah/models/ols.h>
 #include <tadah/core/core_types.h>
 #include <tadah/core/lapack.h>
 
@@ -11,10 +12,10 @@ class EA {
   private:
     const Config &config;
     const SVD &svd;
-    const t_type &T;
+    t_type &T;
     int verbose;
   public:
-    EA(const Config &c, const SVD &svd, const t_type &T):
+    EA(const Config &c, const SVD &svd, t_type &T):
       config(c),
       svd(svd),
       T(T),
@@ -51,11 +52,16 @@ class EA {
       double *t = new double[svd.shapeA().first];
       double *x = new double[svd.shapeA().second];
       t_type m_n((size_t)svd.sizeS());
+      OLS::Workspace ws;
+      auto shapeA = svd.shapeA();
+      int m = shapeA.first;
+      int n = shapeA.second;
     double rcond = config.size("OALGO")==2 ? config.get<double>("OALGO",1) : 1e-8;
       while (test1>EPS2 || test2>EPS2) {
 
         // regularised least square problem (Tikhonov Regularization):
-        RidgeRegression::solve(svd,T,m_n,lambda,rcond);
+        /*RidgeRegression::solve(svd,T,m_n,lambda,rcond);*/
+        OLS::solve_with_svd_with_workspace(m, n, T, m_n, svd, ws, rcond, lambda);
 
         double gamma = 0.0;
         for (size_t j=0; j<svd.sizeS(); j++) {
