@@ -45,22 +45,18 @@ public:
       throw std::runtime_error("LAMBDA -1 requires OALGO 3");
     }
 
-    if (oalgo==1) {
+    if (lambda > 0 && (oalgo==1 || oalgo==2)) {
+      // Augment the design matrix with the regularization term
       size_t j=0;
-      if (lambda>0) {
-        for (size_t i=Phi.rows()-Phi.cols(); i<Phi.rows();++i) {
-          Phi(i,j++) = std::sqrt(lambda);
-        }
+      for (size_t i=Phi.rows()-Phi.cols(); i<Phi.rows();++i) {
+        Phi(i,j++) = std::sqrt(lambda);
       }
+    }
+
+    if (oalgo==1) {
       OLS::solve(Phi, T, weights, rcond, OLS::Algorithm::GELSD);
     }
     else if (oalgo==2) {
-      size_t j=0;
-      if (lambda>0) {
-        for (size_t i=Phi.rows()-Phi.cols(); i<Phi.rows();++i) {
-          Phi(i,j++) = std::sqrt(lambda);
-        }
-      }
       OLS::solve(Phi, T, weights, rcond, OLS::Algorithm::GELS);
     }
     else if (oalgo==3) {
@@ -82,6 +78,9 @@ public:
 
       if (verbose) std::cout << std::endl << "REG LAMBDA: " << lambda << std::endl;
       OLS::solve_with_svd(Phi.rows(), Phi.cols(), T, weights, svd, rcond, lambda);
+    }
+    else if (oalgo==4) {
+      OLS::solve(Phi, T, weights, rcond, OLS::Algorithm::Cholesky);
     }
     else {
       throw std::runtime_error("Unsupported OALGO: " + std::to_string(oalgo));

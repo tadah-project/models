@@ -18,8 +18,8 @@ TEST_CASE("Testing OLS") {
 
   // Prepare test data with corrected matrix initialization
   Matrix A(3, 3, {1, 4, 7,   // First column
-    2, 5, 8,   // Second column
-    3, 6, 10}); // Third column
+                  2, 5, 8,   // Second column
+                  3, 6, 10}); // Third column
 
   Vector expected_weights = {1, 2, 3};
 
@@ -32,7 +32,51 @@ TEST_CASE("Testing OLS") {
     vectors_are_close(weights, expected_weights, 1e-4);
   }
 
-  // Other sections remain unchanged...
+  SECTION("Solve using GELS algorithm without workspace") {
+    Vector weights(3);
+    OLS::solve(A, B, weights, -1.0, OLS::Algorithm::GELS);
+    vectors_are_close(weights, expected_weights, 1e-4);
+  }
+
+  SECTION("Solve using Cholesky algorithm without workspace") {
+    Vector weights(3);
+    OLS::solve(A, B, weights, -1.0, OLS::Algorithm::Cholesky);
+    vectors_are_close(weights, expected_weights, 1e-4);
+  }
+
+  SECTION("Solve using custom SVD implementation without workspace") {
+    Vector weights(3);
+    OLS::solve(A, B, weights, -1.0, OLS::Algorithm::SVD);
+    vectors_are_close(weights, expected_weights, 1e-4);
+  }
+
+  SECTION("Solve using default algorithm (GELSD) with workspace") {
+    Vector weights(3);
+    OLS::Workspace ws;
+    OLS::solve_with_workspace(A, B, weights, ws);
+    vectors_are_close(weights, expected_weights, 1e-4);
+  }
+
+  SECTION("Solve using GELS algorithm with workspace") {
+    Vector weights(3);
+    OLS::Workspace ws;
+    OLS::solve_with_workspace(A, B, weights, ws, -1.0, OLS::Algorithm::GELS);
+    vectors_are_close(weights, expected_weights, 1e-4);
+  }
+
+  SECTION("Solve using Cholesky algorithm with workspace") {
+    Vector weights(3);
+    OLS::Workspace ws;
+    OLS::solve_with_workspace(A, B, weights, ws, -1.0, OLS::Algorithm::Cholesky);
+    vectors_are_close(weights, expected_weights, 1e-4);
+  }
+
+  SECTION("Solve using custom SVD implementation with workspace") {
+    Vector weights(3);
+    OLS::Workspace ws;
+    OLS::solve_with_workspace(A, B, weights, ws, -1.0, OLS::Algorithm::SVD);
+    vectors_are_close(weights, expected_weights, 1e-4);
+  }
 
   SECTION("Test handling of rank-deficient matrix") {
     // Corrected initialization in column-major order
@@ -82,7 +126,7 @@ TEST_CASE("Testing OLS") {
 
     // Recompute B_over
     Vector B_over = A_over * expected_weights_over;
-    Vector B_over2 = B_over;;
+    Vector B_over2 = B_over;
 
     Vector weights(n);
 
@@ -121,10 +165,202 @@ TEST_CASE("Testing OLS") {
     Vector B_computed = A_under * weights;
 
     // Since B_under has been resized, compare only the first m elements
-    Vector B_under_trimmed = Vector(B_under.ptr(),m);
-    Vector B_computed_trimmed = Vector(B_computed.ptr(),m);
+    Vector B_under_trimmed = Vector(B_under.ptr(), m);
+    Vector B_computed_trimmed = Vector(B_computed.ptr(), m);
 
     vectors_are_close(B_computed_trimmed, B_under_trimmed, 1e-4);
+  }
+
+  SECTION("Test solve_with_svd without workspace") {
+    // Assuming SVDType is properly defined and we have access to an SVD implementation
+    // Replace 'SVDType' with your actual SVD class or struct
+
+    // For this test, we'll use the custom SVD algorithm on matrix A
+
+    // Placeholder SVDType and methods
+    struct SVDType {
+      double* getU() { return U.data(); }
+      double* getS() { return S.data(); }
+      double* getVT() { return VT.data(); }
+      std::vector<double> U;
+      std::vector<double> S;
+      std::vector<double> VT;
+    };
+
+    // Compute SVD of A
+    SVDType svd;
+    int m = A.rows();
+    int n = A.cols();
+    int min_mn = std::min(m, n);
+    svd.U.resize(m * min_mn);
+    svd.S.resize(min_mn);
+    svd.VT.resize(min_mn * n);
+
+    // Prepare parameters for LAPACK dgesdd_
+    char jobz = 'S';
+    int lda = m;
+    int ldu = m;
+    int ldvt = min_mn;
+    int info;
+    std::vector<double> A_copy(A.ptr(), A.ptr() + m * n);
+
+    // Workspace query
+    int lwork = -1;
+    double wkopt;
+    std::vector<int> iwork(8 * min_mn);
+    ::dgesdd_(&jobz, &m, &n, A_copy.data(), &lda, svd.S.data(), svd.U.data(), &ldu, svd.VT.data(), &ldvt, &wkopt, &lwork, iwork.data(), &info);
+
+    lwork = static_cast<int>(wkopt);
+    std::vector<double> work(lwork);
+
+    // Compute SVD
+    ::dgesdd_(&jobz, &m, &n, A_copy.data(), &lda, svd.S.data(), svd.U.data(), &ldu, svd.VT.data(), &ldvt, work.data(), &lwork, iwork.data(), &info);
+
+    REQUIRE(info == 0);
+
+    Vector weights(3);
+    OLS::solve_with_svd(m, n, B, weights, svd);
+
+    vectors_are_close(weights, expected_weights, 1e-4);
+  }
+
+  SECTION("Test solve_with_svd with workspace") {
+    // Similar to the previous section but using workspace
+    struct SVDType {
+      double* getU() { return U.data(); }
+      double* getS() { return S.data(); }
+      double* getVT() { return VT.data(); }
+      std::vector<double> U;
+      std::vector<double> S;
+      std::vector<double> VT;
+    };
+
+    // Compute SVD of A
+    SVDType svd;
+    int m = A.rows();
+    int n = A.cols();
+    int min_mn = std::min(m, n);
+    svd.U.resize(m * min_mn);
+    svd.S.resize(min_mn);
+    svd.VT.resize(min_mn * n);
+
+    // Prepare parameters for LAPACK dgesdd_
+    char jobz = 'S';
+    int lda = m;
+    int ldu = m;
+    int ldvt = min_mn;
+    int info;
+    std::vector<double> A_copy(A.ptr(), A.ptr() + m * n);
+
+    // Workspace query
+    int lwork = -1;
+    double wkopt;
+    std::vector<int> iwork(8 * min_mn);
+    ::dgesdd_(&jobz, &m, &n, A_copy.data(), &lda, svd.S.data(), svd.U.data(), &ldu, svd.VT.data(), &ldvt, &wkopt, &lwork, iwork.data(), &info);
+
+    lwork = static_cast<int>(wkopt);
+    std::vector<double> work(lwork);
+
+    // Compute SVD
+    ::dgesdd_(&jobz, &m, &n, A_copy.data(), &lda, svd.S.data(), svd.U.data(), &ldu, svd.VT.data(), &ldvt, work.data(), &lwork, iwork.data(), &info);
+
+    REQUIRE(info == 0);
+
+    Vector weights(3);
+    OLS::Workspace ws;
+    double rcond = -1.0;
+    double lambda = 0.0;
+
+    OLS::solve_with_svd_with_workspace(m, n, B, weights, svd, ws, rcond, lambda);
+
+    vectors_are_close(weights, expected_weights, 1e-4);
+  }
+
+  SECTION("Test solve_with_svd with regularization (lambda)") {
+    // Using a non-zero lambda for regularization
+    struct SVDType {
+      double* getU() { return U.data(); }
+      double* getS() { return S.data(); }
+      double* getVT() { return VT.data(); }
+      std::vector<double> U;
+      std::vector<double> S;
+      std::vector<double> VT;
+    };
+
+    // Compute SVD of A
+    SVDType svd;
+    int m = A.rows();
+    int n = A.cols();
+    int min_mn = std::min(m, n);
+    svd.U.resize(m * min_mn);
+    svd.S.resize(min_mn);
+    svd.VT.resize(min_mn * n);
+
+    // Prepare parameters for LAPACK dgesdd_
+    char jobz = 'S';
+    int lda = m;
+    int ldu = m;
+    int ldvt = min_mn;
+    int info;
+    std::vector<double> A_copy(A.ptr(), A.ptr() + m * n);
+
+    // Workspace query
+    int lwork = -1;
+    double wkopt;
+    std::vector<int> iwork(8 * min_mn);
+    ::dgesdd_(&jobz, &m, &n, A_copy.data(), &lda, svd.S.data(), svd.U.data(), &ldu, svd.VT.data(), &ldvt, &wkopt, &lwork, iwork.data(), &info);
+
+    lwork = static_cast<int>(wkopt);
+    std::vector<double> work(lwork);
+
+    // Compute SVD
+    ::dgesdd_(&jobz, &m, &n, A_copy.data(), &lda, svd.S.data(), svd.U.data(), &ldu, svd.VT.data(), &ldvt, work.data(), &lwork, iwork.data(), &info);
+
+    REQUIRE(info == 0);
+
+    Vector weights(3);
+    double rcond = -1.0;
+    double lambda = 0.0005; // Regularization parameter
+
+    OLS::solve_with_svd(m, n, B, weights, svd, rcond, lambda);
+
+    // Since lambda introduces regularization, weights may not match exactly
+    // but for this test, we can still check that the solution is reasonable
+
+    Vector B_computed = A * weights;
+
+    // Compute residual norm
+    double residual_norm = 0.0;
+    for (int i = 0; i < m; ++i) {
+      residual_norm += std::pow(B[i] - B_computed[i], 2);
+    }
+    residual_norm = std::sqrt(residual_norm);
+
+    REQUIRE(residual_norm < 1e-3); // Adjust tolerance as needed
+  }
+
+  SECTION("Test solve with Cholesky algorithm on ill-conditioned matrix") {
+    // Create an ill-conditioned matrix
+    Matrix A_ill(3, 3, {1e-11, 0,   0,
+                        0,   1e-11, 0,
+                        0,    0,   1e-11});
+
+    Vector B_ill = {1e-11, 1e-11, 1e-11};
+    Vector weights(3);
+
+    // Solve using Cholesky algorithm
+    OLS::solve(A_ill, B_ill, weights, -1.0, OLS::Algorithm::Cholesky);
+    Vector B_computed = A_ill * weights;
+    vectors_are_close(B_ill, B_computed, 1e-11);
+  }
+
+  SECTION("Test solve with Cholesky algorithm on well-conditioned matrix") {
+    Matrix A_well = A; // Use the original well-conditioned matrix
+    Vector B_well = B;
+    Vector weights(3);
+
+    OLS::solve(A_well, B_well, weights, -1.0, OLS::Algorithm::Cholesky);
+    vectors_are_close(weights, expected_weights, 1e-4);
   }
 
   // Rest of the tests...

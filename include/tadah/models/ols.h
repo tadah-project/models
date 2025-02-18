@@ -20,7 +20,7 @@
  * - **GELSD (`DGELSD`):** Uses a singular value decomposition (SVD) approach, handling rank-deficient and ill-conditioned systems.
  * - **GELS (`DGELS`):** Uses QR or LQ factorization, fast but less robust for ill-conditioned systems.
  * - **SVD:** Custom implementation using SVD, allows for explicit control over singular values and regularization.
- * - **Cholesky:** Solves the normal equations using Cholesky decomposition, efficient but may be less stable for ill-conditioned systems.
+ * - **Cholesky:** Solves the normal equations \( A^\top A x = A^\top b \) using Cholesky decomposition. Efficient for well-conditioned systems; however, as it squares the condition number, it may be less stable for ill-conditioned systems.
  *
  * **Workspace Management:**
  * - The class provides a `Workspace` struct to manage memory allocations for the computations.
@@ -253,7 +253,8 @@ void OLS::solve_with_workspace(M& A, V& B, V& weights, Workspace& ws, double rco
         // Custom SVD-based solution
         int min_mn = std::min(m, n);
 
-        if (!ws.U || !ws.S || !ws.VT) {
+        //if (!ws.U || !ws.S || !ws.VT) {
+        if (ws.owns_U || ws.owns_S || ws.owns_VT) {
             // Perform SVD
 
             // Ensure workspace is allocated
@@ -273,9 +274,6 @@ void OLS::solve_with_workspace(M& A, V& B, V& weights, Workspace& ws, double rco
                 throw std::runtime_error("Error in DGESDD: info = " + std::to_string(info));
             }
 
-            ws.owns_U = true;
-            ws.owns_S = true;
-            ws.owns_VT = true;
         }
 
         if (ws.U_t_b == nullptr) {
@@ -318,109 +316,141 @@ void OLS::solve_with_workspace(M& A, V& B, V& weights, Workspace& ws, double rco
 
     } else if (algorithm == Algorithm::Cholesky) {
         // Cholesky-based solution
-        throw std::runtime_error("Cholesky algorithm is not implemented in this version.");
+
+        // Compute AtA = Aᵗ * A
+        char uplo = 'U'; // Use upper triangle
+        char trans = 'T'; // Transpose A
+        double alpha = 1.0;
+        double beta = 0.0;
+        int lda = m;
+        int ldc = n;
+        ::dsyrk_(&uplo, &trans, &n, &m, &alpha, A.ptr(), &lda, &beta, ws.AtA, &ldc);
+
+        // Compute Atb = Aᵗ * B
+        int incx = 1;
+        int incy = 1;
+        ::dgemv_(&trans, &m, &n, &alpha, A.ptr(), &lda, B.ptr(), &incx, &beta, ws.Atb, &incy);
+
+        // Perform Cholesky factorization of AtA
+        ::dpotrf_(&uplo, &n, ws.AtA, &ldc, &info);
+        if (info != 0) {
+            throw std::runtime_error("Error in DPOTRF: Matrix is not positive definite; info = " + std::to_string(info));
+        }
+
+        // Solve AtA * x = Atb
+        int nrhs = 1;
+        ::dpotrs_(&uplo, &n, &nrhs, ws.AtA, &ldc, ws.Atb, &n, &info);
+        if (info != 0) {
+            throw std::runtime_error("Error in DPOTRS: info = " + std::to_string(info));
+        }
+
+        // Copy solution to weights
+        for (int i = 0; i < n; ++i) {
+            weights[i] = ws.Atb[i];
+        }
+
+    } else {
+        throw std::runtime_error("Unknown algorithm.");
     }
 }
-
-// New methods: solve_with_svd
 
 // Overload without lambda, defaults to lambda = 0.0
 template <typename V1 ,typename V2, typename SVDType>
 void OLS::solve_with_svd(int m_, int n_, V1& B, V2& weights, SVDType& svd) {
-    double rcond = -1.0;
-    double lambda = 0.0;
-    Workspace ws;
-    solve_with_svd_with_workspace(m_, n_, B, weights, svd, ws, rcond, lambda);
+  double rcond = -1.0;
+  double lambda = 0.0;
+  Workspace ws;
+  solve_with_svd_with_workspace(m_, n_, B, weights, svd, ws, rcond, lambda);
 }
 
 // Overload with rcond and lambda
 template <typename V1 ,typename V2, typename SVDType>
 void OLS::solve_with_svd(int m_, int n_, V1& B, V2& weights, SVDType& svd, double rcond, double lambda) {
-    Workspace ws;
-    solve_with_svd_with_workspace(m_, n_, B, weights, svd, ws, rcond, lambda);
+  Workspace ws;
+  solve_with_svd_with_workspace(m_, n_, B, weights, svd, ws, rcond, lambda);
 }
 
 // Overload with workspace and default lambda = 0.0
 template <typename V1 ,typename V2, typename SVDType>
 void OLS::solve_with_svd_with_workspace(int m_, int n_, V1& B, V2& weights, SVDType& svd, Workspace& ws) {
-    double rcond = -1.0;
-    double lambda = 0.0;
-    solve_with_svd_with_workspace(m_, n_, B, weights, svd, ws, rcond, lambda);
+  double rcond = -1.0;
+  double lambda = 0.0;
+  solve_with_svd_with_workspace(m_, n_, B, weights, svd, ws, rcond, lambda);
 }
 
 // Main method with workspace, rcond, and lambda
 template <typename V1 ,typename V2, typename SVDType>
 void OLS::solve_with_svd_with_workspace(int m_, int n_, V1& B, V2& weights, SVDType& svd, Workspace& ws, double rcond, double lambda) {
-    int m = m_;
-    int n = n_;
+  int m = m_;
+  int n = n_;
 
-    int min_mn = std::min(m, n);
+  int min_mn = std::min(m, n);
 
-    // Check that dimensions of weights match expected size
-    if (weights.size() != static_cast<std::size_t>(n)) {
-        throw std::invalid_argument("weights size is incorrect.");
+  // Check that dimensions of weights match expected size
+  if (weights.size() != static_cast<std::size_t>(n)) {
+    throw std::invalid_argument("weights size is incorrect.");
+  }
+
+  // Check that B has sufficient size
+  int maxmn = std::max(m, n);
+  if (B.size() < static_cast<std::size_t>(maxmn)) {
+    throw std::invalid_argument("B size is insufficient.");
+  }
+
+  // Check if workspace is sufficient; if not, reallocate
+  if (!ws.is_sufficient(m, n, Algorithm::SVD)) {
+    ws.allocate(m, n, Algorithm::SVD);
+  }
+
+  // Copy precomputed SVD components into the workspace
+  ws.U = svd.getU();   // Assume getU() returns a pointer to U (m x min(m,n))
+  ws.S = svd.getS();   // Assume getS() returns a pointer to singular values (min(m,n))
+  ws.VT = svd.getVT(); // Assume getVT() returns a pointer to VT (min(m,n) x n)
+  ws.lambda = lambda;
+
+  // Indicate that we don't own the SVD component pointers
+  ws.owns_U = false;
+  ws.owns_S = false;
+  ws.owns_VT = false;
+
+  // Proceed with the computations
+  if (ws.U_t_b == nullptr) {
+    ws.U_t_b = new double[min_mn];
+  }
+
+  // Compute Uᵗ * B
+  char trans = 'T'; // Transpose U
+  double alpha = 1.0;
+  double beta = 0.0;
+  int incx = 1;
+  int incy = 1;
+  int lda = m;
+  ::dgemv_(&trans, &m, &min_mn, &alpha, ws.U, &lda, B.ptr(), &incx, &beta, ws.U_t_b, &incy);
+
+  // Find the maximum singular value
+  double smax = 0.0;
+  for (int i = 0; i < min_mn; ++i) {
+    if (ws.S[i] > smax) {
+      smax = ws.S[i];
     }
+  }
 
-    // Check that B has sufficient size
-    int maxmn = std::max(m, n);
-    if (B.size() < static_cast<std::size_t>(maxmn)) {
-        throw std::invalid_argument("B size is insufficient.");
+  // Threshold for singular values
+  double thresh = rcond > 0.0 ? rcond * smax : 0.0;
+
+  // Apply regularization using 'smax' approach and lambda
+  for (int i = 0; i < min_mn; ++i) {
+    if (ws.S[i] > thresh) {
+      ws.U_t_b[i] = ws.U_t_b[i] * ws.S[i] / (ws.S[i] * ws.S[i] + ws.lambda);
+    } else {
+      ws.U_t_b[i] = 0.0;
     }
+  }
 
-    // Check if workspace is sufficient; if not, reallocate
-    if (!ws.is_sufficient(m, n, Algorithm::SVD)) {
-        ws.allocate(m, n, Algorithm::SVD);
-    }
-
-    // Copy precomputed SVD components into the workspace
-    ws.U = svd.getU();   // Assume getU() returns a pointer to U (m x min(m,n))
-    ws.S = svd.getS();   // Assume getS() returns a pointer to singular values (min(m,n))
-    ws.VT = svd.getVT(); // Assume getVT() returns a pointer to VT (min(m,n) x n)
-    ws.lambda = lambda;
-
-    // Indicate that we don't own the SVD component pointers
-    ws.owns_U = false;
-    ws.owns_S = false;
-    ws.owns_VT = false;
-
-    // Proceed with the computations
-    if (ws.U_t_b == nullptr) {
-        ws.U_t_b = new double[min_mn];
-    }
-
-    // Compute Uᵗ * B
-    char trans = 'T'; // Transpose U
-    double alpha = 1.0;
-    double beta = 0.0;
-    int incx = 1;
-    int incy = 1;
-    int lda = m;
-    ::dgemv_(&trans, &m, &min_mn, &alpha, ws.U, &lda, B.ptr(), &incx, &beta, ws.U_t_b, &incy);
-
-    // Find the maximum singular value
-    double smax = 0.0;
-    for (int i = 0; i < min_mn; ++i) {
-        if (ws.S[i] > smax) {
-            smax = ws.S[i];
-        }
-    }
-
-    // Threshold for singular values
-    double thresh = rcond > 0.0 ? rcond * smax : 0.0;
-
-    // Apply regularization using 'smax' approach and lambda
-    for (int i = 0; i < min_mn; ++i) {
-        if (ws.S[i] > thresh) {
-            ws.U_t_b[i] = ws.U_t_b[i] * ws.S[i] / (ws.S[i] * ws.S[i] + ws.lambda);
-        } else {
-            ws.U_t_b[i] = 0.0;
-        }
-    }
-
-    // Compute x = V * (regularized solution)
-    trans = 'T'; // Transpose VT to get V
-    int lda_vt = min_mn;
-    ::dgemv_(&trans, &min_mn, &n, &alpha, ws.VT, &lda_vt, ws.U_t_b, &incx, &beta, weights.ptr(), &incy);
+  // Compute x = V * (regularized solution)
+  trans = 'T'; // Transpose VT to get V
+  int lda_vt = min_mn;
+  ::dgemv_(&trans, &min_mn, &n, &alpha, ws.VT, &lda_vt, ws.U_t_b, &incx, &beta, weights.ptr(), &incy);
 }
 
 #endif // OLS_H
