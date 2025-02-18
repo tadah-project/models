@@ -1,368 +1,354 @@
+// test_ols.cpp
+
 #include "catch2/catch.hpp"
-#include <tadah/core/lapack.h>
-#include <tadah/core/maths.h>
 #include <tadah/models/ols.h>
-#include <iomanip>
+#include <tadah/models/svd.h>
+#include <tadah/models/memory/ModelsWorkspaceManager.h>
+#include <tadah/core/maths.h>
+#include <cmath>
+#include <algorithm>
+#include <stdexcept>
+#include <vector>
 
 TEST_CASE("Testing OLS") {
-  using Matrix = Matrix_T<>; // Replace with your actual matrix type.
-  using Vector = aed_type;   // Replace with your actual vector type.
+    using Matrix = Matrix_T<>;
+    using Vector = aed_type;
 
-  // Helper function to compare vectors
-  auto vectors_are_close = [](const Vector& v1, const Vector& v2, double tolerance) {
-    REQUIRE(v1.size() == v2.size());
-    for (size_t i = 0; i < v1.size(); ++i) {
-      REQUIRE_THAT(v1[i], Catch::Matchers::WithinAbs(v2[i], tolerance));
-    }
-  };
-
-  // Prepare test data with corrected matrix initialization
-  Matrix A(3, 3, {1, 4, 7,   // First column
-                  2, 5, 8,   // Second column
-                  3, 6, 10}); // Third column
-
-  Vector expected_weights = {1, 2, 3};
-
-  // Recompute B = A * expected_weights
-  Vector B = A * expected_weights;
-
-  SECTION("Solve using default algorithm (GELSD) without workspace") {
-    Vector weights(3);
-    OLS::solve(A, B, weights);
-    vectors_are_close(weights, expected_weights, 1e-4);
-  }
-
-  SECTION("Solve using GELS algorithm without workspace") {
-    Vector weights(3);
-    OLS::solve(A, B, weights, -1.0, OLS::Algorithm::GELS);
-    vectors_are_close(weights, expected_weights, 1e-4);
-  }
-
-  SECTION("Solve using Cholesky algorithm without workspace") {
-    Vector weights(3);
-    OLS::solve(A, B, weights, -1.0, OLS::Algorithm::Cholesky);
-    vectors_are_close(weights, expected_weights, 1e-4);
-  }
-
-  SECTION("Solve using custom SVD implementation without workspace") {
-    Vector weights(3);
-    OLS::solve(A, B, weights, -1.0, OLS::Algorithm::SVD);
-    vectors_are_close(weights, expected_weights, 1e-4);
-  }
-
-  SECTION("Solve using default algorithm (GELSD) with workspace") {
-    Vector weights(3);
-    OLS::Workspace ws;
-    OLS::solve_with_workspace(A, B, weights, ws);
-    vectors_are_close(weights, expected_weights, 1e-4);
-  }
-
-  SECTION("Solve using GELS algorithm with workspace") {
-    Vector weights(3);
-    OLS::Workspace ws;
-    OLS::solve_with_workspace(A, B, weights, ws, -1.0, OLS::Algorithm::GELS);
-    vectors_are_close(weights, expected_weights, 1e-4);
-  }
-
-  SECTION("Solve using Cholesky algorithm with workspace") {
-    Vector weights(3);
-    OLS::Workspace ws;
-    OLS::solve_with_workspace(A, B, weights, ws, -1.0, OLS::Algorithm::Cholesky);
-    vectors_are_close(weights, expected_weights, 1e-4);
-  }
-
-  SECTION("Solve using custom SVD implementation with workspace") {
-    Vector weights(3);
-    OLS::Workspace ws;
-    OLS::solve_with_workspace(A, B, weights, ws, -1.0, OLS::Algorithm::SVD);
-    vectors_are_close(weights, expected_weights, 1e-4);
-  }
-
-  SECTION("Test handling of rank-deficient matrix") {
-    // Corrected initialization in column-major order
-    Matrix A_singular(3, 3, {
-      1, 4, 7,  // First column
-      2, 5, 8,  // Second column
-      3, 6, 9   // Third column
-    });
-
-    // Make second column a multiple of the first: second column = 2 * first column
-    for (int i = 0; i < 3; ++i) {
-      A_singular(i,1) = 2 * A_singular(i,0);
-    }
-
-    // Recompute B_singular to match the modified A_singular and expected weights
-    Vector expected_weights_singular = {1, 0, 3}; // Since second column is dependent, set weight[1] = 0
-    Vector B_singular = A_singular * expected_weights_singular;
-
-    Matrix A_singular2 = A_singular;
-    Vector B_singular2 = B_singular;
-
-    Vector weights(3);
-
-    // Solve using GELSD, which can handle rank deficiency
-    OLS::solve(A_singular, B_singular, weights);
-
-    // Since the system is rank-deficient, the solution is not unique
-    // We can check that A_singular * weights is close to B_singular
-    Vector B_computed = A_singular2 * weights;
-
-    // Increase tolerance due to potential numerical inaccuracies
-    vectors_are_close(B_computed, B_singular2, 1e-4);
-  }
-
-  SECTION("Test solve with overdetermined system") {
-    // Corrected matrix initialization in column-major order
-    int m = 5;
-    int n = 3;
-    Matrix A_over(m, n, {
-      1, 4, 7, 1, 0, // First column
-      2, 5, 8, 0, 1, // Second column
-      3, 6, 10,0, 0  // Third column
-    });
-    Matrix A_over2 = A_over;
-
-    Vector expected_weights_over = {1, 2, 3};
-
-    // Recompute B_over
-    Vector B_over = A_over * expected_weights_over;
-    Vector B_over2 = B_over;
-
-    Vector weights(n);
-
-    OLS::solve(A_over, B_over, weights);
-
-    // Compute B_computed = A_over * weights
-    Vector B_computed = A_over2 * weights;
-
-    // Check that the residual is small
-    for (int i = 0; i < m; ++i) {
-      REQUIRE(std::abs(B_over2[i] - B_computed[i]) < 1e-3); // Adjusted tolerance
-    }
-  }
-
-  SECTION("Test solve with underdetermined system") {
-    // Corrected matrix initialization in column-major order
-    int m = 3;
-    int n = 5;
-    Matrix A_under(m, n, {
-      1, 6, 11, // First column
-      2, 7, 12, // Second column
-      3, 8, 13, // Third column
-      4, 9, 14, // Fourth column
-      5,10,15  // Fifth column
-    });
-
-    Vector B_under = {1, 2, 3};
-    // Enlarge B_under to size max(m, n) by appending zeros
-    B_under.resize(std::max(m, n));
-
-    Vector weights(n);
-
-    OLS::solve(A_under, B_under, weights);
-
-    // Compute B_computed = A_under * weights
-    Vector B_computed = A_under * weights;
-
-    // Since B_under has been resized, compare only the first m elements
-    Vector B_under_trimmed = Vector(B_under.ptr(), m);
-    Vector B_computed_trimmed = Vector(B_computed.ptr(), m);
-
-    vectors_are_close(B_computed_trimmed, B_under_trimmed, 1e-4);
-  }
-
-  SECTION("Test solve_with_svd without workspace") {
-    // Assuming SVDType is properly defined and we have access to an SVD implementation
-    // Replace 'SVDType' with your actual SVD class or struct
-
-    // For this test, we'll use the custom SVD algorithm on matrix A
-
-    // Placeholder SVDType and methods
-    struct SVDType {
-      double* getU() { return U.data(); }
-      double* getS() { return S.data(); }
-      double* getVT() { return VT.data(); }
-      std::vector<double> U;
-      std::vector<double> S;
-      std::vector<double> VT;
+    // Helper function to compare vectors within a given tolerance
+    auto vectorsAreClose = [](const Vector& v1, const Vector& v2, double tolerance) {
+        REQUIRE(v1.size() == v2.size());
+        for (size_t i = 0; i < v1.size(); ++i) {
+            REQUIRE(std::abs(v1[i] - v2[i]) < tolerance);
+        }
     };
 
-    // Compute SVD of A
-    SVDType svd;
-    int m = A.rows();
-    int n = A.cols();
-    int min_mn = std::min(m, n);
-    svd.U.resize(m * min_mn);
-    svd.S.resize(min_mn);
-    svd.VT.resize(min_mn * n);
+    // Prepare test data
+    SECTION("Solve with square matrix") {
+        // Initialize A (column-major order)
+        Matrix A(3, 3);
+        A(0,0) = 1; A(1,0) = 4; A(2,0) = 7;   // First column
+        A(0,1) = 2; A(1,1) = 5; A(2,1) = 8;   // Second column
+        A(0,2) = 3; A(1,2) = 6; A(2,2) = 10;  // Third column
 
-    // Prepare parameters for LAPACK dgesdd_
-    char jobz = 'S';
-    int lda = m;
-    int ldu = m;
-    int ldvt = min_mn;
-    int info;
-    std::vector<double> A_copy(A.ptr(), A.ptr() + m * n);
+        Vector expectedWeights = {1, 2, 3};
 
-    // Workspace query
-    int lwork = -1;
-    double wkopt;
-    std::vector<int> iwork(8 * min_mn);
-    ::dgesdd_(&jobz, &m, &n, A_copy.data(), &lda, svd.S.data(), svd.U.data(), &ldu, svd.VT.data(), &ldvt, &wkopt, &lwork, iwork.data(), &info);
+        // Compute B = A * expectedWeights
+        Vector B = A * expectedWeights;
 
-    lwork = static_cast<int>(wkopt);
-    std::vector<double> work(lwork);
+        // Create an instance of OLS
+        tadah::models::OLS ols;
 
-    // Compute SVD
-    ::dgesdd_(&jobz, &m, &n, A_copy.data(), &lda, svd.S.data(), svd.U.data(), &ldu, svd.VT.data(), &ldvt, work.data(), &lwork, iwork.data(), &info);
+        // Test different algorithms
+        std::vector<tadah::models::Algorithm> algorithms = {
+            tadah::models::Algorithm::GELSD,
+            tadah::models::Algorithm::GELS,
+            tadah::models::Algorithm::NormalEquations,
+            tadah::models::Algorithm::Pseudoinverse
+        };
 
-    REQUIRE(info == 0);
-
-    Vector weights(3);
-    OLS::solve_with_svd(m, n, B, weights, svd);
-
-    vectors_are_close(weights, expected_weights, 1e-4);
-  }
-
-  SECTION("Test solve_with_svd with workspace") {
-    // Similar to the previous section but using workspace
-    struct SVDType {
-      double* getU() { return U.data(); }
-      double* getS() { return S.data(); }
-      double* getVT() { return VT.data(); }
-      std::vector<double> U;
-      std::vector<double> S;
-      std::vector<double> VT;
-    };
-
-    // Compute SVD of A
-    SVDType svd;
-    int m = A.rows();
-    int n = A.cols();
-    int min_mn = std::min(m, n);
-    svd.U.resize(m * min_mn);
-    svd.S.resize(min_mn);
-    svd.VT.resize(min_mn * n);
-
-    // Prepare parameters for LAPACK dgesdd_
-    char jobz = 'S';
-    int lda = m;
-    int ldu = m;
-    int ldvt = min_mn;
-    int info;
-    std::vector<double> A_copy(A.ptr(), A.ptr() + m * n);
-
-    // Workspace query
-    int lwork = -1;
-    double wkopt;
-    std::vector<int> iwork(8 * min_mn);
-    ::dgesdd_(&jobz, &m, &n, A_copy.data(), &lda, svd.S.data(), svd.U.data(), &ldu, svd.VT.data(), &ldvt, &wkopt, &lwork, iwork.data(), &info);
-
-    lwork = static_cast<int>(wkopt);
-    std::vector<double> work(lwork);
-
-    // Compute SVD
-    ::dgesdd_(&jobz, &m, &n, A_copy.data(), &lda, svd.S.data(), svd.U.data(), &ldu, svd.VT.data(), &ldvt, work.data(), &lwork, iwork.data(), &info);
-
-    REQUIRE(info == 0);
-
-    Vector weights(3);
-    OLS::Workspace ws;
-    double rcond = -1.0;
-    double lambda = 0.0;
-
-    OLS::solve_with_svd_with_workspace(m, n, B, weights, svd, ws, rcond, lambda);
-
-    vectors_are_close(weights, expected_weights, 1e-4);
-  }
-
-  SECTION("Test solve_with_svd with regularization (lambda)") {
-    // Using a non-zero lambda for regularization
-    struct SVDType {
-      double* getU() { return U.data(); }
-      double* getS() { return S.data(); }
-      double* getVT() { return VT.data(); }
-      std::vector<double> U;
-      std::vector<double> S;
-      std::vector<double> VT;
-    };
-
-    // Compute SVD of A
-    SVDType svd;
-    int m = A.rows();
-    int n = A.cols();
-    int min_mn = std::min(m, n);
-    svd.U.resize(m * min_mn);
-    svd.S.resize(min_mn);
-    svd.VT.resize(min_mn * n);
-
-    // Prepare parameters for LAPACK dgesdd_
-    char jobz = 'S';
-    int lda = m;
-    int ldu = m;
-    int ldvt = min_mn;
-    int info;
-    std::vector<double> A_copy(A.ptr(), A.ptr() + m * n);
-
-    // Workspace query
-    int lwork = -1;
-    double wkopt;
-    std::vector<int> iwork(8 * min_mn);
-    ::dgesdd_(&jobz, &m, &n, A_copy.data(), &lda, svd.S.data(), svd.U.data(), &ldu, svd.VT.data(), &ldvt, &wkopt, &lwork, iwork.data(), &info);
-
-    lwork = static_cast<int>(wkopt);
-    std::vector<double> work(lwork);
-
-    // Compute SVD
-    ::dgesdd_(&jobz, &m, &n, A_copy.data(), &lda, svd.S.data(), svd.U.data(), &ldu, svd.VT.data(), &ldvt, work.data(), &lwork, iwork.data(), &info);
-
-    REQUIRE(info == 0);
-
-    Vector weights(3);
-    double rcond = -1.0;
-    double lambda = 0.0005; // Regularization parameter
-
-    OLS::solve_with_svd(m, n, B, weights, svd, rcond, lambda);
-
-    // Since lambda introduces regularization, weights may not match exactly
-    // but for this test, we can still check that the solution is reasonable
-
-    Vector B_computed = A * weights;
-
-    // Compute residual norm
-    double residual_norm = 0.0;
-    for (int i = 0; i < m; ++i) {
-      residual_norm += std::pow(B[i] - B_computed[i], 2);
+        for (auto algo : algorithms) {
+            SECTION("Solve using algorithm: " + to_string_algorithm(algo)) {
+                Vector weights(3);
+                double rcond = -1.0;
+                std::cout << "------------" << std::endl;
+                std::cout << A << std::endl;
+                std::cout << "expectedWeights: " << expectedWeights << std::endl;
+                ols.solve(A, B, weights, rcond, algo);
+                std::cout << "weights: " << weights << std::endl;
+                Vector B_computed = A * weights;
+                std::cout << "B: " << B<< std::endl;
+                std::cout << "B_computed: " << B_computed << std::endl;
+                vectorsAreClose(weights, expectedWeights, 1e-4);
+            }
+        }
     }
-    residual_norm = std::sqrt(residual_norm);
 
-    REQUIRE(residual_norm < 1e-3); // Adjust tolerance as needed
-  }
+    SECTION("Solve with overdetermined system (m > n)") {
+        int m = 5;
+        int n = 3;
+        Matrix A(m, n);
 
-  SECTION("Test solve with Cholesky algorithm on ill-conditioned matrix") {
-    // Create an ill-conditioned matrix
-    Matrix A_ill(3, 3, {1e-11, 0,   0,
-                        0,   1e-11, 0,
-                        0,    0,   1e-11});
+        // Initialize A (column-major order)
+        A(0,0) = 1;  A(1,0) = 4;  A(2,0) = 7;  A(3,0) = 1;  A(4,0) = 0; // First column
+        A(0,1) = 2;  A(1,1) = 5;  A(2,1) = 8;  A(3,1) = 0;  A(4,1) = 1; // Second column
+        A(0,2) = 3;  A(1,2) = 6;  A(2,2) = 10; A(3,2) = 0;  A(4,2) = 0; // Third column
 
-    Vector B_ill = {1e-11, 1e-11, 1e-11};
-    Vector weights(3);
+        Matrix A_cpy = A;
+        Vector expectedWeights = {1, 2, 3};
 
-    // Solve using Cholesky algorithm
-    OLS::solve(A_ill, B_ill, weights, -1.0, OLS::Algorithm::Cholesky);
-    Vector B_computed = A_ill * weights;
-    vectors_are_close(B_ill, B_computed, 1e-11);
-  }
+        // Compute B = A * expectedWeights
+        Vector B = A * expectedWeights;
+        Vector B_cpy = B;
 
-  SECTION("Test solve with Cholesky algorithm on well-conditioned matrix") {
-    Matrix A_well = A; // Use the original well-conditioned matrix
-    Vector B_well = B;
-    Vector weights(3);
+        tadah::models::OLS ols;
 
-    OLS::solve(A_well, B_well, weights, -1.0, OLS::Algorithm::Cholesky);
-    vectors_are_close(weights, expected_weights, 1e-4);
-  }
+        Vector weights(n);
+        ols.solve(A, B, weights);
 
-  // Rest of the tests...
+        // Compute B_computed = A * weights
+        Vector B_computed = A_cpy * weights;
+
+        // Check residual
+        for (int i = 0; i < m; ++i) {
+            REQUIRE(std::abs(B_cpy[i] - B_computed[i]) < 1e-3);
+        }
+    }
+
+    SECTION("Solve with underdetermined system (m < n)") {
+        int m = 3;
+        int n = 5;
+        Matrix A(m, n);
+
+        // Initialize A (column-major order)
+        A(0,0) = 1;  A(1,0) = 6;   A(2,0) = 11;  // First column
+        A(0,1) = 2;  A(1,1) = 7;   A(2,1) = 12;  // Second column
+        A(0,2) = 3;  A(1,2) = 8;   A(2,2) = 13;  // Third column
+        A(0,3) = 4;  A(1,3) = 9;   A(2,3) = 14;  // Fourth column
+        A(0,4) = 5;  A(1,4) = 10;  A(2,4) = 15;  // Fifth column
+
+        Matrix A_cpy = A;
+        Vector B = {1, 2, 3};
+        Vector B_cpy = B;
+
+        tadah::models::OLS ols;
+
+        Vector weights(n);
+        ols.solve(A, B, weights);
+
+        // Compute B_computed = A * weights
+        Vector B_computed = A_cpy * weights;
+
+        // Check that B_computed matches B
+        vectorsAreClose(B_computed, B_cpy, 1e-4);
+    }
+
+    SECTION("Solve with rank-deficient matrix") {
+        Matrix A(3, 3);
+
+        // Initialize A to be rank-deficient (second column is 2 * first column)
+        A(0,0) = 1;  A(1,0) = 2;  A(2,0) = 3; // First column
+        A(0,1) = 2;  A(1,1) = 4;  A(2,1) = 6; // Second column (2 * first column)
+        A(0,2) = 3;  A(1,2) = 6;  A(2,2) = 9; // Third column
+
+        Matrix A_cpy = A;
+        Vector expectedWeights = {1, 0, 3};
+        Vector B = A * expectedWeights;
+        Vector B_cpy = B;
+
+        tadah::models::OLS ols;
+
+        Vector weights(3);
+        ols.solve(A, B, weights);
+
+        // Since the system is rank-deficient, the solution is not unique
+        // Verify that A * weights is close to B
+
+        Vector B_computed = A_cpy * weights;
+        vectorsAreClose(B_computed, B_cpy, 1e-4);
+    }
+
+    SECTION("Testing solveWithPseudoinverse method") {
+        Matrix A(3, 3);
+        // Initialize A (column-major order)
+        A(0,0) = 1; A(1,0) = 4; A(2,0) = 7;   // First column
+        A(0,1) = 2; A(1,1) = 5; A(2,1) = 8;   // Second column
+        A(0,2) = 3; A(1,2) = 6; A(2,2) = 10;  // Third column
+
+        Vector expectedWeights = {1, 2, 3};
+
+        // Compute B = A * expectedWeights
+        Vector B = A * expectedWeights;
+
+        tadah::models::OLS ols;
+        tadah::models::SVD svd;
+
+        // Compute SVD of A
+        svd.compute(A);
+
+        Vector weights(3);
+        ols.solveWithPseudoinverse(A.rows(), A.cols(), B, weights, svd.getSVDWorkspace());
+
+        vectorsAreClose(weights, expectedWeights, 1e-4);
+    }
+
+    SECTION("Testing solveWithPseudoinverse with regularization") {
+        Matrix A(3, 3);
+        // Initialize A (column-major order)
+        A(0,0) = 1; A(1,0) = 4; A(2,0) = 7;   // First column
+        A(0,1) = 2; A(1,1) = 5; A(2,1) = 8;   // Second column
+        A(0,2) = 3; A(1,2) = 6; A(2,2) = 10;  // Third column
+
+        Matrix A_cpy = A;
+        Vector expectedWeights = {1, 2, 3};
+
+        // Compute B = A * expectedWeights
+        Vector B = A * expectedWeights;
+        Vector B_cpy = B;
+
+        tadah::models::OLS ols;
+        tadah::models::SVD svd;
+
+        // Compute SVD of A
+        svd.compute(A);
+
+        Vector weights(3);
+        double rcond = -1.0;
+        double lambda = 0.0001; // Regularization parameter
+
+        ols.solveWithPseudoinverse(A.rows(), A.cols(), B, weights, svd.getSVDWorkspace(), rcond, lambda);
+
+        // Since lambda introduces regularization, the weights may not match exactly
+        // Compute residual
+        Vector B_computed = A_cpy * weights;
+        double residualNorm = 0.0;
+
+        for (size_t i = 0; i < A.rows(); ++i) {
+            residualNorm += std::pow(B_cpy[i] - B_computed[i], 2);
+        }
+        residualNorm = std::sqrt(residualNorm);
+
+        REQUIRE(residualNorm < 1e-3);
+    }
+
+    SECTION("Testing with workspace manager") {
+        Matrix A(3, 3);
+        // Initialize A (column-major order)
+        A(0,0) = 1; A(1,0) = 4; A(2,0) = 7;   // First column
+        A(0,1) = 2; A(1,1) = 5; A(2,1) = 8;   // Second column
+        A(0,2) = 3; A(1,2) = 6; A(2,2) = 10;  // Third column
+
+        Vector expectedWeights = {1, 2, 3};
+        Vector B = A * expectedWeights;
+
+        // Create a workspace manager
+        tadah::models::memory::ModelsWorkspaceManager workspaceManager;
+
+        // Create OLS instance with the workspace manager
+        tadah::models::OLS ols(workspaceManager);
+
+        Vector weights(3);
+        ols.solve(A, B, weights);
+
+        vectorsAreClose(weights, expectedWeights, 1e-4);
+
+        // Reuse the workspace manager for another computation
+        Matrix A2(3, 3);
+        A2(0,0) = 2; A2(1,0) = 5; A2(2,0) = 8;
+        A2(0,1) = 3; A2(1,1) = 6; A2(2,1) = 9;
+        A2(0,2) = 4; A2(1,2) = 7; A2(2,2) = 11;
+
+        Vector expectedWeights2 = {2, 3, 4};
+        Vector B2 = A2 * expectedWeights2;
+
+        Vector weights2(3);
+        ols.solve(A2, B2, weights2);
+
+        vectorsAreClose(weights2, expectedWeights2, 1e-4);
+    }
+
+    SECTION("Testing exception handling with invalid inputs (NormalEquations)") {
+        Matrix A(3, 3);
+        // Initialize A (column-major order) with zeros to create a singular matrix
+        for (int i = 0; i < 3; ++i) {
+            for (int j = 0; j < 3; ++j) {
+                A(i,j) = 0.0;
+            }
+        }
+
+        Vector B = {0, 0, 0};
+        Vector weights(3);
+
+        tadah::models::OLS ols;
+
+        // Expect an exception due to singular A^T A matrix in NormalEquations algorithm
+        REQUIRE_THROWS_AS(ols.solve(A, B, weights, -1.0, tadah::models::Algorithm::NormalEquations), std::runtime_error);
+    }
+
+    SECTION("Testing with ill-conditioned matrix") {
+        Matrix A(3, 3);
+
+        // Create an ill-conditioned matrix
+        A(0,0) = 1e-10; A(1,0) = 0;      A(2,0) = 0;
+        A(0,1) = 0;      A(1,1) = 1e-10; A(2,1) = 0;
+        A(0,2) = 0;      A(1,2) = 0;      A(2,2) = 1e-10;
+
+        Vector expectedWeights = {1, 2, 3};
+        Vector B = A * expectedWeights;
+
+        tadah::models::OLS ols;
+
+        Vector weights(3);
+        ols.solve(A, B, weights, -1.0, tadah::models::Algorithm::GELSD);
+
+        vectorsAreClose(weights, expectedWeights, 1e-2);
+    }
+
+    SECTION("Testing NormalEquations algorithm with rank-deficient matrix") {
+        Matrix A(2, 2);
+
+        // Initialize A (column-major order) with a rank-deficient matrix
+        A(0,0) = 1;  A(1,0) = 2;  // First column
+        A(0,1) = 2;  A(1,1) = 4;  // Second column (2 * first column)
+
+        Vector B = {5, 10}; // Compute B = A * [1; 2], but it's arbitrary here
+        Vector weights(2);
+
+        tadah::models::OLS ols;
+
+        // Expect an exception due to singular A^T A matrix
+        REQUIRE_THROWS_AS(ols.solve(A, B, weights, -1.0, tadah::models::Algorithm::NormalEquations), std::runtime_error);
+    }
+
+    SECTION("Testing solve with minimum input") {
+        Matrix A(1, 1);
+        A(0,0) = 2;
+
+        Vector B = {4};
+        Vector weights(1);
+
+        tadah::models::OLS ols;
+
+        ols.solve(A, B, weights);
+
+        REQUIRE(weights[0] == Approx(2.0).epsilon(1e-6));
+    }
+
+    SECTION("Testing solve with large matrix") {
+        int m = 100;
+        int n = 50;
+        Matrix A(m, n);
+
+        // Initialize A with random values
+        for (int j = 0; j < n; ++j) {
+            for (int i = 0; i < m; ++i) {
+                A(i,j) = static_cast<double>(std::rand()) / RAND_MAX;
+            }
+        }
+
+        Matrix A_cpy = A;
+
+        Vector expectedWeights(n);
+        for (int i = 0; i < n; ++i) {
+            expectedWeights[i] = static_cast<double>(std::rand()) / RAND_MAX;
+        }
+
+        Vector B = A * expectedWeights;
+        Vector B_cpy = B;
+
+        tadah::models::OLS ols;
+
+        Vector weights(n);
+        ols.solve(A, B, weights);
+
+        // Compute residual norm
+        Vector B_computed = A_cpy * weights;
+        double residualNorm = 0.0;
+        for (int i = 0; i < m; ++i) {
+            residualNorm += std::pow(B_cpy[i] - B_computed[i], 2);
+        }
+        residualNorm = std::sqrt(residualNorm);
+
+        REQUIRE(residualNorm < 1e-2);
+    }
 }
 

@@ -61,12 +61,13 @@ class EKM {
             }
             eps *= max_val;
 
-            SVD svd(K);
+            tadah::models::SVD svd;
+            svd.compute(K);
 
             double *s = svd.getS();
             double *vt = svd.getVT();
-            t_type S(s,svd.sizeS());
-            Matrix VT(vt,svd.shapeVT().first, svd.shapeVT().second);
+            t_type S(s,svd.cols());
+            Matrix VT(vt,svd.cols(), svd.cols());
 
             // First count number of non zero singular values, then
             // filter out corresponding right singular vectors from
@@ -74,7 +75,7 @@ class EKM {
             size_t nonzero_sv=0;
             for (size_t i=0; i<S.size(); ++i) if (s[i]>eps) nonzero_sv++;
 
-            EKM_mat = Matrix(nonzero_sv, svd.shapeVT().second);
+            EKM_mat = Matrix(nonzero_sv, svd.cols());
 
             for (size_t i=0; i<S.size(); ++i) {
                 if (s[i]>eps) {
