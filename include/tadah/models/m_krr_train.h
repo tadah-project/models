@@ -9,6 +9,7 @@
 #include <tadah/models/ekm.h>
 #include <tadah/core/maths.h>
 #include <tadah/core/config.h>
+#include <tadah/models/memory/IModelsWorkspaceManager.h>
 
 #include <iostream>
 #include <limits>
@@ -50,6 +51,11 @@ public:
      * @param c Configuration object reference.
      */
     M_KRR_Train(Kern &kernel, Config &c) : M_KRR_Core<Kern>(kernel, c), ekm(kernel) {}
+    M_KRR_Train(Kern &kernel, Config &c, tadah::models::memory::IModelsWorkspaceManager &workspaceManager) :
+    M_KRR_Core<Kern>(kernel, c),
+    M_Train(&workspaceManager),
+    ekm(kernel)
+  {}
 
     /**
      * @brief Trains the model on given feature and target matrices.
@@ -104,7 +110,7 @@ public:
       if (kernel.get_label() != "Kern_Linear") {
         ekm.project(Phi);
       }
-      LinearRegressor::train(config, Phi, T_r, weights, Sigma);
+      LinearRegressor::train(config, Phi, T_r, weights, Sigma, *workspaceManager_);
       if (kernel.get_label() != "Kern_Linear") {
         weights = ekm.EKM_mat * weights;
       }
@@ -119,7 +125,7 @@ public:
       if (kernel.get_label() != "Kern_Linear") {
         ekm.project(Phi);
       }
-      LinearRegressor::train(config, Phi, T, weights, Sigma);
+      LinearRegressor::train(config, Phi, T, weights, Sigma, *workspaceManager_);
       if (kernel.get_label() != "Kern_Linear") {
         weights = ekm.EKM_mat * weights;
       }

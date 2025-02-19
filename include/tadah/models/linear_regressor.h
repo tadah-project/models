@@ -8,6 +8,7 @@
 #include <tadah/models/ea.h>
 #include <tadah/models/ols.h>
 #include <tadah/models/svd.h>
+#include <tadah/models/memory/IModelsWorkspaceManager.h>
 
 #include <vector>
 
@@ -34,7 +35,7 @@ class LinearRegressor {
    */
 public:
   static void train(Config &config, phi_type &Phi, t_type &T, t_type &weights,
-                    Matrix &Sigma) {
+                    Matrix &Sigma, tadah::models::memory::IModelsWorkspaceManager &workspaceManager) {
 
     int verbose = config.get<int>("VERBOSE");
     double lambda = config.get<double>("LAMBDA", 0);
@@ -56,7 +57,7 @@ public:
       }
     }
 
-    tadah::models::OLS ols;
+    tadah::models::OLS ols(workspaceManager);
     if (oalgo == 1) {
       ols.solve(Phi, T, weights, rcond, tadah::models::Algorithm::GELSD);
     } else if (oalgo == 2) {
@@ -90,6 +91,12 @@ public:
     } else {
       throw std::runtime_error("Unsupported OALGO: " + std::to_string(oalgo));
     }
+
+  }
+  static void train(Config &config, phi_type &Phi, t_type &T, t_type &weights,
+                    Matrix &Sigma) {
+    tadah::models::memory::ModelsWorkspaceManager workspaceManager;
+    train(config, Phi, T, weights, Sigma, workspaceManager);
   }
 
   /**

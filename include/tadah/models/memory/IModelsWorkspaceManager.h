@@ -23,7 +23,7 @@ public:
     /**
      * @brief Virtual destructor.
      */
-    virtual ~IModelsWorkspaceManager() = default;
+    virtual ~IModelsWorkspaceManager();
 
     /**
      * @brief Get an OLS workspace suitable for the given problem size and algorithm.
@@ -64,3 +64,4 @@ public:
 } // namespace tadah
 
 #endif // TADAH_MODELS_MEMORY_IMODELSWORKSPACEMANAGER_H
+

@@ -9,6 +9,7 @@
 #include <tadah/models/functions/function_base.h>
 #include <tadah/models/functions/basis_functions/bf_base.h>
 #include <tadah/core/config.h>
+#include <tadah/models/memory/IModelsWorkspaceManager.h>
 
 #include <iostream>
 #include <vector>
@@ -47,6 +48,10 @@ public:
      * @param c Configuration object reference.
      */
     M_BLR_Train(BF &bf, Config &c) : M_BLR_Core<BF>(bf, c) {}
+    M_BLR_Train(BF &bf, Config &c, tadah::models::memory::IModelsWorkspaceManager &workspaceManager) :
+    M_BLR_Core<BF>(bf, c),
+    M_Train(&workspaceManager)
+  {}
 
     /**
      * @brief Trains the model on given feature and target matrices.
@@ -93,7 +98,7 @@ public:
       // Resize Phi for training
       Phi.resize(Phi.rows(), Phi.cols() - indices.size());
 
-      LinearRegressor::train(config, Phi, T_r, weights, Sigma);
+      LinearRegressor::train(config, Phi, T_r, weights, Sigma,*workspaceManager_);
 
       t_type w_temp(weights.size() + indices.size());
 
@@ -110,7 +115,7 @@ public:
       trained = true;
     }
     else {
-      LinearRegressor::train(config, Phi, T, weights, Sigma);
+      LinearRegressor::train(config, Phi, T, weights, Sigma,*workspaceManager_);
       trained = true;
     }
   }

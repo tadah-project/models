@@ -3,6 +3,7 @@
 
 #include <tadah/core/core_types.h>
 #include <tadah/core/utils.h>
+#include <tadah/models/memory/IModelsWorkspaceManager.h>
 
 /**
  * @class M_Train
@@ -11,7 +12,12 @@
  * Defines the interface for training models with a design matrix and target values.
  */
 class M_Train {
+protected:
+  tadah::models::memory::IModelsWorkspaceManager* workspaceManager_ = nullptr;
+
 public:
+  M_Train() = default;
+  M_Train(tadah::models::memory::IModelsWorkspaceManager* workspaceManager) : workspaceManager_(workspaceManager) {}
   /**
      * @brief Virtual destructor for polymorphic deletion.
      */
@@ -81,6 +87,14 @@ public:
 
     return move_map;
   }
+
+  void setWorkspaceManager(tadah::models::memory::IModelsWorkspaceManager  *workspaceManager) {
+    if (workspaceManager_ != nullptr) {
+      delete workspaceManager_;
+    }
+    workspaceManager_ = workspaceManager;
+  }
+
 };
 
 #endif // M_TRAIN_H
