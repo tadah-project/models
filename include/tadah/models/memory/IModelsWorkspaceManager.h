@@ -18,7 +18,7 @@ class SVDWorkspace; ///< Forward declaration of SVDWorkspace
  * Extends the core IWorkspaceManager interface and provides methods for
  * obtaining and releasing OLS and SVD workspaces.
  */
-class IModelsWorkspaceManager : public tadah::core::memory::IWorkspaceManager {
+class IModelsWorkspaceManager : public virtual tadah::core::memory::IWorkspaceManager {
 public:
     /**
      * @brief Virtual destructor.

@@ -14,7 +14,7 @@ namespace memory {
  *
  * Manages OLS and SVD workspaces, providing methods to obtain and release them.
  */
-class ModelsWorkspaceManager : public IModelsWorkspaceManager {
+class ModelsWorkspaceManager : public virtual IModelsWorkspaceManager {
 public:
     /**
      * @brief Constructor.
