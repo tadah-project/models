@@ -20,11 +20,11 @@ protected:
 public:
   M_Train():
     own_workspace_manager_(true),
-    workspaceManager_(new tadah::models::memory::ModelsWorkspaceManager()),
+    workspaceManager_(new tadah::models::memory::ModelsWorkspaceManager())
   {}
   M_Train(tadah::models::memory::IModelsWorkspaceManager &workspaceManager):
     own_workspace_manager_(false),
-    workspaceManager_(&workspaceManager) {
+    workspaceManager_(&workspaceManager)
   {}
   /**
      * @brief Virtual destructor for polymorphic deletion.
