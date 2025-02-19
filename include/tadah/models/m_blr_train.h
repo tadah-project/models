@@ -50,7 +50,7 @@ public:
     M_BLR_Train(BF &bf, Config &c) : M_BLR_Core<BF>(bf, c) {}
     M_BLR_Train(BF &bf, Config &c, tadah::models::memory::IModelsWorkspaceManager &workspaceManager) :
     M_BLR_Core<BF>(bf, c),
-    M_Train(&workspaceManager)
+    M_Train(workspaceManager)
   {}
 
     /**

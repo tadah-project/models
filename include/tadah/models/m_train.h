@@ -4,6 +4,7 @@
 #include <tadah/core/core_types.h>
 #include <tadah/core/utils.h>
 #include <tadah/models/memory/IModelsWorkspaceManager.h>
+#include <tadah/models/memory/ModelsWorkspaceManager.h>
 
 /**
  * @class M_Train
@@ -13,15 +14,28 @@
  */
 class M_Train {
 protected:
+  bool own_workspace_manager_ = false;
   tadah::models::memory::IModelsWorkspaceManager* workspaceManager_ = nullptr;
 
 public:
-  M_Train() = default;
-  M_Train(tadah::models::memory::IModelsWorkspaceManager* workspaceManager) : workspaceManager_(workspaceManager) {}
+  M_Train():
+    own_workspace_manager_(true),
+    workspaceManager_(new tadah::models::memory::ModelsWorkspaceManager()),
+  {}
+  M_Train(tadah::models::memory::IModelsWorkspaceManager &workspaceManager):
+    own_workspace_manager_(false),
+    workspaceManager_(&workspaceManager) {
+  {}
   /**
      * @brief Virtual destructor for polymorphic deletion.
      */
-  virtual ~M_Train() {}
+  virtual ~M_Train() {
+    if (workspaceManager_ != nullptr && own_workspace_manager_) {
+      delete workspaceManager_;
+      workspaceManager_ = nullptr;
+      own_workspace_manager_ = false;
+    }
+  }
 
   /**
      * @brief Pure virtual function to train the model.

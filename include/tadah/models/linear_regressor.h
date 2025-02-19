@@ -58,6 +58,7 @@ public:
     }
 
     tadah::models::OLS ols(workspaceManager);
+    // tadah::models::OLS ols;
     if (oalgo == 1) {
       ols.solve(Phi, T, weights, rcond, tadah::models::Algorithm::GELSD);
     } else if (oalgo == 2) {

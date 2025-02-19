@@ -53,7 +53,7 @@ public:
     M_KRR_Train(Kern &kernel, Config &c) : M_KRR_Core<Kern>(kernel, c), ekm(kernel) {}
     M_KRR_Train(Kern &kernel, Config &c, tadah::models::memory::IModelsWorkspaceManager &workspaceManager) :
     M_KRR_Core<Kern>(kernel, c),
-    M_Train(&workspaceManager),
+    M_Train(workspaceManager),
     ekm(kernel)
   {}
 
