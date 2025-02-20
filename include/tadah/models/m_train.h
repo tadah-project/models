@@ -103,7 +103,7 @@ public:
   }
 
   void setWorkspaceManager(tadah::models::memory::IModelsWorkspaceManager  *workspaceManager) {
-    if (workspaceManager_ != nullptr) {
+    if (workspaceManager_ != nullptr && own_workspace_manager_) {
       delete workspaceManager_;
     }
     workspaceManager_ = workspaceManager;
