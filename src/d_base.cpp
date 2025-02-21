@@ -99,7 +99,7 @@ int D_Base::get_arg_pos(const std::string &key) const {
 
   return std::distance(keys.begin(), it)+(nparams-keys.size());
 }
-size_t D_Base::size() { return s; };
+size_t D_Base::size() { return s; }
 double D_Base::get_rcut() { 
   return fcut->get_rcut(); 
 }
