@@ -5,7 +5,7 @@ namespace models {
 
 Kern_RBF::Kern_RBF () {}
 Kern_RBF::Kern_RBF (const tadah::core::Config &c):
-    tadah::core::Function_Base(c),
+    Function_Base(c),
     Kern_Base(c),
     sigma(c.get<double>("MPARAMS")),
     gamma(1.0/(sigma*sigma))

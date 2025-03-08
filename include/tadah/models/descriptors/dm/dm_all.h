@@ -1,5 +1,3 @@
-namespace tadah {
-namespace models {
 
 #include <tadah/models/descriptors/dm/dm_base.h>
 #include <tadah/models/descriptors/dm/dm_dummy.h>
@@ -11,6 +9,8 @@ namespace models {
 
 #include <tadah/models/descriptors/dm/dm_func.h>
 
+namespace tadah {
+namespace models {
 } // namespace models
 } // namespace tadah
 

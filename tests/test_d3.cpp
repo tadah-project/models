@@ -2,6 +2,8 @@
 #include <tadah/models/descriptors/d3/d3_all.h>
 #include <tadah/core/maths.h>
 
+using namespace tadah::core;
+using namespace tadah::models;
 TEST_CASE( "Testing D3_Dummy", "[D3]" ) {
   Config c;
   c.remove("INIT3B");

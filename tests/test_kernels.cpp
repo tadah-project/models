@@ -4,6 +4,8 @@
 #include <tadah/core/core_types.h>
 #include <string>
 
+using namespace tadah::core;
+using namespace tadah::models;
 
 //template <typename W, typename B,
 //typename F, double(F::*func)(W&, B&)>

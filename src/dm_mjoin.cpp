@@ -17,14 +17,14 @@ DM_mJoin::DM_mJoin(tadah::core::Config &c) : DM_Base(c) {
   expand_grids(c, configs, "TYPEMB");
 
   for (auto &c1 : configs) {
-    ds.push_back(CONFIG::factory<DM_Base, tadah::core::Config&>(c1.get<std::string>("TYPEMB"), c1));
+    ds.push_back(tadah::core::factory<DM_Base, tadah::core::Config&>(c1.get<std::string>("TYPEMB"), c1));
     s += ds.back()->size();
     rhoisize += ds.back()->rhoi_size();
   }
   set_rfidx(0);
 }
 
-void DM_mJoin::calc_aed(rho_type& rho, tadah::core::aed_type &aed) {
+void DM_mJoin::calc_aed(tadah::core::rho_type& rho, tadah::core::aed_type &aed) {
   for (auto d : ds) {
     d->calc_aed(rho, aed);
   }
@@ -34,9 +34,9 @@ void DM_mJoin::calc_dXijdri_dXjidri(
   const int Zj,
   const double rij,
   const double rij_sq,
-  const Vec3d &vec_ij,
-  rho_type& rhoi,
-  rho_type& rhoj,
+  const tadah::core::Vec3d &vec_ij,
+  tadah::core::rho_type& rhoi,
+  tadah::core::rho_type& rhoj,
   tadah::core::fd_type &fd_ij,
   const double scale) {
   for (auto d : ds) {
@@ -48,15 +48,15 @@ void DM_mJoin::calc_dXijdri(
   const int Zj,
   const double rij,
   const double rij_sq,
-  const Vec3d &vec_ij,
-  rho_type& rhoi,
+  const tadah::core::Vec3d &vec_ij,
+  tadah::core::rho_type& rhoi,
   tadah::core::fd_type &fd_ij, 
   const double scale) {
   for (auto d : ds) { 
     d->calc_dXijdri(Zi,Zj,rij,rij_sq,vec_ij,rhoi,fd_ij,scale);
   }
 }
-void DM_mJoin::init_rhoi(rho_type& rhoi) {
+void DM_mJoin::init_rhoi(tadah::core::rho_type& rhoi) {
   rhoi.resize(2*rhoisize);
   rhoi.set_zero();
 }
@@ -65,8 +65,8 @@ void DM_mJoin::calc_rho(
   const int Zj,
   const double rij,
   const double rij_sq,
-  const Vec3d &vec_ij,
-  rho_type& rho,
+  const tadah::core::Vec3d &vec_ij,
+  tadah::core::rho_type& rho,
   const double scale) {
   for (auto d : ds) {
       d->calc_rho(Zi,Zj,rij,rij_sq,vec_ij,rho,scale);

@@ -3,29 +3,29 @@ namespace tadah {
 namespace models {
 
 
-template<> CONFIG::Registry<DM_Base>::Map CONFIG::Registry<DM_Base>::registry{};
-template<> CONFIG::Registry<DM_Base,tadah::core::Config&>::Map CONFIG::Registry<DM_Base,tadah::core::Config&>::registry{};
+template<> tadah::core::Registry<DM_Base>::Map tadah::core::Registry<DM_Base>::registry{};
+template<> tadah::core::Registry<DM_Base,tadah::core::Config&>::Map tadah::core::Registry<DM_Base,tadah::core::Config&>::registry{};
 
-CONFIG::Registry<D_Base>::Register<DM_Blip> DM_Blip_0( "DM_Blip" );
-CONFIG::Registry<D_Base>::Register<DM_Dummy> DM_Dummy_0( "DM_Dummy" );
-CONFIG::Registry<D_Base>::Register<DM_EAD> DM_EAD_0( "DM_EAD" );
-CONFIG::Registry<D_Base>::Register<DM_EAM> DM_EAM_0( "DM_EAM" );
-CONFIG::Registry<D_Base>::Register<DM_mEAD<F_RLR>> DM_mEAM_0("DM_mEAD");
-CONFIG::Registry<D_Base>::Register<DM_mJoin> DM_mJoin_0("DM_mJoin");
+tadah::core::Registry<D_Base>::Register<DM_Blip> DM_Blip_0( "DM_Blip" );
+tadah::core::Registry<D_Base>::Register<DM_Dummy> DM_Dummy_0( "DM_Dummy" );
+tadah::core::Registry<D_Base>::Register<DM_EAD> DM_EAD_0( "DM_EAD" );
+tadah::core::Registry<D_Base>::Register<DM_EAM> DM_EAM_0( "DM_EAM" );
+tadah::core::Registry<D_Base>::Register<DM_mEAD<F_RLR>> DM_mEAM_0("DM_mEAD");
+tadah::core::Registry<D_Base>::Register<DM_mJoin> DM_mJoin_0("DM_mJoin");
 
-CONFIG::Registry<DM_Base>::Register<DM_Blip> DM_Blip_1( "DM_Blip" );
-CONFIG::Registry<DM_Base>::Register<DM_Dummy> DM_Dummy_1( "DM_Dummy" );
-CONFIG::Registry<DM_Base>::Register<DM_EAD> DM_EAD_1( "DM_EAD" );
-CONFIG::Registry<DM_Base>::Register<DM_EAM> DM_EAM_1( "DM_EAM" );
-CONFIG::Registry<DM_Base>::Register<DM_mEAD<F_RLR>> DM_mEAM_1("DM_mEAD");
-CONFIG::Registry<DM_Base>::Register<DM_mJoin> DM_mJoin_1("DM_mJoin");
+tadah::core::Registry<DM_Base>::Register<DM_Blip> DM_Blip_1( "DM_Blip" );
+tadah::core::Registry<DM_Base>::Register<DM_Dummy> DM_Dummy_1( "DM_Dummy" );
+tadah::core::Registry<DM_Base>::Register<DM_EAD> DM_EAD_1( "DM_EAD" );
+tadah::core::Registry<DM_Base>::Register<DM_EAM> DM_EAM_1( "DM_EAM" );
+tadah::core::Registry<DM_Base>::Register<DM_mEAD<F_RLR>> DM_mEAM_1("DM_mEAD");
+tadah::core::Registry<DM_Base>::Register<DM_mJoin> DM_mJoin_1("DM_mJoin");
 
-CONFIG::Registry<DM_Base,tadah::core::Config&>::Register<DM_Blip> DM_Blip_2( "DM_Blip" );
-CONFIG::Registry<DM_Base,tadah::core::Config&>::Register<DM_Dummy> DM_Dummy_2( "DM_Dummy" );
-CONFIG::Registry<DM_Base,tadah::core::Config&>::Register<DM_EAD> DM_EAD_2( "DM_EAD" );
-CONFIG::Registry<DM_Base,tadah::core::Config&>::Register<DM_EAM> DM_EAM_2( "DM_EAM" );
-CONFIG::Registry<DM_Base,tadah::core::Config&>::Register<DM_mEAD<F_RLR>> DM_mEAM_2("DM_mEAD");
-CONFIG::Registry<DM_Base,tadah::core::Config&>::Register<DM_mJoin> DM_mJoin_2( "DM_mJoin" );
+tadah::core::Registry<DM_Base,tadah::core::Config&>::Register<DM_Blip> DM_Blip_2( "DM_Blip" );
+tadah::core::Registry<DM_Base,tadah::core::Config&>::Register<DM_Dummy> DM_Dummy_2( "DM_Dummy" );
+tadah::core::Registry<DM_Base,tadah::core::Config&>::Register<DM_EAD> DM_EAD_2( "DM_EAD" );
+tadah::core::Registry<DM_Base,tadah::core::Config&>::Register<DM_EAM> DM_EAM_2( "DM_EAM" );
+tadah::core::Registry<DM_Base,tadah::core::Config&>::Register<DM_mEAD<F_RLR>> DM_mEAM_2("DM_mEAD");
+tadah::core::Registry<DM_Base,tadah::core::Config&>::Register<DM_mJoin> DM_mJoin_2( "DM_mJoin" );
 //template<> Registry<DM_Base,F_Base&,tadah::core::Config&>::Map Registry<DM_Base,F_Base&,tadah::core::Config&>::registry{};
 //Registry<DM_Base,tadah::core::Config&>::Register<DM_mEAD<F_RLR>> DM_mEAD_1( "DM_mEAD" );
 

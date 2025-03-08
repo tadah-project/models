@@ -21,7 +21,7 @@ struct BF_Linear : public virtual BF_Base {
      * @brief Constructor with configuration.
      * @param c Configuration object reference.
      */
-    BF_Linear(const Config &c);
+    BF_Linear(const tadah::core::Config &c);
 
     /**
      * @brief Retrieve the label of the basis function.
@@ -37,7 +37,7 @@ struct BF_Linear : public virtual BF_Base {
      * @param aed Atomic descriptors.
      * @return Predicted energy.
      */
-    double epredict(const t_type &weights, const aed_type &aed) const override;
+    double epredict(const tadah::core::t_type &weights, const tadah::core::aed_type &aed) const override;
 
     /**
      * @brief Predicts force for a specific dimension using the linear basis function.
@@ -47,8 +47,8 @@ struct BF_Linear : public virtual BF_Base {
      * @param k Dimension index.
      * @return Predicted force component.
      */
-    double fpredict(const t_type &weights, const fd_type &fdij,
-                    const aed_type &aedi, const size_t k) const override;
+    double fpredict(const tadah::core::t_type &weights, const tadah::core::fd_type &fdij,
+                    const tadah::core::aed_type &aedi, const size_t k) const override;
 
     /**
      * @brief Predicts forces using the linear basis function.
@@ -57,10 +57,10 @@ struct BF_Linear : public virtual BF_Base {
      * @param aedi Atomic descriptors for an individual atom.
      * @return Predicted forces.
      */
+
+    tadah::core::force_type fpredict(const tadah::core::t_type &weights, const tadah::core::fd_type &fdij,
+                        const tadah::core::aed_type &aedi) const override;
+};
 } // namespace models
 } // namespace tadah
-
-    force_type fpredict(const t_type &weights, const fd_type &fdij,
-                        const aed_type &aedi) const override;
-};
 #endif

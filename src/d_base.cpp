@@ -19,10 +19,10 @@ void D_Base::get_grid(const tadah::core::Config &c, std::string key, tadah::core
       double cgmin = c.get<double>(key,2);
       double cgmax = c.get<double>(key,3);
       if (c.get<int>(key) == -1) {
-        v = linspace(cgmin, cgmax, cg);
+        v = tadah::core::linspace(cgmin, cgmax, cg);
       }
       else if (c.get<int>(key) == -2) {
-        v = logspace(cgmin, cgmax, cg, exp(1));
+        v = tadah::core::logspace(cgmin, cgmax, cg, exp(1));
       }
       else {
         throw std::runtime_error(key+" algorithm not supported\n");
@@ -47,14 +47,14 @@ tadah::core::v_type D_Base::get_grid(std::vector<std::string>&vold) {
       size_t cg = std::stoul(*it++);
       double cgmin = std::stod(*it++);
       double cgmax = std::stod(*it++);
-      tadah::core::v_type v = linspace(cgmin, cgmax, cg);
+      tadah::core::v_type v = tadah::core::linspace(cgmin, cgmax, cg);
       vnew.insert(vnew.end(), v.begin(), v.end());
     }
     else if (token == "-2") {
       size_t cg = std::stoul(*it++);
       double cgmin = std::stod(*it++);
       double cgmax = std::stod(*it++);
-      tadah::core::v_type v = logspace(cgmin, cgmax, cg, exp(1));
+      tadah::core::v_type v = tadah::core::logspace(cgmin, cgmax, cg, exp(1));
       vnew.insert(vnew.end(), v.begin(), v.end());
     }
     else if (std::stod(token) < -2) {
@@ -81,7 +81,7 @@ D_Base::D_Base(tadah::core::Config &c):
     for (size_t i=0; i<c.size("ATOMS"); ++i) {
       std::string symbol = c.get<std::string>("ATOMS",i);
       double wi = c.get<double>("WATOMS",i);
-      int Z = PeriodicTable::find_by_symbol(symbol).Z;
+      int Z = tadah::core::PeriodicTable::find_by_symbol(symbol).Z;
       weights[Z]=wi;
     }
   }
@@ -122,13 +122,13 @@ void D_Base::init_for_atoms(const std::vector<std::string> &Zs) {
   
   for (size_t i = 0; i < Zs.size(); i += 2) {
     if (Zs[i] == "*" && Zs[i+1] != "*") {
-      int Zj = PeriodicTable::find_by_symbol(Zs[i+1]).Z;
+      int Zj = tadah::core::PeriodicTable::find_by_symbol(Zs[i+1]).Z;
       for (int Zi = 1; Zi < 119; ++Zi) {
         init_for_atoms(Zi, Zj);
       }
     } 
     else if (Zs[i] != "*" && Zs[i+1] == "*") {
-      int Zi = PeriodicTable::find_by_symbol(Zs[i]).Z;
+      int Zi = tadah::core::PeriodicTable::find_by_symbol(Zs[i]).Z;
       for (int Zj = 1; Zj < 119; ++Zj) {
         init_for_atoms(Zi, Zj);
       }
@@ -141,8 +141,8 @@ void D_Base::init_for_atoms(const std::vector<std::string> &Zs) {
       }
     } 
     else {
-      int Zi = PeriodicTable::find_by_symbol(Zs[i]).Z;
-      int Zj = PeriodicTable::find_by_symbol(Zs[i+1]).Z;
+      int Zi = tadah::core::PeriodicTable::find_by_symbol(Zs[i]).Z;
+      int Zj = tadah::core::PeriodicTable::find_by_symbol(Zs[i+1]).Z;
       init_for_atoms(Zi, Zj);
     }
   }
@@ -150,7 +150,7 @@ void D_Base::init_for_atoms(const std::vector<std::string> &Zs) {
 std::vector<std::string> D_Base::get_init_atoms(tadah::core::Config &c, std::string type) {
   std::vector<std::string> init_atoms(c.size(type));
   c.get(type, init_atoms);
-  std::unique_ptr<D_Base> d(CONFIG::factory<D_Base>(init_atoms[0]));
+  std::unique_ptr<D_Base> d(tadah::core::factory<D_Base>(init_atoms[0]));
   size_t nparams = d->nparams;
   init_atoms.erase(init_atoms.begin(), init_atoms.begin() + nparams);
   return init_atoms;

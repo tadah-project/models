@@ -128,11 +128,5 @@ private:
 
 #include <tadah/models/ols_impl.h> // Include implementation
 
-} // namespace models
-} // namespace tadah
-
-namespace tadah {
-namespace models {
-
 #endif // TADAH_MODELS_OLS_H
 

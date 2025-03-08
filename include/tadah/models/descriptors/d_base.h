@@ -45,8 +45,8 @@ public:
   std::vector<std::string> keys;    // keys required by this descriptor
   size_t nparams;  // number of params which follow TYPExB
   std::vector<bool> is_optimizable;
-  static void get_grid(const Config &c, std::string key, v_type &v);
-  static v_type get_grid(std::vector<std::string>&);  // expand joined grids
+  static void get_grid(const tadah::core::Config &c, std::string key, tadah::core::v_type &v);
+  static tadah::core::v_type get_grid(std::vector<std::string>&);  // expand joined grids
   int verbose;
   virtual ~D_Base();
 
@@ -60,7 +60,7 @@ public:
   virtual std::string label()=0;
   double weights[119] = {1};  // ignore zero index; w[1]->H
   D_Base();
-  D_Base(Config &c);
+  D_Base(tadah::core::Config &c);
 
   virtual void set_fidx(size_t fidx_);
   virtual size_t get_fidx();
@@ -71,7 +71,7 @@ public:
  * This method sets up the required keys names and number of parameters for the descriptor.
  *
  * Note: The implementation of the descriptor should not rely on these initial values,
- * allowing for greater flexibility in how the Config file is parsed.
+ * allowing for greater flexibility in how the tadah::core::Config file is parsed.
  *
  * The keys and parameters are utilized by other classes inheriting from this implementation,
  * such as meta-descriptors.
@@ -91,14 +91,14 @@ public:
   virtual void init_for_atoms(int Zi, int Zj);
   virtual void init_for_atoms(const std::vector<std::string> &Zs);
   virtual void uninit_for_atoms(int Zi, int Zj);
-  static std::vector<std::string> get_init_atoms(Config &c, std::string type);
-  virtual std::vector<std::string> get_init_atoms(Config &c)=0;
+  static std::vector<std::string> get_init_atoms(tadah::core::Config &c, std::string type);
+  virtual std::vector<std::string> get_init_atoms(tadah::core::Config &c)=0;
 
 private:
-} // namespace models
-} // namespace tadah
 
   bool manage_memory=false; // who owns fcut
   Bitset2D init_for_atoms_map;  // 0th is unused
 };
+} // namespace models
+} // namespace tadah
 #endif

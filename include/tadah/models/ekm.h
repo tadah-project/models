@@ -15,12 +15,12 @@ class EKM {
         double eps = std::numeric_limits<double>::epsilon()*0;
         std::vector<size_t> indices;
     public:
-        Matrix EKM_mat;
+        tadah::core::Matrix EKM_mat;
         template <typename T>
             EKM(T &t):
                 kernel(t)
     {}
-        void configure(Matrix &basis) {
+        void configure(tadah::core::Matrix &basis) {
 
             // check norm of basis vectors and keep indices
             for (size_t i=0; i<basis.cols(); i++) {
@@ -31,7 +31,7 @@ class EKM {
             // Copy basis vectors with non zero norm
             // to new basis b
             // basis vectors are stored as columns in basis
-            Matrix b(basis.rows(), indices.size());
+            tadah::core::Matrix b(basis.rows(), indices.size());
             for (const auto &i:indices) {
                 for (size_t j=0; j<basis.rows(); ++j) {
                     b(j,i) = basis(j,i);
@@ -40,14 +40,14 @@ class EKM {
             // Update old basis with new one
             basis=b;
 
-            Matrix K(b.cols(), b.cols());
+            tadah::core::Matrix K(b.cols(), b.cols());
             for (size_t i=0; i<K.cols(); i++) {
                 for (size_t j=0; j<K.cols(); j++) {
                     K(i,j) = kernel(b.col(i),b.col(j));
                 }
             }
 
-            // Matrix balancing
+            // tadah::core::Matrix balancing
             double *a = K.ptr();
             int n = K.cols();
             char job='B';
@@ -69,8 +69,8 @@ class EKM {
 
             double *s = svd.getS();
             double *vt = svd.getVT();
-            t_type S(s,svd.cols());
-            Matrix VT(vt,svd.cols(), svd.cols());
+            tadah::core::t_type S(s,svd.cols());
+            tadah::core::Matrix VT(vt,svd.cols(), svd.cols());
 
             // First count number of non zero singular values, then
             // filter out corresponding right singular vectors from
@@ -78,7 +78,7 @@ class EKM {
             size_t nonzero_sv=0;
             for (size_t i=0; i<S.size(); ++i) if (s[i]>eps) nonzero_sv++;
 
-            EKM_mat = Matrix(nonzero_sv, svd.cols());
+            EKM_mat = tadah::core::Matrix(nonzero_sv, svd.cols());
 
             for (size_t i=0; i<S.size(); ++i) {
                 if (s[i]>eps) {
@@ -89,7 +89,7 @@ class EKM {
             }
 
         }
-        void inverse(Matrix &A) {
+        void inverse(tadah::core::Matrix &A) {
             double *a = &A.data()[0];
             int n = A.rows();   // A is square
             int *ipiv = new int[n];
@@ -103,7 +103,7 @@ class EKM {
             delete[] ipiv;
             delete[] work;
         }
-        void cholesky(Matrix &A, char uplo) {
+        void cholesky(tadah::core::Matrix &A, char uplo) {
             // matrix must be either U or L
             int n = A.cols(); // A is square
             double *a = &A.data()[0];
@@ -111,7 +111,7 @@ class EKM {
             dpotrf_(&uplo, &n, a, &n, &info);
         }
 
-        void project(phi_type &Phi) {
+        void project(tadah::core::phi_type &Phi) {
             // Phi'=Phi*EKM_mat
             char transa = 'N';
             char transb = 'N';
@@ -125,20 +125,20 @@ class EKM {
             dgemm_(&transa, &transb, &m, &n, &n, &alpha, a, &m, b, &n,
                     &beta, c, &m);
 
-            Phi = Matrix(c,m,n);
+            Phi = tadah::core::Matrix(c,m,n);
 
             delete[] c;
 
         }
-        aed_type project(aed_type &aed, Matrix &basis) {
-            aed_type temp(basis.cols());
+        tadah::core::aed_type project(tadah::core::aed_type &aed, tadah::core::Matrix &basis) {
+            tadah::core::aed_type temp(basis.cols());
             for (size_t b=0; b<basis.cols(); b++) {
                 temp(b) = kernel(aed,basis[b]);
             }
-} // namespace models
-} // namespace tadah
 
             return  EKM_mat*temp;
         }
 };
+} // namespace models
+} // namespace tadah
 #endif

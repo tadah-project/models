@@ -304,10 +304,10 @@ class Cut_PT : public Cut_Base {
         double get_rcut();
         double get_rcut_sq();
         double calc(double r);
-} // namespace models
-} // namespace tadah
 
         double calc_prime(double r);
 };
 
+} // namespace models
+} // namespace tadah
 #endif

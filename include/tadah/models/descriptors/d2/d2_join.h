@@ -23,7 +23,7 @@ public:
     if (d1) delete d1;
     if (d2) delete d2;
   }
-  D2_Join(Config &c): D2_Base(c)
+  D2_Join(tadah::core::Config &c): D2_Base(c)
   {
     // prepare configs for d1 and d2
     // first we get joined grid and we have to split it between d1 and d2
@@ -36,14 +36,14 @@ public:
     // and d2 can be any including D2_Join
     // This means that we trim config for d1 and pass
     // whatever is left to d2
-    v_type cgrid;
+    tadah::core::v_type cgrid;
     cgrid.resize(c.size("CGRID2B"));
-    c.get<v_type>("CGRID2B",cgrid);
-    v_type sgrid;
+    c.get<tadah::core::v_type>("CGRID2B",cgrid);
+    tadah::core::v_type sgrid;
     sgrid.resize(c.size("SGRID2B"));
-    c.get<v_type>("SGRID2B",sgrid);
-    Config c1=c;
-    Config c2=c;
+    c.get<tadah::core::v_type>("SGRID2B",sgrid);
+    tadah::core::Config c1=c;
+    tadah::core::Config c2=c;
     c1.remove("CGRID2B");
     c1.remove("SGRID2B");
     c2.remove("CGRID2B");
@@ -111,7 +111,7 @@ public:
     const int Zj,
     const double rij,
     const double rij_sq,
-    aed_type &aed,
+    tadah::core::aed_type &aed,
     const double scale=1) override {
     d1->calc_aed(Zi,Zj,rij,rij_sq,aed,scale);
     d2->calc_aed(Zi,Zj,rij,rij_sq,aed,scale);
@@ -121,7 +121,7 @@ public:
     const int Zj,
     const double rij,
     const double rij_sq,
-    fd_type &fd_ij,
+    tadah::core::fd_type &fd_ij,
     const double scale=1) override {
     d1->calc_dXijdri(Zi,Zj,rij,rij_sq,fd_ij,scale);
     d2->calc_dXijdri(Zi,Zj,rij,rij_sq,fd_ij,scale);
@@ -131,8 +131,8 @@ public:
     const int Zj,
     const double rij,
     const double rij_sq,
-    aed_type &aed,
-    fd_type &fd_ij,
+    tadah::core::aed_type &aed,
+    tadah::core::fd_type &fd_ij,
     const double scale=1) override {
     d1->calc_all(Zi,Zj,rij,rij_sq,aed,fd_ij,scale);
     d2->calc_all(Zi,Zj,rij,rij_sq,aed,fd_ij,scale);
@@ -143,10 +143,10 @@ public:
   void set_fidx(size_t fidx_) override {
     d1->set_fidx(fidx_);
     d2->set_fidx(d1->size()+d1->get_fidx());
-} // namespace models
-} // namespace tadah
 
   }
   void init() override {};
 };
+} // namespace models
+} // namespace tadah
 #endif

@@ -22,8 +22,8 @@ namespace models {
 template <class K = Function_Base&>
 class M_KRR_Core : public virtual M_Core {
 public:
-    Matrix Sigma; ///< Covariance matrix.
-    Config &config; ///< Configuration reference.
+    tadah::core::Matrix Sigma; ///< Covariance matrix.
+    tadah::core::Config &config; ///< Configuration reference.
     K kernel; ///< Kernel function.
 
     /**
@@ -33,7 +33,7 @@ public:
      *
      * @param c Configuration object reference.
      */
-    M_KRR_Core(Config &c) :
+    M_KRR_Core(tadah::core::Config &c) :
         config(c),
         kernel(c)
     {
@@ -52,7 +52,7 @@ public:
      * @param kernel Kernel object.
      * @param c Configuration object reference.
      */
-    M_KRR_Core(K &kernel, Config &c) :
+    M_KRR_Core(K &kernel, tadah::core::Config &c) :
         config(c),
         kernel(kernel)
     {
@@ -67,7 +67,7 @@ public:
      * @param v Input vector for prediction.
      * @return Predicted value.
      */
-    double predict(const aed_type &v) const {
+    double predict(const tadah::core::aed_type &v) const {
         return kernel.epredict(weights, v);
     }
 
@@ -79,7 +79,7 @@ public:
      * @return Vector of uncertainties based on the Sigma diagonal.
      * @throws std::runtime_error if LAMBDA is not zero.
      */
-    t_type get_weights_uncertainty() const {
+    tadah::core::t_type get_weights_uncertainty() const {
         double lambda = config.template get<double>("LAMBDA");
         if(lambda != 0) 
             throw std::runtime_error("Sigma matrix is only computed for LAMBDA != 0");
@@ -95,14 +95,14 @@ private:
     void init() {
         if (config.exist("WEIGHTS")) {
             weights.resize(config.size("WEIGHTS"));
-            config.get<t_type>("WEIGHTS", weights);
+            config.get<tadah::core::t_type>("WEIGHTS", weights);
             trained = true;
         }
         verbose = config.get<int>("VERBOSE");
-} // namespace models
-} // namespace tadah
 
     }
 };
 
+} // namespace models
+} // namespace tadah
 #endif // M_KRR_Core_H

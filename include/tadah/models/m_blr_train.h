@@ -40,7 +40,7 @@ public:
      *
      * @param c Configuration object reference.
      */
-    M_BLR_Train(Config &c) : M_BLR_Core<BF>(c) {}
+    M_BLR_Train(tadah::core::Config &c) : M_BLR_Core<BF>(c) {}
 
     /**
      * @brief Constructor using a basis function and configuration object.
@@ -50,8 +50,8 @@ public:
      * @param bf Basis function object.
      * @param c Configuration object reference.
      */
-    M_BLR_Train(BF &bf, Config &c) : M_BLR_Core<BF>(bf, c) {}
-    M_BLR_Train(BF &bf, Config &c, tadah::models::memory::IModelsWorkspaceManager &workspaceManager) :
+    M_BLR_Train(BF &bf, tadah::core::Config &c) : M_BLR_Core<BF>(bf, c) {}
+    M_BLR_Train(BF &bf, tadah::core::Config &c, tadah::models::memory::IModelsWorkspaceManager &workspaceManager) :
     M_BLR_Core<BF>(bf, c),
     M_Train(workspaceManager)
   {}
@@ -65,7 +65,7 @@ public:
      * @param T Target vector.
      * @throws std::runtime_error if the object is already trained.
      */
-  void train(phi_type &Phi, t_type &T) {
+  void train(tadah::core::phi_type &Phi, tadah::core::t_type &T) {
     if (trained) {
       throw std::runtime_error("This object is already trained!");
     }
@@ -88,14 +88,14 @@ public:
       // Adjust for 0-based indexing
       for (auto &i : indices) i--;
 
-      t_type w_f(config.size("FIXWEIGHT"));
+      tadah::core::t_type w_f(config.size("FIXWEIGHT"));
       if (w_f.size() != indices.size()) {
         throw std::runtime_error("FIXWEIGHT and FIXINDEX differ in size: " + std::to_string(w_f.size()) + " and " + std::to_string(indices.size()));
       }
 
       config.get("FIXWEIGHT", w_f);
 
-      t_type T_r;
+      tadah::core::t_type T_r;
       auto move_map = prep_train_with_residuals(Phi, T, indices, w_f, T_r);
 
       // Resize Phi for training
@@ -103,7 +103,7 @@ public:
 
       LinearRegressor::train(config, Phi, T_r, weights, Sigma,*workspaceManager_);
 
-      t_type w_temp(weights.size() + indices.size());
+      tadah::core::t_type w_temp(weights.size() + indices.size());
 
       for (size_t i = 0; i < w_f.size(); ++i) {
         w_temp[w_temp.size() - w_f.size() + i] = w_f[i];
@@ -121,11 +121,11 @@ public:
       LinearRegressor::train(config, Phi, T, weights, Sigma,*workspaceManager_);
       trained = true;
     }
-} // namespace models
-} // namespace tadah
 
   }
 };
 
+} // namespace models
+} // namespace tadah
 #endif // M_BLR_TRAIN_H
 

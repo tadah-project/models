@@ -5,7 +5,7 @@ namespace models {
 
 Kern_Sigmoid::Kern_Sigmoid () {}
 Kern_Sigmoid::Kern_Sigmoid (const tadah::core::Config &config):
-    tadah::core::Function_Base(config),
+    Function_Base(config),
     Kern_Base(config),
     gamma(config.get<double>("MPARAMS",0)),
     c(config.get<double>("MPARAMS",1))

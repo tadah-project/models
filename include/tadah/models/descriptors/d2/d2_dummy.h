@@ -17,33 +17,33 @@ private:
   std::string lab="D2_Dummy";
 public:
   D2_Dummy();
-  D2_Dummy(Config &);
+  D2_Dummy(tadah::core::Config &);
   void calc_aed(
     const int Zi,
     const int Zj,
     const double rij,
     const double ,
-    aed_type &aed,
+    tadah::core::aed_type &aed,
     const double scale=1) override;
   void calc_dXijdri(
     const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
-    fd_type &fd_ij,
+    tadah::core::fd_type &fd_ij,
     const double scale=1) override;
   void calc_all(
     const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
-    aed_type &aed,
-    fd_type &fd_ij,
+    tadah::core::aed_type &aed,
+    tadah::core::fd_type &fd_ij,
     const double scale=1) override;
-} // namespace models
-} // namespace tadah
 
   std::string label() override;
   void init() override;
 };
+} // namespace models
+} // namespace tadah
 #endif

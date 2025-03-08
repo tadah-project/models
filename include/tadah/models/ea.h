@@ -90,12 +90,12 @@ namespace models {
 
 class EA {
   private:
-    const Config &config;
+    const tadah::core::Config &config;
     tadah::models::SVD &svd;
-    t_type &T;
+    tadah::core::t_type &T;
     int verbose;
   public:
-    EA(const Config &c, tadah::models::SVD &svd, t_type &T):
+    EA(const tadah::core::Config &c, tadah::models::SVD &svd, tadah::core::t_type &T):
       config(c),
       svd(svd),
       T(T),
@@ -130,10 +130,10 @@ class EA {
 
       int outprec=config.get<int>("OUTPREC");
 
-      t_type m_n(sizeS);
+      tadah::core::t_type m_n(sizeS);
       int m = svd.rows();
       int n = svd.cols();
-      t_type Tpred(m);
+      tadah::core::t_type Tpred(m);
     double rcond = config.size("OALGO")==2 ? config.get<double>("OALGO",1) : 1e-8;
     //
         // Create a workspace manager
@@ -158,7 +158,7 @@ class EA {
         }
         alpha = gamma / (m_n*m_n);
 
-        /*t_type Tpred = svd.predict(m_n,t,x);*/
+        /*tadah::core::t_type Tpred = svd.predict(m_n,t,x);*/
         svdMultiplier.compute(m_n.data(), Tpred.data());
         double temp = (T-Tpred)*(T-Tpred);
 
@@ -183,11 +183,11 @@ class EA {
       delete [] eval;
       delete [] d;
 
-} // namespace models
-} // namespace tadah
 
       return convergence_status;
     };
 };
+} // namespace models
+} // namespace tadah
 #endif
 

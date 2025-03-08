@@ -3,6 +3,8 @@
 #include <tadah/core/config.h>
 #include <tadah/core/core_types.h>
 
+using namespace tadah::core;
+using namespace tadah::models;
 TEST_CASE( "Testing D_Base", "[D_Base]" ) {
 
   v_type sgrid(5);

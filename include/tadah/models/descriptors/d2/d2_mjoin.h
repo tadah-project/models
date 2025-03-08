@@ -45,21 +45,21 @@ namespace models {
 class D2_mJoin : public D2_Base, public D_mJoin {
 private:
   std::vector<D2_Base*> ds;
-  std::vector<Config> configs;
+  std::vector<tadah::core::Config> configs;
   std::string lab = "D2_mJoin";
 public:
   D2_mJoin();
   ~D2_mJoin();
-  D2_mJoin(Config &c);
+  D2_mJoin(tadah::core::Config &c);
   
-  void calc_aed(const int Zi, const int Zj, const double rij, const double rij_sq, aed_type &aed, const double scale=1) override;
-  void calc_dXijdri(const int Zi, const int Zj, const double rij, const double rij_sq, fd_type &fd_ij, const double scale=1) override;
-  void calc_all(const int Zi, const int Zj, const double rij, const double rij_sq, aed_type &aed, fd_type &fd_ij, const double scale=1) override;
+  void calc_aed(const int Zi, const int Zj, const double rij, const double rij_sq, tadah::core::aed_type &aed, const double scale=1) override;
+  void calc_dXijdri(const int Zi, const int Zj, const double rij, const double rij_sq, tadah::core::fd_type &fd_ij, const double scale=1) override;
+  void calc_all(const int Zi, const int Zj, const double rij, const double rij_sq, tadah::core::aed_type &aed, tadah::core::fd_type &fd_ij, const double scale=1) override;
   std::string label() override;
-} // namespace models
-} // namespace tadah
 
   void set_fidx(size_t fidx_) override;
   void init() override;
 };
+} // namespace models
+} // namespace tadah
 #endif

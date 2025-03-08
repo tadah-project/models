@@ -32,11 +32,11 @@ D2_ZBL::D2_ZBL(tadah::core::Config &c): D2_Base(c)
   }
   for (int i=0; i<ntypes; ++i) {
     std::string symboli = c.get<std::string>("ATOMS",i);
-    int Zi = PeriodicTable::find_by_symbol(symboli).Z;
+    int Zi = tadah::core::PeriodicTable::find_by_symbol(symboli).Z;
     types[Zi] = i;
     for (int j=0; j<ntypes; ++j) {
       std::string symbolj = c.get<std::string>("ATOMS",j);
-      int Zj = PeriodicTable::find_by_symbol(symbolj).Z;
+      int Zj = tadah::core::PeriodicTable::find_by_symbol(symbolj).Z;
       a[i][j] = screening_length(Zi,Zj);
     }
   }

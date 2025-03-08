@@ -10,9 +10,6 @@
 namespace tadah {
 namespace models {
 
-namespace tadah {
-namespace models {
-
 inline SVD::SVD()
     : workspaceManager_(new memory::ModelsWorkspaceManager()), ownsWorkspaceManager_(true), svdWorkspace_(nullptr), m_(0), n_(0) {}
 
@@ -43,7 +40,7 @@ void SVD::compute(M& A) {
     int info;
 
     // Perform SVD
-    ::dgesdd_(&jobz, &m, &n, A.ptr(), &lda, svdWorkspace_->S, svdWorkspace_->U, &ldu,
+  tadah::core::dgesdd_(&jobz, &m, &n, A.ptr(), &lda, svdWorkspace_->S, svdWorkspace_->U, &ldu,
               svdWorkspace_->VT, &ldvt, svdWorkspace_->work, &svdWorkspace_->lwork, svdWorkspace_->iwork, &info);
 
     if (info != 0) {
@@ -74,9 +71,6 @@ inline int SVD::rows() const {
 inline int SVD::cols() const {
     return n_;
 }
-
-} // namespace models
-} // namespace tadah
 
 } // namespace models
 } // namespace tadah

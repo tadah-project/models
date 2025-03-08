@@ -16,29 +16,29 @@ private:
 
 public:
   Function_Base();
-  Function_Base(const Config &c);
+  Function_Base(const tadah::core::Config &c);
   void set_verbose(int v);
   int get_verbose();
 
-  // Derived classes must implement Derived() and Derived(Config)
+  // Derived classes must implement Derived() and Derived(tadah::core::Config)
   virtual ~Function_Base();
 
   // For Kernels
-  virtual double operator() (const aed_type& , const aed_type& ) const;
-  virtual aed_type derivative(const aed_type& , const aed_type& ) const;
-  virtual double prime(const aed_type& , const aed_type& ,
-                       const aed_type& ) const;
-  virtual void set_basis(const Matrix );
+  virtual double operator() (const tadah::core::aed_type& , const tadah::core::aed_type& ) const;
+  virtual tadah::core::aed_type derivative(const tadah::core::aed_type& , const tadah::core::aed_type& ) const;
+  virtual double prime(const tadah::core::aed_type& , const tadah::core::aed_type& ,
+                       const tadah::core::aed_type& ) const;
+  virtual void set_basis(const tadah::core::Matrix );
 
   /** \brief Return label of this object */
   virtual std::string get_label() const=0;
-  virtual double epredict(const t_type &, const aed_type& ) const=0;
-  virtual double fpredict(const t_type &, const fd_type &,
-                          const aed_type&, const size_t ) const=0;
+  virtual double epredict(const tadah::core::t_type &, const tadah::core::aed_type& ) const=0;
+  virtual double fpredict(const tadah::core::t_type &, const tadah::core::fd_type &,
+                          const tadah::core::aed_type&, const size_t ) const=0;
+
+  virtual tadah::core::force_type fpredict(const tadah::core::t_type &, const tadah::core::fd_type &,
+                              const tadah::core::aed_type& ) const=0;
+};
 } // namespace models
 } // namespace tadah
-
-  virtual force_type fpredict(const t_type &, const fd_type &,
-                              const aed_type& ) const=0;
-};
 #endif

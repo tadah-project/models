@@ -16,7 +16,7 @@ public:
     const double rik,
     const double fc_ij,
     const double fc_ik,
-    aed_type& aed)=0;
+    tadah::core::aed_type& aed)=0;
   virtual void calc_fd(
     const size_t fidx,
     const double rij,
@@ -25,7 +25,7 @@ public:
     const double fc_ik,
     const double fcp_ij,
     const double fcp_ik,
-    fd_type &fd_ij)=0;
+    tadah::core::fd_type &fd_ij)=0;
   virtual void calc_all(
     const size_t fidx,
     const double rij,
@@ -34,13 +34,13 @@ public:
     const double fc_ik,
     const double fcp_ij,
     const double fcp_ik,
-    aed_type& aed,
-    fd_type &fd_ij)=0;
+    tadah::core::aed_type& aed,
+    tadah::core::fd_type &fd_ij)=0;
   virtual size_t size()override=0;
-} // namespace models
-} // namespace tadah
 
   virtual std::string label()override=0;
-  virtual std::vector<std::string> get_init_atoms(Config &c) override;
+  virtual std::vector<std::string> get_init_atoms(tadah::core::Config &c) override;
 };
+} // namespace models
+} // namespace tadah
 #endif

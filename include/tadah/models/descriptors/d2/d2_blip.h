@@ -45,38 +45,38 @@ namespace models {
 class D2_Blip : public D2_Base {
 private:
   std::string lab="D2_Blip";
-  v_type etas;
-  v_type mius;
+  tadah::core::v_type etas;
+  tadah::core::v_type mius;
 
 public:
   D2_Blip();
-  D2_Blip(Config &config);
+  D2_Blip(tadah::core::Config &config);
   void calc_aed(
     const int Zi,
     const int Zj,
     const double rij,
     const double ,
-    aed_type &aed,
+    tadah::core::aed_type &aed,
     const double scale=1) override;
   void calc_dXijdri(
     const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
-    fd_type &fd_ij,
+    tadah::core::fd_type &fd_ij,
     const double scale=1) override;
   void calc_all(
     const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
-    aed_type &aed,
-    fd_type &fd_ij,
+    tadah::core::aed_type &aed,
+    tadah::core::fd_type &fd_ij,
     const double scale=1) override;
-} // namespace models
-} // namespace tadah
 
   std::string label() override;
   void init() override;
 };
+} // namespace models
+} // namespace tadah
 #endif

@@ -4,7 +4,7 @@ namespace models {
 
 
 Kern_Base::Kern_Base() {}
-Kern_Base::Kern_Base(const tadah::core::Config &c): tadah::core::Function_Base(c) {}
+Kern_Base::Kern_Base(const tadah::core::Config &c): Function_Base(c) {}
 Kern_Base::~Kern_Base() {}
 void Kern_Base::set_basis(const tadah::core::Matrix b)
 {

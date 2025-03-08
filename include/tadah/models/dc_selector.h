@@ -18,7 +18,7 @@ class DC_Selector {
         D3_Base *d3b=nullptr;
         DM_Base *dmb=nullptr;
 
-        //Config config;
+        //tadah::core::Config config;
 
         DC_Selector ()
         {};
@@ -52,12 +52,12 @@ class DC_Selector {
             return *this;
         }
 
-        DC_Selector (Config &c)
+        DC_Selector (tadah::core::Config &c)
             //config(c)
     {
         init(c);
     };
-        void init(Config &config) {
+        void init(tadah::core::Config &config) {
             double rcutzero = 0.0; // for dummies
 
             size_t bias=0;
@@ -66,37 +66,37 @@ class DC_Selector {
 
             if (config.get<bool>("INIT2B")) {
                 double rcut2b = config.get<double>("RCUT2BMAX");
-                c2b = CONFIG::factory<Cut_Base,double>( config.get<std::string>("RCTYPE2B"), rcut2b );
-                d2b = CONFIG::factory<D2_Base,Config&>( config.get<std::string>("TYPE2B"), config );
+                c2b = tadah::core::factory<Cut_Base,double>( config.get<std::string>("RCTYPE2B"), rcut2b );
+                d2b = tadah::core::factory<D2_Base,tadah::core::Config&>( config.get<std::string>("TYPE2B"), config );
                 d2b->set_fidx(bias);
             }
             else {
-                c2b = CONFIG::factory<Cut_Base,double>( "Cut_Dummy", rcutzero );
-                d2b = CONFIG::factory<D2_Base,Config&>( "D2_Dummy", config );
+                c2b = tadah::core::factory<Cut_Base,double>( "Cut_Dummy", rcutzero );
+                d2b = tadah::core::factory<D2_Base,tadah::core::Config&>( "D2_Dummy", config );
                 d2b->set_fidx(bias);
             }
 
             if (config.get<bool>("INIT3B")) {
                 double rcut3b = config.get<double>("RCUT3BMAX");
-                c3b = CONFIG::factory<Cut_Base,double>( config.get<std::string>("RCTYPE3B"), rcut3b );
-                d3b = CONFIG::factory<D3_Base,Config&>( config.get<std::string>("TYPE3B"), config );
+                c3b = tadah::core::factory<Cut_Base,double>( config.get<std::string>("RCTYPE3B"), rcut3b );
+                d3b = tadah::core::factory<D3_Base,tadah::core::Config&>( config.get<std::string>("TYPE3B"), config );
                 // d3b->fidx = bias;
             }
             else {
-                c3b = CONFIG::factory<Cut_Base,double>( "Cut_Dummy", rcutzero );
-                d3b = CONFIG::factory<D3_Base,Config&>( "D3_Dummy", config );
+                c3b = tadah::core::factory<Cut_Base,double>( "Cut_Dummy", rcutzero );
+                d3b = tadah::core::factory<D3_Base,tadah::core::Config&>( "D3_Dummy", config );
                 // d3b->fidx = bias;
             }
 
             if (config.get<bool>("INITMB")) {
                 double rcutmb = config.get<double>("RCUTMBMAX");
-                cmb = CONFIG::factory<Cut_Base,double>( config.get<std::string>("RCTYPEMB"), rcutmb );
-                dmb = CONFIG::factory<DM_Base,Config&>( config.get<std::string>("TYPEMB"), config );
+                cmb = tadah::core::factory<Cut_Base,double>( config.get<std::string>("RCTYPEMB"), rcutmb );
+                dmb = tadah::core::factory<DM_Base,tadah::core::Config&>( config.get<std::string>("TYPEMB"), config );
                 dmb->set_fidx(bias + d2b->size());
             }
             else {
-                cmb = CONFIG::factory<Cut_Base,double>( "Cut_Dummy", rcutzero );
-                dmb = CONFIG::factory<DM_Base,Config&>( "DM_Dummy", config );
+                cmb = tadah::core::factory<Cut_Base,double>( "Cut_Dummy", rcutzero );
+                dmb = tadah::core::factory<DM_Base,tadah::core::Config&>( "DM_Dummy", config );
                 dmb->set_fidx(bias + d2b->size());
             }
         }
@@ -113,10 +113,10 @@ class DC_Selector {
             if (cmb)
                 delete cmb;
             if (dmb)
-} // namespace models
-} // namespace tadah
 
                 delete dmb;
         }
 };
+} // namespace models
+} // namespace tadah
 #endif

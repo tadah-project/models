@@ -34,11 +34,11 @@ class LinearRegressor {
    * @param Phi Design matrix.
    * @param T Target matrix.
    * @param weights Vector to store the resultant weights.
-   * @param Sigma Matrix to store the covariance matrix.
+   * @param Sigma tadah::core::Matrix to store the covariance matrix.
    */
 public:
-  static void train(Config &config, phi_type &Phi, t_type &T, t_type &weights,
-                    Matrix &Sigma, tadah::models::memory::IModelsWorkspaceManager &workspaceManager) {
+  static void train(tadah::core::Config &config, tadah::core::phi_type &Phi, tadah::core::t_type &T, tadah::core::t_type &weights,
+                    tadah::core::Matrix &Sigma, tadah::models::memory::IModelsWorkspaceManager &workspaceManager) {
 
     int verbose = config.get<int>("VERBOSE");
     double lambda = config.get<double>("LAMBDA", 0);
@@ -97,8 +97,8 @@ public:
     }
 
   }
-  static void train(Config &config, phi_type &Phi, t_type &T, t_type &weights,
-                    Matrix &Sigma) {
+  static void train(tadah::core::Config &config, tadah::core::phi_type &Phi, tadah::core::t_type &T, tadah::core::t_type &weights,
+                    tadah::core::Matrix &Sigma) {
     tadah::models::memory::ModelsWorkspaceManager workspaceManager;
     train(config, Phi, T, weights, Sigma, workspaceManager);
   }
@@ -112,12 +112,12 @@ public:
    * @param lambda Regularization parameter.
    * @return Covariance matrix.
    */
-  static Matrix get_sigma(tadah::models::SVD &svd, double lambda) {
+  static tadah::core::Matrix get_sigma(tadah::models::SVD &svd, double lambda) {
     double *VT = svd.getVT();
     double *S = svd.getS();
     int n = static_cast<int>(svd.cols());
 
-    Matrix Sigma((size_t)n, (size_t)n);
+    tadah::core::Matrix Sigma((size_t)n, (size_t)n);
     Sigma.set_zero();
     double *sigma = &Sigma.data()[0];
 
@@ -141,10 +141,10 @@ public:
    * @param config Configuration object.
    * @param Sigma Covariance matrix to be added.
    */
-  static void config_add_sigma(Config &config, Matrix &Sigma) {
-    t_type Sigma_as_vector(Sigma.data(), Sigma.cols() * Sigma.rows());
+  static void config_add_sigma(tadah::core::Config &config, tadah::core::Matrix &Sigma) {
+    tadah::core::t_type Sigma_as_vector(Sigma.data(), Sigma.cols() * Sigma.rows());
     config.add("SIGMA", Sigma.rows());
-    config.add<t_type>("SIGMA", Sigma_as_vector);
+    config.add<tadah::core::t_type>("SIGMA", Sigma_as_vector);
   }
 
   /**
@@ -153,10 +153,10 @@ public:
    * Retrieves the Sigma matrix stored in the configuration.
    *
    * @param config Configuration object.
-   * @param Sigma Matrix to store the reconstructed Sigma.
+   * @param Sigma tadah::core::Matrix to store the reconstructed Sigma.
    * @throws std::runtime_error if Sigma is not computed.
    */
-  static void read_sigma(Config &config, Matrix &Sigma) {
+  static void read_sigma(tadah::core::Config &config, tadah::core::Matrix &Sigma) {
     using V = std::vector<double>;
     size_t N;
     try {
@@ -172,10 +172,10 @@ public:
     Sigma.resize(N, N);
     for (size_t c = 0; c < N; ++c)
       for (size_t r = 0; r < N; ++r)
-} // namespace models
-} // namespace tadah
 
         Sigma(r, c) = Sigma_as_vector.at(N * c + r);
   }
 };
+} // namespace models
+} // namespace tadah
 #endif

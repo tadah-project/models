@@ -40,7 +40,7 @@ DM_EAM::DM_EAM(tadah::core::Config &c): DM_Base(c)
 }
 
 void DM_EAM::calc_aed(
-  rho_type& rho,
+  tadah::core::rho_type& rho,
   tadah::core::aed_type &aed)
 {
   //std::cout << "rho[i]:   " << rho(0) << std::endl;
@@ -67,9 +67,9 @@ void DM_EAM::calc_dXijdri_dXjidri(
   const int Zj,
   const double rij,
   const double,
-  const Vec3d &vec_ij,
-  rho_type& rhoi,
-  rho_type& rhoj,
+  const tadah::core::Vec3d &vec_ij,
+  tadah::core::rho_type& rhoi,
+  tadah::core::rho_type& rhoj,
   tadah::core::fd_type &fd_ij,
   const double scale)
 {
@@ -98,8 +98,8 @@ void DM_EAM::calc_dXijdri(
   const int Zj,
   const double rij,
   const double,
-  const Vec3d &vec_ij,
-  rho_type& rhoi,
+  const tadah::core::Vec3d &vec_ij,
+  tadah::core::rho_type& rhoi,
   tadah::core::fd_type &fd_ij,
   const double scale)
 {
@@ -193,7 +193,7 @@ void DM_EAM::gen_splines(int &n, double &delta, std::vector<double> &f,
     spline[m][0] = 3.0*spline[m][3]/delta;
   }
 }
-void DM_EAM::init_rhoi(rho_type& rhoi)
+void DM_EAM::init_rhoi(tadah::core::rho_type& rhoi)
 {
   rhoi.resize(2);
   rhoi.set_zero();
@@ -203,8 +203,8 @@ void DM_EAM::calc_rho(
   const int Zj,
   const double rij,
   const double,
-  const Vec3d &,
-  rho_type& rho,
+  const tadah::core::Vec3d &,
+  tadah::core::rho_type& rho,
   const double scale)
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;

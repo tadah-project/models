@@ -20,25 +20,25 @@ namespace models {
 class Kern_Linear :  public virtual Kern_Base {
     public:
         Kern_Linear ();
-        Kern_Linear (const Config &c);
+        Kern_Linear (const tadah::core::Config &c);
         std::string get_label() const override;
 
         /**
          * Label used for this class
          */
         std::string label = "Kern_Linear";
-        double operator() (const aed_type& b, const aed_type& af) const override;
-        aed_type derivative(const aed_type& b, const aed_type& ) const override;
-        double prime(const aed_type& b, const aed_type& af, const aed_type& ff) const override;
-        void set_basis(const Matrix ) override {}
+        double operator() (const tadah::core::aed_type& b, const tadah::core::aed_type& af) const override;
+        tadah::core::aed_type derivative(const tadah::core::aed_type& b, const tadah::core::aed_type& ) const override;
+        double prime(const tadah::core::aed_type& b, const tadah::core::aed_type& af, const tadah::core::aed_type& ff) const override;
+        void set_basis(const tadah::core::Matrix ) override {}
 
-        double epredict(const t_type &weights, const aed_type& aed) const override;
-        double fpredict(const t_type &weights, const fd_type &fdij,
-                const aed_type& aedi, const size_t k) const override;
+        double epredict(const tadah::core::t_type &weights, const tadah::core::aed_type& aed) const override;
+        double fpredict(const tadah::core::t_type &weights, const tadah::core::fd_type &fdij,
+                const tadah::core::aed_type& aedi, const size_t k) const override;
+
+        tadah::core::force_type fpredict(const tadah::core::t_type &weights, const tadah::core::fd_type &fdij,
+                const tadah::core::aed_type& aedi) const override;
+};
 } // namespace models
 } // namespace tadah
-
-        force_type fpredict(const t_type &weights, const fd_type &fdij,
-                const aed_type& aedi) const override;
-};
 #endif

@@ -105,10 +105,10 @@ inline double dB(double x_c, double eta, double f, double fp)
     return 0.0;
   }
 }
-} // namespace models
-} // namespace tadah
 
 inline double dB(double r, double eta, double miu) {
   return dB(eta*(r-miu), eta);
 }
+} // namespace models
+} // namespace tadah
 #endif

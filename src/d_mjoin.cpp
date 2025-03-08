@@ -142,7 +142,7 @@ std::vector<tadah::core::Config> D_mJoin::parse_config(tadah::core::Config &c, s
     c1.add(type_str,token);
     c1.add(rctypekey,*(data_map[rctypekey]++));
     c1.add(rcutkey,*(data_map[rcutkey]++));
-    D_Base *d = CONFIG::factory<D_Base>(token);
+    D_Base *d = tadah::core::factory<D_Base>(token);
     size_t fparam = d->nparams - d->keys.size();
     for (size_t j=0; j<fparam; ++j) {
       c1.add(type_str,*it++);

@@ -17,7 +17,7 @@ D2_mJoin::D2_mJoin(tadah::core::Config &c) : D2_Base(c) {
   expand_grids(c, configs, "TYPE2B");
 
   for (auto &c1 : configs) {
-    ds.push_back(CONFIG::factory<D2_Base, tadah::core::Config&>(c1.get<std::string>("TYPE2B"), c1));
+    ds.push_back(tadah::core::factory<D2_Base, tadah::core::Config&>(c1.get<std::string>("TYPE2B"), c1));
     s += ds.back()->size();
   }
 }

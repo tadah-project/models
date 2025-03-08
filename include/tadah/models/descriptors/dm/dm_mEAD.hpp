@@ -2,6 +2,9 @@
 #include <tadah/models/descriptors/dm/dm_mEAD.h>
 #include <tadah/models/descriptors/d_basis_functions.h>
 
+namespace tadah {
+namespace models {
+
 template <typename F>
 DM_mEAD<F>::DM_mEAD() {
   init();
@@ -12,7 +15,7 @@ DM_mEAD<F>::DM_mEAD() {
  * of the embedding function
  */
 template <typename F>
-DM_mEAD<F>::DM_mEAD(Config &config): DM_Base(config),
+DM_mEAD<F>::DM_mEAD(tadah::core::Config &config): DM_Base(config),
   rc(config.get<double>("RCUTMBMAX")),
   emb(config)
 {
@@ -54,8 +57,8 @@ DM_mEAD<F>::DM_mEAD(Config &config): DM_Base(config),
 
 template <typename F>
 void DM_mEAD<F>::calc_aed(
-  rho_type& rhoi,
-  aed_type &aed)
+  tadah::core::rho_type& rhoi,
+  tadah::core::aed_type &aed)
 {
   size_t Lshift = 0;
   size_t ii=rfidx;
@@ -77,10 +80,10 @@ void DM_mEAD<F>::calc_dXijdri_dXjidri(
   const int Zj,
   const double rij,
   const double,
-  const Vec3d &vec_ij,
-  rho_type& rhoi,
-  rho_type& rhoj,
-  fd_type &fd_ij,
+  const tadah::core::Vec3d &vec_ij,
+  tadah::core::rho_type& rhoi,
+  tadah::core::rho_type& rhoj,
+  tadah::core::fd_type &fd_ij,
   const double scale)
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
@@ -173,9 +176,9 @@ void DM_mEAD<F>::calc_dXijdri(
   const int Zj,
   const double rij,
   const double,
-  const Vec3d &vec_ij,
-  rho_type& rhoi,
-  fd_type &fd_ij,
+  const tadah::core::Vec3d &vec_ij,
+  tadah::core::rho_type& rhoi,
+  tadah::core::fd_type &fd_ij,
   const double scale)
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
@@ -247,7 +250,7 @@ std::string DM_mEAD<F>::label() {
 }
 
 template <typename F>
-void DM_mEAD<F>::init_rhoi(rho_type& rhoi)
+void DM_mEAD<F>::init_rhoi(tadah::core::rho_type& rhoi)
 {
   rhoi.resize(2*rhoisize);
   rhoi.set_zero();
@@ -258,8 +261,8 @@ void DM_mEAD<F>::calc_rho(
   const int Zj,
   const double rij,
   const double,
-  const Vec3d &vec_ij,
-  rho_type& rhoi,
+  const tadah::core::Vec3d &vec_ij,
+  tadah::core::rho_type& rhoi,
   const double scale)
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
@@ -329,3 +332,6 @@ void DM_mEAD<F>::init() {
   keys.push_back("SEMBFUNC");
   nparams=5;
 }
+
+} // namespace models
+} // namespace tadah

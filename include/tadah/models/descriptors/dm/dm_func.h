@@ -29,19 +29,19 @@ public:
  */
 class F_RLR:  public F_Base {
 private:
-  Config *config=nullptr;
-  v_type sgrid;   // controls depth
-  v_type cgrid;   // control x-intercep at 1/c
+  tadah::core::Config *config=nullptr;
+  tadah::core::v_type sgrid;   // controls depth
+  tadah::core::v_type cgrid;   // control x-intercep at 1/c
 public:
-  F_RLR(Config &conf);
+  F_RLR(tadah::core::Config &conf);
   F_RLR();
   double calc_F(double rho,size_t c);
   double calc_dF(double rho,size_t c);
   //~F_RLR() {
-} // namespace models
-} // namespace tadah
 
   // Do not delete config!
   //}
 };
+} // namespace models
+} // namespace tadah
 #endif

@@ -18,9 +18,9 @@ namespace models {
  */
 class Kern_Base: public virtual Function_Base {
     public:
-        Matrix basis;
+        tadah::core::Matrix basis;
         Kern_Base();
-        Kern_Base(const Config &c);
+        Kern_Base(const tadah::core::Config &c);
         virtual ~Kern_Base();
 
         // /**
@@ -29,7 +29,7 @@ class Kern_Base: public virtual Function_Base {
         //  * - b = basis vector
         //  * - af = atomic energy descriptor
         //  */
-        virtual double operator() (const aed_type &b, const aed_type &af) const=0;
+        virtual double operator() (const tadah::core::aed_type &b, const tadah::core::aed_type &af) const=0;
         //
         // /**
         //  * Calculate the kernel derivative wrt to the second argument
@@ -37,7 +37,7 @@ class Kern_Base: public virtual Function_Base {
         //  * - b = basis vector
         //  * - af = atomic energy descriptor
         //  */
-        virtual aed_type derivative(const aed_type &b, const aed_type &af) const=0;
+        virtual tadah::core::aed_type derivative(const tadah::core::aed_type &b, const tadah::core::aed_type &af) const=0;
 
         /**
          * Calculate inner product of the kernel derivative
@@ -48,27 +48,27 @@ class Kern_Base: public virtual Function_Base {
          * - ff = force descriptor (TODO i-th dir component of it)
          *   TODO consider calculating all 3-directions at once
          */
-        virtual double prime(const aed_type &b, const aed_type &af,
-                const aed_type &ff) const=0;
+        virtual double prime(const tadah::core::aed_type &b, const tadah::core::aed_type &af,
+                const tadah::core::aed_type &ff) const=0;
 
         /** \brief Set basis for calculations */
-        virtual void set_basis(const Matrix b);
+        virtual void set_basis(const tadah::core::Matrix b);
 
         /** \brief Return basis stored by this object */
-        virtual const Matrix &get_basis() const;
+        virtual const tadah::core::Matrix &get_basis() const;
         /** \brief Return basis stored by this object */
-        virtual Matrix get_basis();
+        virtual tadah::core::Matrix get_basis();
 
-        virtual double epredict(const t_type &kweights, const aed_type &aed) const;
-        virtual double fpredict(const t_type &kweights, const fd_type &fdij,
-                const aed_type &aedi, const size_t k) const;
-        virtual force_type fpredict(const t_type &kweights, const fd_type &fdij,
-                const aed_type &aedi) const;
+        virtual double epredict(const tadah::core::t_type &kweights, const tadah::core::aed_type &aed) const;
+        virtual double fpredict(const tadah::core::t_type &kweights, const tadah::core::fd_type &fdij,
+                const tadah::core::aed_type &aedi, const size_t k) const;
+        virtual tadah::core::force_type fpredict(const tadah::core::t_type &kweights, const tadah::core::fd_type &fdij,
+                const tadah::core::aed_type &aedi) const;
 
+        virtual void read_basis_from_config(const tadah::core::Config &config,
+                tadah::core::Matrix &b);
+};
 } // namespace models
 } // namespace tadah
 
-        virtual void read_basis_from_config(const Config &config,
-                Matrix &b);
-};
 #endif

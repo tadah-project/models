@@ -4,6 +4,8 @@
 #include <tadah/core/periodic_table.h>
 #include <tadah/models/cutoffs.h>
 
+using namespace tadah::core;
+using namespace tadah::models;
 template<typename D, typename C>
 void test_d2(Config &c, double r) {
   // std::streambuf *orig = std::cout.rdbuf();

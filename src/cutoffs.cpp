@@ -6,14 +6,14 @@ namespace models {
 
 
 
-template<> CONFIG::Registry<Cut_Base,double>::Map CONFIG::Registry<Cut_Base,double>::registry{};
-CONFIG::Registry<Cut_Base,double>::Register<Cut_Cos> Cut_Cos_1( "Cut_Cos" );
-CONFIG::Registry<Cut_Base,double>::Register<Cut_CosS> Cut_Cos_2( "Cut_CosS" );
-CONFIG::Registry<Cut_Base,double>::Register<Cut_Dummy> Cut_Dummy_1( "Cut_Dummy" );
-CONFIG::Registry<Cut_Base,double>::Register<Cut_Poly> Cut_Poly_1( "Cut_Poly" );
-CONFIG::Registry<Cut_Base,double>::Register<Cut_PolyS> Cut_Poly_2( "Cut_PolyS" );
-CONFIG::Registry<Cut_Base,double>::Register<Cut_PT> Cut_PT_1( "Cut_PT" );
-CONFIG::Registry<Cut_Base,double>::Register<Cut_Tanh> Cut_Tanh_1( "Cut_Tanh" );
+template<> tadah::core::Registry<Cut_Base,double>::Map tadah::core::Registry<Cut_Base,double>::registry{};
+tadah::core::Registry<Cut_Base,double>::Register<Cut_Cos> Cut_Cos_1( "Cut_Cos" );
+tadah::core::Registry<Cut_Base,double>::Register<Cut_CosS> Cut_Cos_2( "Cut_CosS" );
+tadah::core::Registry<Cut_Base,double>::Register<Cut_Dummy> Cut_Dummy_1( "Cut_Dummy" );
+tadah::core::Registry<Cut_Base,double>::Register<Cut_Poly> Cut_Poly_1( "Cut_Poly" );
+tadah::core::Registry<Cut_Base,double>::Register<Cut_PolyS> Cut_Poly_2( "Cut_PolyS" );
+tadah::core::Registry<Cut_Base,double>::Register<Cut_PT> Cut_PT_1( "Cut_PT" );
+tadah::core::Registry<Cut_Base,double>::Register<Cut_Tanh> Cut_Tanh_1( "Cut_Tanh" );
 
 
 Cut_Base::~Cut_Base() {}

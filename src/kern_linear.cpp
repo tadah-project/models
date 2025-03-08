@@ -5,7 +5,7 @@ namespace models {
 
 Kern_Linear::Kern_Linear() {}
 Kern_Linear::Kern_Linear (const tadah::core::Config &c):
-    tadah::core::Function_Base(c),
+    Function_Base(c),
     Kern_Base(c)
 {}
 double Kern_Linear::operator() (const tadah::core::aed_type& b, const tadah::core::aed_type& af) const

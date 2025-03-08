@@ -6,6 +6,8 @@
 #include <cmath>
 #include <vector>
 
+using namespace tadah::core;
+using namespace tadah::models;
 template <typename DM>
 void central_difference_mb(DM *dm, std::vector<Vec3d> &positions, 
                            size_t j, fd_type &fdij, double h=1e-10) {

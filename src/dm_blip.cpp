@@ -48,7 +48,7 @@ DM_Blip::DM_Blip(tadah::core::Config &c): DM_Base(c),
 }
 
 void DM_Blip::calc_aed(
-  rho_type& rhoi,
+  tadah::core::rho_type& rhoi,
   tadah::core::aed_type &aed)
 {
   size_t Lshift = 0;
@@ -70,9 +70,9 @@ void DM_Blip::calc_dXijdri_dXjidri(
   const int Zj,
   const double rij,
   const double,
-  const Vec3d &vec_ij,
-  rho_type& rhoi,
-  rho_type& rhoj,
+  const tadah::core::Vec3d &vec_ij,
+  tadah::core::rho_type& rhoi,
+  tadah::core::rho_type& rhoj,
   tadah::core::fd_type &fd_ij,
   const double scale)
 {
@@ -165,8 +165,8 @@ void DM_Blip::calc_dXijdri(
   const int Zj, 
   const double rij,
   const double,
-  const Vec3d &vec_ij,
-  rho_type& rhoi,
+  const tadah::core::Vec3d &vec_ij,
+  tadah::core::rho_type& rhoi,
   tadah::core::fd_type &fd_ij,
   const double scale)
 {
@@ -237,7 +237,7 @@ std::string DM_Blip::label() {
   return lab;
 }
 
-void DM_Blip::init_rhoi(rho_type& rhoi)
+void DM_Blip::init_rhoi(tadah::core::rho_type& rhoi)
 {
   rhoi.resize(2*rhoisize);
   rhoi.set_zero();
@@ -247,8 +247,8 @@ void DM_Blip::calc_rho(
   const int Zj,
   const double rij,
   const double,
-  const Vec3d &vec_ij,
-  rho_type& rhoi,
+  const tadah::core::Vec3d &vec_ij,
+  tadah::core::rho_type& rhoi,
   const double scale)
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;

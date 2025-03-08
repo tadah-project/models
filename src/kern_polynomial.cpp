@@ -5,7 +5,7 @@ namespace models {
 
 Kern_Polynomial::Kern_Polynomial () {}
 Kern_Polynomial::Kern_Polynomial (const tadah::core::Config &config):
-    tadah::core::Function_Base(config),
+    Function_Base(config),
     Kern_Base(config),
     d(config.get<int>("MPARAMS",0)),
     gamma(config.get<double>("MPARAMS",1)),

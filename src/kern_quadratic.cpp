@@ -5,7 +5,7 @@ namespace models {
 
 Kern_Quadratic::Kern_Quadratic () {}
 Kern_Quadratic::Kern_Quadratic (const tadah::core::Config &c):
-    tadah::core::Function_Base(c),
+    Function_Base(c),
     Kern_Base(c)
 {
     if (get_verbose()) std::cout << std::endl << label << std::endl;

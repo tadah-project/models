@@ -55,7 +55,7 @@ DM_EAD::DM_EAD(tadah::core::Config &config): DM_Base(config),
 }
 
 void DM_EAD::calc_aed(
-  rho_type& rhoi,
+  tadah::core::rho_type& rhoi,
   tadah::core::aed_type &aed)
 {
   size_t Lshift = 0;
@@ -77,9 +77,9 @@ void DM_EAD::calc_dXijdri_dXjidri(
   const int Zj,
   const double rij,
   const double,
-  const Vec3d &vec_ij,
-  rho_type& rhoi,
-  rho_type& rhoj,
+  const tadah::core::Vec3d &vec_ij,
+  tadah::core::rho_type& rhoi,
+  tadah::core::rho_type& rhoj,
   tadah::core::fd_type &fd_ij,
   const double scale)
 {
@@ -172,8 +172,8 @@ void DM_EAD::calc_dXijdri(
   const int Zj,
   const double rij,
   const double,
-  const Vec3d &vec_ij,
-  rho_type& rhoi,
+  const tadah::core::Vec3d &vec_ij,
+  tadah::core::rho_type& rhoi,
   tadah::core::fd_type &fd_ij,
   const double scale)
 {
@@ -244,7 +244,7 @@ std::string DM_EAD::label() {
   return lab;
 }
 
-void DM_EAD::init_rhoi(rho_type& rhoi)
+void DM_EAD::init_rhoi(tadah::core::rho_type& rhoi)
 {
   rhoi.resize(2*rhoisize);
   rhoi.set_zero();
@@ -254,8 +254,8 @@ void DM_EAD::calc_rho(
   const int Zj,
   const double rij,
   const double,
-  const Vec3d &vec_ij,
-  rho_type& rhoi,
+  const tadah::core::Vec3d &vec_ij,
+  tadah::core::rho_type& rhoi,
   const double scale)
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
