@@ -4,6 +4,9 @@
 #include <tadah/models/descriptors/d_base.h>
 #include <string>
 
+namespace tadah {
+namespace models {
+
 /** \brief Base class for all many-body type descriptors.
  *
  * All many-body descriptors **must** inherit this class.
@@ -127,6 +130,9 @@ public:
     return s;
   }
   virtual std::string label()=0;
+} // namespace models
+} // namespace tadah
+
   virtual size_t get_rfidx();
   virtual void set_rfidx(size_t fidx_);
 };

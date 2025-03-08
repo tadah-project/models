@@ -2,6 +2,9 @@
 #define BF_LINEAR_H
 #include <tadah/models/functions/basis_functions/bf_base.h>
 
+namespace tadah {
+namespace models {
+
 /**
  * @brief Linear basis function for modeling linear relationships.
  *
@@ -54,6 +57,9 @@ struct BF_Linear : public virtual BF_Base {
      * @param aedi Atomic descriptors for an individual atom.
      * @return Predicted forces.
      */
+} // namespace models
+} // namespace tadah
+
     force_type fpredict(const t_type &weights, const fd_type &fdij,
                         const aed_type &aedi) const override;
 };

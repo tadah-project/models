@@ -1,9 +1,12 @@
 #include <tadah/models/descriptors/d3/d3_dummy.h>
+namespace tadah {
+namespace models {
+
 
 D3_Dummy::D3_Dummy() {
   init();
 }
-D3_Dummy::D3_Dummy(Config &) {
+D3_Dummy::D3_Dummy(tadah::core::Config &) {
   init();
 }
 
@@ -13,7 +16,7 @@ void D3_Dummy::calc_aed(
         const double,
         const double,
         const double,
-        aed_type& ) {}
+        tadah::core::aed_type& ) {}
 void D3_Dummy::calc_fd(
         const size_t,
         const double,
@@ -22,7 +25,7 @@ void D3_Dummy::calc_fd(
         const double,
         const double,
         const double,
-        fd_type &) {}
+        tadah::core::fd_type &) {}
 void D3_Dummy::calc_all(
         const size_t,
         const double,
@@ -31,10 +34,14 @@ void D3_Dummy::calc_all(
         const double,
         const double,
         const double,
-        aed_type& ,
-        fd_type &) {}
+        tadah::core::aed_type& ,
+        tadah::core::fd_type &) {}
 size_t D3_Dummy::size() { return s;}
 std::string D3_Dummy::label() {return lab;}
 void D3_Dummy::init() {
   nparams=0;
 }
+
+} // namespace models
+} // namespace tadah
+

@@ -14,6 +14,9 @@
 #include <iostream>
 #include <limits>
 
+namespace tadah {
+namespace models {
+
 /**
  * @class M_KRR_Train
  * @brief Implements Kernel Ridge Regression (KRR) training.
@@ -167,6 +170,9 @@ public:
 
 
         trained = true;
+} // namespace models
+} // namespace tadah
+
     }
 };
 

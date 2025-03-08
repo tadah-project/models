@@ -3,6 +3,9 @@
 
 #include <tadah/models/functions/kernels/kern_base.h>
 
+namespace tadah {
+namespace models {
+
 /** \brief Sigmoid kernel.
  *
  * Defined for two vectors **x** and **y**:
@@ -29,6 +32,9 @@ class Kern_Sigmoid : public virtual Kern_Base {
         double operator() (const aed_type& b, const aed_type& af) const override;
         aed_type derivative(const aed_type& b, const aed_type& af) const override;
         double prime(const aed_type& b, const aed_type& af, const aed_type& ff) const override;
+} // namespace models
+} // namespace tadah
+
         std::string get_label() const override;
 
 };

@@ -1,6 +1,9 @@
 #include <tadah/models/cutoffs.h>
 #include <cmath>
 #include <stdexcept>
+namespace tadah {
+namespace models {
+
 
 
 template<> CONFIG::Registry<Cut_Base,double>::Map CONFIG::Registry<Cut_Base,double>::registry{};
@@ -290,3 +293,7 @@ double Cut_Poly::calc_prime(double r) {
         return (-30.0 * x2 + 60.0 * x3 - 30.0 * x4) * rcut_inv;
     }
 }
+
+} // namespace models
+} // namespace tadah
+

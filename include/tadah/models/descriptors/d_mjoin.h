@@ -3,6 +3,9 @@
 #include <tadah/core/config.h>
 #include <vector>
 
+namespace tadah {
+namespace models {
+
 /** \brief Base class to be used by meta descriptors for joining
 */
 class D_mJoin {
@@ -22,6 +25,9 @@ public:
   static std::vector<Config> parse_config(Config &c, std::string type_str);
 
   static void expand_grids(Config &c, std::vector<Config> &configs, std::string type_str);
+} // namespace models
+} // namespace tadah
+
   static void expand_grids(Config &c, std::string type_str);
   static void expand_grids(Config &c);
 };

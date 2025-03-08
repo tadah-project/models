@@ -8,6 +8,9 @@
 
 #include <iostream>
 
+namespace tadah {
+namespace models {
+
 /**
  * @class M_BLR_Core
  * @brief Implements core functionality for Basis Linear Regression (BLR).
@@ -91,6 +94,9 @@ private:
             trained = true;
         }
         verbose = config.get<int>("VERBOSE");
+} // namespace models
+} // namespace tadah
+
     }
 };
 

@@ -2,6 +2,9 @@
 #define D2_DUMMY_H
 #include <tadah/models/descriptors/d2/d2_base.h>
 
+namespace tadah {
+namespace models {
+
 /**
  * Dummy two-body descriptor.
  *
@@ -37,6 +40,9 @@ public:
     aed_type &aed,
     fd_type &fd_ij,
     const double scale=1) override;
+} // namespace models
+} // namespace tadah
+
   std::string label() override;
   void init() override;
 };

@@ -3,6 +3,9 @@
 
 #include <tadah/models/functions/kernels/kern_base.h>
 
+namespace tadah {
+namespace models {
+
 /**
  * Linear kernel also knows as dot product kernel
  *
@@ -32,6 +35,9 @@ class Kern_Linear :  public virtual Kern_Base {
         double epredict(const t_type &weights, const aed_type& aed) const override;
         double fpredict(const t_type &weights, const fd_type &fdij,
                 const aed_type& aedi, const size_t k) const override;
+} // namespace models
+} // namespace tadah
+
         force_type fpredict(const t_type &weights, const fd_type &fdij,
                 const aed_type& aedi) const override;
 };

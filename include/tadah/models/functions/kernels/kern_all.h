@@ -1,3 +1,6 @@
+namespace tadah {
+namespace models {
+
 #include <tadah/models/functions/kernels/kern_base.h>
 #include <tadah/models/functions/kernels/kern_linear.h>
 #include <tadah/models/functions/kernels/kern_rbf.h>
@@ -5,3 +8,7 @@
 #include <tadah/models/functions/kernels/kern_polynomial.h>
 #include <tadah/models/functions/kernels/kern_sigmoid.h>
 #include <tadah/models/functions/kernels/kern_quadratic.h>
+
+} // namespace models
+} // namespace tadah
+

@@ -8,6 +8,9 @@
 
 #include <iostream>
 
+namespace tadah {
+namespace models {
+
 /**
  * @class M_KRR_Core
  * @brief Implements core functionality for Kernel Ridge Regression (KRR).
@@ -96,6 +99,9 @@ private:
             trained = true;
         }
         verbose = config.get<int>("VERBOSE");
+} // namespace models
+} // namespace tadah
+
     }
 };
 

@@ -85,6 +85,9 @@ private:
 #include <tadah/core/core_types.h>
 #include <tadah/core/lapack.h>
 
+namespace tadah {
+namespace models {
+
 class EA {
   private:
     const Config &config;
@@ -179,6 +182,9 @@ class EA {
 
       delete [] eval;
       delete [] d;
+
+} // namespace models
+} // namespace tadah
 
       return convergence_status;
     };

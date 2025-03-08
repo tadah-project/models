@@ -3,6 +3,9 @@
 
 #include <tadah/models/functions/kernels/kern_base.h>
 
+namespace tadah {
+namespace models {
+
 /** \brief Radial Basis Function kernel
  *
  * Defined for two vectors **x** and **y**:
@@ -31,6 +34,9 @@ class Kern_RBF : public virtual Kern_Base {
         std::string get_label() const override;
 
     private:
+} // namespace models
+} // namespace tadah
+
         double gamma;
 
 };

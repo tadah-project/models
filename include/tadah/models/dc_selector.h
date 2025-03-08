@@ -6,6 +6,9 @@
 #include <tadah/models/cut_all.h>
 #include <tadah/core/registry.h>
 
+namespace tadah {
+namespace models {
+
 class DC_Selector {
     public:
         Cut_Base *c2b=nullptr;
@@ -110,6 +113,9 @@ class DC_Selector {
             if (cmb)
                 delete cmb;
             if (dmb)
+} // namespace models
+} // namespace tadah
+
                 delete dmb;
         }
 };

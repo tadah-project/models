@@ -3,11 +3,14 @@
 #include <tadah/models/descriptors/d_basis_functions.h>
 #include <cstdlib>
 #include <stdexcept>
+namespace tadah {
+namespace models {
+
 
 D2_Blip::D2_Blip() {
   init();
 }
-D2_Blip::D2_Blip(Config &c): D2_Base(c)
+D2_Blip::D2_Blip(tadah::core::Config &c): D2_Base(c)
 {
   if (!c.get<bool>("INIT2B")) return;
   init();
@@ -51,7 +54,7 @@ void D2_Blip::calc_aed(
   const int Zj,
   const double rij,
   const double,
-  aed_type &aed,
+  tadah::core::aed_type &aed,
   const double scale)
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
@@ -68,7 +71,7 @@ void D2_Blip::calc_dXijdri(
   const int Zj,
   const double rij,
   const double ,
-  fd_type &fd_ij,
+  tadah::core::fd_type &fd_ij,
   const double scale)
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
@@ -84,8 +87,8 @@ void D2_Blip::calc_all(
   const int Zj,
   const double rij,
   const double ,
-  aed_type &aed,
-  fd_type &fd_ij,
+  tadah::core::aed_type &aed,
+  tadah::core::fd_type &fd_ij,
   const double scale)
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
@@ -108,3 +111,7 @@ void D2_Blip::init() {
   keys.push_back("SGRID2B");
   nparams=2;
 }
+
+} // namespace models
+} // namespace tadah
+

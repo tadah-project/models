@@ -1,8 +1,11 @@
 #include <tadah/models/descriptors/dm/dm_func.h>
 
 #include <tadah/core/config.h>
+namespace tadah {
+namespace models {
 
-F_RLR::F_RLR(Config &conf):
+
+F_RLR::F_RLR(tadah::core::Config &conf):
   config(&conf)
 {
   if (!config->get<bool>("INITMB")) return;
@@ -24,3 +27,7 @@ double F_RLR::calc_dF(double rho,size_t c) {
     return sgrid[c]*(log(cgrid[c]*rho)+1);
   return sgrid[c];
 }
+
+} // namespace models
+} // namespace tadah
+

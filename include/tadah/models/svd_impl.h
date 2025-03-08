@@ -10,6 +10,9 @@
 namespace tadah {
 namespace models {
 
+namespace tadah {
+namespace models {
+
 inline SVD::SVD()
     : workspaceManager_(new memory::ModelsWorkspaceManager()), ownsWorkspaceManager_(true), svdWorkspace_(nullptr), m_(0), n_(0) {}
 
@@ -71,6 +74,9 @@ inline int SVD::rows() const {
 inline int SVD::cols() const {
     return n_;
 }
+
+} // namespace models
+} // namespace tadah
 
 } // namespace models
 } // namespace tadah

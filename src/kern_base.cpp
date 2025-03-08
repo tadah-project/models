@@ -1,13 +1,16 @@
 #include <tadah/models/functions/kernels/kern_base.h>
+namespace tadah {
+namespace models {
+
 
 Kern_Base::Kern_Base() {}
-Kern_Base::Kern_Base(const Config &c): Function_Base(c) {}
+Kern_Base::Kern_Base(const tadah::core::Config &c): tadah::core::Function_Base(c) {}
 Kern_Base::~Kern_Base() {}
-void Kern_Base::set_basis(const Matrix b)
+void Kern_Base::set_basis(const tadah::core::Matrix b)
 {
   basis = b;
 }
-double Kern_Base::epredict(const t_type &kweights, const aed_type &aed) const
+double Kern_Base::epredict(const tadah::core::t_type &kweights, const tadah::core::aed_type &aed) const
 {
   double energy=0;
   for (size_t b=0; b<basis.cols(); ++b) {
@@ -15,8 +18,8 @@ double Kern_Base::epredict(const t_type &kweights, const aed_type &aed) const
   }
   return energy;
 }
-double Kern_Base::fpredict(const t_type &kweights, const fd_type &fdij,
-                           const aed_type &aedi, const size_t k) const
+double Kern_Base::fpredict(const tadah::core::t_type &kweights, const tadah::core::fd_type &fdij,
+                           const tadah::core::aed_type &aedi, const size_t k) const
 {
   double res=0.0;
   for (size_t b=0; b<basis.cols(); ++b) {
@@ -24,10 +27,10 @@ double Kern_Base::fpredict(const t_type &kweights, const fd_type &fdij,
   }
   return res;
 }
-force_type Kern_Base::fpredict(const t_type &kweights, const fd_type &fdij,
-                               const aed_type &aedi) const
+tadah::core::force_type Kern_Base::fpredict(const tadah::core::t_type &kweights, const tadah::core::fd_type &fdij,
+                               const tadah::core::aed_type &aedi) const
 {
-  force_type v;
+  tadah::core::force_type v;
   v.set_zero();
   for (size_t b=0; b<basis.cols(); ++b) {
     for (size_t k=0; k<3; ++k) {
@@ -36,7 +39,7 @@ force_type Kern_Base::fpredict(const t_type &kweights, const fd_type &fdij,
   }
   return v;
 }
-void Kern_Base::read_basis_from_config(const Config &config, Matrix &basis) {
+void Kern_Base::read_basis_from_config(const tadah::core::Config &config, tadah::core::Matrix &basis) {
   // storage is in column-major order
   if (!(config.exist("SBASIS") && config.exist("BASIS"))) return;
   size_t sbasis = config.get<size_t>("SBASIS");
@@ -51,9 +54,13 @@ void Kern_Base::read_basis_from_config(const Config &config, Matrix &basis) {
     }
   }
 }
-const Matrix &Kern_Base::get_basis() const {
+const tadah::core::Matrix &Kern_Base::get_basis() const {
   return basis;
 }
-Matrix Kern_Base::get_basis() {
+tadah::core::Matrix Kern_Base::get_basis() {
   return basis;
 }
+
+} // namespace models
+} // namespace tadah
+

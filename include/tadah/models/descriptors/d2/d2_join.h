@@ -3,6 +3,9 @@
 #include <cstddef>
 #include <tadah/models/descriptors/d2/d2_base.h>
 
+namespace tadah {
+namespace models {
+
 /**
  * Meta two-body descriptor for joining two different D2 descriptors.
  *
@@ -140,6 +143,9 @@ public:
   void set_fidx(size_t fidx_) override {
     d1->set_fidx(fidx_);
     d2->set_fidx(d1->size()+d1->get_fidx());
+} // namespace models
+} // namespace tadah
+
   }
   void init() override {};
 };

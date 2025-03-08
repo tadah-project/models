@@ -5,11 +5,14 @@
 #include <tadah/models/descriptors/d_mjoin.h>
 #include <tadah/models/descriptors/d_base.h>
 #include <vector>
+namespace tadah {
+namespace models {
+
 
 D_mJoin::D_mJoin() {}
 D_mJoin::~D_mJoin() {}
 
-std::vector<std::string> convert_to_strings(const v_type& vec, int precision) {
+std::vector<std::string> convert_to_strings(const tadah::core::v_type& vec, int precision) {
   std::vector<std::string> result;
   std::ostringstream oss;
   oss << std::fixed << std::setprecision(precision);
@@ -23,21 +26,21 @@ std::vector<std::string> convert_to_strings(const v_type& vec, int precision) {
   return result;
 }
 
-void D_mJoin::expand_grids(Config &c) {
+void D_mJoin::expand_grids(tadah::core::Config &c) {
   if (c.exist("TYPE2B")) {
-    std::vector<Config> configs1 = parse_config(c, "TYPE2B");
+    std::vector<tadah::core::Config> configs1 = parse_config(c, "TYPE2B");
     expand_grids(c,configs1,"TYPE2B");
   }
   if (c.exist("TYPEMB")) {
-    std::vector<Config> configs2 = parse_config(c, "TYPEMB");
+    std::vector<tadah::core::Config> configs2 = parse_config(c, "TYPEMB");
     expand_grids(c,configs2,"TYPEMB");
   }
 }
-void D_mJoin::expand_grids(Config &c, std::string type_str) {
-  std::vector<Config> configs = parse_config(c, type_str);
+void D_mJoin::expand_grids(tadah::core::Config &c, std::string type_str) {
+  std::vector<tadah::core::Config> configs = parse_config(c, type_str);
   expand_grids(c,configs,type_str);
 }
-void D_mJoin::expand_grids(Config &c, std::vector<Config> &configs,std::string type_str) {
+void D_mJoin::expand_grids(tadah::core::Config &c, std::vector<tadah::core::Config> &configs,std::string type_str) {
   if (type_str=="TYPE2B") {
     c.remove("CGRID2B"); c.remove("SGRID2B");
     for (auto &c1 : configs) {
@@ -72,7 +75,7 @@ void D_mJoin::expand_grids(Config &c, std::vector<Config> &configs,std::string t
     std::cerr << "Cannot expand config grid: wrong keyword: " << type_str << std::endl;
   }
 }
-std::vector<Config> D_mJoin::parse_config(Config &c, std::string type_str) {
+std::vector<tadah::core::Config> D_mJoin::parse_config(tadah::core::Config &c, std::string type_str) {
   std::string prefix = type_str=="TYPE2B" ? "D2_" : "DM_";
   std::string rctypekey = "RC" + type_str;
   std::string rcutkey = "RCUT" + type_str.substr(type_str.size() - 2);
@@ -130,9 +133,9 @@ std::vector<Config> D_mJoin::parse_config(Config &c, std::string type_str) {
     data_map["SEMBFUNC"] = sembgrid.begin();
   }
 
-  std::vector<Config> configs;
+  std::vector<tadah::core::Config> configs;
   for (auto it = types.begin(); it != types.end();) {
-    Config c1 = c;
+    tadah::core::Config c1 = c;
     c1.remove(type_str); c1.remove(rctypekey); c1.remove(rcutkey);
     c1.remove(cgridkey); c1.remove(sgridkey);
     const auto token = *it++;
@@ -186,3 +189,7 @@ std::vector<Config> D_mJoin::parse_config(Config &c, std::string type_str) {
   }
   return configs;
 }
+
+} // namespace models
+} // namespace tadah
+

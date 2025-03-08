@@ -4,6 +4,9 @@
 #include <tadah/core/core_types.h>
 #include <tadah/core/lapack.h>
 
+namespace tadah {
+namespace models {
+
 template <typename Kern>
 class EKM {
     private:
@@ -132,6 +135,9 @@ class EKM {
             for (size_t b=0; b<basis.cols(); b++) {
                 temp(b) = kernel(aed,basis[b]);
             }
+} // namespace models
+} // namespace tadah
+
             return  EKM_mat*temp;
         }
 };

@@ -123,5 +123,11 @@ private:
 
 #include <tadah/models/svd_impl.h> // Include implementation
 
+} // namespace models
+} // namespace tadah
+
+namespace tadah {
+namespace models {
+
 #endif // TADAH_MODELS_SVD_H
 

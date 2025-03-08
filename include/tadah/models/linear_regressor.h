@@ -12,6 +12,9 @@
 
 #include <vector>
 
+namespace tadah {
+namespace models {
+
 /**
  * @class LinearRegressor
  * @brief Performs linear regression using Singular Value Decomposition (SVD).
@@ -169,6 +172,9 @@ public:
     Sigma.resize(N, N);
     for (size_t c = 0; c < N; ++c)
       for (size_t r = 0; r < N; ++r)
+} // namespace models
+} // namespace tadah
+
         Sigma(r, c) = Sigma_as_vector.at(N * c + r);
   }
 };

@@ -1,25 +1,28 @@
 #include <tadah/models/functions/kernels/kern_quadratic.h>
+namespace tadah {
+namespace models {
+
 
 Kern_Quadratic::Kern_Quadratic () {}
-Kern_Quadratic::Kern_Quadratic (const Config &c):
-    Function_Base(c),
+Kern_Quadratic::Kern_Quadratic (const tadah::core::Config &c):
+    tadah::core::Function_Base(c),
     Kern_Base(c)
 {
     if (get_verbose()) std::cout << std::endl << label << std::endl;
 
     read_basis_from_config(c,basis);
 }
-double Kern_Quadratic::operator() (const aed_type& b, const aed_type& af) const
+double Kern_Quadratic::operator() (const tadah::core::aed_type& b, const tadah::core::aed_type& af) const
 {
     double x = b*af;
     return  x*x;
 }
-aed_type Kern_Quadratic::derivative(const aed_type& b, const aed_type& af) const
+tadah::core::aed_type Kern_Quadratic::derivative(const tadah::core::aed_type& b, const tadah::core::aed_type& af) const
 {
     double temp = 2*(b*af);
     return b*temp;
 }
-double Kern_Quadratic::prime(const aed_type& b, const aed_type& af, const aed_type& ff) const
+double Kern_Quadratic::prime(const tadah::core::aed_type& b, const tadah::core::aed_type& af, const tadah::core::aed_type& ff) const
 {
     //return dot(derivative(b, af), ff);
     // it is faster this way
@@ -30,3 +33,7 @@ std::string Kern_Quadratic::get_label() const
 {
     return label;
 }
+
+} // namespace models
+} // namespace tadah
+

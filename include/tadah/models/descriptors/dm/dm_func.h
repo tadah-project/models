@@ -6,6 +6,9 @@
 
 #include <cstdlib>
 
+namespace tadah {
+namespace models {
+
 class F_Base {
 public:
   virtual double calc_F(double rho, size_t c)=0;
@@ -35,6 +38,9 @@ public:
   double calc_F(double rho,size_t c);
   double calc_dF(double rho,size_t c);
   //~F_RLR() {
+} // namespace models
+} // namespace tadah
+
   // Do not delete config!
   //}
 };

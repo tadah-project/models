@@ -1,10 +1,13 @@
 #include "tadah/models/descriptors/d2/d2_base.h"
 #include <tadah/models/descriptors/d2/d2_eam.h>
+namespace tadah {
+namespace models {
+
 
 D2_EAM::D2_EAM() {
   init();
 }
-D2_EAM::D2_EAM(Config &c): D2_Base(c)
+D2_EAM::D2_EAM(tadah::core::Config &c): D2_Base(c)
 {
   if (!c.get<bool>("INIT2B")) return;
   init();
@@ -15,7 +18,7 @@ D2_EAM::D2_EAM(Config &c): D2_Base(c)
   if (std::abs(ef.rcut - c.get<double>("RCUT2B")) > std::numeric_limits<double>::min()) {
     if (verbose) {
       std::cout << std::endl;
-      std::cout << "Config file cutoff and setfl file cutoff differ: "
+      std::cout << "tadah::core::Config file cutoff and setfl file cutoff differ: "
         << c.get<double>("RCUT2B") << " " << ef.rcut << std::endl;
       std::cout << "Enforcing SETFL file cutoff: " << ef.rcut << std::endl;
     }
@@ -41,7 +44,7 @@ void D2_EAM::calc_aed(
   const int Zj,
   const double rij,
   const double,
-  aed_type &aed,
+  tadah::core::aed_type &aed,
   const double scale)
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
@@ -60,7 +63,7 @@ void D2_EAM::calc_dXijdri(
   const int Zj,
   const double rij,
   const double,
-  fd_type &fd_ij,
+  tadah::core::fd_type &fd_ij,
   const double scale)
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
@@ -85,8 +88,8 @@ void D2_EAM::calc_all(
   const int Zj,
   const double rij,
   const double,
-  aed_type &aed,
-  fd_type &fd_ij,
+  tadah::core::aed_type &aed,
+  tadah::core::fd_type &fd_ij,
   const double scale)
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
@@ -175,4 +178,8 @@ void D2_EAM::gen_splines(int &n, double &delta, std::vector<double> &f,
 void D2_EAM::init() {
   nparams=1;
 }
+
+
+} // namespace models
+} // namespace tadah
 

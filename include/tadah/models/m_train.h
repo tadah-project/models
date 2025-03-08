@@ -6,6 +6,9 @@
 #include <tadah/models/memory/IModelsWorkspaceManager.h>
 #include <tadah/models/memory/ModelsWorkspaceManager.h>
 
+namespace tadah {
+namespace models {
+
 /**
  * @class M_Train
  * @brief Abstract base class for training models.
@@ -108,6 +111,9 @@ public:
     }
     workspaceManager_ = workspaceManager;
   }
+} // namespace models
+} // namespace tadah
+
 
 };
 

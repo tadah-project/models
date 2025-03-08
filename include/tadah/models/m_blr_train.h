@@ -14,6 +14,9 @@
 #include <iostream>
 #include <vector>
 
+namespace tadah {
+namespace models {
+
 /**
  * @class M_BLR_Train
  * @brief Implements training for Basis Linear Regression (BLR).
@@ -118,6 +121,9 @@ public:
       LinearRegressor::train(config, Phi, T, weights, Sigma,*workspaceManager_);
       trained = true;
     }
+} // namespace models
+} // namespace tadah
+
   }
 };
 

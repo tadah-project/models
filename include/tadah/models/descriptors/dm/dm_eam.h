@@ -2,6 +2,9 @@
 #define DM_EAM_H
 #include <tadah/models/descriptors/dm/dm_base.h>
 
+namespace tadah {
+namespace models {
+
 /** \brief many-body part for the Embedded Atom Method descriptor.
  *
  * \f[
@@ -86,6 +89,9 @@ public:
     const double rij_sq,
     const Vec3d &vec_ij,
     rho_type& rho,
+} // namespace models
+} // namespace tadah
+
     const double scale=1) override;
   void init() override;
 };

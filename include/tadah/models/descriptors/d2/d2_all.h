@@ -1,3 +1,6 @@
+namespace tadah {
+namespace models {
+
 #include <tadah/models/descriptors/d2/d2_base.h>
 #include <tadah/models/descriptors/d2/d2_dummy.h>
 #include <tadah/models/descriptors/d2/d2_blip.h>
@@ -9,3 +12,7 @@
 
 #include <tadah/models/descriptors/d2/d2_join.h>
 #include <tadah/models/descriptors/d2/d2_mjoin.h>
+
+} // namespace models
+} // namespace tadah
+

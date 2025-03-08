@@ -1,17 +1,24 @@
 #include <tadah/models/functions/function_base.h>
+namespace tadah {
+namespace models {
 
-Function_Base::Function_Base(): verbose(0) {
+
+tadah::core::Function_Base::tadah::core::Function_Base(): verbose(0) {
 }
-Function_Base::Function_Base(const Config &c) {
+tadah::core::Function_Base::tadah::core::Function_Base(const tadah::core::Config &c) {
   verbose = (c.exist("VERBOSE")) ? c.get<int>("VERBOSE") : 0;
 }
-void Function_Base::set_verbose(int v) { verbose=v; }
-int Function_Base::get_verbose() { return verbose; }
+void tadah::core::Function_Base::set_verbose(int v) { verbose=v; }
+int tadah::core::Function_Base::get_verbose() { return verbose; }
 
-Function_Base::~Function_Base() {}
+tadah::core::Function_Base::~tadah::core::Function_Base() {}
 
-double Function_Base::operator() (const aed_type& , const aed_type& ) const { return 0.0; }
-aed_type Function_Base::derivative(const aed_type& , const aed_type& ) const { return aed_type(); }
-double Function_Base::prime(const aed_type& , const aed_type& ,
-                            const aed_type& ) const { return 0.0; }
-void Function_Base::set_basis(const Matrix ) {}
+double tadah::core::Function_Base::operator() (const tadah::core::aed_type& , const tadah::core::aed_type& ) const { return 0.0; }
+tadah::core::aed_type tadah::core::Function_Base::derivative(const tadah::core::aed_type& , const tadah::core::aed_type& ) const { return tadah::core::aed_type(); }
+double tadah::core::Function_Base::prime(const tadah::core::aed_type& , const tadah::core::aed_type& ,
+                            const tadah::core::aed_type& ) const { return 0.0; }
+void tadah::core::Function_Base::set_basis(const tadah::core::Matrix ) {}
+
+} // namespace models
+} // namespace tadah
+

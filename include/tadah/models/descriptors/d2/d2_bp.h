@@ -3,6 +3,9 @@
 #include <tadah/models/descriptors/d2/d2_base.h>
 #include <vector>
 
+namespace tadah {
+namespace models {
+
 /** \brief Behler-Parrinello two-body descriptor.
  *
  * \f[
@@ -55,6 +58,9 @@ public:
     aed_type &aed,
     fd_type &fd_ij,
     const double scale=1) override;
+} // namespace models
+} // namespace tadah
+
   std::string label() override;
   void init() override;
 };

@@ -85,4 +85,10 @@ public:
 };
 
 #include "dm_mEAD.hpp"
+} // namespace models
+} // namespace tadah
+
 #endif
+namespace tadah {
+namespace models {
+

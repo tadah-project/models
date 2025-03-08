@@ -3,6 +3,9 @@
 
 #include <tadah/core/core_types.h>
 
+namespace tadah {
+namespace models {
+
 /**
  * @class M_Core
  * @brief Abstract base class for model cores.
@@ -67,6 +70,9 @@ public:
      *
      * @return Vector of uncertainties for the weights.
      */
+} // namespace models
+} // namespace tadah
+
     virtual t_type get_weights_uncertainty() const = 0;
 };
 

@@ -3,6 +3,9 @@
 
 #include <tadah/core/core_types.h>
 
+namespace tadah {
+namespace models {
+
 class M_Predict {
     public:
 
@@ -23,6 +26,9 @@ class M_Predict {
         virtual double fpredict(const fd_type &fdij, const aed_type &aedi, size_t k) const=0;
 
         /** \brief Predict force between a pair of atoms. */
+} // namespace models
+} // namespace tadah
+
         virtual force_type fpredict(const fd_type &fdij,
                 const aed_type &aedi) const=0;
 };

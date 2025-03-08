@@ -10,6 +10,9 @@
 #include <vector>
 #include <bitset>
 
+namespace tadah {
+namespace models {
+
 class Bitset2D {
   static constexpr size_t N = 119;
   std::bitset<N * N> data;
@@ -92,6 +95,9 @@ public:
   virtual std::vector<std::string> get_init_atoms(Config &c)=0;
 
 private:
+} // namespace models
+} // namespace tadah
+
   bool manage_memory=false; // who owns fcut
   Bitset2D init_for_atoms_map;  // 0th is unused
 };

@@ -4,6 +4,9 @@
 namespace tadah {
 namespace models {
 
+namespace tadah {
+namespace models {
+
 /**
  * @enum Algorithm
  * @brief Enum to select the algorithm used for solving computational problems.
@@ -22,6 +25,9 @@ enum class Algorithm {
     Pseudoinverse,  ///< Uses custom SVD-based pseudoinverse implementation
     NormalEquations ///< Uses Cholesky decomposition to solve normal equations
 };
+
+} // namespace models
+} // namespace tadah
 
 } // namespace models
 } // namespace tadah

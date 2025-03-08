@@ -5,6 +5,9 @@
 #include <tadah/models/descriptors/d2/d2_base.h>
 #include <tadah/models/descriptors/d_mjoin.h>
 
+namespace tadah {
+namespace models {
+
 /** \brief Meta two-body descriptor for combining multiple D2 descriptors.
  *
  * This descriptor provides a convenient interface for concatenating multiple two-body descriptors. 
@@ -53,6 +56,9 @@ public:
   void calc_dXijdri(const int Zi, const int Zj, const double rij, const double rij_sq, fd_type &fd_ij, const double scale=1) override;
   void calc_all(const int Zi, const int Zj, const double rij, const double rij_sq, aed_type &aed, fd_type &fd_ij, const double scale=1) override;
   std::string label() override;
+} // namespace models
+} // namespace tadah
+
   void set_fidx(size_t fidx_) override;
   void init() override;
 };

@@ -51,4 +51,3 @@ void ModelsWorkspaceManager::releaseSVDWorkspace(SVDWorkspace* workspace) {
 } // namespace memory
 } // namespace models
 } // namespace tadah
-

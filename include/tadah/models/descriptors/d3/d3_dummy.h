@@ -2,6 +2,9 @@
 #define D3_DUMMY_H
 #include <tadah/models/descriptors/d3/d3_base.h>
 class D3_Dummy: public D3_Base {
+namespace tadah {
+namespace models {
+
 private:
   size_t s=0;
   std::string lab="D3_Dummy";
@@ -35,6 +38,9 @@ public:
     aed_type& aed,
     fd_type &fd_ij);
   size_t size();
+} // namespace models
+} // namespace tadah
+
   std::string label();
   void init() override;
 };

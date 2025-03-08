@@ -2,11 +2,14 @@
 #include <tadah/models/descriptors/dm/dm_blip.h>
 #include <tadah/models/descriptors/d_basis_functions.h>
 #include <vector>
+namespace tadah {
+namespace models {
+
 
 DM_Blip::DM_Blip() {
   init();
 }
-DM_Blip::DM_Blip(Config &c): DM_Base(c),
+DM_Blip::DM_Blip(tadah::core::Config &c): DM_Base(c),
   rc(c.get<double>("RCUTMBMAX"))
 {
   if (!c.get<bool>("INITMB")) return;
@@ -46,7 +49,7 @@ DM_Blip::DM_Blip(Config &c): DM_Base(c),
 
 void DM_Blip::calc_aed(
   rho_type& rhoi,
-  aed_type &aed)
+  tadah::core::aed_type &aed)
 {
   size_t Lshift = 0;
   size_t ii=rfidx;
@@ -70,7 +73,7 @@ void DM_Blip::calc_dXijdri_dXjidri(
   const Vec3d &vec_ij,
   rho_type& rhoi,
   rho_type& rhoj,
-  fd_type &fd_ij,
+  tadah::core::fd_type &fd_ij,
   const double scale)
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
@@ -164,7 +167,7 @@ void DM_Blip::calc_dXijdri(
   const double,
   const Vec3d &vec_ij,
   rho_type& rhoi,
-  fd_type &fd_ij,
+  tadah::core::fd_type &fd_ij,
   const double scale)
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
@@ -310,3 +313,7 @@ void DM_Blip::init() {
   keys.push_back("SGRIDMB");
   nparams=3;
 }
+
+} // namespace models
+} // namespace tadah
+

@@ -4,6 +4,9 @@
 #include <tadah/core/core_types.h>
 #include <tadah/core/config.h>
 
+namespace tadah {
+namespace models {
+
 
 /** Base class for Kernels and Basis Functions */
 struct Function_Base {
@@ -32,6 +35,9 @@ public:
   virtual double epredict(const t_type &, const aed_type& ) const=0;
   virtual double fpredict(const t_type &, const fd_type &,
                           const aed_type&, const size_t ) const=0;
+} // namespace models
+} // namespace tadah
+
   virtual force_type fpredict(const t_type &, const fd_type &,
                               const aed_type& ) const=0;
 };

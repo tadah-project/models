@@ -2,6 +2,9 @@
 #define DM_DUMMY_H
 #include <tadah/models/descriptors/dm/dm_base.h>
 
+namespace tadah {
+namespace models {
+
 /**
  * Dummy many-body descriptor.
  *
@@ -46,6 +49,9 @@ public:
     const double rij_sq,
     const Vec3d &vec_ij,
     rho_type& rho,
+} // namespace models
+} // namespace tadah
+
     const double scale=1) override;
   void init() override;
 };

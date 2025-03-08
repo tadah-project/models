@@ -13,6 +13,9 @@
 namespace tadah {
 namespace models {
 
+namespace tadah {
+namespace models {
+
 // Helper function to convert Algorithm enum to string
 inline std::string to_string_algorithm(Algorithm algo) {
     switch (algo) {
@@ -304,6 +307,9 @@ void OLS::solveWithPseudoinverse(int m, int n, V1& B, V2& weights, memory::SVDWo
     int ldvt = n;
     ::dgemv_(&trans, &minmn, &n, &alpha, VT, &ldvt, ws->UtB, &incx, &beta, weights.ptr(), &incy);
 }
+
+} // namespace models
+} // namespace tadah
 
 } // namespace models
 } // namespace tadah

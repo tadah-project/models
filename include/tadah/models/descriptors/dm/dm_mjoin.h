@@ -6,6 +6,9 @@
 #include <tadah/models/descriptors/dm/dm_base.h>
 #include <tadah/models/descriptors/d_mjoin.h>
 
+namespace tadah {
+namespace models {
+
 /** \brief Meta many-body descriptor for combining multiple DM descriptors.
  *
  * This descriptor provides an interface for concatenating various many-body descriptors.
@@ -86,6 +89,9 @@ public:
     const double scale=1) override;
   void set_fidx(size_t fidx_) override;
   void set_rfidx(size_t rfidx_) override;
+} // namespace models
+} // namespace tadah
+
   void init() override;
 };
 

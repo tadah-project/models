@@ -4,6 +4,9 @@
 #include <tadah/models/cut_all.h>
 #include <tadah/models/descriptors/d_base.h>
 
+namespace tadah {
+namespace models {
+
 /** \brief Base class for all two-body type descriptors.
  *
  * All two-body descriptors **must** inherit this class.
@@ -86,6 +89,9 @@ public:
     double rp = r+h;
     (*this).calc_aed(Zi,Zj,rn,rn*rn,aed_n);
     (*this).calc_aed(Zi,Zj,rp,rp*rp,aed_p);
+} // namespace models
+} // namespace tadah
+
     fd(0) = (0.5/h)*(aed_p - aed_n);
   }
 };

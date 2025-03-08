@@ -3,6 +3,9 @@
 #include <tadah/models/descriptors/d_basis_functions.h>
 #include <stdexcept>
 #include <vector>
+namespace tadah {
+namespace models {
+
 
 DM_EAD::DM_EAD() {
   init();
@@ -11,7 +14,7 @@ DM_EAD::DM_EAD() {
  * rhoi array is split 50/50 into density and derivative
  * of the embedding function
  */
-DM_EAD::DM_EAD(Config &config): DM_Base(config),
+DM_EAD::DM_EAD(tadah::core::Config &config): DM_Base(config),
   rc(config.get<double>("RCUTMBMAX"))
 {
   if (!config.get<bool>("INITMB")) {
@@ -53,7 +56,7 @@ DM_EAD::DM_EAD(Config &config): DM_Base(config),
 
 void DM_EAD::calc_aed(
   rho_type& rhoi,
-  aed_type &aed)
+  tadah::core::aed_type &aed)
 {
   size_t Lshift = 0;
   size_t ii=rfidx;
@@ -77,7 +80,7 @@ void DM_EAD::calc_dXijdri_dXjidri(
   const Vec3d &vec_ij,
   rho_type& rhoi,
   rho_type& rhoj,
-  fd_type &fd_ij,
+  tadah::core::fd_type &fd_ij,
   const double scale)
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
@@ -171,7 +174,7 @@ void DM_EAD::calc_dXijdri(
   const double,
   const Vec3d &vec_ij,
   rho_type& rhoi,
-  fd_type &fd_ij,
+  tadah::core::fd_type &fd_ij,
   const double scale)
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
@@ -316,3 +319,7 @@ void DM_EAD::init() {
   keys.push_back("SGRIDMB");
   nparams=3;
 }
+
+} // namespace models
+} // namespace tadah
+

@@ -6,6 +6,9 @@
 
 #include <iostream>
 
+namespace tadah {
+namespace models {
+
 /** \brief Abstract class to be used as a base for all kernels.
  *
  *  - b = basis vector
@@ -61,6 +64,9 @@ class Kern_Base: public virtual Function_Base {
                 const aed_type &aedi, const size_t k) const;
         virtual force_type fpredict(const t_type &kweights, const fd_type &fdij,
                 const aed_type &aedi) const;
+
+} // namespace models
+} // namespace tadah
 
         virtual void read_basis_from_config(const Config &config,
                 Matrix &b);

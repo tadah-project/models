@@ -3,7 +3,6 @@
 #include <stdexcept>
 #include <tadah/core/lapack.h>
 #include <tadah/models/memory/OLSWorkspace.h>
-
 namespace tadah {
 namespace models {
 namespace memory {
@@ -93,7 +92,7 @@ void OLSWorkspace::allocate(int m_, int n_,
     double *bDummy = nullptr;
     double rcondDummy = -1.0;
     int rankDummy;
-    ::dgelsd_(&m, &n, &nrhs, aDummy, &m, bDummy, &maxmn, s, &rcondDummy,
+    ::tadah::core::dgelsd_(&m, &n, &nrhs, aDummy, &m, bDummy, &maxmn, s, &rcondDummy,
               &rankDummy, &workQuery, &lworkQuery, iwork, &info);
     lwork = static_cast<int>(workQuery);
     work = new double[lwork];
@@ -105,7 +104,7 @@ void OLSWorkspace::allocate(int m_, int n_,
     double *aDummy = nullptr;
     double *bDummy = nullptr;
     char trans = 'N';
-    ::dgels_(&trans, &m, &n, &nrhs, aDummy, &m, bDummy, &m, &workQuery,
+    ::tadah::core::dgels_(&trans, &m, &n, &nrhs, aDummy, &m, bDummy, &m, &workQuery,
              &lworkQuery, &info);
     lwork = static_cast<int>(workQuery);
     work = new double[lwork];
@@ -131,7 +130,7 @@ void OLSWorkspace::allocate(int m_, int n_,
     double wkopt;
     double *aDummy = nullptr;
     int infoQuery;
-    ::dgesdd_(&jobz, &m, &n, aDummy, &lda, S, U, &ldu, VT, &ldvt, &wkopt,
+    ::tadah::core::dgesdd_(&jobz, &m, &n, aDummy, &lda, S, U, &ldu, VT, &ldvt, &wkopt,
               &lwork, iworkSVD, &infoQuery);
 
     if (infoQuery != 0) {

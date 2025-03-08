@@ -3,7 +3,10 @@
 #include <string>
 #include <tadah/models/descriptors/d_base.h>
 #include <vector>
-void D_Base::get_grid(const Config &c, std::string key, v_type &v) {
+namespace tadah {
+namespace models {
+
+void D_Base::get_grid(const tadah::core::Config &c, std::string key, tadah::core::v_type &v) {
   if (c.get<double>(key) < 0) {
     // generate grid automatically if first element
     // is<zero and int. If it is double than assume that
@@ -27,16 +30,16 @@ void D_Base::get_grid(const Config &c, std::string key, v_type &v) {
     }
     else {
       v.resize(c.size(key));
-      c.get<v_type>(key,v);
+      c.get<tadah::core::v_type>(key,v);
     }
   }
   else {
     v.resize(c.size(key));
-    c.get<v_type>(key,v);
+    c.get<tadah::core::v_type>(key,v);
   }
 }
-v_type D_Base::get_grid(std::vector<std::string>&vold) {
-  v_type vnew;
+tadah::core::v_type D_Base::get_grid(std::vector<std::string>&vold) {
+  tadah::core::v_type vnew;
   auto it = vold.begin();
   while (it != vold.end()) {
     std::string token = *it++;
@@ -44,14 +47,14 @@ v_type D_Base::get_grid(std::vector<std::string>&vold) {
       size_t cg = std::stoul(*it++);
       double cgmin = std::stod(*it++);
       double cgmax = std::stod(*it++);
-      v_type v = linspace(cgmin, cgmax, cg);
+      tadah::core::v_type v = linspace(cgmin, cgmax, cg);
       vnew.insert(vnew.end(), v.begin(), v.end());
     }
     else if (token == "-2") {
       size_t cg = std::stoul(*it++);
       double cgmin = std::stod(*it++);
       double cgmax = std::stod(*it++);
-      v_type v = logspace(cgmin, cgmax, cg, exp(1));
+      tadah::core::v_type v = logspace(cgmin, cgmax, cg, exp(1));
       vnew.insert(vnew.end(), v.begin(), v.end());
     }
     else if (std::stod(token) < -2) {
@@ -70,7 +73,7 @@ D_Base::~D_Base() {
 }
 
 D_Base::D_Base() {}
-D_Base::D_Base(Config &c):
+D_Base::D_Base(tadah::core::Config &c):
   verbose(c.get<int>("VERBOSE"))
 {
   std::fill_n(weights, 119, 1.0);
@@ -144,7 +147,7 @@ void D_Base::init_for_atoms(const std::vector<std::string> &Zs) {
     }
   }
 }
-std::vector<std::string> D_Base::get_init_atoms(Config &c, std::string type) {
+std::vector<std::string> D_Base::get_init_atoms(tadah::core::Config &c, std::string type) {
   std::vector<std::string> init_atoms(c.size(type));
   c.get(type, init_atoms);
   std::unique_ptr<D_Base> d(CONFIG::factory<D_Base>(init_atoms[0]));
@@ -152,3 +155,7 @@ std::vector<std::string> D_Base::get_init_atoms(Config &c, std::string type) {
   init_atoms.erase(init_atoms.begin(), init_atoms.begin() + nparams);
   return init_atoms;
 }
+
+} // namespace models
+} // namespace tadah
+

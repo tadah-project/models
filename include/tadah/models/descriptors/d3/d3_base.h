@@ -3,6 +3,9 @@
 
 #include <tadah/models/descriptors/d_base.h>
 
+namespace tadah {
+namespace models {
+
 class D3_Base: public D_Base {
 public:
   virtual ~D3_Base() {};
@@ -34,6 +37,9 @@ public:
     aed_type& aed,
     fd_type &fd_ij)=0;
   virtual size_t size()override=0;
+} // namespace models
+} // namespace tadah
+
   virtual std::string label()override=0;
   virtual std::vector<std::string> get_init_atoms(Config &c) override;
 };

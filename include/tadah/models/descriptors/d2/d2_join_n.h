@@ -5,6 +5,9 @@
 #include <tuple>
 #include <string>
 
+namespace tadah {
+namespace models {
+
 /**
  * Meta multi-body descriptor for joining multiple D2 descriptors.
  *
@@ -106,6 +109,9 @@
 //
 //   void set_fidx(size_t fidx_) override {
 //     set_fidx_impl<0>(fidx_);
+} // namespace models
+} // namespace tadah
+
 //   }
 // };
 
