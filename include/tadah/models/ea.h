@@ -39,7 +39,7 @@ public:
             double beta = 0.0;
             int incy = 1;
 
-            dgemv_(&trans, &m, &n, &alpha, VT_, &lda, x, &incx, &beta, y_.data(), &incy);
+      tadah::core::dgemv_(&trans, &m, &n, &alpha, VT_, &lda, x, &incx, &beta, y_.data(), &incy);
         }
 
         // Step 2: Compute z = S * y (element-wise multiplication)
@@ -58,7 +58,7 @@ public:
             double beta = 0.0;
             int incy = 1;
 
-            dgemv_(&trans, &m, &n, &alpha, U_, &lda, z_.data(), &incx, &beta, result, &incy);
+      tadah::core::dgemv_(&trans, &m, &n, &alpha, U_, &lda, z_.data(), &incx, &beta, result, &incy);
         }
     }
 
@@ -177,8 +177,8 @@ class EA {
           break;
         }
       }
-      if (convergence_status && verbose) std::cout << "Number of steps for convergence: " + to_string(counter,outprec) << std::endl;
-      if (!convergence_status && verbose) std::cout << "Max number of steps reached: " + to_string(counter,outprec) << std::endl;
+      if (convergence_status && verbose) std::cout << "Number of steps for convergence: " + tadah::core::to_string(counter,outprec) << std::endl;
+      if (!convergence_status && verbose) std::cout << "Max number of steps reached: " + tadah::core::to_string(counter,outprec) << std::endl;
 
       delete [] eval;
       delete [] d;

@@ -1,0 +1,8 @@
+BF_Polynomial2
+BF_Linear
+Kern_Linear
+Kern_Polynomial
+Kern_RBF
+Kern_Sigmoid
+Kern_LQ
+Kern_Quadratic

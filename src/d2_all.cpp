@@ -2,7 +2,6 @@
 namespace tadah {
 namespace models {
 
-
 template<> tadah::core::Registry<D_Base>::Map tadah::core::Registry<D_Base>::registry{};
 template<> tadah::core::Registry<D_Base,tadah::core::Config&>::Map tadah::core::Registry<D_Base,tadah::core::Config&>::registry{};
 template<> tadah::core::Registry<D2_Base,tadah::core::Config&>::Map tadah::core::Registry<D2_Base,tadah::core::Config&>::registry{};

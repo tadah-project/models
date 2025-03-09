@@ -53,7 +53,7 @@ class EKM {
             char job='B';
             int ilo; int ihi; int info;
             double *scale = new double[n];
-            dgebal_(&job, &n, a, &n, &ilo, &ihi, scale, &info);
+    tadah::core::dgebal_(&job, &n, a, &n, &ilo, &ihi, scale, &info);
             delete [] scale;
 
             // Find max value in K diagonal
@@ -97,8 +97,8 @@ class EKM {
             double *work = new double[lwork];
             int info;
 
-            dgetrf_(&n,&n,a,&n,ipiv,&info);
-            dgetri_(&n,a,&n,ipiv,work,&lwork,&info);
+    tadah::core::dgetrf_(&n,&n,a,&n,ipiv,&info);
+    tadah::core::dgetri_(&n,a,&n,ipiv,work,&lwork,&info);
 
             delete[] ipiv;
             delete[] work;
@@ -108,7 +108,7 @@ class EKM {
             int n = A.cols(); // A is square
             double *a = &A.data()[0];
             int info;
-            dpotrf_(&uplo, &n, a, &n, &info);
+    tadah::core::dpotrf_(&uplo, &n, a, &n, &info);
         }
 
         void project(tadah::core::phi_type &Phi) {
@@ -122,7 +122,7 @@ class EKM {
             double *c = new double[m*n];
             double alpha = 1.0;
             double beta = 0.0;
-            dgemm_(&transa, &transb, &m, &n, &n, &alpha, a, &m, b, &n,
+    tadah::core::dgemm_(&transa, &transb, &m, &n, &n, &alpha, a, &m, b, &n,
                     &beta, c, &m);
 
             Phi = tadah::core::Matrix(c,m,n);

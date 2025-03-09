@@ -75,7 +75,7 @@ public:
       config.get("FIXINDEX", indices_str);
 
       // Parse indices and perform checks
-      std::vector<size_t> indices = parse_indices(indices_str);
+      std::vector<size_t> indices = tadah::core::parse_indices(indices_str);
 
       // Check that the min index is >= 1 and max index is <= Phi.cols()
       if (!indices.empty()) {
