@@ -20,7 +20,7 @@ class Kern_Base: public virtual Function_Base {
     public:
         tadah::core::Matrix basis;
         Kern_Base();
-        Kern_Base(const tadah::core::Config &c);
+        Kern_Base(const tadah::core::Context &c);
         virtual ~Kern_Base();
 
         // /**
@@ -65,7 +65,7 @@ class Kern_Base: public virtual Function_Base {
         virtual tadah::core::force_type fpredict(const tadah::core::t_type &kweights, const tadah::core::fd_type &fdij,
                 const tadah::core::aed_type &aedi) const;
 
-        virtual void read_basis_from_config(const tadah::core::Config &config,
+        virtual void read_basis_from_config(const tadah::core::Context &config,
                 tadah::core::Matrix &b);
 };
 } // namespace models

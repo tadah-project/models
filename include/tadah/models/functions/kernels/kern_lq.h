@@ -22,7 +22,7 @@ namespace models {
 class Kern_LQ : public virtual Kern_Base {
     public:
         Kern_LQ ();
-        Kern_LQ (const tadah::core::Config &c);
+        Kern_LQ (const tadah::core::Context &c);
         /**
          * Label used for this class
          */

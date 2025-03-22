@@ -2,7 +2,7 @@
 namespace tadah {
 namespace models {
 
-BF_Base::BF_Base(const tadah::core::Config &c): Function_Base(c) {}
+BF_Base::BF_Base(const tadah::core::Context &c): Function_Base(c) {}
 BF_Base::BF_Base() {}
 BF_Base::~BF_Base() {}
 

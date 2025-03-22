@@ -4,7 +4,7 @@ namespace models {
 
 
 BF_Polynomial2::BF_Polynomial2() {}
-BF_Polynomial2::BF_Polynomial2(const tadah::core::Config &c): 
+BF_Polynomial2::BF_Polynomial2(const tadah::core::Context &c): 
   Function_Base(c),
   BF_Base(c)
 {}

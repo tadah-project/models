@@ -21,7 +21,7 @@ namespace models {
  * This descriptor will enforce cutoff distance as specified in a \ref SETFL file.
  * Set \ref RCUTMB to the same value to suppress the warning message.
  *
- * Required tadah::core::Config keys:
+ * Required tadah::core::Context keys:
  * \ref INITMB \ref SETFL
  */
 class DM_EAM: public DM_Base {
@@ -57,7 +57,7 @@ private:
 
 public:
   DM_EAM();
-  DM_EAM(tadah::core::Config&);
+  DM_EAM(tadah::core::Context&);
   void calc_aed(
     tadah::core::rho_type& rho,
     tadah::core::aed_type &aed) override;

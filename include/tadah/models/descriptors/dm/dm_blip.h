@@ -33,7 +33,7 @@ namespace models {
  * <i>Journal of Physical Chemistry Letters</i>, <i>10</i>(17),
  * 4962–4967. https://doi.org/10.1021/acs.jpclett.9b02037</div>
  *
- * Required tadah::core::Config keys:
+ * Required tadah::core::Context keys:
  * \ref INITMB \ref CGRIDMB \ref SGRIDMB
  */
 class DM_Blip: public DM_Base {
@@ -51,7 +51,7 @@ private:
 
 public:
   DM_Blip();
-  DM_Blip(tadah::core::Config&);
+  DM_Blip(tadah::core::Context&);
   void calc_aed(
     tadah::core::rho_type& rho,
     tadah::core::aed_type &aed) override;

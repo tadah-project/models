@@ -11,7 +11,7 @@ private:
   std::string lab="D3_Dummy";
 public:
   D3_Dummy();
-  D3_Dummy(tadah::core::Config&);
+  D3_Dummy(tadah::core::Context&);
   void calc_aed(
     const size_t fidx,
     const double rij,

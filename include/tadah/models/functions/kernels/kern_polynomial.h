@@ -15,14 +15,14 @@ namespace models {
  * \mathrm{c} \big)^{\mathrm{d}}
  * \f]
  *
- *  Required tadah::core::Config key: \ref MPARAMS <int> d  <double> \f$ \gamma \f$  c
+ *  Required tadah::core::Context key: \ref MPARAMS <int> d  <double> \f$ \gamma \f$  c
  *
  *  @see Kern_Base
  */
 class Kern_Polynomial : public virtual Kern_Base {
     public:
         Kern_Polynomial ();
-        Kern_Polynomial (const tadah::core::Config &c);
+        Kern_Polynomial (const tadah::core::Context &c);
         int d; // power
         double gamma;   // scalling
         double c;   // shift

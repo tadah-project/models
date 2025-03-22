@@ -45,12 +45,12 @@ namespace models {
 class D2_mJoin : public D2_Base, public D_mJoin {
 private:
   std::vector<D2_Base*> ds;
-  std::vector<tadah::core::Config> configs;
+  std::vector<tadah::core::Context> configs;
   std::string lab = "D2_mJoin";
 public:
   D2_mJoin();
   ~D2_mJoin();
-  D2_mJoin(tadah::core::Config &c);
+  D2_mJoin(tadah::core::Context &c);
   
   void calc_aed(const int Zi, const int Zj, const double rij, const double rij_sq, tadah::core::aed_type &aed, const double scale=1) override;
   void calc_dXijdri(const int Zi, const int Zj, const double rij, const double rij_sq, tadah::core::fd_type &fd_ij, const double scale=1) override;

@@ -20,7 +20,7 @@ namespace models {
 class Kern_Linear :  public virtual Kern_Base {
     public:
         Kern_Linear ();
-        Kern_Linear (const tadah::core::Config &c);
+        Kern_Linear (const tadah::core::Context &c);
         std::string get_label() const override;
 
         /**

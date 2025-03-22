@@ -2,8 +2,8 @@
 namespace tadah {
 namespace models {
 
-//template struct Registry<D3_Base, tadah::core::Config &>;
-std::vector<std::string> D3_Base::get_init_atoms(tadah::core::Config &) {
+//template struct Registry<D3_Base, tadah::core::Context &>;
+std::vector<std::string> D3_Base::get_init_atoms(tadah::core::Context &) {
   return {};
 }
 

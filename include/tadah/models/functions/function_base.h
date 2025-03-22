@@ -2,7 +2,7 @@
 #define FUNCTION_BASE_h
 
 #include <tadah/core/core_types.h>
-#include <tadah/core/config.h>
+#include <tadah/core/context.h>
 
 namespace tadah {
 namespace models {
@@ -16,11 +16,11 @@ private:
 
 public:
   Function_Base();
-  Function_Base(const tadah::core::Config &c);
+  Function_Base(const tadah::core::Context &c);
   void set_verbose(int v);
   int get_verbose();
 
-  // Derived classes must implement Derived() and Derived(tadah::core::Config)
+  // Derived classes must implement Derived() and Derived(tadah::core::Context)
   virtual ~Function_Base();
 
   // For Kernels

@@ -4,7 +4,7 @@ namespace models {
 
 
 Kern_Base::Kern_Base() {}
-Kern_Base::Kern_Base(const tadah::core::Config &c): Function_Base(c) {}
+Kern_Base::Kern_Base(const tadah::core::Context &c): Function_Base(c) {}
 Kern_Base::~Kern_Base() {}
 void Kern_Base::set_basis(const tadah::core::Matrix b)
 {
@@ -39,7 +39,7 @@ tadah::core::force_type Kern_Base::fpredict(const tadah::core::t_type &kweights,
   }
   return v;
 }
-void Kern_Base::read_basis_from_config(const tadah::core::Config &config, tadah::core::Matrix &basis) {
+void Kern_Base::read_basis_from_config(const tadah::core::Context &config, tadah::core::Matrix &basis) {
   // storage is in column-major order
   if (!(config.exist("SBASIS") && config.exist("BASIS"))) return;
   size_t sbasis = config.get<size_t>("SBASIS");

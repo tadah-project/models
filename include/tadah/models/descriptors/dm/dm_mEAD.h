@@ -29,7 +29,7 @@ namespace models {
  *
  * e.g., \f$L_{max}=2\f$ will calculate descriptors with \f$ L=0,1,2 \f$ (s, p, d orbitals).
  *
- * Required tadah::core::Config keys:
+ * Required tadah::core::Context keys:
  * \ref INITMB \ref CGRIDMB \ref SGRIDMB
  */
 
@@ -50,7 +50,7 @@ private:
 
 public:
   DM_mEAD();
-  DM_mEAD(tadah::core::Config&);
+  DM_mEAD(tadah::core::Context&);
   void calc_aed(
     tadah::core::rho_type& rho,
     tadah::core::aed_type &aed) override;

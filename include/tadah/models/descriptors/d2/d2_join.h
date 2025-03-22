@@ -23,7 +23,7 @@ public:
     if (d1) delete d1;
     if (d2) delete d2;
   }
-  D2_Join(tadah::core::Config &c): D2_Base(c)
+  D2_Join(tadah::core::Context &c): D2_Base(c)
   {
     // prepare configs for d1 and d2
     // first we get joined grid and we have to split it between d1 and d2
@@ -42,8 +42,8 @@ public:
     tadah::core::v_type sgrid;
     sgrid.resize(c.size("SGRID2B"));
     c.get<tadah::core::v_type>("SGRID2B",sgrid);
-    tadah::core::Config c1=c;
-    tadah::core::Config c2=c;
+    tadah::core::Context c1=c;
+    tadah::core::Context c2=c;
     c1.remove("CGRID2B");
     c1.remove("SGRID2B");
     c2.remove("CGRID2B");

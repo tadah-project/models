@@ -1,7 +1,7 @@
 #ifndef M_KRR_Core_H
 #define M_KRR_Core_H
 
-#include <tadah/core/config.h>
+#include <tadah/core/context.h>
 #include <tadah/models/functions/function_base.h>
 #include <tadah/models/functions/kernels/kern_base.h>
 #include <tadah/models/m_core.h>
@@ -23,7 +23,7 @@ template <class K = Function_Base&>
 class M_KRR_Core : public virtual M_Core {
 public:
     tadah::core::Matrix Sigma; ///< Covariance matrix.
-    tadah::core::Config &config; ///< Configuration reference.
+    tadah::core::Context &config; ///< Configuration reference.
     K kernel; ///< Kernel function.
 
     /**
@@ -33,7 +33,7 @@ public:
      *
      * @param c Configuration object reference.
      */
-    M_KRR_Core(tadah::core::Config &c) :
+    M_KRR_Core(tadah::core::Context &c) :
         config(c),
         kernel(c)
     {
@@ -52,7 +52,7 @@ public:
      * @param kernel Kernel object.
      * @param c Configuration object reference.
      */
-    M_KRR_Core(K &kernel, tadah::core::Config &c) :
+    M_KRR_Core(K &kernel, tadah::core::Context &c) :
         config(c),
         kernel(kernel)
     {

@@ -79,7 +79,7 @@ private:
 #ifndef M_EA_H
 #define M_EA_H
 
-#include <tadah/core/config.h>
+#include <tadah/core/context.h>
 #include <tadah/models/svd.h>
 #include <tadah/models/ols.h>
 #include <tadah/core/core_types.h>
@@ -90,12 +90,12 @@ namespace models {
 
 class EA {
   private:
-    const tadah::core::Config &config;
+    const tadah::core::Context &config;
     tadah::models::SVD &svd;
     tadah::core::t_type &T;
     int verbose;
   public:
-    EA(const tadah::core::Config &c, tadah::models::SVD &svd, tadah::core::t_type &T):
+    EA(const tadah::core::Context &c, tadah::models::SVD &svd, tadah::core::t_type &T):
       config(c),
       svd(svd),
       T(T),

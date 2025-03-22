@@ -11,13 +11,13 @@ D2_mJoin::~D2_mJoin() {
   for (auto d : ds) if (d) delete d;
 }
 
-D2_mJoin::D2_mJoin(tadah::core::Config &c) : D2_Base(c) {
+D2_mJoin::D2_mJoin(tadah::core::Context &c) : D2_Base(c) {
   init();
   configs = parse_config(c, "TYPE2B");
   expand_grids(c, configs, "TYPE2B");
 
   for (auto &c1 : configs) {
-    ds.push_back(tadah::core::factory<D2_Base, tadah::core::Config&>(c1.get<std::string>("TYPE2B"), c1));
+    ds.push_back(tadah::core::factory<D2_Base, tadah::core::Context&>(c1.get<std::string>("TYPE2B"), c1));
     s += ds.back()->size();
   }
 }

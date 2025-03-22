@@ -49,12 +49,12 @@ namespace models {
 class DM_mJoin : public DM_Base, public D_mJoin {
 private:
   std::vector<DM_Base*> ds;
-  std::vector<tadah::core::Config> configs;
+  std::vector<tadah::core::Context> configs;
   std::string lab = "DM_mJoin";
 public:
   DM_mJoin();
   ~DM_mJoin();
-  DM_mJoin(tadah::core::Config &c);
+  DM_mJoin(tadah::core::Context &c);
   void calc_aed(
     tadah::core::rho_type& rho,
     tadah::core::aed_type &aed) override;

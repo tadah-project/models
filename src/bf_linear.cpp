@@ -4,7 +4,7 @@ namespace models {
 
 
 BF_Linear::BF_Linear() {}
-BF_Linear::BF_Linear(const tadah::core::Config &c):
+BF_Linear::BF_Linear(const tadah::core::Context &c):
   Function_Base(c),
   BF_Base(c) {}
 std::string BF_Linear::get_label() const {

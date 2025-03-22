@@ -5,8 +5,8 @@ namespace models {
 
 Function_Base::Function_Base(): verbose(0) {
 }
-Function_Base::Function_Base(const tadah::core::Config &c) {
-  verbose = (c.exist("VERBOSE")) ? c.get<int>("VERBOSE") : 0;
+Function_Base::Function_Base(const tadah::core::Context &c) {
+  verbose = (c.contains("VERBOSE")) ? c.get<int>("VERBOSE") : 0;
 }
 void Function_Base::set_verbose(int v) { verbose=v; }
 int Function_Base::get_verbose() { return verbose; }

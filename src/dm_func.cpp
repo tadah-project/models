@@ -1,11 +1,11 @@
 #include <tadah/models/descriptors/dm/dm_func.h>
 
-#include <tadah/core/config.h>
+#include <tadah/core/context.h>
 namespace tadah {
 namespace models {
 
 
-F_RLR::F_RLR(tadah::core::Config &conf):
+F_RLR::F_RLR(tadah::core::Context &conf):
   config(&conf)
 {
   if (!config->get<bool>("INITMB")) return;

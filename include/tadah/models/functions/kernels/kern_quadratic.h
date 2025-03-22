@@ -21,7 +21,7 @@ namespace models {
 class Kern_Quadratic : public virtual Kern_Base {
     public:
         Kern_Quadratic ();
-        Kern_Quadratic (const tadah::core::Config &c);
+        Kern_Quadratic (const tadah::core::Context &c);
         /**
          * Label used for this class
          */

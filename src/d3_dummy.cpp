@@ -6,7 +6,7 @@ namespace models {
 D3_Dummy::D3_Dummy() {
   init();
 }
-D3_Dummy::D3_Dummy(tadah::core::Config &) {
+D3_Dummy::D3_Dummy(tadah::core::Context &) {
   init();
 }
 

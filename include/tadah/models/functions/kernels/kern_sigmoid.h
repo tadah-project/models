@@ -15,7 +15,7 @@ namespace models {
  * + \mathrm{c} \big)
  * \f]
  *
- *  Required tadah::core::Config key: \ref MPARAMS <double> \f$ \gamma \f$  c
+ *  Required tadah::core::Context key: \ref MPARAMS <double> \f$ \gamma \f$  c
  *
  *  @see Kern_Base
  */
@@ -27,7 +27,7 @@ class Kern_Sigmoid : public virtual Kern_Base {
          * Label used for this class
          */
         Kern_Sigmoid ();
-        Kern_Sigmoid (const tadah::core::Config &c);
+        Kern_Sigmoid (const tadah::core::Context &c);
         std::string label = "Kern_Sigmoid";
         double operator() (const tadah::core::aed_type& b, const tadah::core::aed_type& af) const override;
         tadah::core::aed_type derivative(const tadah::core::aed_type& b, const tadah::core::aed_type& af) const override;

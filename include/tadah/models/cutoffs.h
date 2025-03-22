@@ -2,7 +2,7 @@
 #define CUTOFFS_H
 
 #include <string>
-#include <tadah/core/config.h>
+#include <tadah/core/context.h>
 #include <tadah/core/registry.h>
 
 namespace tadah {

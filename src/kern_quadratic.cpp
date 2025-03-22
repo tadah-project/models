@@ -4,7 +4,7 @@ namespace models {
 
 
 Kern_Quadratic::Kern_Quadratic () {}
-Kern_Quadratic::Kern_Quadratic (const tadah::core::Config &c):
+Kern_Quadratic::Kern_Quadratic (const tadah::core::Context &c):
     Function_Base(c),
     Kern_Base(c)
 {

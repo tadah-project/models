@@ -78,12 +78,12 @@ namespace models {
 //   }
 //
 //   template<typename T>
-//   T create_descriptor(tadah::core::Config &c) {
+//   T create_descriptor(tadah::core::Context &c) {
 //     return T(c);
 //   }
 //
 // public:
-//   D2_Join_N(tadah::core::Config &c) : descriptors(create_descriptor<Descriptors>(c)...) {
+//   D2_Join_N(tadah::core::Context &c) : descriptors(create_descriptor<Descriptors>(c)...) {
 //     calculate_sizes<0>();
 //   }
 //

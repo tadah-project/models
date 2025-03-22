@@ -21,7 +21,7 @@ namespace models {
  * This descriptor will enforce cutoff distance as specified in a \ref SETFL file.
  * Set \ref RCUT2B to the same value to suppress the warning message.
  *
- * Required tadah::core::Config keys:
+ * Required tadah::core::Context keys:
  * \ref INIT2B \ref SETFL
  */
 class D2_EAM : public D2_Base {
@@ -55,7 +55,7 @@ private:
 
 public:
   D2_EAM();
-  D2_EAM(tadah::core::Config &config);
+  D2_EAM(tadah::core::Context &config);
   void calc_aed(
     const int Zi,
     const int Zj,

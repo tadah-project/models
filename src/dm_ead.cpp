@@ -14,7 +14,7 @@ DM_EAD::DM_EAD() {
  * rhoi array is split 50/50 into density and derivative
  * of the embedding function
  */
-DM_EAD::DM_EAD(tadah::core::Config &config): DM_Base(config),
+DM_EAD::DM_EAD(tadah::core::Context &config): DM_Base(config),
   rc(config.get<double>("RCUTMBMAX"))
 {
   if (!config.get<bool>("INITMB")) {

@@ -4,7 +4,7 @@ namespace models {
 
 
 Kern_LQ::Kern_LQ () {}
-Kern_LQ::Kern_LQ (const tadah::core::Config &c):
+Kern_LQ::Kern_LQ (const tadah::core::Context &c):
     Function_Base(c),
     Kern_Base(c)
 {

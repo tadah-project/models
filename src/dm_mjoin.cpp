@@ -11,13 +11,13 @@ DM_mJoin::~DM_mJoin() {
   for (auto d : ds) if (d) delete d;
 }
 
-DM_mJoin::DM_mJoin(tadah::core::Config &c) : DM_Base(c) {
+DM_mJoin::DM_mJoin(tadah::core::Context &c) : DM_Base(c) {
   init();
   configs = parse_config(c, "TYPEMB");
   expand_grids(c, configs, "TYPEMB");
 
   for (auto &c1 : configs) {
-    ds.push_back(tadah::core::factory<DM_Base, tadah::core::Config&>(c1.get<std::string>("TYPEMB"), c1));
+    ds.push_back(tadah::core::factory<DM_Base, tadah::core::Context&>(c1.get<std::string>("TYPEMB"), c1));
     s += ds.back()->size();
     rhoisize += ds.back()->rhoi_size();
   }

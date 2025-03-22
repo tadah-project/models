@@ -39,7 +39,7 @@ public:
   virtual size_t size()override=0;
 
   virtual std::string label()override=0;
-  virtual std::vector<std::string> get_init_atoms(tadah::core::Config &c) override;
+  virtual std::vector<std::string> get_init_atoms(tadah::core::Context &c) override;
 };
 } // namespace models
 } // namespace tadah

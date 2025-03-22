@@ -26,28 +26,28 @@ std::vector<std::string> convert_to_strings(const tadah::core::v_type& vec, int 
   return result;
 }
 
-void D_mJoin::expand_grids(tadah::core::Config &c) {
-  if (c.exist("TYPE2B")) {
-    std::vector<tadah::core::Config> configs1 = parse_config(c, "TYPE2B");
+void D_mJoin::expand_grids(tadah::core::Context &c) {
+  if (c.contains("TYPE2B")) {
+    std::vector<tadah::core::Context> configs1 = parse_config(c, "TYPE2B");
     expand_grids(c,configs1,"TYPE2B");
   }
-  if (c.exist("TYPEMB")) {
-    std::vector<tadah::core::Config> configs2 = parse_config(c, "TYPEMB");
+  if (c.contains("TYPEMB")) {
+    std::vector<tadah::core::Context> configs2 = parse_config(c, "TYPEMB");
     expand_grids(c,configs2,"TYPEMB");
   }
 }
-void D_mJoin::expand_grids(tadah::core::Config &c, std::string type_str) {
-  std::vector<tadah::core::Config> configs = parse_config(c, type_str);
+void D_mJoin::expand_grids(tadah::core::Context &c, std::string type_str) {
+  std::vector<tadah::core::Context> configs = parse_config(c, type_str);
   expand_grids(c,configs,type_str);
 }
-void D_mJoin::expand_grids(tadah::core::Config &c, std::vector<tadah::core::Config> &configs,std::string type_str) {
+void D_mJoin::expand_grids(tadah::core::Context &c, std::vector<tadah::core::Context> &configs,std::string type_str) {
   if (type_str=="TYPE2B") {
     c.remove("CGRID2B"); c.remove("SGRID2B");
     for (auto &c1 : configs) {
-      if (c1.exist("CGRID2B"))
+      if (c1.contains("CGRID2B"))
         for (size_t i = 0; i < c1.size("CGRID2B"); ++i)
           c.add("CGRID2B", c1.get<double>("CGRID2B", i));
-      if (c1.exist("SGRID2B"))
+      if (c1.contains("SGRID2B"))
         for (size_t i = 0; i < c1.size("SGRID2B"); ++i)
           c.add("SGRID2B", c1.get<double>("SGRID2B", i));
     }
@@ -57,16 +57,16 @@ void D_mJoin::expand_grids(tadah::core::Config &c, std::vector<tadah::core::Conf
     c.remove("CEMBFUNC"); c.remove("SEMBFUNC");
 
     for (auto &c1 : configs) {
-      if (c1.exist("CGRIDMB"))
+      if (c1.contains("CGRIDMB"))
         for (size_t i = 0; i < c1.size("CGRIDMB"); ++i)
           c.add("CGRIDMB", c1.get<double>("CGRIDMB", i));
-      if (c1.exist("SGRIDMB"))
+      if (c1.contains("SGRIDMB"))
         for (size_t i = 0; i < c1.size("SGRIDMB"); ++i)
           c.add("SGRIDMB", c1.get<double>("SGRIDMB", i));
-      if (c1.exist("CEMBFUNC"))
+      if (c1.contains("CEMBFUNC"))
         for (size_t i = 0; i < c1.size("CEMBFUNC"); ++i)
           c.add("CEMBFUNC", c1.get<double>("CEMBFUNC", i));
-      if (c1.exist("SEMBFUNC"))
+      if (c1.contains("SEMBFUNC"))
         for (size_t i = 0; i < c1.size("SEMBFUNC"); ++i)
           c.add("SEMBFUNC", c1.get<double>("SEMBFUNC", i));
     }
@@ -75,7 +75,7 @@ void D_mJoin::expand_grids(tadah::core::Config &c, std::vector<tadah::core::Conf
     std::cerr << "Cannot expand config grid: wrong keyword: " << type_str << std::endl;
   }
 }
-std::vector<tadah::core::Config> D_mJoin::parse_config(tadah::core::Config &c, std::string type_str) {
+std::vector<tadah::core::Context> D_mJoin::parse_config(tadah::core::Context &c, std::string type_str) {
   std::string prefix = type_str=="TYPE2B" ? "D2_" : "DM_";
   std::string rctypekey = "RC" + type_str;
   std::string rcutkey = "RCUT" + type_str.substr(type_str.size() - 2);
@@ -105,37 +105,37 @@ std::vector<tadah::core::Config> D_mJoin::parse_config(tadah::core::Config &c, s
 
   size_t p = c.get<size_t>("OUTPREC");
   std::vector<std::string> cgrid;
-  if (c.exist(cgridkey)) {
+  if (c.contains(cgridkey)) {
     cgrid.resize(c.size(cgridkey));
     c.get(cgridkey, cgrid);
     cgrid = convert_to_strings(D_Base::get_grid(cgrid),p); 
     data_map[cgridkey] = cgrid.begin();
   }
   std::vector<std::string> sgrid;
-  if (c.exist(sgridkey)) {
+  if (c.contains(sgridkey)) {
     sgrid.resize(c.size(sgridkey));
     c.get(sgridkey, sgrid);
     sgrid = convert_to_strings(D_Base::get_grid(sgrid),p); 
     data_map[sgridkey] = sgrid.begin();
   }
   std::vector<std::string> cembgrid;
-  if (c.exist("CEMBFUNC")) {
+  if (c.contains("CEMBFUNC")) {
     cembgrid.resize(c.size("CEMBFUNC"));
     c.get("CEMBFUNC", cembgrid);
     cembgrid = convert_to_strings(D_Base::get_grid(cembgrid),p); 
     data_map["CEMBFUNC"] = cembgrid.begin();
   }
   std::vector<std::string> sembgrid;
-  if (c.exist("SEMBFUNC")) {
+  if (c.contains("SEMBFUNC")) {
     sembgrid.resize(c.size("SEMBFUNC"));
     c.get("SEMBFUNC", sembgrid);
     sembgrid = convert_to_strings(D_Base::get_grid(sembgrid),p); 
     data_map["SEMBFUNC"] = sembgrid.begin();
   }
 
-  std::vector<tadah::core::Config> configs;
+  std::vector<tadah::core::Context> configs;
   for (auto it = types.begin(); it != types.end();) {
-    tadah::core::Config c1 = c;
+    tadah::core::Context c1 = c;
     c1.remove(type_str); c1.remove(rctypekey); c1.remove(rcutkey);
     c1.remove(cgridkey); c1.remove(sgridkey);
     const auto token = *it++;

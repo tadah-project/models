@@ -7,7 +7,7 @@ namespace models {
 D2_EAM::D2_EAM() {
   init();
 }
-D2_EAM::D2_EAM(tadah::core::Config &c): D2_Base(c)
+D2_EAM::D2_EAM(tadah::core::Context &c): D2_Base(c)
 {
   if (!c.get<bool>("INIT2B")) return;
   init();
@@ -18,7 +18,7 @@ D2_EAM::D2_EAM(tadah::core::Config &c): D2_Base(c)
   if (std::abs(ef.rcut - c.get<double>("RCUT2B")) > std::numeric_limits<double>::min()) {
     if (verbose) {
       std::cout << std::endl;
-      std::cout << "tadah::core::Config file cutoff and setfl file cutoff differ: "
+      std::cout << "tadah::core::Context file cutoff and setfl file cutoff differ: "
         << c.get<double>("RCUT2B") << " " << ef.rcut << std::endl;
       std::cout << "Enforcing SETFL file cutoff: " << ef.rcut << std::endl;
     }

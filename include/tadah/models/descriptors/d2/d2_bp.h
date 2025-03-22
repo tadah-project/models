@@ -24,7 +24,7 @@ namespace models {
  * potential-energy surfaces. <i>Physical Review Letters</i>,
  * <i>98</i>(14), 146401. https://doi.org/10.1103/PhysRevLett.98.146401</div>
  *
- * Required tadah::core::Config keys:
+ * Required tadah::core::Context keys:
  * \ref INIT2B \ref CGRID2B \ref SGRID2B
  */
 class D2_BP : public D2_Base {
@@ -35,7 +35,7 @@ private:
 
 public:
   D2_BP();
-  D2_BP(tadah::core::Config &config);
+  D2_BP(tadah::core::Context &config);
   void calc_aed(
     const int Zi,
     const int Zj,

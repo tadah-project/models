@@ -1,7 +1,7 @@
 #ifndef DM_func_H
 #define DM_func_H
 
-#include <tadah/core/config.h>
+#include <tadah/core/context.h>
 #include <tadah/models/descriptors/d_base.h>
 
 #include <cstdlib>
@@ -29,11 +29,11 @@ public:
  */
 class F_RLR:  public F_Base {
 private:
-  tadah::core::Config *config=nullptr;
+  tadah::core::Context *config=nullptr;
   tadah::core::v_type sgrid;   // controls depth
   tadah::core::v_type cgrid;   // control x-intercep at 1/c
 public:
-  F_RLR(tadah::core::Config &conf);
+  F_RLR(tadah::core::Context &conf);
   F_RLR();
   double calc_F(double rho,size_t c);
   double calc_dF(double rho,size_t c);

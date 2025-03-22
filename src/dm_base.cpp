@@ -5,8 +5,8 @@ namespace models {
 void DM_Base::set_rfidx(size_t rfidx_) { rfidx=rfidx_; }
 size_t DM_Base::get_rfidx() { return rfidx; }
 
-std::vector<std::string> DM_Base::get_init_atoms(tadah::core::Config &c) {
-  if (!c.exist("TYPEMB")) {
+std::vector<std::string> DM_Base::get_init_atoms(tadah::core::Context &c) {
+  if (!c.contains("TYPEMB")) {
     std::cerr << "Warning: TYPEMB key was not found. "
       "Atom pairs must be initialized manually." << std::endl;
     return {};

@@ -8,7 +8,7 @@
 #include <tadah/models/m_krr_core.h>
 #include <tadah/models/ekm.h>
 #include <tadah/core/maths.h>
-#include <tadah/core/config.h>
+#include <tadah/core/context.h>
 #include <tadah/models/memory/IModelsWorkspaceManager.h>
 
 #include <iostream>
@@ -43,7 +43,7 @@ public:
      *
      * @param c Configuration object reference.
      */
-    M_KRR_Train(tadah::core::Config &c) : M_KRR_Core<Kern>(c), ekm(c) {}
+    M_KRR_Train(tadah::core::Context &c) : M_KRR_Core<Kern>(c), ekm(c) {}
 
     /**
      * @brief Constructor using a kernel and configuration object.
@@ -53,8 +53,8 @@ public:
      * @param kernel Kernel object.
      * @param c Configuration object reference.
      */
-    M_KRR_Train(Kern &kernel, tadah::core::Config &c) : M_KRR_Core<Kern>(kernel, c), ekm(kernel) {}
-    M_KRR_Train(Kern &kernel, tadah::core::Config &c, tadah::models::memory::IModelsWorkspaceManager &workspaceManager) :
+    M_KRR_Train(Kern &kernel, tadah::core::Context &c) : M_KRR_Core<Kern>(kernel, c), ekm(kernel) {}
+    M_KRR_Train(Kern &kernel, tadah::core::Context &c, tadah::models::memory::IModelsWorkspaceManager &workspaceManager) :
     M_KRR_Core<Kern>(kernel, c),
     M_Train(workspaceManager),
     ekm(kernel)

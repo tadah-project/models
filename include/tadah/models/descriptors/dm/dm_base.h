@@ -18,9 +18,9 @@ protected:
   size_t rhoisize=0;
 public:
   DM_Base() {};
-  DM_Base(tadah::core::Config &c): D_Base(c) {
+  DM_Base(tadah::core::Context &c): D_Base(c) {
     //if (c.get<bool>("INITMB")) {
-    if (c.exist("RCUTMBMAX") && c.exist("RCTYPEMB")) {
+    if (c.contains("RCUTMBMAX") && c.contains("RCTYPEMB")) {
       double rcutmb = c.get<double>("RCUTMBMAX");
       set_fcut(tadah::core::factory<Cut_Base,double>( c.get<std::string>("RCTYPEMB"), rcutmb ), true);
     }
@@ -29,7 +29,7 @@ public:
     }
   }
   virtual ~DM_Base() {};
-  virtual std::vector<std::string> get_init_atoms(tadah::core::Config &c) override;
+  virtual std::vector<std::string> get_init_atoms(tadah::core::Context &c) override;
 
   /** \brief Calculate \ref AED
    *

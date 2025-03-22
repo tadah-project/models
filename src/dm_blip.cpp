@@ -9,7 +9,7 @@ namespace models {
 DM_Blip::DM_Blip() {
   init();
 }
-DM_Blip::DM_Blip(tadah::core::Config &c): DM_Base(c),
+DM_Blip::DM_Blip(tadah::core::Context &c): DM_Base(c),
   rc(c.get<double>("RCUTMBMAX"))
 {
   if (!c.get<bool>("INITMB")) return;

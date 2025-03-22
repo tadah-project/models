@@ -12,7 +12,7 @@ namespace models {
 /** \brief Base class to be used by all basis functions */
 struct BF_Base: public virtual Function_Base {
   BF_Base();
-  BF_Base(const tadah::core::Config &c);
+  BF_Base(const tadah::core::Context &c);
   virtual ~BF_Base();
 
   // virtual double epredict(const tadah::core::t_type &, const tadah::core::aed_type& ) const=0;

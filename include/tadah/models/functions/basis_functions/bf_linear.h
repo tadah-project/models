@@ -21,7 +21,7 @@ struct BF_Linear : public virtual BF_Base {
      * @brief Constructor with configuration.
      * @param c Configuration object reference.
      */
-    BF_Linear(const tadah::core::Config &c);
+    BF_Linear(const tadah::core::Context &c);
 
     /**
      * @brief Retrieve the label of the basis function.

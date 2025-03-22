@@ -7,7 +7,7 @@ namespace models {
 D2_BP::D2_BP() {
   init();
 }
-D2_BP::D2_BP(tadah::core::Config &c): D2_Base(c) {
+D2_BP::D2_BP(tadah::core::Context &c): D2_Base(c) {
   init();
 
   if (!c.get<bool>("INIT2B")) return;

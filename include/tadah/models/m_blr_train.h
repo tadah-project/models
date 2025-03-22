@@ -8,7 +8,7 @@
 #include <tadah/models/linear_regressor.h>
 #include <tadah/models/functions/function_base.h>
 #include <tadah/models/functions/basis_functions/bf_base.h>
-#include <tadah/core/config.h>
+#include <tadah/core/context.h>
 #include <tadah/models/memory/IModelsWorkspaceManager.h>
 
 #include <iostream>
@@ -40,7 +40,7 @@ public:
      *
      * @param c Configuration object reference.
      */
-    M_BLR_Train(tadah::core::Config &c) : M_BLR_Core<BF>(c) {}
+    M_BLR_Train(tadah::core::Context &c) : M_BLR_Core<BF>(c) {}
 
     /**
      * @brief Constructor using a basis function and configuration object.
@@ -50,8 +50,8 @@ public:
      * @param bf Basis function object.
      * @param c Configuration object reference.
      */
-    M_BLR_Train(BF &bf, tadah::core::Config &c) : M_BLR_Core<BF>(bf, c) {}
-    M_BLR_Train(BF &bf, tadah::core::Config &c, tadah::models::memory::IModelsWorkspaceManager &workspaceManager) :
+    M_BLR_Train(BF &bf, tadah::core::Context &c) : M_BLR_Core<BF>(bf, c) {}
+    M_BLR_Train(BF &bf, tadah::core::Context &c, tadah::models::memory::IModelsWorkspaceManager &workspaceManager) :
     M_BLR_Core<BF>(bf, c),
     M_Train(workspaceManager)
   {}

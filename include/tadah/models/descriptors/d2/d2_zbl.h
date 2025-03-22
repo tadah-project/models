@@ -37,7 +37,7 @@ namespace models {
  * \phi(x) = 0.1818 e^{-3.2x} + 0.5099 e^{-0.9423x} + 0.2802 e^{-0.4029x} + 0.02817 e^{-0.2016x}
  * \f]
  *
- * Required tadah::core::Config Key: \ref INIT2B \ref TYPE2B
+ * Required tadah::core::Context Key: \ref INIT2B \ref TYPE2B
  *
  * - TYPE2B D2_ZBL \f$ a_0 \f$ \f$ s_0 \f$ \f$ p_0 \f$ \f$ p_1 \f$ ELEMENT1 ELEMENT2
  *
@@ -64,7 +64,7 @@ private:
   int ntypes=0; // number of elements for this calc
 public:
   D2_ZBL();
-  D2_ZBL(tadah::core::Config &config);
+  D2_ZBL(tadah::core::Context &config);
   ~D2_ZBL();
   void calc_aed(
     const int Zi,

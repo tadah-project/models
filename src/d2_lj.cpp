@@ -7,7 +7,7 @@ namespace models {
 D2_LJ::D2_LJ() {
   init();
 }
-D2_LJ::D2_LJ(tadah::core::Config &c): D2_Base(c)
+D2_LJ::D2_LJ(tadah::core::Context &c): D2_Base(c)
 {
   if (!c.get<bool>("INIT2B")) return;
   init();

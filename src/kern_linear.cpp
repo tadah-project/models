@@ -4,7 +4,7 @@ namespace models {
 
 
 Kern_Linear::Kern_Linear() {}
-Kern_Linear::Kern_Linear (const tadah::core::Config &c):
+Kern_Linear::Kern_Linear (const tadah::core::Context &c):
     Function_Base(c),
     Kern_Base(c)
 {}

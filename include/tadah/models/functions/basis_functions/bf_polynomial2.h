@@ -21,7 +21,7 @@ struct BF_Polynomial2 : public virtual BF_Base {
      * @brief Constructor with configuration.
      * @param c Configuration object reference.
      */
-    BF_Polynomial2(const tadah::core::Config &c);
+    BF_Polynomial2(const tadah::core::Context &c);
 
     std::string label = "BF_Polynomial2"; ///< Label identifying the basis function.
 

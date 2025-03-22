@@ -3,8 +3,8 @@ namespace tadah {
 namespace models {
 
 
-std::vector<std::string> D2_Base::get_init_atoms(tadah::core::Config &c) {
-  if (!c.exist("TYPE2B")) {
+std::vector<std::string> D2_Base::get_init_atoms(tadah::core::Context &c) {
+  if (!c.contains("TYPE2B")) {
     std::cerr << "Warning: TYPE2B key was not found. "
       "Atom pairs must be initialized manually." << std::endl;
     return {};

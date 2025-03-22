@@ -20,7 +20,7 @@ namespace models {
  *
  * Any cutoff can be used
  *
- * Required tadah::core::Config Key: \ref INIT2B \ref TYPE2B
+ * Required tadah::core::Context Key: \ref INIT2B \ref TYPE2B
  *
  * TYPE2B D2_MIE 12 6 ELEMENT1 ELEMENT2
  *
@@ -33,7 +33,7 @@ private:
   tadah::core::v_type etas;
 public:
   D2_MIE();
-  D2_MIE(tadah::core::Config &config);
+  D2_MIE(tadah::core::Context &config);
   void calc_aed(
     const int Zi,
     const int Zj,

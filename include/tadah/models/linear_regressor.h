@@ -3,7 +3,7 @@
 
 #include <cstddef>
 #include <limits>
-#include <tadah/core/config.h>
+#include <tadah/core/context.h>
 #include <tadah/core/core_types.h>
 #include <tadah/models/ea.h>
 #include <tadah/models/ols.h>
@@ -37,8 +37,12 @@ class LinearRegressor {
    * @param Sigma tadah::core::Matrix to store the covariance matrix.
    */
 public:
-  static void train(tadah::core::Config &config, tadah::core::phi_type &Phi, tadah::core::t_type &T, tadah::core::t_type &weights,
-                    tadah::core::Matrix &Sigma, tadah::models::memory::IModelsWorkspaceManager &workspaceManager) {
+  static void train(tadah::core::Context &config,
+                    tadah::core::phi_type &Phi,
+                    tadah::core::t_type &T,
+                    tadah::core::t_type &weights,
+                    tadah::core::Matrix &Sigma,
+                    tadah::models::memory::IModelsWorkspaceManager &workspaceManager) {
 
     int verbose = config.get<int>("VERBOSE");
     double lambda = config.get<double>("LAMBDA", 0);
@@ -97,7 +101,7 @@ public:
     }
 
   }
-  static void train(tadah::core::Config &config, tadah::core::phi_type &Phi, tadah::core::t_type &T, tadah::core::t_type &weights,
+  static void train(tadah::core::Context &config, tadah::core::phi_type &Phi, tadah::core::t_type &T, tadah::core::t_type &weights,
                     tadah::core::Matrix &Sigma) {
     tadah::models::memory::ModelsWorkspaceManager workspaceManager;
     train(config, Phi, T, weights, Sigma, workspaceManager);
@@ -141,7 +145,7 @@ public:
    * @param config Configuration object.
    * @param Sigma Covariance matrix to be added.
    */
-  static void config_add_sigma(tadah::core::Config &config, tadah::core::Matrix &Sigma) {
+  static void config_add_sigma(tadah::core::Context &config, tadah::core::Matrix &Sigma) {
     tadah::core::t_type Sigma_as_vector(Sigma.data(), Sigma.cols() * Sigma.rows());
     config.add("SIGMA", Sigma.rows());
     config.add<tadah::core::t_type>("SIGMA", Sigma_as_vector);
@@ -156,7 +160,7 @@ public:
    * @param Sigma tadah::core::Matrix to store the reconstructed Sigma.
    * @throws std::runtime_error if Sigma is not computed.
    */
-  static void read_sigma(tadah::core::Config &config, tadah::core::Matrix &Sigma) {
+  static void read_sigma(tadah::core::Context &config, tadah::core::Matrix &Sigma) {
     using V = std::vector<double>;
     size_t N;
     try {

@@ -15,7 +15,7 @@ namespace models {
  * {2\sigma^2} \Big)
  * \f]
  *
- *  Required tadah::core::Config key: \ref MPARAMS <double> \f$ \sigma \f$
+ *  Required tadah::core::Context key: \ref MPARAMS <double> \f$ \sigma \f$
  *
  *  @see Kern_Base Kern_Linear Kern_Quadratic
  */
@@ -26,7 +26,7 @@ class Kern_RBF : public virtual Kern_Base {
          * Label used for this class
          */
         Kern_RBF ();
-        Kern_RBF (const tadah::core::Config &c);
+        Kern_RBF (const tadah::core::Context &c);
         std::string label = "Kern_RBF";
         double operator() (const tadah::core::aed_type& b, const tadah::core::aed_type& af) const override;
         tadah::core::aed_type derivative(const tadah::core::aed_type& b, const tadah::core::aed_type& af) const override;

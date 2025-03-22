@@ -10,7 +10,7 @@ namespace models {
 D2_Blip::D2_Blip() {
   init();
 }
-D2_Blip::D2_Blip(tadah::core::Config &c): D2_Base(c)
+D2_Blip::D2_Blip(tadah::core::Context &c): D2_Base(c)
 {
   if (!c.get<bool>("INIT2B")) return;
   init();

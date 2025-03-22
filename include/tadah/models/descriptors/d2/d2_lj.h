@@ -31,14 +31,14 @@ namespace models {
  * It is ok thought to set them to true it's just that
  * numerical values will be different.
  *
- * Required tadah::core::Config Key: \ref INIT2B
+ * Required tadah::core::Context Key: \ref INIT2B
  */
 class D2_LJ : public D2_Base {
 private:
   std::string lab="D2_LJ";
 public:
   D2_LJ();
-  D2_LJ(tadah::core::Config &config);
+  D2_LJ(tadah::core::Context &config);
   void calc_aed(
     const int Zi,
     const int Zj,
