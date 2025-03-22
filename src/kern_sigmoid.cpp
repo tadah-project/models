@@ -4,16 +4,16 @@ namespace models {
 
 
 Kern_Sigmoid::Kern_Sigmoid () {}
-Kern_Sigmoid::Kern_Sigmoid (const tadah::core::Context &config):
-    Function_Base(config),
-    Kern_Base(config),
-    gamma(config.get<double>("MPARAMS",0)),
-    c(config.get<double>("MPARAMS",1))
+Kern_Sigmoid::Kern_Sigmoid (const tadah::core::Context &context):
+    Function_Base(context),
+    Kern_Base(context),
+    gamma(context.get<double>("MPARAMS",0)),
+    c(context.get<double>("MPARAMS",1))
 {
     if (get_verbose()) std::cout << std::endl << label << " | gamma: " << gamma
         << " | c: " << c << std::endl;
 
-    read_basis_from_config(config,basis);
+    read_basis_from_context(context,basis);
 }
 double Kern_Sigmoid::operator() (const tadah::core::aed_type& b, const tadah::core::aed_type& af) const
 {

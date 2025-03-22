@@ -17,7 +17,7 @@ DM_Blip::DM_Blip(tadah::core::Context &c): DM_Base(c),
 
   get_grid(c,"CGRIDMB",cgrid);
   get_grid(c,"SGRIDMB",sgrid);
-  // update config with generated grid
+  // update context with generated grid
   c.remove("CGRIDMB");
   for (const auto &i: cgrid) c.add("CGRIDMB",i);
   c.remove("SGRIDMB");

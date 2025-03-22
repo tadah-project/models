@@ -77,10 +77,10 @@ D_Base::D_Base(tadah::core::Context &c):
   verbose(c.get<int>("VERBOSE"))
 {
   std::fill_n(weights, 119, 1.0);
-  if (c.contains("ATOMS")) {
-    for (size_t i=0; i<c.size("ATOMS"); ++i) {
-      std::string symbol = c.get<std::string>("ATOMS",i);
-      double wi = c.get<double>("WATOMS",i);
+  if (c.contains("ATOM")) {
+    for (size_t i=0; i<c.size("ATOM"); ++i) {
+      std::string symbol = c.get<std::string>("ATOM",i);
+      double wi = c.get<double>("WATOM",i);
       int Z = tadah::core::PeriodicTable::find_by_symbol(symbol).Z;
       weights[Z]=wi;
     }

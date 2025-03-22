@@ -13,7 +13,7 @@ Kern_RBF::Kern_RBF (const tadah::core::Context &c):
     if (get_verbose()) std::cout << std::endl << label << " | sigma: " << sigma
         << " | gamma: " << gamma << std::endl;
 
-    read_basis_from_config(c,basis);
+    read_basis_from_context(c,basis);
 }
 double Kern_RBF::operator() (const tadah::core::aed_type& b, const tadah::core::aed_type& af) const
 {

@@ -23,7 +23,7 @@ template <class BF = Function_Base&>
 class M_BLR_Core : public virtual M_Core {
 public:
     tadah::core::Matrix Sigma; ///< Covariance matrix.
-    tadah::core::Context &config; ///< Configuration reference.
+    tadah::core::Context &context; ///< Configuration reference.
     BF bf; ///< Basis function.
 
     /**
@@ -33,7 +33,7 @@ public:
      *
      * @param c Configuration object reference.
      */
-    M_BLR_Core(tadah::core::Context &c) : config(c), bf(c) {
+    M_BLR_Core(tadah::core::Context &c) : context(c), bf(c) {
         static_assert(std::is_base_of<BF_Base, BF>::value,
                       "\nThe provided Basis function is not of a BasisFunction type.\n"
                       "For BLR use basis functions defined in basis_functions.h.\n"
@@ -50,7 +50,7 @@ public:
      * @param bf Basis function object.
      * @param c Configuration object reference.
      */
-    M_BLR_Core(BF &bf, tadah::core::Context &c) : config(c), bf(bf) {
+    M_BLR_Core(BF &bf, tadah::core::Context &c) : context(c), bf(bf) {
         if (dynamic_cast<BF_Base*>(&bf) == nullptr)
             throw std::invalid_argument("Provided object is not of BF_Base type");
         init();
@@ -75,7 +75,7 @@ public:
      * @throws std::runtime_error if LAMBDA is not zero.
      */
     tadah::core::t_type get_weights_uncertainty() const {
-        double lambda = config.template get<double>("LAMBDA");
+        double lambda = context.template get<double>("LAMBDA");
         if (lambda != 0)
             throw std::runtime_error("Sigma matrix is only computed for LAMBDA != 0");
         return Sigma.diagonal();
@@ -88,12 +88,12 @@ private:
      * Loads weights if available in the configuration and sets the verbose level.
      */
     void init() {
-        if (config.exist("WEIGHTS")) {
-            weights.resize(config.size("WEIGHTS"));
-            config.get<tadah::core::t_type>("WEIGHTS", weights);
+        if (context.contains("WEIGHTS")) {
+            weights.resize(context.size("WEIGHTS"));
+            context.get<tadah::core::t_type>("WEIGHTS", weights);
             trained = true;
         }
-        verbose = config.get<int>("VERBOSE");
+        verbose = context.get<int>("VERBOSE");
 
     }
 };

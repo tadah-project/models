@@ -24,7 +24,6 @@ D2_EAM::D2_EAM(tadah::core::Context &c): D2_Base(c)
     }
     c.remove("RCUT2B");
     c.add("RCUT2B", ef.rcut);
-    c.postprocess();
   }
 
   frho_spline.resize(ef.nrho+1, std::vector<double>(7));

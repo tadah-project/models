@@ -38,7 +38,7 @@ private:
   std::string lab="D2_LJ";
 public:
   D2_LJ();
-  D2_LJ(tadah::core::Context &config);
+  D2_LJ(tadah::core::Context &context);
   void calc_aed(
     const int Zi,
     const int Zj,

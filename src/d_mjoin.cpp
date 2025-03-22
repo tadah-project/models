@@ -28,22 +28,22 @@ std::vector<std::string> convert_to_strings(const tadah::core::v_type& vec, int 
 
 void D_mJoin::expand_grids(tadah::core::Context &c) {
   if (c.contains("TYPE2B")) {
-    std::vector<tadah::core::Context> configs1 = parse_config(c, "TYPE2B");
-    expand_grids(c,configs1,"TYPE2B");
+    std::vector<tadah::core::Context> contexts1 = parse_context(c, "TYPE2B");
+    expand_grids(c,contexts1,"TYPE2B");
   }
   if (c.contains("TYPEMB")) {
-    std::vector<tadah::core::Context> configs2 = parse_config(c, "TYPEMB");
-    expand_grids(c,configs2,"TYPEMB");
+    std::vector<tadah::core::Context> contexts2 = parse_context(c, "TYPEMB");
+    expand_grids(c,contexts2,"TYPEMB");
   }
 }
 void D_mJoin::expand_grids(tadah::core::Context &c, std::string type_str) {
-  std::vector<tadah::core::Context> configs = parse_config(c, type_str);
-  expand_grids(c,configs,type_str);
+  std::vector<tadah::core::Context> contexts = parse_context(c, type_str);
+  expand_grids(c,contexts,type_str);
 }
-void D_mJoin::expand_grids(tadah::core::Context &c, std::vector<tadah::core::Context> &configs,std::string type_str) {
+void D_mJoin::expand_grids(tadah::core::Context &c, std::vector<tadah::core::Context> &contexts,std::string type_str) {
   if (type_str=="TYPE2B") {
     c.remove("CGRID2B"); c.remove("SGRID2B");
-    for (auto &c1 : configs) {
+    for (auto &c1 : contexts) {
       if (c1.contains("CGRID2B"))
         for (size_t i = 0; i < c1.size("CGRID2B"); ++i)
           c.add("CGRID2B", c1.get<double>("CGRID2B", i));
@@ -56,7 +56,7 @@ void D_mJoin::expand_grids(tadah::core::Context &c, std::vector<tadah::core::Con
     c.remove("CGRIDMB"); c.remove("SGRIDMB");
     c.remove("CEMBFUNC"); c.remove("SEMBFUNC");
 
-    for (auto &c1 : configs) {
+    for (auto &c1 : contexts) {
       if (c1.contains("CGRIDMB"))
         for (size_t i = 0; i < c1.size("CGRIDMB"); ++i)
           c.add("CGRIDMB", c1.get<double>("CGRIDMB", i));
@@ -72,10 +72,10 @@ void D_mJoin::expand_grids(tadah::core::Context &c, std::vector<tadah::core::Con
     }
   }
   else {
-    std::cerr << "Cannot expand config grid: wrong keyword: " << type_str << std::endl;
+    std::cerr << "Cannot expand context grid: wrong keyword: " << type_str << std::endl;
   }
 }
-std::vector<tadah::core::Context> D_mJoin::parse_config(tadah::core::Context &c, std::string type_str) {
+std::vector<tadah::core::Context> D_mJoin::parse_context(tadah::core::Context &c, std::string type_str) {
   std::string prefix = type_str=="TYPE2B" ? "D2_" : "DM_";
   std::string rctypekey = "RC" + type_str;
   std::string rcutkey = "RCUT" + type_str.substr(type_str.size() - 2);
@@ -133,7 +133,7 @@ std::vector<tadah::core::Context> D_mJoin::parse_config(tadah::core::Context &c,
     data_map["SEMBFUNC"] = sembgrid.begin();
   }
 
-  std::vector<tadah::core::Context> configs;
+  std::vector<tadah::core::Context> contexts;
   for (auto it = types.begin(); it != types.end();) {
     tadah::core::Context c1 = c;
     c1.remove(type_str); c1.remove(rctypekey); c1.remove(rcutkey);
@@ -184,10 +184,10 @@ std::vector<tadah::core::Context> D_mJoin::parse_config(tadah::core::Context &c,
         "Token: " + token);
     }
 
-    configs.push_back(c1);
+    contexts.push_back(c1);
     delete d;
   }
-  return configs;
+  return contexts;
 }
 
 } // namespace models

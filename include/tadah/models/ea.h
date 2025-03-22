@@ -90,13 +90,13 @@ namespace models {
 
 class EA {
   private:
-    const tadah::core::Context &config;
+    const tadah::core::Context &context;
     tadah::models::SVD &svd;
     tadah::core::t_type &T;
     int verbose;
   public:
     EA(const tadah::core::Context &c, tadah::models::SVD &svd, tadah::core::t_type &T):
-      config(c),
+      context(c),
       svd(svd),
       T(T),
       verbose(c.get<int>("VERBOSE"))
@@ -128,13 +128,13 @@ class EA {
       // D is a filter factors matrix
       double *d = new double[sizeS];
 
-      int outprec=config.get<int>("OUTPREC");
+      int outprec=context.get<int>("OUTPREC");
 
       tadah::core::t_type m_n(sizeS);
       int m = svd.rows();
       int n = svd.cols();
       tadah::core::t_type Tpred(m);
-    double rcond = config.size("OALGO")==2 ? config.get<double>("OALGO",1) : 1e-8;
+    double rcond = context.size("OALGO")==2 ? context.get<double>("OALGO",1) : 1e-8;
     //
         // Create a workspace manager
         tadah::models::memory::ModelsWorkspaceManager workspaceManager;

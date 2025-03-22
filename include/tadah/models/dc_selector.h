@@ -18,7 +18,7 @@ class DC_Selector {
         D3_Base *d3b=nullptr;
         DM_Base *dmb=nullptr;
 
-        //tadah::core::Context config;
+        //tadah::core::Context context;
 
         DC_Selector ()
         {};
@@ -31,18 +31,18 @@ class DC_Selector {
          // Const Assignment operator
          // Instead of deep copying
          // we use a trick where we just copy
-         // the config file and run init()
+         // the context file and run init()
          // as in a costructor
          // DC_Selector& operator=(const DC_Selector& dc)
          // {
-         //     //config=dc.config;
+         //     //context=dc.context;
          //     //init();
          //     return *this;
          // }
         // Assignment operator
         DC_Selector& operator=(DC_Selector& dc)
         {
-            //std::swap(config,dc.config);
+            //std::swap(context,dc.context);
             std::swap(c2b,dc.c2b);
             std::swap(c3b,dc.c3b);
             std::swap(cmb,dc.cmb);
@@ -53,50 +53,50 @@ class DC_Selector {
         }
 
         DC_Selector (tadah::core::Context &c)
-            //config(c)
+            //context(c)
     {
         init(c);
     };
-        void init(tadah::core::Context &config) {
+        void init(tadah::core::Context &context) {
             double rcutzero = 0.0; // for dummies
 
             size_t bias=0;
-            if (config.get<bool>("BIAS"))
+            if (context.get<bool>("BIAS"))
                 bias++;
 
-            if (config.get<bool>("INIT2B")) {
-                double rcut2b = config.get<double>("RCUT2BMAX");
-                c2b = tadah::core::factory<Cut_Base,double>( config.get<std::string>("RCTYPE2B"), rcut2b );
-                d2b = tadah::core::factory<D2_Base,tadah::core::Context&>( config.get<std::string>("TYPE2B"), config );
+            if (context.get<bool>("INIT2B")) {
+                double rcut2b = context.get<double>("RCUT2BMAX");
+                c2b = tadah::core::factory<Cut_Base,double>( context.get<std::string>("RCTYPE2B"), rcut2b );
+                d2b = tadah::core::factory<D2_Base,tadah::core::Context&>( context.get<std::string>("TYPE2B"), context );
                 d2b->set_fidx(bias);
             }
             else {
                 c2b = tadah::core::factory<Cut_Base,double>( "Cut_Dummy", rcutzero );
-                d2b = tadah::core::factory<D2_Base,tadah::core::Context&>( "D2_Dummy", config );
+                d2b = tadah::core::factory<D2_Base,tadah::core::Context&>( "D2_Dummy", context );
                 d2b->set_fidx(bias);
             }
 
-            if (config.get<bool>("INIT3B")) {
-                double rcut3b = config.get<double>("RCUT3BMAX");
-                c3b = tadah::core::factory<Cut_Base,double>( config.get<std::string>("RCTYPE3B"), rcut3b );
-                d3b = tadah::core::factory<D3_Base,tadah::core::Context&>( config.get<std::string>("TYPE3B"), config );
+            if (context.get<bool>("INIT3B")) {
+                double rcut3b = context.get<double>("RCUT3BMAX");
+                c3b = tadah::core::factory<Cut_Base,double>( context.get<std::string>("RCTYPE3B"), rcut3b );
+                d3b = tadah::core::factory<D3_Base,tadah::core::Context&>( context.get<std::string>("TYPE3B"), context );
                 // d3b->fidx = bias;
             }
             else {
                 c3b = tadah::core::factory<Cut_Base,double>( "Cut_Dummy", rcutzero );
-                d3b = tadah::core::factory<D3_Base,tadah::core::Context&>( "D3_Dummy", config );
+                d3b = tadah::core::factory<D3_Base,tadah::core::Context&>( "D3_Dummy", context );
                 // d3b->fidx = bias;
             }
 
-            if (config.get<bool>("INITMB")) {
-                double rcutmb = config.get<double>("RCUTMBMAX");
-                cmb = tadah::core::factory<Cut_Base,double>( config.get<std::string>("RCTYPEMB"), rcutmb );
-                dmb = tadah::core::factory<DM_Base,tadah::core::Context&>( config.get<std::string>("TYPEMB"), config );
+            if (context.get<bool>("INITMB")) {
+                double rcutmb = context.get<double>("RCUTMBMAX");
+                cmb = tadah::core::factory<Cut_Base,double>( context.get<std::string>("RCTYPEMB"), rcutmb );
+                dmb = tadah::core::factory<DM_Base,tadah::core::Context&>( context.get<std::string>("TYPEMB"), context );
                 dmb->set_fidx(bias + d2b->size());
             }
             else {
                 cmb = tadah::core::factory<Cut_Base,double>( "Cut_Dummy", rcutzero );
-                dmb = tadah::core::factory<DM_Base,tadah::core::Context&>( "DM_Dummy", config );
+                dmb = tadah::core::factory<DM_Base,tadah::core::Context&>( "DM_Dummy", context );
                 dmb->set_fidx(bias + d2b->size());
             }
         }

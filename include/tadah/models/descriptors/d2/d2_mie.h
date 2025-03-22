@@ -33,7 +33,7 @@ private:
   tadah::core::v_type etas;
 public:
   D2_MIE();
-  D2_MIE(tadah::core::Context &config);
+  D2_MIE(tadah::core::Context &context);
   void calc_aed(
     const int Zi,
     const int Zj,

@@ -30,25 +30,25 @@ class LinearRegressor {
    * This method supports both ordinary least squares and ridge regression based
    * on the lambda value.
    *
-   * @param config Configuration object containing training parameters.
+   * @param context Context object containing training parameters.
    * @param Phi Design matrix.
    * @param T Target matrix.
    * @param weights Vector to store the resultant weights.
    * @param Sigma tadah::core::Matrix to store the covariance matrix.
    */
 public:
-  static void train(tadah::core::Context &config,
+  static void train(tadah::core::Context &context,
                     tadah::core::phi_type &Phi,
                     tadah::core::t_type &T,
                     tadah::core::t_type &weights,
                     tadah::core::Matrix &Sigma,
                     tadah::models::memory::IModelsWorkspaceManager &workspaceManager) {
 
-    int verbose = config.get<int>("VERBOSE");
-    double lambda = config.get<double>("LAMBDA", 0);
-    int oalgo = config.get<int>("OALGO", 0);
+    int verbose = context.get<int>("VERBOSE");
+    double lambda = context.get<double>("LAMBDA", 0);
+    int oalgo = context.get<int>("OALGO", 0);
     double rcond =
-        config.size("OALGO") == 2 ? config.get<double>("OALGO", 1) : 1e-8;
+        context.size("OALGO") == 2 ? context.get<double>("OALGO", 1) : 1e-8;
     weights.resize(Phi.cols());
 
     if (std::abs(lambda + 1) < std::numeric_limits<double>::min() &&
@@ -74,19 +74,19 @@ public:
       tadah::models::SVD svd;
       svd.compute(Phi);
       if (lambda < 0) {
-        double alpha = config.get<double>("ALPHA");
-        double beta = config.get<double>("BETA");
-        EA ea(config, svd, T);
+        double alpha = context.get<double>("ALPHA");
+        double beta = context.get<double>("BETA");
+        EA ea(context, svd, T);
         ea.run(alpha, beta);
         lambda = alpha / beta;
-        config.remove("ALPHA");
-        config.remove("BETA");
-        config.add("ALPHA", alpha);
-        config.add("BETA", beta);
+        context.remove("ALPHA");
+        context.remove("BETA");
+        context.add("ALPHA", alpha);
+        context.add("BETA", beta);
       }
 
       Sigma = get_sigma(svd, lambda);
-      config_add_sigma(config, Sigma);
+      config_add_sigma(context, Sigma);
 
       if (verbose)
         std::cout << std::endl << "REG LAMBDA: " << lambda << std::endl;
@@ -101,10 +101,10 @@ public:
     }
 
   }
-  static void train(tadah::core::Context &config, tadah::core::phi_type &Phi, tadah::core::t_type &T, tadah::core::t_type &weights,
+  static void train(tadah::core::Context &context, tadah::core::phi_type &Phi, tadah::core::t_type &T, tadah::core::t_type &weights,
                     tadah::core::Matrix &Sigma) {
     tadah::models::memory::ModelsWorkspaceManager workspaceManager;
-    train(config, Phi, T, weights, Sigma, workspaceManager);
+    train(context, Phi, T, weights, Sigma, workspaceManager);
   }
 
   /**
@@ -142,13 +142,13 @@ public:
    *
    * Converts the Sigma matrix to a vector and stores it in the configuration.
    *
-   * @param config Configuration object.
+   * @param context Context object.
    * @param Sigma Covariance matrix to be added.
    */
-  static void config_add_sigma(tadah::core::Context &config, tadah::core::Matrix &Sigma) {
+  static void config_add_sigma(tadah::core::Context &context, tadah::core::Matrix &Sigma) {
     tadah::core::t_type Sigma_as_vector(Sigma.data(), Sigma.cols() * Sigma.rows());
-    config.add("SIGMA", Sigma.rows());
-    config.add<tadah::core::t_type>("SIGMA", Sigma_as_vector);
+    context.add("SIGMA", Sigma.rows());
+    context.add<tadah::core::t_type>("SIGMA", Sigma_as_vector);
   }
 
   /**
@@ -156,22 +156,22 @@ public:
    *
    * Retrieves the Sigma matrix stored in the configuration.
    *
-   * @param config Configuration object.
+   * @param context Context object.
    * @param Sigma tadah::core::Matrix to store the reconstructed Sigma.
    * @throws std::runtime_error if Sigma is not computed.
    */
-  static void read_sigma(tadah::core::Context &config, tadah::core::Matrix &Sigma) {
+  static void read_sigma(tadah::core::Context &context, tadah::core::Matrix &Sigma) {
     using V = std::vector<double>;
     size_t N;
     try {
-      N = config.get<size_t>("SIGMA");
+      N = context.get<size_t>("SIGMA");
     } catch (const std::runtime_error &error) {
       throw std::runtime_error("\nSigma matrix is not computed.\nHint: It is "
                                "only computed for LAMBDA != 0.\n");
     }
 
     V Sigma_as_vector(N * N + 1);
-    config.get<V>("SIGMA", Sigma_as_vector);
+    context.get<V>("SIGMA", Sigma_as_vector);
     Sigma_as_vector.erase(Sigma_as_vector.begin());
     Sigma.resize(N, N);
     for (size_t c = 0; c < N; ++c)

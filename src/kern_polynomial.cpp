@@ -4,16 +4,16 @@ namespace models {
 
 
 Kern_Polynomial::Kern_Polynomial () {}
-Kern_Polynomial::Kern_Polynomial (const tadah::core::Context &config):
-    Function_Base(config),
-    Kern_Base(config),
-    d(config.get<int>("MPARAMS",0)),
-    gamma(config.get<double>("MPARAMS",1)),
-    c(config.get<double>("MPARAMS",2))
+Kern_Polynomial::Kern_Polynomial (const tadah::core::Context &context):
+    Function_Base(context),
+    Kern_Base(context),
+    d(context.get<int>("MPARAMS",0)),
+    gamma(context.get<double>("MPARAMS",1)),
+    c(context.get<double>("MPARAMS",2))
 {
     if (get_verbose()) std::cout << std::endl << label << " | degree: " << d
         <<" | gamma: " << gamma << " | c: " << c << std::endl;
-    read_basis_from_config(config,basis);
+    read_basis_from_context(context,basis);
 }
 double Kern_Polynomial::operator() (const tadah::core::aed_type& b, const tadah::core::aed_type& af) const
 {

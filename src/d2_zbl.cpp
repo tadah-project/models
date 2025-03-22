@@ -25,17 +25,17 @@ D2_ZBL::D2_ZBL(tadah::core::Context &c): D2_Base(c)
     std::cout << label() << ": " << a0 << " "
       << s0 << " " << p0 << " " << p1 << std::endl;
 
-  ntypes = c.size("ATOMS");
+  ntypes = c.size("ATOM");
   a = new double*[ntypes];
   for (int i = 0; i < ntypes; ++i) {
     a[i] = new double[ntypes];
   }
   for (int i=0; i<ntypes; ++i) {
-    std::string symboli = c.get<std::string>("ATOMS",i);
+    std::string symboli = c.get<std::string>("ATOM",i);
     int Zi = tadah::core::PeriodicTable::find_by_symbol(symboli).Z;
     types[Zi] = i;
     for (int j=0; j<ntypes; ++j) {
-      std::string symbolj = c.get<std::string>("ATOMS",j);
+      std::string symbolj = c.get<std::string>("ATOM",j);
       int Zj = tadah::core::PeriodicTable::find_by_symbol(symbolj).Z;
       a[i][j] = screening_length(Zi,Zj);
     }

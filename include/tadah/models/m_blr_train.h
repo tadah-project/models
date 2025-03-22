@@ -29,7 +29,7 @@ template <class BF = Function_Base&>
 class M_BLR_Train : public M_BLR_Core<BF>, public M_Train {
 public:
     using M_BLR_Core<BF>::trained;
-    using M_BLR_Core<BF>::config;
+    using M_BLR_Core<BF>::context;
     using M_BLR_Core<BF>::weights;
     using M_BLR_Core<BF>::Sigma;
 
@@ -70,9 +70,9 @@ public:
       throw std::runtime_error("This object is already trained!");
     }
 
-    if (config.exist("FIXWEIGHT") && config.exist("FIXINDEX")) {
-      std::vector<std::string> indices_str(config.size("FIXINDEX"));
-      config.get("FIXINDEX", indices_str);
+    if (context.contains("FIXWEIGHT") && context.contains("FIXINDEX")) {
+      std::vector<std::string> indices_str(context.size("FIXINDEX"));
+      context.get("FIXINDEX", indices_str);
 
       // Parse indices and perform checks
       std::vector<size_t> indices = tadah::core::parse_indices(indices_str);
@@ -88,12 +88,12 @@ public:
       // Adjust for 0-based indexing
       for (auto &i : indices) i--;
 
-      tadah::core::t_type w_f(config.size("FIXWEIGHT"));
+      tadah::core::t_type w_f(context.size("FIXWEIGHT"));
       if (w_f.size() != indices.size()) {
         throw std::runtime_error("FIXWEIGHT and FIXINDEX differ in size: " + std::to_string(w_f.size()) + " and " + std::to_string(indices.size()));
       }
 
-      config.get("FIXWEIGHT", w_f);
+      context.get("FIXWEIGHT", w_f);
 
       tadah::core::t_type T_r;
       auto move_map = prep_train_with_residuals(Phi, T, indices, w_f, T_r);
@@ -101,7 +101,7 @@ public:
       // Resize Phi for training
       Phi.resize(Phi.rows(), Phi.cols() - indices.size());
 
-      LinearRegressor::train(config, Phi, T_r, weights, Sigma,*workspaceManager_);
+      LinearRegressor::train(context, Phi, T_r, weights, Sigma,*workspaceManager_);
 
       tadah::core::t_type w_temp(weights.size() + indices.size());
 
@@ -118,7 +118,7 @@ public:
       trained = true;
     }
     else {
-      LinearRegressor::train(config, Phi, T, weights, Sigma,*workspaceManager_);
+      LinearRegressor::train(context, Phi, T, weights, Sigma,*workspaceManager_);
       trained = true;
     }
 

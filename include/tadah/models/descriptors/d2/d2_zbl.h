@@ -64,7 +64,7 @@ private:
   int ntypes=0; // number of elements for this calc
 public:
   D2_ZBL();
-  D2_ZBL(tadah::core::Context &config);
+  D2_ZBL(tadah::core::Context &context);
   ~D2_ZBL();
   void calc_aed(
     const int Zi,

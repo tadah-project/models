@@ -50,7 +50,7 @@ private:
 
 public:
   D2_Blip();
-  D2_Blip(tadah::core::Context &config);
+  D2_Blip(tadah::core::Context &context);
   void calc_aed(
     const int Zi,
     const int Zj,

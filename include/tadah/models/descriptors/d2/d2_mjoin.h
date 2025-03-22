@@ -45,7 +45,7 @@ namespace models {
 class D2_mJoin : public D2_Base, public D_mJoin {
 private:
   std::vector<D2_Base*> ds;
-  std::vector<tadah::core::Context> configs;
+  std::vector<tadah::core::Context> contexts;
   std::string lab = "D2_mJoin";
 public:
   D2_mJoin();

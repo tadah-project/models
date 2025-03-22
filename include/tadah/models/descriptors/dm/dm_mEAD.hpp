@@ -15,27 +15,27 @@ DM_mEAD<F>::DM_mEAD() {
  * of the embedding function
  */
 template <typename F>
-DM_mEAD<F>::DM_mEAD(tadah::core::Config &config): DM_Base(config),
-  rc(config.get<double>("RCUTMBMAX")),
-  emb(config)
+DM_mEAD<F>::DM_mEAD(tadah::core::Context &context): DM_Base(context),
+  rc(context.get<double>("RCUTMBMAX")),
+  emb(context)
 {
 
-  if (!config.get<bool>("INITMB")) return;
+  if (!context.get<bool>("INITMB")) return;
   init();
 
-  get_grid(config,"CGRIDMB",cgrid);
-  get_grid(config,"SGRIDMB",sgrid);
-  // update config with generated grid
-  config.remove("CGRIDMB");
-  for (const auto &i: cgrid) config.add("CGRIDMB",i);
-  config.remove("SGRIDMB");
-  for (const auto &i: sgrid) config.add("SGRIDMB",i);
+  get_grid(context,"CGRIDMB",cgrid);
+  get_grid(context,"SGRIDMB",sgrid);
+  // update context with generated grid
+  context.remove("CGRIDMB");
+  for (const auto &i: cgrid) context.add("CGRIDMB",i);
+  context.remove("SGRIDMB");
+  for (const auto &i: sgrid) context.add("SGRIDMB",i);
 
   if (cgrid.size()!=sgrid.size()) {
     throw std::runtime_error("SGRID2B and CGRID2B arrays differ in size.\n");
   }
 
-  Lmax = config.get<int>("TYPEMB",1);
+  Lmax = context.get<int>("TYPEMB",1);
   s=sgrid.size()*(Lmax+1);
   rhoisize = gen_atomic_orbitals(Lmax);
   rhoisize *= sgrid.size();
@@ -51,7 +51,7 @@ DM_mEAD<F>::DM_mEAD(tadah::core::Config &config): DM_Base(config),
     std::cout << std::endl;
     std::cout << "rhoisize: " << rhoisize << std::endl;
   }
-  auto init_atoms = get_init_atoms(config);
+  auto init_atoms = get_init_atoms(context);
   init_for_atoms(init_atoms);
 }
 

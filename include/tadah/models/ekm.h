@@ -11,7 +11,7 @@ template <typename Kern>
 class EKM {
     private:
         Kern kernel;
-        // TODO add to config? Experiment with value
+        // TODO add to context? Experiment with value
         double eps = std::numeric_limits<double>::epsilon()*0;
         std::vector<size_t> indices;
     public:

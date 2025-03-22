@@ -17,7 +17,7 @@ D2_Blip::D2_Blip(tadah::core::Context &c): D2_Base(c)
 
   get_grid(c,"CGRID2B",mius);
   get_grid(c,"SGRID2B",etas);
-  // update config with generated grid
+  // update context with generated grid
   c.remove("CGRID2B");
   for (const auto &m: mius) c.add("CGRID2B",m);
   c.remove("SGRID2B");

@@ -31,7 +31,7 @@ public:
     EKM<Kern> ekm; ///< Extended Kernel tadah::core::Matrix object.
 
     using M_KRR_Core<Kern>::trained;
-    using M_KRR_Core<Kern>::config;
+    using M_KRR_Core<Kern>::context;
     using M_KRR_Core<Kern>::kernel;
     using M_KRR_Core<Kern>::weights;
     using M_KRR_Core<Kern>::Sigma;
@@ -74,9 +74,9 @@ public:
       throw std::runtime_error("This object is already trained!");
     }
 
-    if (config.exist("FIXWEIGHT") && config.exist("FIXINDEX")) {
-      std::vector<std::string> indices_str(config.size("FIXINDEX"));
-      config.get("FIXINDEX", indices_str);
+    if (context.contains("FIXWEIGHT") && context.contains("FIXINDEX")) {
+      std::vector<std::string> indices_str(context.size("FIXINDEX"));
+      context.get("FIXINDEX", indices_str);
 
       // Parse indices and perform checks
       std::vector<size_t> indices = tadah::core::parse_indices(indices_str);
@@ -92,12 +92,12 @@ public:
       // Adjust for 0-based indexing
       for (auto &i : indices) i--;
 
-      tadah::core::t_type w_f(config.size("FIXWEIGHT"));
+      tadah::core::t_type w_f(context.size("FIXWEIGHT"));
       if (w_f.size() != indices.size()) {
         throw std::runtime_error("FIXWEIGHT and FIXINDEX differ in size: " + std::to_string(w_f.size()) + " and " + std::to_string(indices.size()));
       }
 
-      config.get("FIXWEIGHT", w_f);
+      context.get("FIXWEIGHT", w_f);
 
       tadah::core::t_type T_r;
       auto move_map = prep_train_with_residuals(Phi, T, indices, w_f, T_r);
@@ -113,7 +113,7 @@ public:
       if (kernel.get_label() != "Kern_Linear") {
         ekm.project(Phi);
       }
-      LinearRegressor::train(config, Phi, T_r, weights, Sigma, *workspaceManager_);
+      LinearRegressor::train(context, Phi, T_r, weights, Sigma, *workspaceManager_);
       if (kernel.get_label() != "Kern_Linear") {
         weights = ekm.EKM_mat * weights;
       }
@@ -128,7 +128,7 @@ public:
       if (kernel.get_label() != "Kern_Linear") {
         ekm.project(Phi);
       }
-      LinearRegressor::train(config, Phi, T, weights, Sigma, *workspaceManager_);
+      LinearRegressor::train(context, Phi, T, weights, Sigma, *workspaceManager_);
       if (kernel.get_label() != "Kern_Linear") {
         weights = ekm.EKM_mat * weights;
       }
@@ -147,7 +147,7 @@ public:
      * @throws std::runtime_error if lambda is negative for evidence approximation.
      */
     void train2(tadah::core::Matrix &B, tadah::core::t_type &T) {
-        double lambda = config.template get<double>("LAMBDA");
+        double lambda = context.template get<double>("LAMBDA");
 
         if (lambda < 0)
             throw std::runtime_error("This KRR implementation cannot use LAMBDA -1 (Evidence Approximation)");
@@ -164,7 +164,7 @@ public:
         if (M_KRR_Core<Kern>::is_verbose()) std::cout << "tadah::core::Matrix condition number: " << condition_number(K) << std::endl;
 
         if (M_KRR_Core<Kern>::is_verbose()) std::cout << "Solving..." << std::flush;
-        //double rcond = config.template size("LAMBDA")==2 ? config.template get<double>("LAMBDA",1) : 1e-8;
+        //double rcond = context.template size("LAMBDA")==2 ? context.template get<double>("LAMBDA",1) : 1e-8;
         weights = solve_posv(K, T);
         if (M_KRR_Core<Kern>::is_verbose()) std::cout << "Done" << std::endl;
 

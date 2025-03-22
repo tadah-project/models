@@ -58,13 +58,13 @@ void central_difference_mb(DM *dm, std::vector<Vec3d> &positions,
 }
 
 template<typename DM, typename CUT>
-void test_case(Config &config_mb, 
+void test_case(Context &context, 
                std::string label,
                size_t size) {
-  config_mb.add("ATOMS", "H");
-  config_mb.add("WATOMS", 1);
-  config_mb.add("TYPEMB", "H");
-  config_mb.add("TYPEMB", "H");
+  context.add("ATOM", "H");
+  context.add("WATOM", 1);
+  context.add("TYPEMB", "H");
+  context.add("TYPEMB", "H");
   // Define a simple system of 4 atoms
   // Will calculate forces acting on the first atom
   Vec3d x1(0.0,0.0,0.0);
@@ -95,8 +95,8 @@ void test_case(Config &config_mb,
   double r32 = sqrt(rsq32);    double r42 = sqrt(rsq42);
   double r34 = sqrt(rsq34);    double r43 = sqrt(rsq43);
 
-  CUT fc(config_mb.get<double>("RCUTMB"));
-  DM dm(config_mb);
+  CUT fc(context.get<double>("RCUTMB"));
+  DM dm(context);
   dm.set_fcut(&fc,false);
   aed_type aed1(dm.size());
   aed_type aed2(dm.size());
@@ -304,84 +304,84 @@ struct TestFixture {
     }
 };
 TEST_CASE_METHOD(TestFixture, "Testing DM_EAD 1", "[DM]") {
-    Config config_mb;
-    config_mb.add("RCUTMB", 10);
-    config_mb.remove("INITMB");
-    config_mb.add("INITMB", "true");
-    config_mb.add("TYPEMB", "DM_EAD");
-    config_mb.add("TYPEMB", 2);
-    config_mb.add("TYPEMB", 2);
-    config_mb.add("TYPEMB", 2);
-    config_mb.add("CGRIDMB", "1 2");
-    config_mb.add("SGRIDMB", "0.1 0.2");
-    test_case<DM_EAD, Cut_Dummy>(config_mb, "DM_EAD", 3 * 2);
-    test_case<DM_EAD, Cut_Cos>(config_mb, "DM_EAD", 3 * 2);
-    test_case<DM_EAD, Cut_Tanh>(config_mb, "DM_EAD", 3 * 2);
-    test_case<DM_EAD, Cut_PolyS>(config_mb, "DM_EAD", 3 * 2);
+    Context context;
+    context.add("RCUTMB", 10);
+    context.remove("INITMB");
+    context.add("INITMB", "true");
+    context.add("TYPEMB", "DM_EAD");
+    context.add("TYPEMB", 2);
+    context.add("TYPEMB", 2);
+    context.add("TYPEMB", 2);
+    context.add("CGRIDMB", "1 2");
+    context.add("SGRIDMB", "0.1 0.2");
+    test_case<DM_EAD, Cut_Dummy>(context, "DM_EAD", 3 * 2);
+    test_case<DM_EAD, Cut_Cos>(context, "DM_EAD", 3 * 2);
+    test_case<DM_EAD, Cut_Tanh>(context, "DM_EAD", 3 * 2);
+    test_case<DM_EAD, Cut_PolyS>(context, "DM_EAD", 3 * 2);
 }
 
 TEST_CASE_METHOD(TestFixture, "Testing DM_EAD 2", "[DM]") {
-    Config config_mb;
-    config_mb.add("RCUTMB", 6);
-    config_mb.remove("INITMB");
-    config_mb.add("INITMB", "true");
-    config_mb.add("TYPEMB", "DM_EAD");
-    config_mb.add("TYPEMB", 3);
-    config_mb.add("TYPEMB", 3);
-    config_mb.add("TYPEMB", 3);
-    config_mb.add("CGRIDMB", "1 2 3");
-    config_mb.add("SGRIDMB", "0.1 0.2 0.9");
-    test_case<DM_EAD, Cut_Dummy>(config_mb, "DM_EAD", 4 * 3);
-    test_case<DM_EAD, Cut_Cos>(config_mb, "DM_EAD", 4 * 3);
-    test_case<DM_EAD, Cut_Tanh>(config_mb, "DM_EAD", 4 * 3);
-    test_case<DM_EAD, Cut_PolyS>(config_mb, "DM_EAD", 4 * 3);
+    Context context;
+    context.add("RCUTMB", 6);
+    context.remove("INITMB");
+    context.add("INITMB", "true");
+    context.add("TYPEMB", "DM_EAD");
+    context.add("TYPEMB", 3);
+    context.add("TYPEMB", 3);
+    context.add("TYPEMB", 3);
+    context.add("CGRIDMB", "1 2 3");
+    context.add("SGRIDMB", "0.1 0.2 0.9");
+    test_case<DM_EAD, Cut_Dummy>(context, "DM_EAD", 4 * 3);
+    test_case<DM_EAD, Cut_Cos>(context, "DM_EAD", 4 * 3);
+    test_case<DM_EAD, Cut_Tanh>(context, "DM_EAD", 4 * 3);
+    test_case<DM_EAD, Cut_PolyS>(context, "DM_EAD", 4 * 3);
 }
 
 TEST_CASE_METHOD(TestFixture, "Testing DM_Blip 1", "[DM]") {
-    Config config_mb;
-    config_mb.add("RCUTMB", 10);
-    config_mb.remove("INITMB");
-    config_mb.add("INITMB", "true");
-    config_mb.add("TYPEMB", "DM_Blip");
-    config_mb.add("TYPEMB", 2);
-    config_mb.add("TYPEMB", 2);
-    config_mb.add("TYPEMB", 2);
-    config_mb.add("CGRIDMB", "1 2");
-    config_mb.add("SGRIDMB", "0.1 0.2");
-    test_case<DM_Blip, Cut_Dummy>(config_mb, "DM_Blip", 3 * 2);
-    test_case<DM_Blip, Cut_Cos>(config_mb, "DM_Blip", 3 * 2);
-    test_case<DM_Blip, Cut_Tanh>(config_mb, "DM_Blip", 3 * 2);
-    test_case<DM_Blip, Cut_PolyS>(config_mb, "DM_Blip", 3 * 2);
+    Context context;
+    context.add("RCUTMB", 10);
+    context.remove("INITMB");
+    context.add("INITMB", "true");
+    context.add("TYPEMB", "DM_Blip");
+    context.add("TYPEMB", 2);
+    context.add("TYPEMB", 2);
+    context.add("TYPEMB", 2);
+    context.add("CGRIDMB", "1 2");
+    context.add("SGRIDMB", "0.1 0.2");
+    test_case<DM_Blip, Cut_Dummy>(context, "DM_Blip", 3 * 2);
+    test_case<DM_Blip, Cut_Cos>(context, "DM_Blip", 3 * 2);
+    test_case<DM_Blip, Cut_Tanh>(context, "DM_Blip", 3 * 2);
+    test_case<DM_Blip, Cut_PolyS>(context, "DM_Blip", 3 * 2);
 }
 
 TEST_CASE_METHOD(TestFixture, "Testing DM_Blip 2", "[DM]") {
-    Config config_mb;
-    config_mb.add("RCUTMB", 6);
-    config_mb.remove("INITMB");
-    config_mb.add("INITMB", "true");
-    config_mb.add("TYPEMB", "DM_Blip");
-    config_mb.add("TYPEMB", 3);
-    config_mb.add("TYPEMB", 3);
-    config_mb.add("TYPEMB", 3);
-    config_mb.add("CGRIDMB", "1 2 3");
-    config_mb.add("SGRIDMB", "0.1 0.2 0.9");
-    test_case<DM_Blip, Cut_Dummy>(config_mb, "DM_Blip", 4 * 3);
-    test_case<DM_Blip, Cut_Cos>(config_mb, "DM_Blip", 4 * 3);
-    test_case<DM_Blip, Cut_Tanh>(config_mb, "DM_Blip", 4 * 3);
-    test_case<DM_Blip, Cut_PolyS>(config_mb, "DM_Blip", 4 * 3);
+    Context context;
+    context.add("RCUTMB", 6);
+    context.remove("INITMB");
+    context.add("INITMB", "true");
+    context.add("TYPEMB", "DM_Blip");
+    context.add("TYPEMB", 3);
+    context.add("TYPEMB", 3);
+    context.add("TYPEMB", 3);
+    context.add("CGRIDMB", "1 2 3");
+    context.add("SGRIDMB", "0.1 0.2 0.9");
+    test_case<DM_Blip, Cut_Dummy>(context, "DM_Blip", 4 * 3);
+    test_case<DM_Blip, Cut_Cos>(context, "DM_Blip", 4 * 3);
+    test_case<DM_Blip, Cut_Tanh>(context, "DM_Blip", 4 * 3);
+    test_case<DM_Blip, Cut_PolyS>(context, "DM_Blip", 4 * 3);
 }
 
 TEST_CASE_METHOD(TestFixture, "Testing DM_EAM 1", "[DM]") {
-    Config config_mb;
-    config_mb.add("RCUTMB", 5.58190742024);
-    config_mb.remove("INITMB");
-    config_mb.add("INITMB", "true");
-    config_mb.add("TYPEMB", "DM_EAM");
-    config_mb.add("TYPEMB", "tests_data/eam.alloy");
-    test_case<DM_EAM, Cut_Dummy>(config_mb, "DM_EAM", 1);
+    Context context;
+    context.add("RCUTMB", 5.58190742024);
+    context.remove("INITMB");
+    context.add("INITMB", "true");
+    context.add("TYPEMB", "DM_EAM");
+    context.add("TYPEMB", "tests_data/eam.alloy");
+    test_case<DM_EAM, Cut_Dummy>(context, "DM_EAM", 1);
 
     // Throws
-    Config c_err;
+    Context c_err;
     c_err.remove("INITMB");
     c_err.add("INITMB", "true");
     c_err.add("TYPEMB", "DM_EAM");
@@ -390,26 +390,26 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_EAM 1", "[DM]") {
 }
 
 TEST_CASE_METHOD(TestFixture, "Testing DM_EAM 2", "[DM]") {
-    Config config_mb;
-    config_mb.add("RCUTMB", 5.58190742024);
-    config_mb.remove("INITMB");
-    config_mb.add("INITMB", "true");
-    config_mb.add("TYPEMB", "DM_EAM");
-    config_mb.add("TYPEMB", "tests_data/eam.alloy");
-    test_case<DM_EAM, Cut_Dummy>(config_mb, "DM_EAM", 1);
+    Context context;
+    context.add("RCUTMB", 5.58190742024);
+    context.remove("INITMB");
+    context.add("INITMB", "true");
+    context.add("TYPEMB", "DM_EAM");
+    context.add("TYPEMB", "tests_data/eam.alloy");
+    test_case<DM_EAM, Cut_Dummy>(context, "DM_EAM", 1);
 }
 
 TEST_CASE_METHOD(TestFixture, "Testing DM_EAM 3", "[DM]") {
-    Config config_mb;
-    config_mb.add("RCUTMB", 5.58190742024);
-    config_mb.remove("INITMB");
-    config_mb.add("INITMB", "true");
-    config_mb.add("TYPEMB", "DM_EAM");
-    config_mb.add("TYPEMB", "tests_data/eam.alloy");
-    test_case<DM_EAM, Cut_Dummy>(config_mb, "DM_EAM", 1);
+    Context context;
+    context.add("RCUTMB", 5.58190742024);
+    context.remove("INITMB");
+    context.add("INITMB", "true");
+    context.add("TYPEMB", "DM_EAM");
+    context.add("TYPEMB", "tests_data/eam.alloy");
+    test_case<DM_EAM, Cut_Dummy>(context, "DM_EAM", 1);
 
     // Throws
-    Config c_err;
+    Context c_err;
     c_err.remove("INITMB");
     c_err.add("INITMB", "true");
     c_err.add("SETFL", "path/to/nowhere");
@@ -417,7 +417,7 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_EAM 3", "[DM]") {
 }
 
 TEST_CASE_METHOD(TestFixture, "Testing DM_Dummy", "[DM]") {
-    Config c;
+    Context c;
     c.add("RCUTMB", 5.58190742024);
     c.add("RCTYPEMB", "Cut_Cos");
     c.remove("INITMB");

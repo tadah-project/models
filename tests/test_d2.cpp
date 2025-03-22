@@ -7,7 +7,7 @@
 using namespace tadah::core;
 using namespace tadah::models;
 template<typename D, typename C>
-void test_d2(Config &c, double r) {
+void test_d2(Context &c, double r) {
   // std::streambuf *orig = std::cout.rdbuf();
   std::stringstream ss;
   // std::cout.rdbuf (ss.rdbuf()); // redirect cout
@@ -57,14 +57,14 @@ void test_d2(Config &c, double r) {
 }
 
 template<typename D>
-void test_D2(Config &c) {
+void test_D2(Context &c) {
   // std::streambuf *orig = std::cout.rdbuf();
   std::stringstream ss;
   // std::cout.rdbuf (ss.rdbuf()); // redirect cout
   c.remove("VERBOSE");
   c.add("VERBOSE", 1);
-  c.add("ATOMS", "H");
-  c.add("WATOMS", 1);
+  c.add("ATOM", "H");
+  c.add("WATOM", 1);
   // We cannot test r=rcut as finite difference will fail
   // but we can test r slightly smaller than rcut
   std::vector<double> rs = {2,2.0001,2.0123,5,11};
@@ -80,7 +80,7 @@ void test_D2(Config &c) {
       test_d2<D,Cut_PolyS>(c,r);
     }
   }
-  Config c2; // INIT2B=false
+  Context c2; // INIT2B=false
   D d(c2);
   REQUIRE(d.size()==0);
   // std::cout.rdbuf (orig); // restore
@@ -94,7 +94,7 @@ struct TestFixture {
 };
 
 TEST_CASE_METHOD(TestFixture, "Testing D2_Dummy", "[D2]") {
-    Config c;
+    Context c;
     double rcut = 5.1;
     c.remove("INIT2B");
     c.add("INIT2B", "true");
@@ -106,7 +106,7 @@ TEST_CASE_METHOD(TestFixture, "Testing D2_Dummy", "[D2]") {
 }
 
 TEST_CASE_METHOD(TestFixture, "Testing D2_LJ", "[D2]") {
-    Config c;
+    Context c;
     c.remove("INIT2B");
     c.add("INIT2B", "true");
     c.add("TYPE2B", "D2_LJ");
@@ -123,7 +123,7 @@ TEST_CASE_METHOD(TestFixture, "Testing D2_BLIP", "[D2]") {
     // std::cout.rdbuf(ss.rdbuf()); // redirect cout
     using D = D2_Blip;
 
-    Config c;
+    Context c;
     c.remove("INIT2B");
     c.add("INIT2B", "true");
     c.add("SGRID2B", "0.01 0.4 5.6");
@@ -165,7 +165,7 @@ TEST_CASE_METHOD(TestFixture, "Testing D2_BP", "[D2]") {
     // std::cout.rdbuf(ss.rdbuf()); // redirect cout
     using D = D2_BP;
 
-    Config c;
+    Context c;
     c.remove("INIT2B");
     c.add("INIT2B", "true");
     c.add("SGRID2B", "0.01 0.4");
@@ -206,7 +206,7 @@ TEST_CASE_METHOD(TestFixture, "Testing D2_EAM", "[D2]") {
     std::stringstream ss;
     // std::cout.rdbuf(ss.rdbuf()); // redirect cout
     
-    Config c;
+    Context c;
     c.remove("INIT2B");
     c.add("INIT2B", "true");
     c.add("SETFL", "tests_data/eam.alloy");
@@ -217,7 +217,7 @@ TEST_CASE_METHOD(TestFixture, "Testing D2_EAM", "[D2]") {
     REQUIRE(d.label() == "D2_EAM");
 
     // Test throws
-    Config c_err;
+    Context c_err;
     c_err.remove("INIT2B");
     c_err.add("INIT2B", "true");
     c_err.add("SETFL", "path/to/nowhere");
@@ -227,7 +227,7 @@ TEST_CASE_METHOD(TestFixture, "Testing D2_EAM", "[D2]") {
 }
 
 TEST_CASE_METHOD(TestFixture, "Testing D2_MIE", "[D2]") {
-    Config c;
+    Context c;
     c.remove("INIT2B");
     c.add("INIT2B", "true");
     c.add("TYPE2B", "D2_MIE");
@@ -259,7 +259,7 @@ TEST_CASE_METHOD(TestFixture, "Testing D2_MIE", "[D2]") {
 
 }
 TEST_CASE_METHOD(TestFixture, "Testing D2_ZBL", "[D2]") {
-    Config c;
+    Context c;
     c.remove("INIT2B");
     c.add("INIT2B", "true");
     c.add("TYPE2B", "D2_ZBL");

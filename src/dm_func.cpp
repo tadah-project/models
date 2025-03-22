@@ -1,20 +1,19 @@
 #include <tadah/models/descriptors/dm/dm_func.h>
 
-#include <tadah/core/context.h>
 namespace tadah {
 namespace models {
 
 
-F_RLR::F_RLR(tadah::core::Context &conf):
-  config(&conf)
+F_RLR::F_RLR(tadah::core::Context &c):
+  context(&c)
 {
-  if (!config->get<bool>("INITMB")) return;
-  D_Base::get_grid(*config,"SEMBFUNC",sgrid);
-  D_Base::get_grid(*config,"CEMBFUNC",cgrid);
+  if (!context->get<bool>("INITMB")) return;
+  D_Base::get_grid(*context,"SEMBFUNC",sgrid);
+  D_Base::get_grid(*context,"CEMBFUNC",cgrid);
 
 }
 F_RLR::F_RLR():
-  config(nullptr)
+  context(nullptr)
 {
 }
 double F_RLR::calc_F(double rho,size_t c) {

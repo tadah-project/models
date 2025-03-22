@@ -22,9 +22,9 @@ protected:
 public:
   virtual ~D_mJoin();
   D_mJoin();
-  static std::vector<tadah::core::Context> parse_config(tadah::core::Context &c, std::string type_str);
+  static std::vector<tadah::core::Context> parse_context(tadah::core::Context &c, std::string type_str);
 
-  static void expand_grids(tadah::core::Context &c, std::vector<tadah::core::Context> &configs, std::string type_str);
+  static void expand_grids(tadah::core::Context &c, std::vector<tadah::core::Context> &contexts, std::string type_str);
 
   static void expand_grids(tadah::core::Context &c, std::string type_str);
   static void expand_grids(tadah::core::Context &c);

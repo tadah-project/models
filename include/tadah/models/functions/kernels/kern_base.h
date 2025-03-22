@@ -65,7 +65,7 @@ class Kern_Base: public virtual Function_Base {
         virtual tadah::core::force_type fpredict(const tadah::core::t_type &kweights, const tadah::core::fd_type &fdij,
                 const tadah::core::aed_type &aedi) const;
 
-        virtual void read_basis_from_config(const tadah::core::Context &config,
+        virtual void read_basis_from_context(const tadah::core::Context &context,
                 tadah::core::Matrix &b);
 };
 } // namespace models

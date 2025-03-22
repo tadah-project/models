@@ -39,13 +39,13 @@ tadah::core::force_type Kern_Base::fpredict(const tadah::core::t_type &kweights,
   }
   return v;
 }
-void Kern_Base::read_basis_from_config(const tadah::core::Context &config, tadah::core::Matrix &basis) {
+void Kern_Base::read_basis_from_context(const tadah::core::Context &context, tadah::core::Matrix &basis) {
   // storage is in column-major order
-  if (!(config.exist("SBASIS") && config.exist("BASIS"))) return;
-  size_t sbasis = config.get<size_t>("SBASIS");
-  size_t vlen = config("BASIS").size()/sbasis;
+  if (!(context.contains("SBASIS") && context.contains("BASIS"))) return;
+  size_t sbasis = context.get<size_t>("SBASIS");
+  size_t vlen = context("BASIS").size()/sbasis;
   std::vector<double> temp(sbasis*vlen);
-  config.get<std::vector<double>>("BASIS",temp);
+  context.get<std::vector<double>>("BASIS",temp);
   basis.resize(vlen,sbasis);  // aeds are in column-major order
   size_t ii=0;
   for (size_t i=0;i<sbasis; ++i) {

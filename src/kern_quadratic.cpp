@@ -10,7 +10,7 @@ Kern_Quadratic::Kern_Quadratic (const tadah::core::Context &c):
 {
     if (get_verbose()) std::cout << std::endl << label << std::endl;
 
-    read_basis_from_config(c,basis);
+    read_basis_from_context(c,basis);
 }
 double Kern_Quadratic::operator() (const tadah::core::aed_type& b, const tadah::core::aed_type& af) const
 {

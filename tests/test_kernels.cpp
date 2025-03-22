@@ -1,6 +1,7 @@
 #include "catch2/catch.hpp"
 #include <tadah/models/functions/f_all.h>
-#include <tadah/core/config.h>
+#include <tadah/core/context.h>
+#include <tadah/core/core_user_config_parser.h>
 #include <tadah/core/core_types.h>
 #include <string>
 
@@ -54,9 +55,9 @@ TEST_CASE( "Testing Kern_Base", "[kernels]" ) {
   }
 
   Matrix matbas(3,2);
-  Config cbasis("tests_data/basis");
+  Context cbasis = CoreUserConfigParser().parse("tests_data/basis");
   Kern_Quadratic kern2;
-  kern2.read_basis_from_config(cbasis, matbas);
+  kern2.read_basis_from_context(cbasis, matbas);
   Matrix test_basis(3,2);
   test_basis(0,0)=1.0;
   test_basis(1,0)=2.0;
@@ -73,7 +74,7 @@ TEST_CASE( "Testing Kern_Base", "[kernels]" ) {
 }
 TEST_CASE( "Testing Kern_Linear 1", "[kernels]" ) {
   using K=Kern_Linear;
-  Config c;
+  Context c;
   REQUIRE_NOTHROW(K(c));
   K kern;
   aed_type w(4);
@@ -146,7 +147,7 @@ TEST_CASE( "Testing Kern_Linear 3", "[kernels]" ) {
 }
 TEST_CASE( "Testing Kern_Quadratic", "[kernels]" ) {
   using K=Kern_Quadratic;
-  Config c;
+  Context c;
   REQUIRE_NOTHROW(K(c));
   K kern;
   Matrix basis(2,10);
@@ -179,7 +180,7 @@ TEST_CASE( "Testing Kern_Quadratic", "[kernels]" ) {
 }
 TEST_CASE( "Testing Kern_LQ", "[kernels]" ) {
   using K=Kern_LQ;
-  Config c;
+  Context c;
   REQUIRE_NOTHROW(K(c));
   K kern;
   Matrix basis(2,10);
@@ -213,7 +214,7 @@ TEST_CASE( "Testing Kern_RBF", "[kernels]" ) {
   std::stringstream ss;
   std::cout.rdbuf (ss.rdbuf()); // redirect cout
   using K=Kern_RBF;
-  Config c;
+  Context c;
   double s=0.15273;
   double g=1.0/(2.0*s*s);
   c.add("MPARAMS", s);
@@ -254,7 +255,7 @@ TEST_CASE( "Testing Kern_Sigmoid", "[kernels]" ) {
   std::stringstream ss;
   std::cout.rdbuf (ss.rdbuf()); // redirect cout
   using K=Kern_Sigmoid;
-  Config c;
+  Context c;
   double g=1.123;
   double s=0.15273;
   c.add("MPARAMS", g);
@@ -295,7 +296,7 @@ TEST_CASE( "Testing Kern_Polynomial", "[kernels]" ) {
   std::stringstream ss;
   std::cout.rdbuf (ss.rdbuf()); // redirect cout
   using K=Kern_Polynomial;
-  Config c;
+  Context c;
   int d=3;
   double g=1.123;
   double s=0.15273;

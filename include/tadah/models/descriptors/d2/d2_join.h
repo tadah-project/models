@@ -25,7 +25,7 @@ public:
   }
   D2_Join(tadah::core::Context &c): D2_Base(c)
   {
-    // prepare configs for d1 and d2
+    // prepare contexts for d1 and d2
     // first we get joined grid and we have to split it between d1 and d2
     // we have to deal with -1 -2 algorithms and manual cases
     // TYPE2B 1st element is type followed be grid sizes (after expansion)
@@ -34,7 +34,7 @@ public:
     // We want to be able to use this class in a recurence realtion
     // where d1 <- any D2 but not D2_Join
     // and d2 can be any including D2_Join
-    // This means that we trim config for d1 and pass
+    // This means that we trim context for d1 and pass
     // whatever is left to d2
     tadah::core::v_type cgrid;
     cgrid.resize(c.size("CGRID2B"));
@@ -90,7 +90,7 @@ public:
     d1 = new D1(c1);
     d2 = new D2(c2);
 
-    // update main config file with generated grids
+    // update main context file with generated grids
     cgrid.resize(c1.size("CGRID2B")+c2.size("CGRID2B"));
     sgrid.resize(c1.size("SGRID2B")+c2.size("SGRID2B"));
     c.remove("CGRID2B"); c.remove("SGRID2B");

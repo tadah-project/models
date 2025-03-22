@@ -35,7 +35,7 @@ private:
 
 public:
   D2_BP();
-  D2_BP(tadah::core::Context &config);
+  D2_BP(tadah::core::Context &context);
   void calc_aed(
     const int Zi,
     const int Zj,

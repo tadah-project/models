@@ -49,7 +49,7 @@ namespace models {
 class DM_mJoin : public DM_Base, public D_mJoin {
 private:
   std::vector<DM_Base*> ds;
-  std::vector<tadah::core::Context> configs;
+  std::vector<tadah::core::Context> contexts;
   std::string lab = "DM_mJoin";
 public:
   DM_mJoin();

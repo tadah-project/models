@@ -23,7 +23,7 @@ template <class K = Function_Base&>
 class M_KRR_Core : public virtual M_Core {
 public:
     tadah::core::Matrix Sigma; ///< Covariance matrix.
-    tadah::core::Context &config; ///< Configuration reference.
+    tadah::core::Context &context; ///< Configuration reference.
     K kernel; ///< Kernel function.
 
     /**
@@ -34,7 +34,7 @@ public:
      * @param c Configuration object reference.
      */
     M_KRR_Core(tadah::core::Context &c) :
-        config(c),
+        context(c),
         kernel(c)
     {
         static_assert(std::is_base_of<Kern_Base, K>::value,
@@ -53,7 +53,7 @@ public:
      * @param c Configuration object reference.
      */
     M_KRR_Core(K &kernel, tadah::core::Context &c) :
-        config(c),
+        context(c),
         kernel(kernel)
     {
         if (dynamic_cast<Kern_Base*>(&kernel) == nullptr)
@@ -80,7 +80,7 @@ public:
      * @throws std::runtime_error if LAMBDA is not zero.
      */
     tadah::core::t_type get_weights_uncertainty() const {
-        double lambda = config.template get<double>("LAMBDA");
+        double lambda = context.template get<double>("LAMBDA");
         if(lambda != 0) 
             throw std::runtime_error("Sigma matrix is only computed for LAMBDA != 0");
         return Sigma.diagonal();
@@ -93,12 +93,12 @@ private:
      * Loads weights if available in the configuration and sets the verbose level.
      */
     void init() {
-        if (config.exist("WEIGHTS")) {
-            weights.resize(config.size("WEIGHTS"));
-            config.get<tadah::core::t_type>("WEIGHTS", weights);
+        if (context.contains("WEIGHTS")) {
+            weights.resize(context.size("WEIGHTS"));
+            context.get<tadah::core::t_type>("WEIGHTS", weights);
             trained = true;
         }
-        verbose = config.get<int>("VERBOSE");
+        verbose = context.get<int>("VERBOSE");
 
     }
 };

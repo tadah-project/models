@@ -23,7 +23,6 @@ DM_EAM::DM_EAM(tadah::core::Context &c): DM_Base(c)
     }
     c.remove("RCUTMB");
     c.add("RCUTMB", ef.rcut);
-    c.postprocess();
   }
 
   frho_spline.resize(ef.nrho+1, std::vector<double>(7));
