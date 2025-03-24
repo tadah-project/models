@@ -12,10 +12,10 @@ namespace models {
 class DC_Selector {
     public:
         Cut_Base *c2b=nullptr;
-        Cut_Base *c3b=nullptr;
+        // Cut_Base *c3b=nullptr;
         Cut_Base *cmb=nullptr;
         D2_Base *d2b=nullptr;
-        D3_Base *d3b=nullptr;
+        // D3_Base *d3b=nullptr;
         DM_Base *dmb=nullptr;
 
         //tadah::core::Context context;
@@ -52,12 +52,12 @@ class DC_Selector {
             return *this;
         }
 
-        DC_Selector (tadah::core::Context &c)
+        DC_Selector (const tadah::core::Context &c)
             //context(c)
     {
         init(c);
     };
-        void init(tadah::core::Context &context) {
+        void init(const tadah::core::Context &context) {
             double rcutzero = 0.0; // for dummies
 
             size_t bias=0;
@@ -76,17 +76,17 @@ class DC_Selector {
                 d2b->set_fidx(bias);
             }
 
-            if (context.get<bool>("INIT3B")) {
-                double rcut3b = context.get<double>("RCUT3BMAX");
-                c3b = tadah::core::factory<Cut_Base,double>( context.get<std::string>("RCTYPE3B"), rcut3b );
-                d3b = tadah::core::factory<D3_Base,tadah::core::Context&>( context.get<std::string>("TYPE3B"), context );
-                // d3b->fidx = bias;
-            }
-            else {
-                c3b = tadah::core::factory<Cut_Base,double>( "Cut_Dummy", rcutzero );
-                d3b = tadah::core::factory<D3_Base,tadah::core::Context&>( "D3_Dummy", context );
-                // d3b->fidx = bias;
-            }
+            // if (context.get<bool>("INIT3B")) {
+            //     double rcut3b = context.get<double>("RCUT3BMAX");
+            //     c3b = tadah::core::factory<Cut_Base,double>( context.get<std::string>("RCTYPE3B"), rcut3b );
+            //     d3b = tadah::core::factory<D3_Base,tadah::core::Context&>( context.get<std::string>("TYPE3B"), context );
+            //     // d3b->fidx = bias;
+            // }
+            // else {
+            //     c3b = tadah::core::factory<Cut_Base,double>( "Cut_Dummy", rcutzero );
+            //     d3b = tadah::core::factory<D3_Base,tadah::core::Context&>( "D3_Dummy", context );
+            //     // d3b->fidx = bias;
+            // }
 
             if (context.get<bool>("INITMB")) {
                 double rcutmb = context.get<double>("RCUTMBMAX");
