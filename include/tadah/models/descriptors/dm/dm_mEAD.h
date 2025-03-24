@@ -11,8 +11,8 @@
  * but allows the usage of a custom-defined embedding function, \f$ \mathcal{F} \f$, in place of the default quadratic one.
  *
  * Available implementations: 
- *   1. D_mRLR uses F_RLR
- *   2. D_mSQRT uses F_SQRT
+ *   1. DM_mRLR uses F_RLR
+ *   2. DM_mSQRT uses F_SQRT
  *
  * \f[
  * V_i^{L,\eta,r_s} = \sum_{l_x,l_y,l_z}^{l_x+l_y+l_z=L} \frac{L!}{l_x!l_y!l_z!}
