@@ -54,7 +54,7 @@ public:
 
 /**
  * @class F_SQRT
- * @brief Implements \f$ s \sqrt(\rho) \f$.
+ * @brief Implements \f$ s \sqrt{\rho} \f$.
  *
  * Optional parameter:
  * - **SEMBFUNC**: Controls the strength, \f$ s \f$, of the embedding function.
