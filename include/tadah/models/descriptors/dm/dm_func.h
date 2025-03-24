@@ -30,12 +30,13 @@ public:
  * @brief Implements an embedding function of the form: \f$ s \rho \log(c \rho) \f$
  *
  * This class supports embedding functions characterized by two main parameters:
- * - **SEMBFUNC**: Controls the depth, \f$ s \f$, of the embedding function.
+ * - **SEMBFUNC**: Controls the depth, \f$ s \f$, of the embedding function. 
  * - **CEMBFUNC**: Determines the x-intercept, with the x-intercept at \f$ 1/c \f$.
+ * 
+ *  Require: size(**SEMBFUNC**)=size(**CEMBFUNC**)=1
  * 
  * The number of keys for these parameters must match the entries in the mEAD descriptor.
  *
- * @note Ensure the configuration keys match the descriptor requirements.
  */
 class F_RLR:  public F_Base {
 private:
@@ -59,7 +60,9 @@ public:
  * Optional parameter:
  * - **SEMBFUNC**: Controls the strength, \f$ s \f$, of the embedding function.
  *   If no; value is provided, the default is 1.
- *  
+ *
+ *  Require: size(**SEMBFUNC**)=(0 or 1) and size(**CEMBFUNC**)=0
+ *
  */
 class F_SQRT : public F_Base {
 private:
@@ -72,7 +75,7 @@ public:
    * @param conf Reference to a Config instance.
    *
    * The constructor extracts or initializes relevant parameter for the model from
-   * the provided configuration.
+   * the provided configuration.  SEMBFUNC is set to 1 if not specified in the Config.
    */
   F_SQRT(Config &conf);
 
@@ -80,7 +83,7 @@ public:
    * @brief Default constructor for F_SQRT.
    *
    * This version does not initialize from a Config object. Users must
-   * manually set sgrid if this constructor is used.
+   * manually set sgrid if this constructor is used. SEMBFUNC is set to 1.
    */
   F_SQRT();
 
