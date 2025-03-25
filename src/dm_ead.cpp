@@ -14,7 +14,7 @@ DM_EAD::DM_EAD() {
  * rhoi array is split 50/50 into density and derivative
  * of the embedding function
  */
-DM_EAD::DM_EAD(tadah::core::Context &context): DM_Base(context),
+DM_EAD::DM_EAD(const tadah::core::Context &context): DM_Base(context),
   rc(context.get<double>("RCUTMBMAX"))
 {
   if (!context.get<bool>("INITMB")) {
@@ -25,10 +25,10 @@ DM_EAD::DM_EAD(tadah::core::Context &context): DM_Base(context),
   get_grid(context,"CGRIDMB",cgrid);
   get_grid(context,"SGRIDMB",sgrid);
   // update context with generated grid
-  context.remove("CGRIDMB");
-  for (const auto &i: cgrid) context.add("CGRIDMB",i);
-  context.remove("SGRIDMB");
-  for (const auto &i: sgrid) context.add("SGRIDMB",i);
+  /*context.remove("CGRIDMB");*/
+  /*for (const auto &i: cgrid) context.add("CGRIDMB",i);*/
+  /*context.remove("SGRIDMB");*/
+  /*for (const auto &i: sgrid) context.add("SGRIDMB",i);*/
 
   if (cgrid.size()!=sgrid.size()) {
     throw std::runtime_error("SGRID2B and CGRID2B arrays differ in size.\n");

@@ -7,7 +7,7 @@ namespace models {
 DM_EAM::DM_EAM() {
   init();
 }
-DM_EAM::DM_EAM(tadah::core::Context &c): DM_Base(c)
+DM_EAM::DM_EAM(core::Context &c): DM_Base(c)
 {
   init();
   if (!c.get<bool>("INITMB")) return;
@@ -16,11 +16,14 @@ DM_EAM::DM_EAM(tadah::core::Context &c): DM_Base(c)
   read_setfl();
 
   if (std::abs(ef.rcut - c.get<double>("RCUTMB")) > std::numeric_limits<double>::min()) {
-    if (verbose) {
-      std::cout << "tadah::core::Context file cutoff and setfl file cutoff differ: "
-        << c.get<double>("RCUTMB") << " " << ef.rcut << std::endl;
-      std::cout << "Enforcing SETFL file cutoff: " << ef.rcut << std::endl;
-    }
+    core::Logger::instance().log(
+        core::LogLevel::WARNING,
+        "tadah::core::Context file cutoff and setfl file cutoff differ: " +
+            std::to_string(c.get<double>("RCUTMB")) + " " +
+            std::to_string(ef.rcut));
+    core::Logger::instance().log(
+        core::LogLevel::WARNING,
+        "Enforcing SETFL file cutoff: " + std::to_string(ef.rcut));
     c.remove("RCUTMB");
     c.add("RCUTMB", ef.rcut);
   }

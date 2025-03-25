@@ -29,11 +29,11 @@ public:
  */
 class F_RLR:  public F_Base {
 private:
-  tadah::core::Context *context=nullptr;
+  const tadah::core::Context *context=nullptr;
   tadah::core::v_type sgrid;   // controls depth
   tadah::core::v_type cgrid;   // control x-intercep at 1/c
 public:
-  F_RLR(tadah::core::Context &context);
+  F_RLR(const tadah::core::Context &context);
   F_RLR();
   double calc_F(double rho,size_t c);
   double calc_dF(double rho,size_t c);

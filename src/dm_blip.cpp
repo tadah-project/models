@@ -9,7 +9,7 @@ namespace models {
 DM_Blip::DM_Blip() {
   init();
 }
-DM_Blip::DM_Blip(tadah::core::Context &c): DM_Base(c),
+DM_Blip::DM_Blip(const tadah::core::Context &c): DM_Base(c),
   rc(c.get<double>("RCUTMBMAX"))
 {
   if (!c.get<bool>("INITMB")) return;
@@ -18,10 +18,10 @@ DM_Blip::DM_Blip(tadah::core::Context &c): DM_Base(c),
   get_grid(c,"CGRIDMB",cgrid);
   get_grid(c,"SGRIDMB",sgrid);
   // update context with generated grid
-  c.remove("CGRIDMB");
-  for (const auto &i: cgrid) c.add("CGRIDMB",i);
-  c.remove("SGRIDMB");
-  for (const auto &i: sgrid) c.add("SGRIDMB",i);
+  /*c.remove("CGRIDMB");*/
+  /*for (const auto &i: cgrid) c.add("CGRIDMB",i);*/
+  /*c.remove("SGRIDMB");*/
+  /*for (const auto &i: sgrid) c.add("SGRIDMB",i);*/
   if (cgrid.size()!=sgrid.size()) {
 
     throw std::runtime_error("SGRID2B and CGRID2B arrays differ in size.\n");

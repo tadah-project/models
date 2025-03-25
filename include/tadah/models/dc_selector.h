@@ -12,10 +12,8 @@ namespace models {
 class DC_Selector {
     public:
         Cut_Base *c2b=nullptr;
-        // Cut_Base *c3b=nullptr;
         Cut_Base *cmb=nullptr;
         D2_Base *d2b=nullptr;
-        // D3_Base *d3b=nullptr;
         DM_Base *dmb=nullptr;
 
         //tadah::core::Context context;
@@ -44,20 +42,18 @@ class DC_Selector {
         {
             //std::swap(context,dc.context);
             std::swap(c2b,dc.c2b);
-            std::swap(c3b,dc.c3b);
             std::swap(cmb,dc.cmb);
             std::swap(d2b,dc.d2b);
-            std::swap(d3b,dc.d3b);
             std::swap(dmb,dc.dmb);
             return *this;
         }
 
-        DC_Selector (const tadah::core::Context &c)
+        DC_Selector (tadah::core::Context &c)
             //context(c)
     {
         init(c);
     };
-        void init(const tadah::core::Context &context) {
+        void init(tadah::core::Context &context) {
             double rcutzero = 0.0; // for dummies
 
             size_t bias=0;
@@ -75,18 +71,6 @@ class DC_Selector {
                 d2b = tadah::core::factory<D2_Base,tadah::core::Context&>( "D2_Dummy", context );
                 d2b->set_fidx(bias);
             }
-
-            // if (context.get<bool>("INIT3B")) {
-            //     double rcut3b = context.get<double>("RCUT3BMAX");
-            //     c3b = tadah::core::factory<Cut_Base,double>( context.get<std::string>("RCTYPE3B"), rcut3b );
-            //     d3b = tadah::core::factory<D3_Base,tadah::core::Context&>( context.get<std::string>("TYPE3B"), context );
-            //     // d3b->fidx = bias;
-            // }
-            // else {
-            //     c3b = tadah::core::factory<Cut_Base,double>( "Cut_Dummy", rcutzero );
-            //     d3b = tadah::core::factory<D3_Base,tadah::core::Context&>( "D3_Dummy", context );
-            //     // d3b->fidx = bias;
-            // }
 
             if (context.get<bool>("INITMB")) {
                 double rcutmb = context.get<double>("RCUTMBMAX");
@@ -106,10 +90,6 @@ class DC_Selector {
                 delete d2b;
             if (c2b)
                 delete c2b;
-            if (c3b)
-                delete c3b;
-            if (d3b)
-                delete d3b;
             if (cmb)
                 delete cmb;
             if (dmb)

@@ -10,18 +10,18 @@ namespace models {
 D2_Blip::D2_Blip() {
   init();
 }
-D2_Blip::D2_Blip(tadah::core::Context &c): D2_Base(c)
+D2_Blip::D2_Blip(const tadah::core::Context &c): D2_Base(c)
 {
   if (!c.get<bool>("INIT2B")) return;
   init();
 
   get_grid(c,"CGRID2B",mius);
   get_grid(c,"SGRID2B",etas);
-  // update context with generated grid
-  c.remove("CGRID2B");
-  for (const auto &m: mius) c.add("CGRID2B",m);
-  c.remove("SGRID2B");
-  for (const auto &e: etas) c.add("SGRID2B",e);
+  /*// update context with generated grid*/
+  /*c.remove("CGRID2B");*/
+  /*for (const auto &m: mius) c.add("CGRID2B",m);*/
+  /*c.remove("SGRID2B");*/
+  /*for (const auto &e: etas) c.add("SGRID2B",e);*/
 
   if (verbose) {
     std::cout << std::endl;

@@ -4,7 +4,7 @@ namespace tadah {
 namespace models {
 
 
-F_RLR::F_RLR(tadah::core::Context &c):
+F_RLR::F_RLR(const tadah::core::Context &c):
   context(&c)
 {
   if (!context->get<bool>("INITMB")) return;

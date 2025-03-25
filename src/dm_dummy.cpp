@@ -7,7 +7,7 @@ namespace models {
 DM_Dummy::DM_Dummy() {
   init();
 }
-DM_Dummy::DM_Dummy(tadah::core::Context&c): DM_Base(c) {
+DM_Dummy::DM_Dummy(const tadah::core::Context&c): DM_Base(c) {
   init();
 }
 void DM_Dummy::calc_aed(

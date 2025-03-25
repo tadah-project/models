@@ -75,7 +75,7 @@ void D_mJoin::expand_grids(tadah::core::Context &c, std::vector<tadah::core::Con
     std::cerr << "Cannot expand context grid: wrong keyword: " << type_str << std::endl;
   }
 }
-std::vector<tadah::core::Context> D_mJoin::parse_context(tadah::core::Context &c, std::string type_str) {
+std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Context &c, std::string type_str) {
   std::string prefix = type_str=="TYPE2B" ? "D2_" : "DM_";
   std::string rctypekey = "RC" + type_str;
   std::string rcutkey = "RCUT" + type_str.substr(type_str.size() - 2);

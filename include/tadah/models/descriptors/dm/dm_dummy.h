@@ -17,7 +17,7 @@ private:
   std::string lab="DM_Dummy";
 public:
   DM_Dummy();
-  DM_Dummy(tadah::core::Context&);
+  DM_Dummy(const tadah::core::Context&);
   void calc_aed(
     tadah::core::rho_type& rho,
     tadah::core::aed_type &aed) override;

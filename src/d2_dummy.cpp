@@ -7,7 +7,7 @@ namespace models {
 D2_Dummy::D2_Dummy() {
   init();
 }
-D2_Dummy::D2_Dummy(tadah::core::Context &c): D2_Base(c)
+D2_Dummy::D2_Dummy(const tadah::core::Context &c): D2_Base(c)
 {
   init();
 }

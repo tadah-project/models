@@ -50,7 +50,7 @@ private:
 
 public:
   DM_EAD();
-  DM_EAD(tadah::core::Context&);
+  DM_EAD(const tadah::core::Context&);
   void calc_aed(
     tadah::core::rho_type& rho,
     tadah::core::aed_type &aed) override;

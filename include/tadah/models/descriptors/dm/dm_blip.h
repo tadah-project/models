@@ -51,7 +51,7 @@ private:
 
 public:
   DM_Blip();
-  DM_Blip(tadah::core::Context&);
+  DM_Blip(const tadah::core::Context&);
   void calc_aed(
     tadah::core::rho_type& rho,
     tadah::core::aed_type &aed) override;

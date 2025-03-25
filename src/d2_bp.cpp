@@ -7,7 +7,7 @@ namespace models {
 D2_BP::D2_BP() {
   init();
 }
-D2_BP::D2_BP(tadah::core::Context &c): D2_Base(c) {
+D2_BP::D2_BP(const tadah::core::Context &c): D2_Base(c) {
   init();
 
   if (!c.get<bool>("INIT2B")) return;
@@ -15,10 +15,10 @@ D2_BP::D2_BP(tadah::core::Context &c): D2_Base(c) {
   get_grid(c,"CGRID2B",mius);
   get_grid(c,"SGRID2B",etas);
   // update context with generated grid
-  c.remove("CGRID2B");
-  for (const auto &m: mius) c.add("CGRID2B",m);
-  c.remove("SGRID2B");
-  for (const auto &e: etas) c.add("SGRID2B",e);
+  /*c.remove("CGRID2B");*/
+  /*for (const auto &m: mius) c.add("CGRID2B",m);*/
+  /*c.remove("SGRID2B");*/
+  /*for (const auto &e: etas) c.add("SGRID2B",e);*/
 
   if (verbose) {
     std::cout << std::endl;

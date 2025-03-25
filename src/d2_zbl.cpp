@@ -6,7 +6,7 @@ namespace models {
 D2_ZBL::D2_ZBL() {
   init();
 }
-D2_ZBL::D2_ZBL(tadah::core::Context &c): D2_Base(c)
+D2_ZBL::D2_ZBL(const tadah::core::Context &c): D2_Base(c)
 {
   if (!c.get<bool>("INIT2B")) return;
   init();

@@ -73,7 +73,7 @@ D_Base::~D_Base() {
 }
 
 D_Base::D_Base() {}
-D_Base::D_Base(tadah::core::Context &c):
+D_Base::D_Base(const tadah::core::Context &c):
   verbose(c.get<int>("VERBOSE"))
 {
   std::fill_n(weights, 119, 1.0);
@@ -147,7 +147,7 @@ void D_Base::init_for_atoms(const std::vector<std::string> &Zs) {
     }
   }
 }
-std::vector<std::string> D_Base::get_init_atoms(tadah::core::Context &c, std::string type) {
+std::vector<std::string> D_Base::get_init_atoms(const tadah::core::Context &c, std::string type) {
   std::vector<std::string> init_atoms(c.size(type));
   c.get(type, init_atoms);
   std::unique_ptr<D_Base> d(tadah::core::factory<D_Base>(init_atoms[0]));

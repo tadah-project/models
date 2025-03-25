@@ -17,7 +17,7 @@ private:
   std::string lab="D2_Dummy";
 public:
   D2_Dummy();
-  D2_Dummy(tadah::core::Context &);
+  D2_Dummy(const tadah::core::Context &);
   void calc_aed(
     const int Zi,
     const int Zj,

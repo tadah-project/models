@@ -16,12 +16,14 @@ D2_EAM::D2_EAM(tadah::core::Context &c): D2_Base(c)
   read_setfl();
 
   if (std::abs(ef.rcut - c.get<double>("RCUT2B")) > std::numeric_limits<double>::min()) {
-    if (verbose) {
-      std::cout << std::endl;
-      std::cout << "tadah::core::Context file cutoff and setfl file cutoff differ: "
-        << c.get<double>("RCUT2B") << " " << ef.rcut << std::endl;
-      std::cout << "Enforcing SETFL file cutoff: " << ef.rcut << std::endl;
-    }
+    core::Logger::instance().log(
+        core::LogLevel::WARNING,
+        "tadah::core::Context file cutoff and setfl file cutoff differ: " +
+            std::to_string(c.get<double>("RCUT2B")) + " " +
+            std::to_string(ef.rcut));
+    core::Logger::instance().log(
+        core::LogLevel::WARNING,
+        "Enforcing SETFL file cutoff: " + std::to_string(ef.rcut));
     c.remove("RCUT2B");
     c.add("RCUT2B", ef.rcut);
   }

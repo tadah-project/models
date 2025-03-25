@@ -14,7 +14,7 @@ namespace models {
 class D2_Base: public D_Base {
 public:
   D2_Base() {};
-  D2_Base(tadah::core::Context &c): D_Base(c) {
+  D2_Base(const tadah::core::Context &c): D_Base(c) {
     //if (c.get<bool>("INIT2B")) {
     if (c.contains("RCUT2BMAX") && c.contains("RCTYPE2B")) {
       double rcut2b = c.get<double>("RCUT2BMAX");
@@ -25,7 +25,7 @@ public:
     }
   }
   virtual ~D2_Base() {};
-  virtual std::vector<std::string> get_init_atoms(tadah::core::Context &c) override;
+  virtual std::vector<std::string> get_init_atoms(const tadah::core::Context &c) override;
 
   /** \brief Calculate \ref AED
    *

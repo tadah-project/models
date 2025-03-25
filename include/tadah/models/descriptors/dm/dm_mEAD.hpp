@@ -15,7 +15,7 @@ DM_mEAD<F>::DM_mEAD() {
  * of the embedding function
  */
 template <typename F>
-DM_mEAD<F>::DM_mEAD(tadah::core::Context &context): DM_Base(context),
+DM_mEAD<F>::DM_mEAD(const tadah::core::Context &context): DM_Base(context),
   rc(context.get<double>("RCUTMBMAX")),
   emb(context)
 {
@@ -26,10 +26,10 @@ DM_mEAD<F>::DM_mEAD(tadah::core::Context &context): DM_Base(context),
   get_grid(context,"CGRIDMB",cgrid);
   get_grid(context,"SGRIDMB",sgrid);
   // update context with generated grid
-  context.remove("CGRIDMB");
-  for (const auto &i: cgrid) context.add("CGRIDMB",i);
-  context.remove("SGRIDMB");
-  for (const auto &i: sgrid) context.add("SGRIDMB",i);
+  /*context.remove("CGRIDMB");*/
+  /*for (const auto &i: cgrid) context.add("CGRIDMB",i);*/
+  /*context.remove("SGRIDMB");*/
+  /*for (const auto &i: sgrid) context.add("SGRIDMB",i);*/
 
   if (cgrid.size()!=sgrid.size()) {
     throw std::runtime_error("SGRID2B and CGRID2B arrays differ in size.\n");

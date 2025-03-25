@@ -5,6 +5,7 @@
 #include <tadah/core/context.h>
 #include <tadah/core/core_types.h>
 #include <tadah/core/periodic_table.h>
+#include <tadah/core/logger.h>
 #include <tadah/core/registry.h>
 #include <tadah/models/cut_all.h>
 #include <vector>
@@ -60,7 +61,7 @@ public:
   virtual std::string label()=0;
   double weights[119] = {1};  // ignore zero index; w[1]->H
   D_Base();
-  D_Base(tadah::core::Context &c);
+  D_Base(const tadah::core::Context &c);
 
   virtual void set_fidx(size_t fidx_);
   virtual size_t get_fidx();
@@ -91,8 +92,8 @@ public:
   virtual void init_for_atoms(int Zi, int Zj);
   virtual void init_for_atoms(const std::vector<std::string> &Zs);
   virtual void uninit_for_atoms(int Zi, int Zj);
-  static std::vector<std::string> get_init_atoms(tadah::core::Context &c, std::string type);
-  virtual std::vector<std::string> get_init_atoms(tadah::core::Context &c)=0;
+  static std::vector<std::string> get_init_atoms(const tadah::core::Context &c, std::string type);
+  virtual std::vector<std::string> get_init_atoms(const tadah::core::Context &c)=0;
 
 private:
 
