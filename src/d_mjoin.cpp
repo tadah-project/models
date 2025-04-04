@@ -133,6 +133,8 @@ std::vector<Config> D_mJoin::parse_config(Config &c, std::string type_str) {
   std::vector<Config> configs;
   for (auto it = types.begin(); it != types.end();) {
     Config c1 = c;
+    std::cout << "init config:" << std::endl;
+    std::cout << c << std::endl; 
     c1.remove(type_str); c1.remove(rctypekey); c1.remove(rcutkey);
     c1.remove(cgridkey); c1.remove(sgridkey);
     c1.remove("CEMBFUNC"); c1.remove("SEMBFUNC");
@@ -182,6 +184,8 @@ std::vector<Config> D_mJoin::parse_config(Config &c, std::string type_str) {
         "Token: " + token);
     }
 
+    std::cout << "parser config:" << std::endl;
+    std::cout << c1 << std::endl; 
     configs.push_back(c1);
     delete d;
   }
