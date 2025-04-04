@@ -327,5 +327,5 @@ void DM_mEAD<F>::init() {
   keys.push_back("SGRIDMB");
   keys.push_back("CEMBFUNC");
   keys.push_back("SEMBFUNC");
-  nparams=5;
+  nparams=3;
 }
