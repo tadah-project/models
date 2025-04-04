@@ -13,8 +13,8 @@ DM_mEAD<F>::DM_mEAD() {
  */
 template <typename F>
 DM_mEAD<F>::DM_mEAD(Config &config): DM_Base(config),
-  rc(config.get<double>("RCUTMBMAX")),
-  emb(config, config.size("CGRIDMB"), config.size("SGRIDMB"))
+  rc(config.get<double>("RCUTMBMAX"))
+  // emb(config, config.size("CGRIDMB"), config.size("SGRIDMB"))
 {
 
   if (!config.get<bool>("INITMB")) return;
@@ -28,9 +28,12 @@ DM_mEAD<F>::DM_mEAD(Config &config): DM_Base(config),
   config.remove("SGRIDMB");
   for (const auto &i: sgrid) config.add("SGRIDMB",i);
 
+
   if (cgrid.size()!=sgrid.size()) {
     throw std::runtime_error("SGRID2B and CGRID2B arrays differ in size.\n");
   }
+
+  emb = F(config, cgrid.size(), sgrid.size());
 
   Lmax = config.get<int>("TYPEMB",1);
   s=sgrid.size()*(Lmax+1);
