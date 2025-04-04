@@ -146,6 +146,7 @@ std::vector<Config> D_mJoin::parse_config(Config &c, std::string type_str) {
     Config c1 = c;
     c1.remove(type_str); c1.remove(rctypekey); c1.remove(rcutkey);
     c1.remove(cgridkey); c1.remove(sgridkey);
+    c1.remove("CEMBFUNC"); c1.remove("SEMBFUNC");
     const auto token = *it++;
     c1.add(type_str,token);
     c1.add(rctypekey,*(data_map[rctypekey]++));
@@ -190,35 +191,6 @@ std::vector<Config> D_mJoin::parse_config(Config &c, std::string type_str) {
         "Ensure each element is paired correctly. "
         "For instance, '" + token + " Ti * Nb Zr' means that interactions of Ti with any atom, as well as Nb-Zr, will be computed. "
         "Token: " + token);
-    }
-
-    // debug
-    std::cout << "parse_config() DEBUG: " << type_str << ": " << token << std::endl;
-    std::cout << "parse_config() DEBUG: " << rctypekey << ": " << *(data_map[rctypekey]-1) << std::endl;
-    std::cout << "parse_config() DEBUG: " << rcutkey << ": " << *(data_map[rcutkey]-1) << std::endl;
-    std::cout << "parse_config() DEBUG: " << cgridkey << ": ";
-    if (c.exist(cgridkey)) {
-      std::cout << *(data_map[cgridkey]-1) << std::endl;
-    } else {
-      std::cout << "not set" << std::endl;
-    }
-    std::cout << "parse_config() DEBUG: " << sgridkey << ": ";
-    if (c.exist(sgridkey)) {
-      std::cout << *(data_map[sgridkey]-1) << std::endl;
-    } else {
-      std::cout << "not set" << std::endl;
-    }
-    std::cout << "parse_config() DEBUG: " << cembgrid.size() << ": ";
-    if (c.exist("CEMBFUNC")) {
-      std::cout << *(data_map["CEMBFUNC"]-1) << std::endl;
-    } else {
-      std::cout << "not set" << std::endl;
-    }
-    std::cout << "parse_config() DEBUG: " << sembgrid.size() << ": ";
-    if (c.exist("SEMBFUNC")) {
-      std::cout << *(data_map["SEMBFUNC"]-1) << std::endl;
-    } else {
-      std::cout << "not set" << std::endl;
     }
 
     std::cout << c1 << std::endl;
