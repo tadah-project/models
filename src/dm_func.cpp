@@ -20,9 +20,11 @@ F_RLR::F_RLR(Config &conf, size_t cSize, size_t sSize):
 //   config(nullptr)
 // {}
 double F_RLR::calc_F(double rho,size_t p) {
+  if (rho<=0) return 0;
   return sfuncgrid[p]*rho*log(cfuncgrid[p]*rho);
 }
 double F_RLR::calc_dF(double rho,size_t p) {
+  if (rho<=0) return 0;
   return sfuncgrid[p]*(log(cfuncgrid[p]*rho)+1);
 }
 
