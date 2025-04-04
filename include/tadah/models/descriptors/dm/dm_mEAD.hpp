@@ -14,7 +14,6 @@ DM_mEAD<F>::DM_mEAD() {
 template <typename F>
 DM_mEAD<F>::DM_mEAD(Config &config): DM_Base(config),
   rc(config.get<double>("RCUTMBMAX"))
-  // emb(config, config.size("CGRIDMB"), config.size("SGRIDMB"))
 {
 
   if (!config.get<bool>("INITMB")) return;
