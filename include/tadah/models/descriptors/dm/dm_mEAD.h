@@ -12,6 +12,10 @@ namespace models {
  * This descriptor has a mathematical form very similar to DM_EAD
  * but allows the usage of a custom-defined embedding function, \f$ \mathcal{F} \f$, in place of the default quadratic one.
  *
+ * Available implementations: 
+ *   1. DM_mRLR uses F_RLR
+ *   2. DM_mSQRT uses F_SQRT
+ *
  * \f[
  * V_i^{L,\eta,r_s} = \sum_{l_x,l_y,l_z}^{l_x+l_y+l_z=L} \frac{L!}{l_x!l_y!l_z!}
  * \mathcal{F}\Big( \rho_i^{\eta,r_s,l_x,l_y,l_z} \Big)
@@ -29,7 +33,30 @@ namespace models {
  *
  * e.g., \f$L_{max}=2\f$ will calculate descriptors with \f$ L=0,1,2 \f$ (s, p, d orbitals).
  *
- * Required tadah::core::Context keys:
+ * ```
+ * # TYPEMB params: L, size(cgrid), size(sgrid),
+ * # size(cembfunc), size(sembfunc), list of element pairs
+ * TYPEMB    DM_mRLR 0 7 7 1 1 Ta Ta    
+ * RCTYPEMB  Cut_Tanh
+ * RCUTMB    7.5
+ * SGRIDMB   -2 7 0.1 10
+ * CGRIDMB   0 0 0 0 0 0 0
+ * SEMBFUNC  1.2
+ * CEMBFUNC  0.5
+ * ```
+ *
+ * ```
+ * # TYPEMB params: L, size(cgrid), size(sgrid),
+ * # size(cembfunc), size(sembfunc), list of element pairs
+ * TYPEMB    DM_mSQRT 1 5 5 0 1 * * 
+ * RCTYPEMB  Cut_Cos
+ * RCUTMB    3.0
+ * CGRIDMB   -1 5 0 3.0
+ * SGRIDMB   -2 5 1.0 10.0
+ * SEMBFUNC   1.5
+ * ```
+ *
+ * Required Config keys:
  * \ref INITMB \ref CGRIDMB \ref SGRIDMB
  */
 
@@ -91,4 +118,3 @@ public:
 #include "dm_mEAD.hpp"
 
 #endif
-

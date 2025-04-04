@@ -16,8 +16,7 @@ DM_mEAD<F>::DM_mEAD() {
  */
 template <typename F>
 DM_mEAD<F>::DM_mEAD(const tadah::core::Context &context): DM_Base(context),
-  rc(context.get<double>("RCUTMBMAX")),
-  emb(context)
+  rc(context.get<double>("RCUTMBMAX"))
 {
 
   if (!context.get<bool>("INITMB")) return;
@@ -31,9 +30,12 @@ DM_mEAD<F>::DM_mEAD(const tadah::core::Context &context): DM_Base(context),
   /*context.remove("SGRIDMB");*/
   /*for (const auto &i: sgrid) context.add("SGRIDMB",i);*/
 
+
   if (cgrid.size()!=sgrid.size()) {
     throw std::runtime_error("SGRID2B and CGRID2B arrays differ in size.\n");
   }
+
+  emb = F(context, cgrid.size(), sgrid.size());
 
   Lmax = context.get<int>("TYPEMB",1);
   s=sgrid.size()*(Lmax+1);

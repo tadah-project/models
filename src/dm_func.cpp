@@ -3,30 +3,59 @@
 namespace tadah {
 namespace models {
 
-
-F_RLR::F_RLR(const tadah::core::Context &c):
+F_RLR::F_RLR(const tadah::core::Context &c, size_t cSize, size_t sSize):
   context(&c)
 {
   if (!context->get<bool>("INITMB")) return;
-  D_Base::get_grid(*context,"SEMBFUNC",sgrid);
-  D_Base::get_grid(*context,"CEMBFUNC",cgrid);
+  D_Base::get_grid(*context,"SEMBFUNC",sfuncgrid);
+  D_Base::get_grid(*context,"CEMBFUNC",cfuncgrid);
+  // check if size is correct, throw otherwise
+  if (sfuncgrid.size() != sSize) {
+    throw std::runtime_error("F_RLR: size of SEMBFUNC does not match the number of [C/S]GRIDMB.");
+  }
+  if (cfuncgrid.size() != cSize) {
+    throw std::runtime_error("F_RLR: size of CEMBFUNC does not match the number of [C/S]GRIDMB.");
+  }
+}
+double F_RLR::calc_F(double rho,size_t p) {
+  if (rho<=0) return 0;
+  return sfuncgrid[p]*rho*log(cfuncgrid[p]*rho);
+}
+double F_RLR::calc_dF(double rho,size_t p) {
+  if (rho<=0) return 0;
+  return sfuncgrid[p]*(log(cfuncgrid[p]*rho)+1);
+}
 
-}
-F_RLR::F_RLR():
-  context(nullptr)
+//////////////////////////
+// F_SQRT
+//////////////////////////
+F_SQRT::F_SQRT(const tadah::core::Context &c, size_t, size_t sSize):
+  context(&c)
 {
+  if (!context->get<bool>("INITMB")) return;
+  if (context->contains("SEMBFUNC")) {
+    D_Base::get_grid(*context, "SEMBFUNC", sfuncgrid);
+    // check if size is correct, throw otherwise
+    if (sfuncgrid.size() != sSize) {
+      throw std::runtime_error("F_SQRT: size of SEMBFUNCT does not match the number of [C/S]GRIDMB.");
+    }
+  } else {
+    sfuncgrid.resize(sSize);
+    for (size_t i=0; i<sSize; ++i) {
+      sfuncgrid[i] = 1.0;
+    }
+  }
 }
-double F_RLR::calc_F(double rho,size_t c) {
+double F_SQRT::calc_F(double rho,size_t p) {
   if (rho>0)
-    return sgrid[c]*rho*log(cgrid[c]*rho);
+    return sfuncgrid[p]*std::sqrt(rho);
   return 0;
 }
-double F_RLR::calc_dF(double rho,size_t c) {
+double F_SQRT::calc_dF(double rho,size_t p) {
   if (rho>0)
-    return sgrid[c]*(log(cgrid[c]*rho)+1);
-  return sgrid[c];
+    return 0.5*sfuncgrid[p]/(std::sqrt(rho));
+  return 0;
 }
 
 } // namespace models
 } // namespace tadah
-
