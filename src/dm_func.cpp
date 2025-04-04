@@ -10,10 +10,10 @@ F_RLR::F_RLR(Config &conf, size_t cSize, size_t sSize):
   D_Base::get_grid(*config,"CEMBFUNC",cfuncgrid);
   // check if size is correct, throw otherwise
   if (sfuncgrid.size() != sSize) {
-    throw std::runtime_error("F_RLR: size of SEMBFUNC does not match the number of [C/S]GRIDMB.");
+    throw std::runtime_error("F_RLR: size of SEMBFUNC does not match declared size.");
   }
   if (cfuncgrid.size() != cSize) {
-    throw std::runtime_error("F_RLR: size of CEMBFUNC does not match the number of [C/S]GRIDMB.");
+    throw std::runtime_error("F_RLR: size of CEMBFUNC does not match declared size.");
   }
 }
 // F_RLR::F_RLR():
@@ -38,7 +38,7 @@ F_SQRT::F_SQRT(Config &conf, size_t, size_t sSize):
     D_Base::get_grid(*config, "SEMBFUNC", sfuncgrid);
     // check if size is correct, throw otherwise
     if (sfuncgrid.size() != sSize) {
-      throw std::runtime_error("F_SQRT: size of SEMBFUNCT does not match the number of [C/S]GRIDMB.");
+      throw std::runtime_error("F_SQRT: size of SEMBFUNC does not match declared size.");
     }
   } else {
     // size_t n = config->size("SGRIDMB");
