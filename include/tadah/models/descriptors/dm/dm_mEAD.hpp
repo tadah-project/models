@@ -14,7 +14,7 @@ DM_mEAD<F>::DM_mEAD() {
 template <typename F>
 DM_mEAD<F>::DM_mEAD(Config &config): DM_Base(config),
   rc(config.get<double>("RCUTMBMAX")),
-  emb(config)
+  emb(config, config.size("CGRIDMB"), config.size("SGRIDMB"))
 {
 
   if (!config.get<bool>("INITMB")) return;
@@ -325,7 +325,7 @@ template <typename F>
 void DM_mEAD<F>::init() {
   keys.push_back("CGRIDMB");
   keys.push_back("SGRIDMB");
-  // keys.push_back("CEMBFUNC");
-  // keys.push_back("SEMBFUNC");
-  nparams=3;
+  keys.push_back("CEMBFUNC");
+  keys.push_back("SEMBFUNC");
+  nparams=5;
 }

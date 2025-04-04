@@ -17,7 +17,7 @@ TEST_CASE("F_RLR: Basic Function and Derivative", "[F_RLR]")
   c.add("SEMBFUNC", 0.2);
   c.add("CEMBFUNC", 0.3);
 
-  F_RLR rlr(c);
+  F_RLR rlr(c, 1, 1);
 
   double rho = 2.0;
   size_t p = 0; // Single parameter index
@@ -47,7 +47,7 @@ TEST_CASE("F_SQRT: Basic Function and Derivative", "[F_SQRT]")
   c.add("INITMB", "true");
   c.add("SEMBFUNC", 0.2);
 
-  F_SQRT sqrt_func(c);
+  F_SQRT sqrt_func(c, 0,1);
 
   double rho = 4.0;
   size_t p = 0; // Single parameter index
