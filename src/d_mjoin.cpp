@@ -63,15 +63,9 @@ void D_mJoin::expand_grids(Config &c, std::vector<Config> &configs,std::string t
       if (c1.exist("CEMBFUNC"))
         for (size_t i = 0; i < c1.size("CEMBFUNC"); ++i)
           c.add("CEMBFUNC", c1.get<double>("CEMBFUNC", i));
-      if (c1.exist("SEMBFUNC")) {
+      if (c1.exist("SEMBFUNC"))
         for (size_t i = 0; i < c1.size("SEMBFUNC"); ++i)
           c.add("SEMBFUNC", c1.get<double>("SEMBFUNC", i));
-        // DEBUG
-        std::cout << "expand_grids() DEBUG: SGRIDMB: " << c1.size("SEMBFUNC") << std::endl;
-        for (size_t i = 0; i < c1.size("SEMBFUNC"); ++i) {
-          std::cout << "SEMBFUNC[" << i << "] = " << c1.get<double>("SEMBFUNC", i) << std::endl;
-        }
-    }
     }
   }
   else {
@@ -133,11 +127,6 @@ std::vector<Config> D_mJoin::parse_config(Config &c, std::string type_str) {
     sembgrid.resize(c.size("SEMBFUNC"));
     c.get("SEMBFUNC", sembgrid);
     sembgrid = convert_to_strings(D_Base::get_grid(sembgrid),p); 
-    // debug
-    std::cout << "parse_config() DEBUG: SGRIDMB: " << sembgrid.size() << std::endl;
-    for (size_t i=0; i<sembgrid.size(); ++i) {
-      std::cout << "SEMBFUNC[" << i << "] = " << sembgrid[i] << std::endl;
-    }
     data_map["SEMBFUNC"] = sembgrid.begin();
   }
 
@@ -193,7 +182,6 @@ std::vector<Config> D_mJoin::parse_config(Config &c, std::string type_str) {
         "Token: " + token);
     }
 
-    std::cout << c1 << std::endl;
     configs.push_back(c1);
     delete d;
   }

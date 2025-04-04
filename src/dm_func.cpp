@@ -38,16 +38,6 @@ F_SQRT::F_SQRT(Config &conf, size_t, size_t sSize):
     D_Base::get_grid(*config, "SEMBFUNC", sfuncgrid);
     // check if size is correct, throw otherwise
     if (sfuncgrid.size() != sSize) {
-      std::cout << conf << std::endl;
-      std::cout << "DEBUG" << std::endl;
-      std::cout << "sfuncgrid.size() = " << sfuncgrid.size() << std::endl;
-      std::cout << "sSize = " << sSize << std::endl;
-      std::cout << "config->size(\"SEMBFUNC\") = " << config->size("SEMBFUNC") << std::endl;
-      std::cout << "config->size(\"SGRIDMB\") = " << config->size("SGRIDMB") << std::endl;
-      for (size_t i=0; i<sfuncgrid.size(); ++i) {
-        std::cout << "sfuncgrid[" << i << "] = " << sfuncgrid[i] << std::endl;
-      }
-
       throw std::runtime_error("F_SQRT: size of SEMBFUNC does not match declared size.");
     }
   } else {
