@@ -138,6 +138,7 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
     tadah::core::Context c1 = c;
     c1.remove(type_str); c1.remove(rctypekey); c1.remove(rcutkey);
     c1.remove(cgridkey); c1.remove(sgridkey);
+    c1.remove("CEMBFUNC"); c1.remove("SEMBFUNC");
     const auto token = *it++;
     c1.add(type_str,token);
     c1.add(rctypekey,*(data_map[rctypekey]++));

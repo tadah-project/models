@@ -11,10 +11,10 @@ F_RLR::F_RLR(const tadah::core::Context &c, size_t cSize, size_t sSize):
   D_Base::get_grid(*context,"CEMBFUNC",cfuncgrid);
   // check if size is correct, throw otherwise
   if (sfuncgrid.size() != sSize) {
-    throw std::runtime_error("F_RLR: size of SEMBFUNC does not match the number of [C/S]GRIDMB.");
+    throw std::runtime_error("F_RLR: size of SEMBFUNC does not match declared size.");
   }
   if (cfuncgrid.size() != cSize) {
-    throw std::runtime_error("F_RLR: size of CEMBFUNC does not match the number of [C/S]GRIDMB.");
+    throw std::runtime_error("F_RLR: size of CEMBFUNC does not match declared size.");
   }
 }
 double F_RLR::calc_F(double rho,size_t p) {
@@ -37,7 +37,7 @@ F_SQRT::F_SQRT(const tadah::core::Context &c, size_t, size_t sSize):
     D_Base::get_grid(*context, "SEMBFUNC", sfuncgrid);
     // check if size is correct, throw otherwise
     if (sfuncgrid.size() != sSize) {
-      throw std::runtime_error("F_SQRT: size of SEMBFUNCT does not match the number of [C/S]GRIDMB.");
+      throw std::runtime_error("F_SQRT: size of SEMBFUNC does not match declared size.");
     }
   } else {
     sfuncgrid.resize(sSize);
