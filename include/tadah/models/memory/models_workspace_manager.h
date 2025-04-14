@@ -1,7 +1,7 @@
 #ifndef TADAH_MODELS_MEMORY_MODELSWORKSPACEMANAGER_H
 #define TADAH_MODELS_MEMORY_MODELSWORKSPACEMANAGER_H
 
-#include <tadah/models/memory/IModelsWorkspaceManager.h>
+#include <tadah/models/memory/imodels_workspace_manager.h>
 #include <tadah/models/Algorithm.h>
 
 namespace tadah {

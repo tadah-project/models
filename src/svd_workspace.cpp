@@ -1,4 +1,4 @@
-#include <tadah/models/memory/SVDWorkspace.h>
+#include <tadah/models/memory/svd_workspace.h>
 #include <tadah/core/lapack.h>
 #include <algorithm>
 #include <cmath>

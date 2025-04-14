@@ -2,7 +2,7 @@
 #include <cmath>
 #include <stdexcept>
 #include <tadah/core/lapack.h>
-#include <tadah/models/memory/OLSWorkspace.h>
+#include <tadah/models/memory/ols_workspace.h>
 namespace tadah {
 namespace models {
 namespace memory {
