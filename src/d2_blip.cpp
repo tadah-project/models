@@ -15,19 +15,21 @@ D2_Blip::D2_Blip(const tadah::core::Context &c): D2_Base(c)
   if (!c.get<bool>("INIT2B")) return;
   init();
 
-  get_grid(c,"CGRID2B",mius);
-  get_grid(c,"SGRID2B",etas);
+  get_grid(c,"CGRID2B",cgrid);
+  get_grid(c,"SGRID2B",sgrid);
+  D_Base::printGrid(cgrid,"CGRIDMB");
+  D_Base::printGrid(sgrid,"SGRIDMB");
 
-  if (mius.size()!=etas.size()) {
+  if (cgrid.size()!=sgrid.size()) {
     throw std::runtime_error("SGRID2B and CGRID2B arrays differ in size.\n");
   }
 
-  for (const auto &e:etas) {
+  for (const auto &e:sgrid) {
     if(std::abs(e)<std::numeric_limits<double>::min())
       throw std::runtime_error("At least one of SGRID2B values is zero.\n");
   }
 
-  s=mius.size();
+  s=cgrid.size();
 
   auto init_atoms = get_init_atoms(c);
   init_for_atoms(init_atoms);
@@ -44,8 +46,8 @@ void D2_Blip::calc_aed(
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   size_t i=fidx;
   double fc_ij = fcut->calc(rij);
-  for (size_t c=0; c<mius.size(); c++) {
-    double t = B(etas[c]*(rij-mius[c]),fc_ij);
+  for (size_t c=0; c<cgrid.size(); c++) {
+    double t = B(sgrid[c]*(rij-cgrid[c]),fc_ij);
     aed(i++) += scale*weights[Zj]*t;
   }
 
@@ -62,8 +64,8 @@ void D2_Blip::calc_dXijdri(
   size_t i=fidx;
   double fc_ij = fcut->calc(rij);
   double fcp_ij = fcut->calc_prime(rij);
-  for (size_t c=0; c<mius.size(); c++) {
-    fd_ij(i++,0) = scale*weights[Zj]*dB(etas[c]*(rij-mius[c]),etas[c],fc_ij,fcp_ij);
+  for (size_t c=0; c<cgrid.size(); c++) {
+    fd_ij(i++,0) = scale*weights[Zj]*dB(sgrid[c]*(rij-cgrid[c]),sgrid[c],fc_ij,fcp_ij);
   }
 }
 void D2_Blip::calc_all(
@@ -80,9 +82,9 @@ void D2_Blip::calc_all(
   size_t i=fidx;
   double fc_ij = fcut->calc(rij);
   double fcp_ij = fcut->calc_prime(rij);
-  for (size_t c=0; c<mius.size(); c++) {
-    aed(i) += scale*weights[Zj]*B(etas[c]*(rij-mius[c]),fc_ij);
-    fd_ij(i,0) = scale*weights[Zj]*dB(etas[c]*(rij-mius[c]),etas[c],fc_ij,fcp_ij);
+  for (size_t c=0; c<cgrid.size(); c++) {
+    aed(i) += scale*weights[Zj]*B(sgrid[c]*(rij-cgrid[c]),fc_ij);
+    fd_ij(i,0) = scale*weights[Zj]*dB(sgrid[c]*(rij-cgrid[c]),sgrid[c],fc_ij,fcp_ij);
     ++i;
   }
 }

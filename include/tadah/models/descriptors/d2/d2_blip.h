@@ -45,8 +45,8 @@ namespace models {
 class D2_Blip : public D2_Base {
 private:
   std::string lab="D2_Blip";
-  tadah::core::v_type etas;
-  tadah::core::v_type mius;
+  tadah::core::v_type cgrid;
+  tadah::core::v_type sgrid;
 
 public:
   D2_Blip();

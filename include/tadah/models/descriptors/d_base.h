@@ -63,6 +63,13 @@ public:
   D_Base();
   D_Base(const tadah::core::Context &c);
 
+  /** \brief Print grid to the log.
+   *
+   * @param v Vector to print.
+   * @param key Key name for the vector.
+   */
+  void printGrid(core::v_type &v, const std::string &key, core::LogLevel logLevel=core::LogLevel::INFO);
+
   virtual void set_fidx(size_t fidx_);
   virtual size_t get_fidx();
 

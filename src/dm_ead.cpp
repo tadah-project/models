@@ -24,6 +24,8 @@ DM_EAD::DM_EAD(const tadah::core::Context &context): DM_Base(context),
 
   get_grid(context,"CGRIDMB",cgrid);
   get_grid(context,"SGRIDMB",sgrid);
+  D_Base::printGrid(cgrid,"CGRIDMB");
+  D_Base::printGrid(sgrid,"SGRIDMB");
 
   if (cgrid.size()!=sgrid.size()) {
     throw std::runtime_error("SGRID2B and CGRID2B arrays differ in size.\n");

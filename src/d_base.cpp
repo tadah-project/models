@@ -61,6 +61,10 @@ D_Base::D_Base(const tadah::core::Context &c):
     }
   }
 }
+void D_Base::printGrid(core::v_type &v, const std::string &key, core::LogLevel logLevel) {
+  core::Logger::instance().log(logLevel, label()," ",key," = ", v);
+}
+
 void D_Base::set_fidx(size_t fidx_) { fidx=fidx_; }
 size_t D_Base::get_fidx() { return fidx; }
 void D_Base::set_fcut(Cut_Base* cut, bool manage_memory) {

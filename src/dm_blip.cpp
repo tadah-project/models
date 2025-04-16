@@ -17,6 +17,8 @@ DM_Blip::DM_Blip(const tadah::core::Context &c): DM_Base(c),
 
   get_grid(c,"CGRIDMB",cgrid);
   get_grid(c,"SGRIDMB",sgrid);
+  D_Base::printGrid(cgrid,"CGRIDMB");
+  D_Base::printGrid(sgrid,"SGRIDMB");
 
   if (cgrid.size()!=sgrid.size()) {
     throw std::runtime_error("SGRID2B and CGRID2B arrays differ in size.\n");
