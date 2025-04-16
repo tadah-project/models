@@ -14,22 +14,6 @@ D2_BP::D2_BP(const tadah::core::Context &c): D2_Base(c) {
 
   get_grid(c,"CGRID2B",mius);
   get_grid(c,"SGRID2B",etas);
-  // update context with generated grid
-  /*c.remove("CGRID2B");*/
-  /*for (const auto &m: mius) c.add("CGRID2B",m);*/
-  /*c.remove("SGRID2B");*/
-  /*for (const auto &e: etas) c.add("SGRID2B",e);*/
-
-  if (verbose) {
-    std::cout << std::endl;
-    std::cout << "SGRID2B: " << etas.size() << std::endl;
-    for (auto e:etas) std::cout << e << "  ";
-    std::cout << std::endl;
-
-    std::cout << "CGRID2B: " << mius.size() << std::endl;
-    for (auto m:mius) std::cout << m << "  ";
-    std::cout << std::endl;
-  }
 
   if (mius.size()!=etas.size()) {
     throw std::runtime_error("SGRID2B and CGRID2B arrays differ in size.\n");

@@ -17,13 +17,8 @@ DM_Blip::DM_Blip(const tadah::core::Context &c): DM_Base(c),
 
   get_grid(c,"CGRIDMB",cgrid);
   get_grid(c,"SGRIDMB",sgrid);
-  // update context with generated grid
-  /*c.remove("CGRIDMB");*/
-  /*for (const auto &i: cgrid) c.add("CGRIDMB",i);*/
-  /*c.remove("SGRIDMB");*/
-  /*for (const auto &i: sgrid) c.add("SGRIDMB",i);*/
-  if (cgrid.size()!=sgrid.size()) {
 
+  if (cgrid.size()!=sgrid.size()) {
     throw std::runtime_error("SGRID2B and CGRID2B arrays differ in size.\n");
   }
 
@@ -32,17 +27,6 @@ DM_Blip::DM_Blip(const tadah::core::Context &c): DM_Base(c),
   rhoisize = gen_atomic_orbitals(Lmax);
   rhoisize *= sgrid.size();
 
-  if (verbose) {
-    std::cout << std::endl;
-    std::cout << "SGRID (SGRIDMB): " << sgrid.size() << std::endl;
-    for (auto e:sgrid) std::cout << e << "  ";
-    std::cout << std::endl;
-
-    std::cout << "CGRID (CGRIDMB): " << cgrid.size() << std::endl;
-    for (auto L:cgrid) std::cout << L << "  ";
-    std::cout << std::endl;
-    std::cout << "rhoisize: " << rhoisize << std::endl;
-  }
   auto init_atoms = get_init_atoms(c);
   init_for_atoms(init_atoms);
 }

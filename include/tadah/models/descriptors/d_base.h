@@ -46,8 +46,8 @@ public:
   std::vector<std::string> keys;    // keys required by this descriptor
   size_t nparams;  // number of params which follow TYPExB
   std::vector<bool> is_optimizable;
-  static void get_grid(const tadah::core::Context &c, std::string key, tadah::core::v_type &v);
-  static tadah::core::v_type get_grid(std::vector<std::string>&);  // expand joined grids
+  static void get_grid(const tadah::core::Context &c, const std::string &key, tadah::core::v_type &v);
+  static tadah::core::v_type get_grid(const std::vector<std::string>&);  // expand joined grids
   int verbose;
   virtual ~D_Base();
 

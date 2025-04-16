@@ -6,59 +6,27 @@
 namespace tadah {
 namespace models {
 
-void D_Base::get_grid(const tadah::core::Context &c, std::string key, tadah::core::v_type &v) {
-  if (c.get<double>(key) < 0) {
-    // generate grid automatically if first element
-    // is<zero and int. If it is double than assume that
-    // grid is provided manually and min value is just smaller
-    // than zero.
-    double int_part;
-    if (std::modf ( c.get<double>(key), &int_part ) == 0.0) {
-      // automatic generation
-      size_t cg = abs(c.get<int>(key,1));
-      double cgmin = c.get<double>(key,2);
-      double cgmax = c.get<double>(key,3);
-      if (c.get<int>(key) == -1) {
-        v = tadah::core::linspace(cgmin, cgmax, cg);
-      }
-      else if (c.get<int>(key) == -2) {
-        v = tadah::core::logspace(cgmin, cgmax, cg, exp(1));
-      }
-      else {
-        throw std::runtime_error(key+" algorithm not supported\n");
-      }
-    }
-    else {
-      v.resize(c.size(key));
-      c.get<tadah::core::v_type>(key,v);
-    }
-  }
-  else {
-    v.resize(c.size(key));
-    c.get<tadah::core::v_type>(key,v);
-  }
-}
-tadah::core::v_type D_Base::get_grid(std::vector<std::string>&vold) {
-  tadah::core::v_type vnew;
+core::v_type D_Base::get_grid(const std::vector<std::string>&vold) {
+  core::v_type vnew;
   auto it = vold.begin();
   while (it != vold.end()) {
     std::string token = *it++;
-    if (token == "-1") {
+    if (core::to_upper(token) == "LIN") {
       size_t cg = std::stoul(*it++);
       double cgmin = std::stod(*it++);
       double cgmax = std::stod(*it++);
-      tadah::core::v_type v = tadah::core::linspace(cgmin, cgmax, cg);
+      core::v_type v = core::linspace(cgmin, cgmax, cg);
       vnew.insert(vnew.end(), v.begin(), v.end());
     }
-    else if (token == "-2") {
+    else if (core::to_upper(token) == "GEOM") {
       size_t cg = std::stoul(*it++);
       double cgmin = std::stod(*it++);
       double cgmax = std::stod(*it++);
-      tadah::core::v_type v = tadah::core::logspace(cgmin, cgmax, cg, exp(1));
+      core::v_type v = core::geomspace(cgmin, cgmax, cg, exp(1));
       vnew.insert(vnew.end(), v.begin(), v.end());
     }
-    else if (std::stod(token) < -2) {
-      throw std::runtime_error("Either algorithm is not supported or negative value was encountered in a grid: " + token);
+    else if (!core::is_number(token)) {
+      throw std::invalid_argument("Invalid grid specification: " + token);
     }
     else {
       vnew.push_back(std::stod(token));
@@ -66,6 +34,13 @@ tadah::core::v_type D_Base::get_grid(std::vector<std::string>&vold) {
   }
   return vnew;
 }
+
+void D_Base::get_grid(const tadah::core::Context &c, const std::string &key, tadah::core::v_type &v) {
+  std::vector<std::string> grid_line(c.size(key));
+  c.get<>(key, grid_line);
+  v = get_grid(grid_line);
+}
+
 D_Base::~D_Base() {
   if (this->manage_memory && fcut) {
     delete fcut;
