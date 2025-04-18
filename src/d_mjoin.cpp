@@ -148,20 +148,20 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
     for (size_t j=0; j<fparam; ++j) {
       c1.add(type_str,*it++);
     }
-     for (const auto& k : d->keys) {
-       int n = std::stoi(*it++);
-       // check dimensions: ensure there are at least n remaining tokens
-       if (data_map[k].second + n > data_map[k].first->size()) {
-         throw std::runtime_error(
-           "Error: Not enough data for key '" + k + "' in context. "
-           "Expected " + std::to_string(n) + " but got " + std::to_string(data_map[k].first->size()) +
-           ". Token: " + token);
-       }
-       c1.add(type_str, n);
-       for (int j = 0; j < n; ++j) {
-         c1.add(k, (*data_map[k].first)[ data_map[k].second++ ]);
-       } 
-     }
+    for (const auto& k : d->keys) {
+      int n = std::stoi(*it++);
+      // check dimensions: ensure there are at least n remaining tokens
+      if (data_map[k].second + n > data_map[k].first->size()) {
+        throw std::runtime_error(
+            "Error: Not enough data for key '" + k + "' in context. "
+            "Expected " + std::to_string(n) + " but got " + std::to_string(data_map[k].first->size()) +
+            ". Token: " + token);
+      }
+      c1.add(type_str, n);
+      for (int j = 0; j < n; ++j) {
+        c1.add(k, (*data_map[k].first)[ data_map[k].second++ ]);
+      } 
+    }
 
     // read init atoms
     size_t found_init_atoms=0;
