@@ -103,7 +103,7 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
   c.get(rcutkey, rcut);
   data_map[rcutkey]=rcut.begin();
 
-  size_t p = c.get<size_t>("OUTPREC");
+  size_t p = c.get<size_t>("NUMERIC");
   std::vector<std::string> cgrid;
   if (c.contains(cgridkey)) {
     cgrid.resize(c.size(cgridkey));
