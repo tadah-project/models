@@ -82,7 +82,7 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
   std::string cgridkey = "CGRID" + type_str.substr(type_str.size() - 2);
   std::string sgridkey = "SGRID" + type_str.substr(type_str.size() - 2);
 
-  std::map<std::string, std::vector<std::string>::iterator> data_map;
+  std::map<std::string, std::pair<const std::vector<std::string>*, size_t>> data_map;
 
   std::vector<std::string> types(c.size(type_str)); // including params TYPE2B D2_Blip 7 7
   c.get(type_str, types);
@@ -97,11 +97,11 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
   
   std::vector<std::string> rctypes(c.size(rctypekey));
   c.get(rctypekey, rctypes);
-  data_map[rctypekey]=rctypes.begin();
+  data_map[rctypekey]= { &rctypes, 0 };
 
   std::vector<std::string> rcut(c.size(rcutkey));
   c.get(rcutkey, rcut);
-  data_map[rcutkey]=rcut.begin();
+  data_map[rcutkey]={&rcut, 0};
 
   size_t p = c.get<size_t>("NUMERIC");
   std::vector<std::string> cgrid;
@@ -109,28 +109,28 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
     cgrid.resize(c.size(cgridkey));
     c.get(cgridkey, cgrid);
     cgrid = convert_to_strings(D_Base::get_grid(cgrid),p); 
-    data_map[cgridkey] = cgrid.begin();
+    data_map[cgridkey] = {&cgrid, 0};
   }
   std::vector<std::string> sgrid;
   if (c.contains(sgridkey)) {
     sgrid.resize(c.size(sgridkey));
     c.get(sgridkey, sgrid);
     sgrid = convert_to_strings(D_Base::get_grid(sgrid),p); 
-    data_map[sgridkey] = sgrid.begin();
+    data_map[sgridkey] = {&sgrid, 0};
   }
   std::vector<std::string> cembgrid;
   if (c.contains("CEMBFUNC")) {
     cembgrid.resize(c.size("CEMBFUNC"));
     c.get("CEMBFUNC", cembgrid);
     cembgrid = convert_to_strings(D_Base::get_grid(cembgrid),p); 
-    data_map["CEMBFUNC"] = cembgrid.begin();
+    data_map["CEMBFUNC"] = {&cembgrid, 0};
   }
   std::vector<std::string> sembgrid;
   if (c.contains("SEMBFUNC")) {
     sembgrid.resize(c.size("SEMBFUNC"));
     c.get("SEMBFUNC", sembgrid);
     sembgrid = convert_to_strings(D_Base::get_grid(sembgrid),p); 
-    data_map["SEMBFUNC"] = sembgrid.begin();
+    data_map["SEMBFUNC"] = {&sembgrid, 0};
   }
 
   std::vector<tadah::core::Context> contexts;
@@ -141,21 +141,27 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
     c1.remove("CEMBFUNC"); c1.remove("SEMBFUNC");
     const auto token = *it++;
     c1.add(type_str,token);
-    c1.add(rctypekey,*(data_map[rctypekey]++));
-    c1.add(rcutkey,*(data_map[rcutkey]++));
+    c1.add(rctypekey, (*data_map[rctypekey].first)[ data_map[rctypekey].second++ ]);
+    c1.add(rcutkey, (*data_map[rcutkey].first)[ data_map[rcutkey].second++ ]);
     D_Base *d = tadah::core::factory<D_Base>(token);
     size_t fparam = d->nparams - d->keys.size();
     for (size_t j=0; j<fparam; ++j) {
       c1.add(type_str,*it++);
     }
-
-    for (const auto& k : d->keys) {
-      int n = std::stoi(*it++);
-      c1.add(type_str,n);
-      for (int j = 0; j < n; ++j) {
-        c1.add(k,*(data_map[k]++));
-      } 
-    }
+     for (const auto& k : d->keys) {
+       int n = std::stoi(*it++);
+       // check dimensions: ensure there are at least n remaining tokens
+       if (data_map[k].second + n > data_map[k].first->size()) {
+         throw std::runtime_error(
+           "Error: Not enough data for key '" + k + "' in context. "
+           "Expected " + std::to_string(n) + " but got " + std::to_string(data_map[k].first->size()) +
+           ". Token: " + token);
+       }
+       c1.add(type_str, n);
+       for (int j = 0; j < n; ++j) {
+         c1.add(k, (*data_map[k].first)[ data_map[k].second++ ]);
+       } 
+     }
 
     // read init atoms
     size_t found_init_atoms=0;
