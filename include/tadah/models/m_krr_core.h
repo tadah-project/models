@@ -81,7 +81,7 @@ public:
      */
     tadah::core::t_type get_weights_uncertainty() const {
         double lambda = context.template get<double>("LAMBDA");
-        if(lambda != 0) 
+        if(lambda == 0) 
             throw std::runtime_error("Sigma matrix is only computed for LAMBDA != 0");
         return Sigma.diagonal();
     }

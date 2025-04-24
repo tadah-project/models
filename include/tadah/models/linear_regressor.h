@@ -44,7 +44,6 @@ public:
                     tadah::core::Matrix &Sigma,
                     tadah::models::memory::IModelsWorkspaceManager &workspaceManager) {
 
-    int verbose = context.get<int>("VERBOSE");
     double lambda = context.get<double>("LAMBDA", 0);
     int oalgo = context.get<int>("OALGO", 0);
     double rcond =
@@ -88,8 +87,8 @@ public:
       Sigma = get_sigma(svd, lambda);
       config_add_sigma(context, Sigma);
 
-      if (verbose)
-        std::cout << std::endl << "REG LAMBDA: " << lambda << std::endl;
+      core::Logger::instance().log(tadah::core::LogLevel::INFO,
+          "LinearRegressor::train -> Regularization lambda: ", lambda);
 
       ols.solveWithPseudoinverse(Phi.rows(), Phi.cols(), T, weights,
                                  svd.getSVDWorkspace(), rcond, lambda);
@@ -166,8 +165,7 @@ public:
     try {
       N = context.get<size_t>("SIGMA");
     } catch (const std::runtime_error &error) {
-      throw std::runtime_error("\nSigma matrix is not computed.\nHint: It is "
-                               "only computed for LAMBDA != 0.\n");
+      throw std::runtime_error("\nSigma matrix is not computed.\n");
     }
 
     V Sigma_as_vector(N * N + 1);
