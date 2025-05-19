@@ -151,7 +151,6 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
     for (const auto& k : d->keys) {
       int n = std::stoi(*it++);
       // check dimensions: ensure there are at least n remaining tokens
-      std::cout << "DEBUG: " << k << " " << n << std::endl;
       if (data_map.find(k) != data_map.end() && data_map[k].second + n > data_map[k].first->size()) {
         throw std::runtime_error(
             "Error: Not enough data for key '" + k + "' in context. "
