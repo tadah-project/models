@@ -5,6 +5,7 @@ namespace models {
 
 template<> tadah::core::Registry<DM_Base>::Map tadah::core::Registry<DM_Base>::registry{};
 template<> tadah::core::Registry<DM_Base,tadah::core::Context&>::Map tadah::core::Registry<DM_Base,tadah::core::Context&>::registry{};
+template<> tadah::core::Registry<DM_Base,const tadah::core::Context&>::Map tadah::core::Registry<DM_Base,const tadah::core::Context&>::registry{};
 
 tadah::core::Registry<D_Base>::Register<DM_Blip> DM_Blip_0( "DM_Blip" );
 tadah::core::Registry<D_Base>::Register<DM_Dummy> DM_Dummy_0( "DM_Dummy" );

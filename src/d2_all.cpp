@@ -4,7 +4,9 @@ namespace models {
 
 template<> tadah::core::Registry<D_Base>::Map tadah::core::Registry<D_Base>::registry{};
 template<> tadah::core::Registry<D_Base,tadah::core::Context&>::Map tadah::core::Registry<D_Base,tadah::core::Context&>::registry{};
+template<> tadah::core::Registry<D_Base,const tadah::core::Context&>::Map tadah::core::Registry<D_Base,const tadah::core::Context&>::registry{};
 template<> tadah::core::Registry<D2_Base,tadah::core::Context&>::Map tadah::core::Registry<D2_Base,tadah::core::Context&>::registry{};
+template<> tadah::core::Registry<D2_Base,const tadah::core::Context&>::Map tadah::core::Registry<D2_Base,const tadah::core::Context&>::registry{};
 
 tadah::core::Registry<D_Base,tadah::core::Context&>::Register<D2_Blip> D2_Blip_00( "D2_Blip" );
 tadah::core::Registry<D_Base,tadah::core::Context&>::Register<D2_BP> D2_BP_00( "D2_BP" );
