@@ -22,7 +22,7 @@ public:
     //if (c.get<bool>("INITMB")) {
     if (c.contains("RCUTMBMAX") && c.contains("RCTYPEMB")) {
       double rcutmb = c.get<double>("RCUTMBMAX");
-      set_fcut(tadah::core::factory<Cut_Base,double>( c.get<std::string>("RCTYPEMB"), rcutmb ), true);
+      set_fcut(tadah::core::factory<Cut_Base,double&>( c.get<std::string>("RCTYPEMB"), rcutmb ), true);
     }
     else {
       set_fcut(new Cut_Dummy(0), true);

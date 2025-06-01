@@ -18,7 +18,7 @@ public:
     //if (c.get<bool>("INIT2B")) {
     if (c.contains("RCUT2BMAX") && c.contains("RCTYPE2B")) {
       double rcut2b = c.get<double>("RCUT2BMAX");
-      set_fcut(tadah::core::factory<Cut_Base,double>( c.get<std::string>("RCTYPE2B"), rcut2b ), true);
+      set_fcut(tadah::core::factory<Cut_Base,double&>( c.get<std::string>("RCTYPE2B"), rcut2b ), true);
     }
     else {
       set_fcut(new Cut_Dummy(0), true);
