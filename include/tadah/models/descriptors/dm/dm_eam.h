@@ -58,6 +58,7 @@ private:
 public:
   DM_EAM();
   DM_EAM(tadah::core::Context&);
+  DM_EAM(const tadah::core::Context&);
   void calc_aed(
     tadah::core::rho_type& rho,
     tadah::core::aed_type &aed) override;

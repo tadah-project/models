@@ -3,6 +3,8 @@
 namespace tadah {
 namespace models {
 
+D2_mJoin::D2_mJoin(const tadah::core::Context& c)             // new, const version
+  : D2_mJoin::D2_mJoin(const_cast<tadah::core::Context&>(c)) {}      // delegates to old one
 
 D2_mJoin::D2_mJoin() {
   init();

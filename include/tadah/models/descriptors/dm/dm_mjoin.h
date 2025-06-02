@@ -55,6 +55,7 @@ public:
   DM_mJoin();
   ~DM_mJoin();
   DM_mJoin(tadah::core::Context &c);
+  DM_mJoin(const tadah::core::Context &c);
   void calc_aed(
     tadah::core::rho_type& rho,
     tadah::core::aed_type &aed) override;

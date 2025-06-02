@@ -3,6 +3,8 @@
 namespace tadah {
 namespace models {
 
+DM_EAM::DM_EAM(const tadah::core::Context& c)             // new, const version
+  : DM_EAM::DM_EAM(const_cast<tadah::core::Context&>(c)) {}      // delegates to old one
 
 DM_EAM::DM_EAM() {
   init();

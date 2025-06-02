@@ -30,6 +30,14 @@ tadah::core::Registry<DM_Base,tadah::core::Context&>::Register<DM_EAM> DM_EAM_2(
 tadah::core::Registry<DM_Base,tadah::core::Context&>::Register<DM_mEAD<F_RLR>> DM_mEAD_2("DM_mRLR");
 tadah::core::Registry<DM_Base,tadah::core::Context&>::Register<DM_mEAD<F_SQRT>> DM_mEAD_22("DM_mSQRT");
 tadah::core::Registry<DM_Base,tadah::core::Context&>::Register<DM_mJoin> DM_mJoin_2( "DM_mJoin" );
+
+tadah::core::Registry<DM_Base,const tadah::core::Context&>::Register<DM_Blip> cDM_Blip_2( "DM_Blip" );
+tadah::core::Registry<DM_Base,const tadah::core::Context&>::Register<DM_Dummy> cDM_Dummy_2( "DM_Dummy" );
+tadah::core::Registry<DM_Base,const tadah::core::Context&>::Register<DM_EAD> cDM_EAD_2( "DM_EAD" );
+tadah::core::Registry<DM_Base,const tadah::core::Context&>::Register<DM_EAM> cDM_EAM_2( "DM_EAM" );
+tadah::core::Registry<DM_Base,const tadah::core::Context&>::Register<DM_mEAD<F_RLR>> cDM_mEAD_2("DM_mRLR");
+tadah::core::Registry<DM_Base,const tadah::core::Context&>::Register<DM_mEAD<F_SQRT>> cDM_mEAD_22("DM_mSQRT");
+tadah::core::Registry<DM_Base,const tadah::core::Context&>::Register<DM_mJoin> cDM_mJoin_2( "DM_mJoin" );
 //template<> Registry<DM_Base,F_Base&,tadah::core::Context&>::Map Registry<DM_Base,F_Base&,tadah::core::Context&>::registry{};
 //Registry<DM_Base,tadah::core::Context&>::Register<DM_mEAD<F_RLR>> DM_mEAD_1( "DM_mEAD" );
 

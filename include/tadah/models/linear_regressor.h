@@ -159,7 +159,7 @@ public:
    * @param Sigma tadah::core::Matrix to store the reconstructed Sigma.
    * @throws std::runtime_error if Sigma is not computed.
    */
-  static void read_sigma(tadah::core::Context &context, tadah::core::Matrix &Sigma) {
+  static void read_sigma(const tadah::core::Context &context, tadah::core::Matrix &Sigma) {
     using V = std::vector<double>;
     size_t N;
     try {

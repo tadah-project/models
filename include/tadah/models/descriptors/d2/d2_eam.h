@@ -56,6 +56,7 @@ private:
 public:
   D2_EAM();
   D2_EAM(tadah::core::Context &context);
+  D2_EAM(const tadah::core::Context& c);
   void calc_aed(
     const int Zi,
     const int Zj,
