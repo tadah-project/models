@@ -24,7 +24,6 @@ class DC_Selector {
         // Copy constructor
         DC_Selector(const DC_Selector& )
         {
-            std::cout << "Copy constructor called\n";
         }
          // Const Assignment operator
          // Instead of deep copying
