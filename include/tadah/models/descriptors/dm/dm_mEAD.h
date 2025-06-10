@@ -70,8 +70,6 @@ private:
   std::vector<std::vector<std::vector<int>>> orbitals;
   std::vector<std::vector<double>> fac;
   size_t gen_atomic_orbitals(int L);
-  double fact(int n);
-  double my_pow(double,int);
   double rc;
   F emb;
 

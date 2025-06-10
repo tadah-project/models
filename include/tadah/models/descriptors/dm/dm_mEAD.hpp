@@ -2,25 +2,130 @@
 #include <tadah/models/descriptors/dm/dm_mEAD.h>
 #include <tadah/models/descriptors/d_basis_functions.h>
 
+#include <array>
+#include <memory>
+
+constexpr std::size_t MAX_GRID = 64;          // <-- adjust to your input deck
+static_assert(MAX_GRID >= 1, "MAX_GRID must be > 0");
+
+
+
+namespace {
+using namespace tadah::models;
+
+template<std::size_t N = 64>
+class StackOrHeapBuffer
+{
+public:
+    explicit StackOrHeapBuffer(std::size_t n)
+    : sz(n)
+    , use_heap(n > N)
+    , heap(use_heap ? new double[2*n] : nullptr)   // ×2 for g and dg
+    {}
+
+    /* first half: G(r)   second half: dG/dr (if needed) */
+    double* g ()       { return use_heap ?  heap.get()      : stack; }
+    double* dg()       { return use_heap ? &heap.get()[sz] : &stack[N]; }
+    std::size_t size() const { return sz; }
+
+private:
+    std::size_t  sz;
+    bool         use_heap;
+    std::unique_ptr<double[]> heap;
+    alignas(64) double stack[2*N];    // on-stack contiguous block
+};
+
+/* Factorials 0! … 6! at compile time */
+constexpr std::array<double,7> FACT_TBL =
+{1.0, 1.0, 2.0, 6.0, 24.0, 120.0, 720.0};
+
+inline double fact_cached(int n)
+{
+  return FACT_TBL[n];          // n is guaranteed 0…6
+}
+
+inline double pow_i06(double x, int n)
+{
+  switch (n) {
+    case 0:  return 1.0;
+    case 1:  return x;
+    case 2:  return x * x;
+    case 3:  return x * x * x;
+    case 4:  { double x2 = x * x;  return x2 * x2; }                // x⁴
+    case 5:  { double x2 = x * x;  return x2 * x2 * x; }            // x⁵
+    case 6:  { double x2 = x * x;  return x2 * x2 * x2; }           // x⁶
+    default: return std::pow(x, n);  // should never hit (L ≤ 6)
+  }
+}
+inline void precompute_powers(double x, int L, double powp[7])
+{
+  powp[0] = 1.0;
+  for(int n=1; n<=L; ++n) powp[n] = powp[n-1]*x;
+#if defined(__SANITIZE_ADDRESS__) || defined(ADDRESS_SANITIZER)
+  for(int n=L+1; n<=6; ++n){ powp[n]=0.0; }
+#endif
+}
+inline void
+  precompute_powers(double x,           // coordinate
+      int    L,           // 0 ≤ L ≤ 6
+      double powp[7],     // x⁰ … xᴸ   (output)
+      double dpow[7])     // ∂/∂x x⁰ … xᴸ (output)
+  {
+    powp[0] = 1.0;      dpow[0] = 0.0;
+    for(int n = 1; n <= L; ++n){
+      powp[n] = powp[n-1] * x;           // xⁿ
+      dpow[n] = n * powp[n-1];           // n·xⁿ⁻¹
+    }
+#if defined(__SANITIZE_ADDRESS__) || defined(ADDRESS_SANITIZER)
+    for(int n=L+1; n<=6; ++n){ powp[n]=0.0; dpow[n]=0.0; }
+#endif
+  }
+
+inline void
+  precompute_radials(double rij,
+      double fc,
+      const std::vector<double>& sgrid,
+      const std::vector<double>& cgrid,
+      double* g, size_t ng)
+  {
+    for(std::size_t c=0; c<ng; ++c){
+      g [c] = G (rij, sgrid[c], cgrid[c], fc );
+    }
+  }
+inline void
+  precompute_radials(double rij,
+      double fc, double fcp,
+      const std::vector<double>& sgrid,
+      const std::vector<double>& cgrid,
+      double* g, double* dg, size_t ng)
+  {
+    for(std::size_t c=0; c<ng; ++c){
+      g [c] = G (rij, sgrid[c], cgrid[c], fc );
+      dg[c] = dG(rij, sgrid[c], cgrid[c], fc , fcp);
+    }
+  }
+}   // unnamed namespace
+
 namespace tadah {
 namespace models {
 
 template <typename F>
-DM_mEAD<F>::DM_mEAD() {
-  init();
-}
+  DM_mEAD<F>::DM_mEAD() {
+    init();
+  }
 
 /* Index ii iterates rhoi array
  * rhoi array is split 50/50 into density and derivative
  * of the embedding function
  */
 template <typename F>
-DM_mEAD<F>::DM_mEAD(const tadah::core::Context &context): DM_Base(context),
+  DM_mEAD<F>::DM_mEAD(const tadah::core::Context &context): DM_Base(context),
   rc(context.get<double>("RCUTMBMAX"))
 {
 
   if (!context.get<bool>("INITMB")) return;
   init();
+
 
   get_grid(context,"CGRIDMB",cgrid);
   get_grid(context,"SGRIDMB",sgrid);
@@ -39,6 +144,11 @@ DM_mEAD<F>::DM_mEAD(const tadah::core::Context &context): DM_Base(context),
   emb = F(context, cgrid.size(), sgrid.size());
 
   Lmax = context.get<int>("TYPEMB",1);
+  if (Lmax > 6)
+    throw std::runtime_error(
+        "DM_mEAD: Lmax > 6 is not supported (requested "
+        + std::to_string(Lmax) + ").");
+
   s=sgrid.size()*(Lmax+1);
   rhoisize = gen_atomic_orbitals(Lmax);
   rhoisize *= sgrid.size();
@@ -46,284 +156,250 @@ DM_mEAD<F>::DM_mEAD(const tadah::core::Context &context): DM_Base(context),
   auto init_atoms = get_init_atoms(context);
   init_for_atoms(init_atoms);
 }
-
 template <typename F>
-void DM_mEAD<F>::calc_aed(
-  tadah::core::rho_type& rhoi,
-  tadah::core::aed_type &aed)
-{
-  size_t Lshift = 0;
-  size_t ii=rfidx;
-  for (int L=0; L<=Lmax; ++L) {
-    for (size_t o=0; o<orbitals[L].size(); ++o) {
-      const double f = fac[L][o];
-      for (size_t c=0; c<cgrid.size(); c++) {
-        aed(c+Lshift+fidx) += f*emb.calc_F(rhoi(ii),c);
-        rhoi(ii+rhoisize) = f*emb.calc_dF(rhoi(ii),c);
-        ii++;
+  void DM_mEAD<F>::calc_aed(core::rho_type& rhoi, core::aed_type& aed)
+  {
+    std::size_t Lshift = 0;
+    std::size_t ii     = rfidx;
+
+    for(int L=0; L<=Lmax; ++L){
+      const std::size_t ng = cgrid.size();
+      for(std::size_t o=0; o<orbitals[L].size(); ++o){
+        const double f = fac[L][o];
+
+        for(std::size_t c=0; c<ng; ++c, ++ii){
+          const double rho = rhoi(ii);                // load once
+          const double FF  = emb.calc_F (rho, c);
+          const double dFF = emb.calc_dF(rho, c);
+
+          aed (c+Lshift+fidx) += f * FF;
+          rhoi(ii+rhoisize )  = f * dFF;
+        }
       }
+      Lshift += ng;
     }
-    Lshift += sgrid.size();
   }
-}
 template <typename F>
-void DM_mEAD<F>::calc_dXijdri_dXjidri(
-  const int Zi,
-  const int Zj,
-  const double rij,
-  const double,
-  const tadah::core::Vec3d &vec_ij,
-  tadah::core::rho_type& rhoi,
-  tadah::core::rho_type& rhoj,
-  tadah::core::fd_type &fd_ij,
-  const double scale)
-{
-  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
-  const double x = vec_ij[0];
-  const double y = vec_ij[1];
-  const double z = vec_ij[2];
+  void DM_mEAD<F>::calc_dXijdri_dXjidri(
+      int Zi, int Zj, double rij, double,
+      const core::Vec3d& v, core::rho_type& rhoi, core::rho_type& rhoj,
+      core::fd_type& fd_ij, double scale)
+  {
+    if(!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
+    /* -------- constants & scratch arrays --------------------------- */
+    const double x=v[0], y=v[1], z=v[2];
+    const double wi = weights[Zi], wj = weights[Zj];
 
-  size_t Lshift = 0;
+    const double fc  = fcut->calc       (rij);
+    const double fcp = fcut->calc_prime (rij);
 
-  double wi = weights[Zi];
-  double wj = weights[Zj];
-  double fc_ij = fcut->calc(rij);
-  double fcp_ij = fcut->calc_prime(rij);
+    /* radial part ---------------------------------------------------- */
+    const std::size_t ng = cgrid.size();
+    StackOrHeapBuffer<MAX_GRID> buf(ng);
+    precompute_radials(rij, fc, fcp, sgrid, cgrid, buf.g(), buf.dg(), ng);
 
-  size_t ii=rhoisize+rfidx;
-  for (int L=0; L<=Lmax; ++L) {
-    for (size_t o=0; o<orbitals[L].size(); ++o) {
-      const int lx = orbitals[L][o][0];
-      const int ly = orbitals[L][o][1];
-      const int lz = orbitals[L][o][2];
 
-      const double powxlxij = my_pow(x,lx);
-      const double powylyij = my_pow(y,ly);
-      const double powzlzij = my_pow(z,lz);
+    /* Cartesian powers up to 6 -------------------------------------- */
+    double px[7], py[7], pz[7], dpx[7], dpy[7], dpz[7];
+    precompute_powers(x, Lmax ,px ,dpx);
+    precompute_powers(y, Lmax ,py ,dpy);
+    precompute_powers(z, Lmax ,pz ,dpz);
 
-      const double powxlxji = my_pow(-x,lx);
-      const double powylyji = my_pow(-y,ly);
-      const double powzlzji = my_pow(-z,lz);
+    /* negative versions are sign flips (avoid extra mul) */
+    auto neg = [](double v,int n){ return (n&1)? -v : v; };
 
-      double txij=0.0,tyij=0.0,tzij=0.0;
-      double txji=0.0,tyji=0.0,tzji=0.0;
-      if (lx!=0) {
-        txij = lx*my_pow(x,lx-1)*powylyij*powzlzij;
-        txji = lx*my_pow(-x,lx-1)*powylyji*powzlzji;
+    /* --------------------------------------------------------------- */
+    std::size_t Lshift = 0, ii = rhoisize + rfidx;
+
+    for(int L=0; L<=Lmax; ++L){
+      const auto& orbs = orbitals[L];
+
+      for(std::size_t o=0; o<orbs.size(); ++o){
+        const int lx=orbs[o][0], ly=orbs[o][1], lz=orbs[o][2];
+
+        const double pxij =  px[lx], pyij =  py[ly], pzij =  pz[lz];
+        const double pxji = neg(pxij,lx), pyji = neg(pyij,ly), pzji = neg(pzij,lz);
+
+        const double pqrij = pxij*pyij*pzij;
+        const double pqrji = pxji*pyji*pzji;
+
+        const double txij = dpx[lx]*pyij*pzij;
+        const double tyij = dpy[ly]*pxij*pzij;
+        const double tzij = dpz[lz]*pyij*pxij;
+
+        const double txji = neg(txij,lx-1);
+        const double tyji = neg(tyij,ly-1);
+        const double tzji = neg(tzij,lz-1);
+
+        for(std::size_t c = 0; c < ng; ++c, ++ii)
+        {
+          const double bf  = buf.g()[c];           //   G(rij,…)
+          const double dbf = buf.dg()[c];           //  dG/dr
+
+          const double rijInv = 1.0 / rij;
+
+          /* --- term-2, radial derivative -------------------------------- */
+          const double term2x = dbf * rijInv * x;
+          const double term2y = dbf * rijInv * y;
+          const double term2z = dbf * rijInv * z;
+
+          /* --- term-1, angular derivative ------------------------------- */
+          const double T1ijx = bf * txij;
+          const double T1ijy = bf * tyij;
+          const double T1ijz = bf * tzij;
+
+          const double T1jix = bf * txji;
+          const double T1jiy = bf * tyji;
+          const double T1jiz = bf * tzji;
+
+          const double f_ri = rhoi(ii);
+          const double f_rj = rhoj(ii);
+
+          const std::size_t row = c + Lshift + fidx;
+
+          /* ---- accumulate ---------------------------------------------- */
+          fd_ij(row,0) += scale * ( f_ri*(T1ijx + pqrij*term2x)*wj
+              - f_rj*(T1jix + pqrji*term2x)*wi );
+
+          fd_ij(row,1) += scale * ( f_ri*(T1ijy + pqrij*term2y)*wj
+              - f_rj*(T1jiy + pqrji*term2y)*wi );
+
+          fd_ij(row,2) += scale * ( f_ri*(T1ijz + pqrij*term2z)*wj
+              - f_rj*(T1jiz + pqrji*term2z)*wi );
+        }
       }
-      if (ly!=0) {
-        tyij = ly*my_pow(y,ly-1)*powxlxij*powzlzij;
-        tyji = ly*my_pow(-y,ly-1)*powxlxji*powzlzji;
-      }
-      if (lz!=0) {
-        tzij = lz*my_pow(z,lz-1)*powylyij*powxlxij;
-        tzji = lz*my_pow(-z,lz-1)*powylyji*powxlxji;
-      }
-      const double pqrij = powxlxij*powylyij*powzlzij;
-      const double pqrji = powxlxji*powylyji*powzlzji;
-
-      for (size_t c=0; c<cgrid.size(); c++) {
-        double bf= G(rij,sgrid[c],cgrid[c],fc_ij);
-        double dbf= dG(rij,sgrid[c],cgrid[c],fc_ij,fcp_ij);
-
-        const double term2ijx=pqrij*dbf*x/rij;
-        const double term2ijy=pqrij*dbf*y/rij;
-        const double term2ijz=pqrij*dbf*z/rij;
-
-        const double term2jix=-pqrji*dbf*x/rij;
-        const double term2jiy=-pqrji*dbf*y/rij;
-        const double term2jiz=-pqrji*dbf*z/rij;
-
-        const double term1ijx = bf*txij;
-        const double term1ijy = bf*tyij;
-        const double term1ijz = bf*tzij;
-
-        const double term1jix = bf*txji;
-        const double term1jiy = bf*tyji;
-        const double term1jiz = bf*tzji;
-
-        fd_ij(c+Lshift+fidx,0) += scale*(
-          rhoi(ii)*(term1ijx + term2ijx)*wj
-          -rhoj(ii)*(term1jix + term2jix)*wi)
-        ;
-
-        fd_ij(c+Lshift+fidx,1) += scale*(
-          rhoi(ii)*(term1ijy + term2ijy)*wj
-          -rhoj(ii)*(term1jiy + term2jiy)*wi)
-        ;
-
-        fd_ij(c+Lshift+fidx,2) += scale*(
-          rhoi(ii)*(term1ijz + term2ijz)*wj
-          -rhoj(ii)*(term1jiz + term2jiz)*wi)
-        ;
-        ii++;
-      }
+      Lshift += ng;
     }
-    Lshift+=sgrid.size();
   }
-}
 template <typename F>
-void DM_mEAD<F>::calc_dXijdri(
-  const int Zi,
-  const int Zj,
-  const double rij,
-  const double,
-  const tadah::core::Vec3d &vec_ij,
-  tadah::core::rho_type& rhoi,
-  tadah::core::fd_type &fd_ij,
-  const double scale)
-{
-  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
-  const double x = vec_ij[0];
-  const double y = vec_ij[1];
-  const double z = vec_ij[2];
+  void DM_mEAD<F>::calc_dXijdri(
+      int Zi,int Zj,double rij,double,
+      const core::Vec3d& v, core::rho_type& rhoi,
+      core::fd_type& fd_ij, double scale)
+  {
+    if(!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
 
-  double wj = weights[Zj];
-  double fc_ij = scale*wj*fcut->calc(rij);
-  double fcp_ij = scale*wj*fcut->calc_prime(rij);
+    const double x=v[0], y=v[1], z=v[2];
+    const double wj = weights[Zj];
 
-  size_t Lshift = 0;
+    const double fc  = scale*wj*fcut->calc       (rij);
+    const double fcp = scale*wj*fcut->calc_prime (rij);
 
-  size_t ii=rhoisize+rfidx;
-  for (int L=0; L<=Lmax; ++L) {
-    for (size_t o=0; o<orbitals[L].size(); ++o) {
-      const int lx = orbitals[L][o][0];
-      const int ly = orbitals[L][o][1];
-      const int lz = orbitals[L][o][2];
+    const std::size_t ng = cgrid.size();
+    StackOrHeapBuffer<MAX_GRID> buf(ng);
+    precompute_radials(rij, fc, fcp, sgrid, cgrid, buf.g(), buf.dg(), ng);
 
-      const double powxlxij = my_pow(x,lx);
-      const double powylyij = my_pow(y,ly);
-      const double powzlzij = my_pow(z,lz);
+    double px[7], py[7], pz[7], dpx[7], dpy[7], dpz[7];
+    precompute_powers(x, Lmax ,px ,dpx);
+    precompute_powers(y, Lmax ,py ,dpy);
+    precompute_powers(z, Lmax ,pz ,dpz);
 
-      double txij=0.0,tyij=0.0,tzij=0.0;
-      if (lx!=0) {
-        txij = lx*my_pow(x,lx-1)*powylyij*powzlzij;
+    std::size_t Lshift=0, ii=rhoisize+rfidx;
+    const double rijInv = 1.0/rij;
+
+    for(int L=0; L<=Lmax; ++L){
+      const auto& orbs = orbitals[L];
+
+      for(std::size_t o=0; o<orbs.size(); ++o){
+        const int lx=orbs[o][0], ly=orbs[o][1], lz=orbs[o][2];
+
+        const double pxij = px[lx],  pyij = py[ly],  pzij = pz[lz];
+        const double pqrij = pxij*pyij*pzij;
+
+        const double txij = dpx[lx]*pyij*pzij;
+        const double tyij = dpy[ly]*pxij*pzij;
+        const double tzij = dpz[lz]*pyij*pxij;
+
+        for(std::size_t c=0; c<ng; ++c, ++ii){
+          const double bf  = buf.g() [c];
+          const double dbf = buf.dg()[c];
+
+          const double term2x = pqrij*dbf*x*rijInv;
+          const double term2y = pqrij*dbf*y*rijInv;
+          const double term2z = pqrij*dbf*z*rijInv;
+
+          const double f_r = rhoi(ii);
+          const std::size_t row = c + Lshift + fidx;
+
+          fd_ij(row,0) += f_r*( bf*txij + term2x );
+          fd_ij(row,1) += f_r*( bf*tyij + term2y );
+          fd_ij(row,2) += f_r*( bf*tzij + term2z );
+        }
       }
-      if (ly!=0) {
-        tyij = ly*my_pow(y,ly-1)*powxlxij*powzlzij;
-      }
-      if (lz!=0) {
-        tzij = lz*my_pow(z,lz-1)*powylyij*powxlxij;
-      }
-      const double pqrij = powxlxij*powylyij*powzlzij;
-
-      for (size_t c=0; c<cgrid.size(); c++) {
-        double bf= G(rij,sgrid[c],cgrid[c],fc_ij);
-        double dbf= dG(rij,sgrid[c],cgrid[c],fc_ij,fcp_ij);
-
-        const double term2ijx=pqrij*dbf*x/rij;
-        const double term2ijy=pqrij*dbf*y/rij;
-        const double term2ijz=pqrij*dbf*z/rij;
-
-        const double term1ijx = bf*txij;
-        const double term1ijy = bf*tyij;
-        const double term1ijz = bf*tzij;
-
-        fd_ij(c+Lshift+fidx,0) +=
-          rhoi(ii)*(term1ijx + term2ijx)
-        ;
-
-        fd_ij(c+Lshift+fidx,1) +=
-          rhoi(ii)*(term1ijy + term2ijy)
-        ;
-
-        fd_ij(c+Lshift+fidx,2) += 
-          rhoi(ii)*(term1ijz + term2ijz)
-        ;
-        ii++;
-      }
+      Lshift += ng;
     }
-    Lshift+=sgrid.size();
   }
-}
 template <typename F>
-std::string DM_mEAD<F>::label() {
-  return lab;
-}
+  std::string DM_mEAD<F>::label() {
+    return lab;
+  }
 
 template <typename F>
-void DM_mEAD<F>::init_rhoi(tadah::core::rho_type& rhoi)
-{
-  rhoi.resize(2*rhoisize);
-  rhoi.set_zero();
-}
+  void DM_mEAD<F>::init_rhoi(tadah::core::rho_type& rhoi)
+  {
+    rhoi.resize(2*rhoisize);
+    rhoi.set_zero();
+  }
 template <typename F>
-void DM_mEAD<F>::calc_rho(
-  const int Zi,
-  const int Zj,
-  const double rij,
-  const double,
-  const tadah::core::Vec3d &vec_ij,
-  tadah::core::rho_type& rhoi,
-  const double scale)
-{
-  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
-  size_t ii=rfidx;
-  double fc_ij = scale*weights[Zj]*fcut->calc(rij);
-  for (int L=0; L<=Lmax; ++L) {
-    for (size_t o=0; o<orbitals[L].size(); ++o) {
-      const size_t lx = orbitals[L][o][0];
-      const size_t ly = orbitals[L][o][1];
-      const size_t lz = orbitals[L][o][2];
-      double t = (my_pow(vec_ij[0],lx)*my_pow(vec_ij[1],ly)*my_pow(vec_ij[2],lz));
-      for (size_t c=0; c<cgrid.size(); c++) {
-        rhoi(ii++) += G(rij,sgrid[c],cgrid[c],fc_ij)*t;
+  void DM_mEAD<F>::calc_rho(
+      int Zi,int Zj,double rij,double,const core::Vec3d& v,
+      core::rho_type& rhoi,double scale)
+  {
+    if(!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
+
+    const double fc = scale*weights[Zj]*fcut->calc(rij);
+
+    const std::size_t ng = cgrid.size();
+    StackOrHeapBuffer<MAX_GRID> buf(ng);
+    precompute_radials(rij, fc, sgrid, cgrid, buf.g(), ng);
+    double px[7], py[7], pz[7];
+    precompute_powers(v[0],Lmax,px);
+    precompute_powers(v[1],Lmax,py);
+    precompute_powers(v[2],Lmax,pz);
+
+    std::size_t ii = rfidx;
+
+    for(int L=0; L<=Lmax; ++L){
+      const auto& orbs = orbitals[L];
+      for(std::size_t o=0;o<orbs.size();++o){
+        const int lx=orbs[o][0], ly=orbs[o][1], lz=orbs[o][2];
+        const double poly = px[lx]*py[ly]*pz[lz];
+        for(std::size_t c=0;c<ng;++c)
+          rhoi(ii++) += buf.g()[c]*poly;
       }
     }
   }
-}
 
 template <typename F>
-size_t DM_mEAD<F>::gen_atomic_orbitals(int Lmax) {
-  orbitals.resize(Lmax+1);
-  fac.resize(Lmax+1);
+  size_t DM_mEAD<F>::gen_atomic_orbitals(int Lmax) {
+    orbitals.resize(Lmax+1);
+    fac.resize(Lmax+1);
 
-  size_t count = 0;
-  for (int L = 0; L <= Lmax; ++L) {
-    for (int lx = 0; lx <= L; ++lx) {
-      for (int ly = 0; ly <= L; ++ly) {
-        for (int lz = 0; lz <= L; ++lz) {
+    size_t count = 0;
+    for (int L = 0; L <= Lmax; ++L) {
+      for (int lx = 0; lx <= L; ++lx) {
+        for (int ly = 0; ly <= L-lx; ++ly) {
+          int lz = L - lx - ly;
           if (lx+ly+lz == L) {
             std::vector<int> o = {lx, ly, lz};
             orbitals[L].push_back(o);
-            const double f = fact(L)/(fact(lx)*fact(ly)*fact(lz))/my_pow(4*rc,L);
+            const double f = fact_cached(L)/(fact_cached(lx)*fact_cached(ly)*fact_cached(lz))/pow_i06(4*rc,L);
             fac[L].push_back(f);
             count++;
           }
         }
       }
     }
+    return count;
   }
-  return count;
-}
 template <typename F>
-double DM_mEAD<F>::fact(int n)
-{
-  double f=1.0;
-  while (n) {
-    f *= n;
-    --n;
+  void DM_mEAD<F>::init() {
+    keys.push_back("CGRIDMB");
+    keys.push_back("SGRIDMB");
+    keys.push_back("CEMBFUNC");
+    keys.push_back("SEMBFUNC");
+    nparams=5;
   }
-  return f;
-}
-template <typename F>
-double DM_mEAD<F>::my_pow(double x, int n){
-  double r = 1.0;
-
-  while(n > 0){
-    r *= x;
-    --n;
-  }
-  return r;
-}
-template <typename F>
-void DM_mEAD<F>::init() {
-  keys.push_back("CGRIDMB");
-  keys.push_back("SGRIDMB");
-  keys.push_back("CEMBFUNC");
-  keys.push_back("SEMBFUNC");
-  nparams=5;
-}
 
 } // namespace models
 } // namespace tadah
