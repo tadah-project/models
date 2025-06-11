@@ -16,19 +16,19 @@ using namespace tadah::models;
 template<std::size_t N = 64>
 class StackOrHeapBuffer
 {
-public:
+  public:
     explicit StackOrHeapBuffer(std::size_t n)
-    : sz(n)
-    , use_heap(n > N)
-    , heap(use_heap ? new double[2*n] : nullptr)   // ×2 for g and dg
-    {}
+      : sz(n)
+        , use_heap(n > N)
+        , heap(use_heap ? new double[2*n] : nullptr)   // ×2 for g and dg
+        {}
 
     /* first half: G(r)   second half: dG/dr (if needed) */
     double* g ()       { return use_heap ?  heap.get()      : stack; }
     double* dg()       { return use_heap ? &heap.get()[sz] : &stack[N]; }
     std::size_t size() const { return sz; }
 
-private:
+  private:
     std::size_t  sz;
     bool         use_heap;
     std::unique_ptr<double[]> heap;
@@ -65,8 +65,7 @@ inline void precompute_powers(double x, int L, double powp[7])
   for(int n=L+1; n<=6; ++n){ powp[n]=0.0; }
 #endif
 }
-inline void
-  precompute_powers(double x,           // coordinate
+inline void precompute_powers(double x,           // coordinate
       int    L,           // 0 ≤ L ≤ 6
       double powp[7],     // x⁰ … xᴸ   (output)
       double dpow[7])     // ∂/∂x x⁰ … xᴸ (output)
@@ -81,8 +80,7 @@ inline void
 #endif
   }
 
-inline void
-  precompute_radials(double rij,
+inline void precompute_radials(double rij,
       double fc,
       const std::vector<double>& sgrid,
       const std::vector<double>& cgrid,
@@ -92,8 +90,7 @@ inline void
       g [c] = G (rij, sgrid[c], cgrid[c], fc );
     }
   }
-inline void
-  precompute_radials(double rij,
+inline void precompute_radials(double rij,
       double fc, double fcp,
       const std::vector<double>& sgrid,
       const std::vector<double>& cgrid,
