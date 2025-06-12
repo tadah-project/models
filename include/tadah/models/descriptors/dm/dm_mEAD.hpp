@@ -361,8 +361,9 @@ template <typename F>
       for(std::size_t o=0;o<orbs.size();++o){
         const int lx=orbs[o][0], ly=orbs[o][1], lz=orbs[o][2];
         const double poly = px[lx]*py[ly]*pz[lz];
-        for(std::size_t c=0;c<ng;++c)
+        for(std::size_t c=0;c<ng;++c) {
           rhoi(ii++) += buf.g()[c]*poly;
+        }
       }
     }
   }
