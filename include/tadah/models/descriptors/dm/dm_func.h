@@ -17,7 +17,7 @@ public:
    * @param p Index for model parameters.
    * @return Function value F(rho).
    */
-  virtual double calc_F(double rho, size_t p) = 0;
+  virtual double calc_F(double rho, size_t p) const = 0;
 
   /**
    * @brief Calculates the first derivative of the embedding function.
@@ -25,7 +25,7 @@ public:
    * @param p Index for model parameters.
    * @return Derivative dF/d(rho).
    */
-  virtual double calc_dF(double rho, size_t p) = 0;
+  virtual double calc_dF(double rho, size_t p) const = 0;
 };
 
 /**
@@ -46,11 +46,12 @@ private:
   const tadah::core::Context *context=nullptr;
   tadah::core::v_type sfuncgrid;   // controls depth
   tadah::core::v_type cfuncgrid;   // control x-intercep at 1/c
+  double eps=1e-10; // small value to avoid log(0)
 public:
   F_RLR(const tadah::core::Context &context, size_t cSize, size_t sSize);
   F_RLR() = default;
-  double calc_F(double rho,size_t p) override;
-  double calc_dF(double rho,size_t p) override;
+  double calc_F(double rho,size_t p) const override;
+  double calc_dF(double rho,size_t p) const override;
   //~F_RLR() {
 
   // Do not delete context!
@@ -72,6 +73,7 @@ class F_SQRT : public F_Base {
 private:
   const tadah::core::Context *context=nullptr;
   tadah::core::v_type sfuncgrid;   // controls depth
+  double eps=1e-10; // small value to avoid sqrt(0)
 
 public:
   /**
@@ -93,7 +95,7 @@ public:
    * @param p Index for model parameters. Here p=0
    * @return Embedding function value \f$ F(\rho) = s_{p} \sqrt{ c_{p} \rho } \f$.
    */
-  double calc_F(double rho, size_t p) override;
+  double calc_F(double rho, size_t p) const override;
 
   /**
    * @brief Calculates the derivative of the square-root embedding function.
@@ -101,7 +103,7 @@ public:
    * @param p Index for model parameters. Here p=0
    * @return First derivative \f$ dF/d\rho = \frac{s_{p} \, {2 \sqrt{\rho}} \f$.
    */
-  double calc_dF(double rho, size_t p) override;
+  double calc_dF(double rho, size_t p) const override;
 };
 
 } // namespace models

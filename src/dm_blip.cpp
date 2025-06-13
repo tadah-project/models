@@ -1,303 +1,361 @@
-#include "tadah/models/descriptors/dm/dm_base.h"
+#include <tadah/models/descriptors/dm/dm_func.h>
 #include <tadah/models/descriptors/dm/dm_blip.h>
 #include <tadah/models/descriptors/d_basis_functions.h>
+
+#include <array>
+#include <memory>
 #include <vector>
+#include <stdexcept>
+#include <cmath>
+
+constexpr std::size_t MAX_GRID = 64;
+static_assert(MAX_GRID>=1,"MAX_GRID must be > 0");
+
+namespace {
+using namespace tadah::models;
+
+/* ------------------------------------------------------------------ *
+ *  Stack-or-Heap scratch buffer                                       *
+ * ------------------------------------------------------------------ */
+template<std::size_t N=64>
+class StackOrHeapBuffer {
+public:
+  explicit StackOrHeapBuffer(std::size_t n)
+  : sz(n), use_heap(n>N), heap(use_heap?new double[2*n]:nullptr) {}
+
+  double* g ()       { return use_heap?  heap.get()      : stack;     }
+  double* dg()       { return use_heap? &heap.get()[sz] : &stack[N]; }
+  std::size_t size() const { return sz; }
+
+private:
+  std::size_t              sz;
+  bool                     use_heap;
+  std::unique_ptr<double[]> heap;
+  alignas(64) double       stack[2*N];
+};
+
+/* ------------ factorials & 0…6 integer powers --------------------- */
+constexpr std::array<double,7> FACT_TBL={1.,1.,2.,6.,24.,120.,720.};
+
+inline double fact_cached(int n)      { return FACT_TBL[n]; }
+
+inline double pow_i06(double x,int n){
+  switch(n){
+    case 0: return 1.;
+    case 1: return x;
+    case 2: return x*x;
+    case 3: return x*x*x;
+    case 4: { double x2=x*x; return x2*x2; }
+    case 5: { double x2=x*x; return x2*x2*x; }
+    case 6: { double x2=x*x; return x2*x2*x2; }
+    default:return std::pow(x,n);
+  }
+}
+
+/* ------------ Cartesian powers and derivatives -------------------- */
+inline void precompute_powers(double x,int L,double p[7]){
+  p[0]=1.; for(int n=1;n<=L;++n) p[n]=p[n-1]*x;
+#if defined(__SANITIZE_ADDRESS__)||defined(ADDRESS_SANITIZER)
+  for(int n=L+1;n<=6;++n){ p[n]=0.; }
+#endif
+}
+inline void precompute_powers(double x,int L,double p[7],double dp[7]){
+  p[0]=1.; dp[0]=0.;
+  for(int n=1;n<=L;++n){ p[n]=p[n-1]*x; dp[n]=n*p[n-1]; }
+#if defined(__SANITIZE_ADDRESS__)||defined(ADDRESS_SANITIZER)
+  for(int n=L+1;n<=6;++n){ p[n]=0.; dp[n]=0.; }
+#endif
+}
+
+/* ------------ radial pre-computation (Blip) ----------------------- */
+inline void precompute_radials(double r,double fc,
+                               const std::vector<double>& sg,
+                               const std::vector<double>& cg,
+                               double* g,std::size_t n)
+{
+  for(std::size_t i=0;i<n;++i){
+    const double x = sg[i]*(r-cg[i]);
+    g[i] = B(x,fc);
+  }
+}
+inline void precompute_radials(double r,double fc,double fcp,
+                               const std::vector<double>& sg,
+                               const std::vector<double>& cg,
+                               double* g,double* dg,std::size_t n)
+{
+  for(std::size_t i=0;i<n;++i){
+    const double s  = sg[i];
+    const double x  = s*(r-cg[i]);
+    g [i] = B (x,fc);
+    dg[i] = dB(x,s,fc,fcp);          // derivative w.r.t. r
+  }
+}
+
+/* sign helper */
+inline double neg(double v,int n){ return (n&1)?-v:v; }
+} // namespace
+
+/* ================================================================== *
+ *  DM_Blip implementation                                            *
+ * ================================================================== */
 namespace tadah {
 namespace models {
 
+DM_Blip::DM_Blip() { init(); }
 
-DM_Blip::DM_Blip() {
-  init();
-}
-DM_Blip::DM_Blip(const tadah::core::Context &c): DM_Base(c),
-  rc(c.get<double>("RCUTMBMAX"))
+/* ------------------------------------------------------------------ */
+DM_Blip::DM_Blip(const core::Context& ctx)
+: DM_Base(ctx)
+, rc(ctx.get<double>("RCUTMBMAX"))
 {
-  if (!c.get<bool>("INITMB")) return;
+  if(!ctx.get<bool>("INITMB")) return;
   init();
 
-  get_grid(c,"CGRIDMB",cgrid);
-  get_grid(c,"SGRIDMB",sgrid);
+  get_grid(ctx,"CGRIDMB",cgrid);
+  get_grid(ctx,"SGRIDMB",sgrid);
   D_Base::printGrid(cgrid,"CGRIDMB");
   D_Base::printGrid(sgrid,"SGRIDMB");
 
-  if (cgrid.size()!=sgrid.size()) {
-    throw std::runtime_error("SGRID2B and CGRID2B arrays differ in size.\n");
-  }
+  if(cgrid.size()!=sgrid.size())
+    throw std::runtime_error("CGRIDMB and SGRIDMB sizes differ.");
 
-  Lmax = c.get<int>("TYPEMB",1);
-  s=sgrid.size()*(Lmax+1);
-  rhoisize = gen_atomic_orbitals(Lmax);
-  rhoisize *= sgrid.size();
+  Lmax = ctx.get<int>("TYPEMB",1);
+  if(Lmax>6)
+    throw std::runtime_error("DM_Blip: Lmax>6 not supported.");
 
-  auto init_atoms = get_init_atoms(c);
-  init_for_atoms(init_atoms);
+  s         = cgrid.size()*(Lmax+1);
+  rhoisize  = gen_atomic_orbitals(Lmax)*cgrid.size();
+
+  init_for_atoms( get_init_atoms(ctx) );
 }
 
-void DM_Blip::calc_aed(
-  tadah::core::rho_type& rhoi,
-  tadah::core::aed_type &aed)
+/* ------------------ embedding energy / derivative ----------------- */
+void DM_Blip::calc_aed(core::rho_type& rhoi, core::aed_type& aed)
 {
-  size_t Lshift = 0;
-  size_t ii=rfidx;
-  for (int L=0; L<=Lmax; ++L) {
-    for (size_t o=0; o<orbitals[L].size(); ++o) {
-      const double f = fac[L][o];
-      for (size_t c=0; c<cgrid.size(); c++) {
-        aed(c+Lshift+fidx) += f*rhoi(ii)*rhoi(ii);
-        rhoi(ii+rhoisize) = 2.0*f*rhoi(ii);
-        ii++;
+  std::size_t Lshift=0, ii=rfidx;
+  const std::size_t ng=cgrid.size();
+
+  for(int L=0;L<=Lmax;++L){
+    for(std::size_t o=0;o<orbitals[L].size();++o){
+      const double f=fac[L][o];
+      for(std::size_t c=0;c<ng;++c,++ii){
+        const double rho=rhoi(ii);
+        aed (c+Lshift+fidx) += f*rho*rho;    // F(ρ)=ρ²
+        rhoi(ii+rhoisize)   = 2.0*f*rho;     // F′(ρ)=2ρ
       }
     }
-    Lshift += sgrid.size();
+    Lshift+=ng;
   }
 }
+
+/* -------------------- dXij/dr_i & dXji/dr_i ----------------------- */
 void DM_Blip::calc_dXijdri_dXjidri(
-  const int Zi,
-  const int Zj,
-  const double rij,
-  const double,
-  const tadah::core::Vec3d &vec_ij,
-  tadah::core::rho_type& rhoi,
-  tadah::core::rho_type& rhoj,
-  tadah::core::fd_type &fd_ij,
-  const double scale)
+        int Zi,int Zj,double rij,double,
+        const core::Vec3d& v,
+        core::rho_type&    rhoi,
+        core::rho_type&    rhoj,
+        core::fd_type&     fd_ij,
+        double             scale)
 {
-  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
+  if(!is_init_for_atoms(Zi,Zj) || rij>get_rcut()) return;
 
-  const double x = vec_ij[0];
-  const double y = vec_ij[1];
-  const double z = vec_ij[2];
+  const double x=v[0],y=v[1],z=v[2];
+  const double wi=weights[Zi], wj=weights[Zj];
 
-  double wi = weights[Zi];
-  double wj = weights[Zj];
-  double fc_ij = fcut->calc(rij);
-  double fcp_ij = fcut->calc_prime(rij);
+  const double fc = fcut->calc       (rij);
+  const double fp = fcut->calc_prime (rij);
 
-  size_t Lshift = 0;
+  const std::size_t ng=cgrid.size();
+  StackOrHeapBuffer<MAX_GRID> buf(ng);
+  precompute_radials(rij,fc,fp,sgrid,cgrid,buf.g(),buf.dg(),ng);
 
-  size_t ii=rhoisize+rfidx;
-  for (int L=0; L<=Lmax; ++L) {
-    for (size_t o=0; o<orbitals[L].size(); ++o) {
-      const int lx = orbitals[L][o][0];
-      const int ly = orbitals[L][o][1];
-      const int lz = orbitals[L][o][2];
+  double px[7],py[7],pz[7],dpx[7],dpy[7],dpz[7];
+  precompute_powers(x,Lmax,px,dpx);
+  precompute_powers(y,Lmax,py,dpy);
+  precompute_powers(z,Lmax,pz,dpz);
 
-      const double powxlxij = my_pow(x,lx);
-      const double powylyij = my_pow(y,ly);
-      const double powzlzij = my_pow(z,lz);
+  std::size_t Lshift=0, ii=rhoisize+rfidx;
+  const double rinv=1.0/rij;
 
-      const double powxlxji = my_pow(-x,lx);
-      const double powylyji = my_pow(-y,ly);
-      const double powzlzji = my_pow(-z,lz);
+  for(int L=0;L<=Lmax;++L){
+    for(std::size_t o=0;o<orbitals[L].size();++o){
+      const int lx=orbitals[L][o][0],
+                ly=orbitals[L][o][1],
+                lz=orbitals[L][o][2];
 
-      double txij=0.0,tyij=0.0,tzij=0.0;
-      double txji=0.0,tyji=0.0,tzji=0.0;
-      if (lx!=0) {
-        txij = lx*my_pow(x,lx-1)*powylyij*powzlzij;
-        txji = lx*my_pow(-x,lx-1)*powylyji*powzlzji;
-      }
-      if (ly!=0) {
-        tyij = ly*my_pow(y,ly-1)*powxlxij*powzlzij;
-        tyji = ly*my_pow(-y,ly-1)*powxlxji*powzlzji;
-      }
-      if (lz!=0) {
-        tzij = lz*my_pow(z,lz-1)*powylyij*powxlxij;
-        tzji = lz*my_pow(-z,lz-1)*powylyji*powxlxji;
-      }
-      const double pqrij = powxlxij*powylyij*powzlzij;
-      const double pqrji = powxlxji*powylyji*powzlzji;
+      const double pxij= px[lx], pyij= py[ly], pzij= pz[lz];
+      const double pxji= neg(pxij,lx),
+                    pyji= neg(pyij,ly),
+                    pzji= neg(pzij,lz);
 
-      for (size_t c=0; c<cgrid.size(); c++) {
-        double blip = B(sgrid[c]*(rij-cgrid[c]),fc_ij);
-        double dblip = dB(sgrid[c]*(rij-cgrid[c]),sgrid[c],fc_ij,fcp_ij);
-        const double term2ijx=pqrij*dblip*x/rij;
-        const double term2ijy=pqrij*dblip*y/rij;
-        const double term2ijz=pqrij*dblip*z/rij;
+      const double pqrij=pxij*pyij*pzij;
+      const double pqrji=pxji*pyji*pzji;
 
-        const double term2jix=-pqrji*dblip*x/rij;
-        const double term2jiy=-pqrji*dblip*y/rij;
-        const double term2jiz=-pqrji*dblip*z/rij;
+      const double txij=dpx[lx]*pyij*pzij;
+      const double tyij=dpy[ly]*pxij*pzij;
+      const double tzij=dpz[lz]*pyij*pxij;
 
-        const double term1ijx = blip*txij;
-        const double term1ijy = blip*tyij;
-        const double term1ijz = blip*tzij;
+      const double txji=neg(txij,lx-1);
+      const double tyji=neg(tyij,ly-1);
+      const double tzji=neg(tzij,lz-1);
 
-        const double term1jix = blip*txji;
-        const double term1jiy = blip*tyji;
-        const double term1jiz = blip*tzji;
+      for(std::size_t c=0;c<ng;++c,++ii){
+        const double b  = buf.g() [c];
+        const double db = buf.dg()[c];
 
-        fd_ij(c+Lshift+fidx,0) += scale*(
-          rhoi(ii)*(term1ijx + term2ijx)*wj
-          -rhoj(ii)*(term1jix + term2jix)*wi)
-        ;
+        const double term2x=db*rinv*x;
+        const double term2y=db*rinv*y;
+        const double term2z=db*rinv*z;
 
-        fd_ij(c+Lshift+fidx,1) += scale*(
-          rhoi(ii)*(term1ijy + term2ijy)*wj
-          -rhoj(ii)*(term1jiy + term2jiy)*wi)
-        ;
+        const double f_ri=rhoi(ii);
+        const double f_rj=rhoj(ii);
+        const std::size_t row=c+Lshift+fidx;
 
-        fd_ij(c+Lshift+fidx,2) += scale*(
-          rhoi(ii)*(term1ijz + term2ijz)*wj
-          -rhoj(ii)*(term1jiz + term2jiz)*wi)
-        ;
-        ii++;
+        fd_ij(row,0)+=scale*( f_ri*(b*txij + pqrij*term2x)*wj
+                            - f_rj*(b*txji + pqrji*term2x)*wi );
+        fd_ij(row,1)+=scale*( f_ri*(b*tyij + pqrij*term2y)*wj
+                            - f_rj*(b*tyji + pqrji*term2y)*wi );
+        fd_ij(row,2)+=scale*( f_ri*(b*tzij + pqrij*term2z)*wj
+                            - f_rj*(b*tzji + pqrji*term2z)*wi );
       }
     }
-    Lshift+=sgrid.size();
+    Lshift+=ng;
   }
 }
+
+/* -------------------- dXij/dr_i (one-sided) ----------------------- */
 void DM_Blip::calc_dXijdri(
-  const int Zi, 
-  const int Zj, 
-  const double rij,
-  const double,
-  const tadah::core::Vec3d &vec_ij,
-  tadah::core::rho_type& rhoi,
-  tadah::core::fd_type &fd_ij,
-  const double scale)
+        int Zi,int Zj,double rij,double,
+        const core::Vec3d& v,
+        core::rho_type&    rhoi,
+        core::fd_type&     fd_ij,
+        double             scale)
 {
-  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
-  const double x = vec_ij[0];
-  const double y = vec_ij[1];
-  const double z = vec_ij[2];
+  if(!is_init_for_atoms(Zi,Zj) || rij>get_rcut()) return;
 
-  double wj = weights[Zj];
-  double fc_ij = scale*wj*fcut->calc(rij);
-  double fcp_ij = scale*wj*fcut->calc_prime(rij);
+  const double x=v[0],y=v[1],z=v[2];
+  const double wj=weights[Zj];
 
-  size_t Lshift = 0;
+  const double fc = scale*wj*fcut->calc       (rij);
+  const double fp = scale*wj*fcut->calc_prime (rij);
 
-  size_t ii=rhoisize+rfidx;
-  for (int L=0; L<=Lmax; ++L) {
-    for (size_t o=0; o<orbitals[L].size(); ++o) {
-      const int lx = orbitals[L][o][0];
-      const int ly = orbitals[L][o][1];
-      const int lz = orbitals[L][o][2];
+  const std::size_t ng=cgrid.size();
+  StackOrHeapBuffer<MAX_GRID> buf(ng);
+  precompute_radials(rij,fc,fp,sgrid,cgrid,buf.g(),buf.dg(),ng);
 
-      const double powxlxij = my_pow(x,lx);
-      const double powylyij = my_pow(y,ly);
-      const double powzlzij = my_pow(z,lz);
+  double px[7],py[7],pz[7],dpx[7],dpy[7],dpz[7];
+  precompute_powers(x,Lmax,px,dpx);
+  precompute_powers(y,Lmax,py,dpy);
+  precompute_powers(z,Lmax,pz,dpz);
 
-      double txij=0.0,tyij=0.0,tzij=0.0;
-      if (lx!=0) {
-        txij = lx*my_pow(x,lx-1)*powylyij*powzlzij;
-      }
-      if (ly!=0) {
-        tyij = ly*my_pow(y,ly-1)*powxlxij*powzlzij;
-      }
-      if (lz!=0) {
-        tzij = lz*my_pow(z,lz-1)*powylyij*powxlxij;
-      }
-      const double pqrij = powxlxij*powylyij*powzlzij;
+  std::size_t Lshift=0, ii=rhoisize+rfidx;
+  const double rinv=1.0/rij;
 
-      for (size_t c=0; c<cgrid.size(); c++) {
-        double blip = B(sgrid[c]*(rij-cgrid[c]),fc_ij);
-        double dblip = dB(sgrid[c]*(rij-cgrid[c]),sgrid[c],fc_ij,fcp_ij);
+  for(int L=0;L<=Lmax;++L){
+    for(std::size_t o=0;o<orbitals[L].size();++o){
+      const int lx=orbitals[L][o][0],
+                ly=orbitals[L][o][1],
+                lz=orbitals[L][o][2];
 
-        const double term2ijx=pqrij*dblip*x/rij;
-        const double term2ijy=pqrij*dblip*y/rij;
-        const double term2ijz=pqrij*dblip*z/rij;
+      const double pxij=px[lx], pyij=py[ly], pzij=pz[lz];
+      const double pqrij=pxij*pyij*pzij;
 
-        const double term1ijx = blip*txij;
-        const double term1ijy = blip*tyij;
-        const double term1ijz = blip*tzij;
+      const double txij=dpx[lx]*pyij*pzij;
+      const double tyij=dpy[ly]*pxij*pzij;
+      const double tzij=dpz[lz]*pyij*pxij;
 
-        fd_ij(c+Lshift+fidx,0) +=
-          rhoi(ii)*(term1ijx + term2ijx)
-        ;
+      for(std::size_t c=0;c<ng;++c,++ii){
+        const double b = buf.g()[c];
+        const double db= buf.dg()[c];
 
-        fd_ij(c+Lshift+fidx,1) +=
-          rhoi(ii)*(term1ijy + term2ijy)
-        ;
+        const double term2x=pqrij*db*x*rinv;
+        const double term2y=pqrij*db*y*rinv;
+        const double term2z=pqrij*db*z*rinv;
 
-        fd_ij(c+Lshift+fidx,2) += 
-          rhoi(ii)*(term1ijz + term2ijz)
-        ;
-        ii++;
+        const double f_r = rhoi(ii);
+        const std::size_t row=c+Lshift+fidx;
+
+        fd_ij(row,0)+=f_r*(b*txij+term2x);
+        fd_ij(row,1)+=f_r*(b*tyij+term2y);
+        fd_ij(row,2)+=f_r*(b*tzij+term2z);
       }
     }
-    Lshift+=sgrid.size();
+    Lshift+=ng;
   }
 }
-std::string DM_Blip::label() {
-  return lab;
+
+/* ----------------------- ρ_i accumulation ------------------------- */
+void DM_Blip::calc_rho(int Zi,int Zj,double rij,double,
+                       const core::Vec3d& v,
+                       core::rho_type&    rhoi,
+                       double             scale)
+{
+  if(!is_init_for_atoms(Zi,Zj) || rij>get_rcut()) return;
+
+  const double fc = scale*weights[Zj]*fcut->calc(rij);
+
+  const std::size_t ng=cgrid.size();
+  StackOrHeapBuffer<MAX_GRID> buf(ng);
+  precompute_radials(rij,fc,sgrid,cgrid,buf.g(),ng);
+
+  double px[7],py[7],pz[7];
+  precompute_powers(v[0],Lmax,px);
+  precompute_powers(v[1],Lmax,py);
+  precompute_powers(v[2],Lmax,pz);
+
+  std::size_t ii=rfidx;
+
+  for(int L=0;L<=Lmax;++L){
+    for(std::size_t o=0;o<orbitals[L].size();++o){
+      const int lx=orbitals[L][o][0],
+                ly=orbitals[L][o][1],
+                lz=orbitals[L][o][2];
+
+      const double poly = px[lx]*py[ly]*pz[lz];
+
+      for(std::size_t c=0;c<ng;++c)
+        rhoi(ii++) += buf.g()[c]*poly;
+    }
+  }
 }
 
-void DM_Blip::init_rhoi(tadah::core::rho_type& rhoi)
+/* ----------------------- rho_i memory ----------------------------- */
+void DM_Blip::init_rhoi(core::rho_type& rhoi)
 {
   rhoi.resize(2*rhoisize);
   rhoi.set_zero();
 }
-void DM_Blip::calc_rho(
-  const int Zi, 
-  const int Zj,
-  const double rij,
-  const double,
-  const tadah::core::Vec3d &vec_ij,
-  tadah::core::rho_type& rhoi,
-  const double scale)
+
+/* ------------------- orbital enumeration & factors ---------------- */
+std::size_t DM_Blip::gen_atomic_orbitals(int Lm)
 {
-  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
-  size_t ii=rfidx;
-  double fc_ij = scale*weights[Zj]*fcut->calc(rij);
-  for (int L=0; L<=Lmax; ++L) {
-    for (size_t o=0; o<orbitals[L].size(); ++o) {
-      const size_t lx = orbitals[L][o][0];
-      const size_t ly = orbitals[L][o][1];
-      const size_t lz = orbitals[L][o][2];
-      double t = (my_pow(vec_ij[0],lx)*my_pow(vec_ij[1],ly)*my_pow(vec_ij[2],lz));
-      for (size_t c=0; c<cgrid.size(); c++) {
-        rhoi(ii++) += B(sgrid[c]*(rij-cgrid[c]),fc_ij)*t;
+  orbitals.resize(Lm+1);
+  fac     .resize(Lm+1);
+
+  std::size_t cnt=0;
+  for(int L=0;L<=Lm;++L){
+    for(int lx=0;lx<=L;++lx){
+      for(int ly=0;ly<=L-lx;++ly){
+        int lz=L-lx-ly;
+        orbitals[L].push_back({lx,ly,lz});
+        const double f = fact_cached(L)/
+                         (fact_cached(lx)*fact_cached(ly)*fact_cached(lz))/
+                         pow_i06(4*rc,L);
+        fac[L].push_back(f);
+        ++cnt;
       }
     }
   }
+  return cnt;
 }
 
-size_t DM_Blip::gen_atomic_orbitals(int Lmax) {
-  orbitals.resize(Lmax+1);
-  fac.resize(Lmax+1);
+/* ------------------------------- misc ----------------------------- */
+std::string DM_Blip::label(){ return lab; }
 
-  size_t count = 0;
-  for (int L = 0; L <= Lmax; ++L) {
-    for (int lx = 0; lx <= L; ++lx) {
-      for (int ly = 0; ly <= L; ++ly) {
-        for (int lz = 0; lz <= L; ++lz) {
-          if (lx+ly+lz == L) {
-            std::vector<int> o = {lx, ly, lz};
-            orbitals[L].push_back(o);
-            const double f = fact(L)/(fact(lx)*fact(ly)*fact(lz))/my_pow(4*rc,L);
-            fac[L].push_back(f);
-            count++;
-          }
-        }
-      }
-    }
-  }
-  return count;
-}
-double DM_Blip::fact(int n)
+void DM_Blip::init()
 {
-  double f=1.0;
-  while (n) {
-    f *= n;
-    --n;
-  }
-  return f;
-}
-double DM_Blip::my_pow(double x, int n){
-  double r = 1.0;
-
-  while(n > 0){
-    r *= x;
-    --n;
-  }
-
-  return r;
-}
-void DM_Blip::init() {
-  keys.push_back("CGRIDMB");
-  keys.push_back("SGRIDMB");
-  nparams=3;
+  keys = {"CGRIDMB","SGRIDMB"};
+  nparams = 2+1;
 }
 
 } // namespace models

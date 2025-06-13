@@ -91,7 +91,7 @@ private:
         if (context.contains("WEIGHTS")) {
             weights.resize(context.size("WEIGHTS"));
             context.get<tadah::core::t_type>("WEIGHTS", weights);
-            trained = true;
+            // trained = true;
         }
         verbose = context.get<int>("VERBOSE");
 
