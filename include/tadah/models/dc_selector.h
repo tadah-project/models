@@ -63,7 +63,7 @@ namespace tadah {
           else {
             c2b = tadah::core::factory<Cut_Base,double&>( "Cut_Dummy", rcutzero );
             d2b = tadah::core::factory<D2_Base,const tadah::core::Context&>( "D2_Dummy", context );
-            d2b->set_fidx(bias);
+            // d2b->set_fidx(bias);
           }
 
           if (context.get<bool>("INITMB")) {
@@ -75,7 +75,7 @@ namespace tadah {
           else {
             cmb = tadah::core::factory<Cut_Base,double&>( "Cut_Dummy", rcutzero );
             dmb = tadah::core::factory<DM_Base,const tadah::core::Context&>( "DM_Dummy", context );
-            dmb->set_fidx(bias + d2b->size());
+            // dmb->set_fidx(bias + d2b->size());
           }
 
           desc_size = bias + d2b->size() + dmb->size();
