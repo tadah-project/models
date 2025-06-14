@@ -106,6 +106,20 @@ public:
   double calc_dF(double rho, size_t p) const override;
 };
 
+class F_SQ : public F_Base {
+private:
+  const tadah::core::Context *context=nullptr;
+
+public:
+  F_SQ(const tadah::core::Context &context, size_t, size_t);
+
+  F_SQ() = default;
+
+  double calc_F(double rho, size_t p) const override;
+
+  double calc_dF(double rho, size_t p) const override;
+};
+
 } // namespace models
 } // namespace tadah
 

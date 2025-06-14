@@ -22,7 +22,11 @@ double F_RLR::calc_F(double rho,size_t p) const {
   return sfuncgrid[p]*std::abs(rho)*std::log(cfuncgrid[p]*std::abs(rho) + eps);
 }
 double F_RLR::calc_dF(double rho,size_t p) const {
-  return sfuncgrid[p]*(std::log(cfuncgrid[p]*std::abs(rho) + eps)+1);
+  if (rho < 0.0) {
+    return -sfuncgrid[p]*(std::log(cfuncgrid[p]*std::abs(rho) + eps) + 1.0);
+  } else {
+    return sfuncgrid[p]*(std::log(cfuncgrid[p]*std::abs(rho) + eps)+1);
+  }
 }
 
 //////////////////////////
@@ -49,7 +53,26 @@ double F_SQRT::calc_F(double rho,size_t p) const {
     return sfuncgrid[p]*std::sqrt(std::abs(rho) + eps);
 }
 double F_SQRT::calc_dF(double rho,size_t p) const {
-    return 0.5*sfuncgrid[p]/(std::sqrt(std::abs(rho) + eps));
+  if (rho < 0.0) {
+    return -0.5*sfuncgrid[p]/(std::sqrt(std::abs(rho) + eps));
+  } else {
+    return 0.5*sfuncgrid[p]/(std::sqrt(rho + eps));
+  }
+}
+
+//////////////////////////
+// F_SQ
+//////////////////////////
+F_SQ::F_SQ(const tadah::core::Context &c, size_t, size_t ):
+  context(&c)
+{
+  if (!context->get<bool>("INITMB")) return;
+}
+double F_SQ::calc_F(double rho,size_t ) const {
+    return rho*rho;
+}
+double F_SQ::calc_dF(double rho,size_t ) const {
+  return 2.0*rho;
 }
 
 } // namespace models

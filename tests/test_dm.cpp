@@ -370,6 +370,137 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_Blip 2", "[DM]") {
     test_case<DM_Blip, Cut_Tanh>(context, "DM_Blip", 4 * 3);
     test_case<DM_Blip, Cut_PolyS>(context, "DM_Blip", 4 * 3);
 }
+TEST_CASE_METHOD(TestFixture, "Testing DM_mEAD<F_RLR> 1", "[DM]") {
+    Context context;
+    context.add("RCUTMB", 10);
+    context.remove("INITMB");
+    context.add("INITMB", "true");
+    context.add("TYPEMB", "DM_mRLR");
+    context.add("TYPEMB", 2);
+    context.add("TYPEMB", 2);
+    context.add("TYPEMB", 2);
+    context.add("TYPEMB", 0);
+    context.add("TYPEMB", 0);
+    context.add("CGRIDMB", "1 2");
+    context.add("SGRIDMB", "0.1 0.2");
+    context.add("CEMBFUNC", "1 2");
+    context.add("SEMBFUNC", "0.1 0.2");
+    test_case<DM_mEAD<F_RLR>, Cut_Dummy>(context, "DM_mEAD", 3 * 2);
+    test_case<DM_mEAD<F_RLR>, Cut_Cos>(context, "DM_mEAD", 3 * 2);
+    test_case<DM_mEAD<F_RLR>, Cut_Tanh>(context, "DM_mEAD", 3 * 2);
+    test_case<DM_mEAD<F_RLR>, Cut_PolyS>(context, "DM_mEAD", 3 * 2);
+}
+TEST_CASE_METHOD(TestFixture, "Testing DM_mEAD<F_RLR> 2", "[DM]") {
+    Context context;
+    context.add("RCUTMB", 10);
+    context.remove("INITMB");
+    context.add("INITMB", "true");
+    context.add("TYPEMB", "DM_mSQRT");
+    context.add("TYPEMB", 3);
+    context.add("TYPEMB", 3);
+    context.add("TYPEMB", 3);
+    context.add("TYPEMB", 3);
+    context.add("TYPEMB", 3);
+    context.add("CGRIDMB", "1 2 3");
+    context.add("SGRIDMB", "0.1 0.2 0.3");
+    context.add("CEMBFUNC", "1 2 3");
+    context.add("SEMBFUNC", "0.1 0.2 0.3");
+    test_case<DM_mEAD<F_RLR>, Cut_Dummy>(context, "DM_mEAD", 4 * 3);
+    test_case<DM_mEAD<F_RLR>, Cut_Cos>(context, "DM_mEAD", 4 * 3);
+    test_case<DM_mEAD<F_RLR>, Cut_Tanh>(context, "DM_mEAD", 4 * 3);
+    test_case<DM_mEAD<F_RLR>, Cut_PolyS>(context, "DM_mEAD", 4 * 3);
+}
+TEST_CASE_METHOD(TestFixture, "Testing DM_mEAD<F_SQRT> 1", "[DM]") {
+    Context context;
+    context.add("RCUTMB", 10);
+    context.remove("INITMB");
+    context.add("INITMB", "true");
+    context.add("TYPEMB", "DM_mSQRT");
+    context.add("TYPEMB", 2);
+    context.add("TYPEMB", 2);
+    context.add("TYPEMB", 2);
+    context.add("TYPEMB", 2);
+    context.add("TYPEMB", 2);
+    context.add("CGRIDMB", "1 2");
+    context.add("SGRIDMB", "0.1 0.2");
+    context.add("SEMBFUNC", "1 1");
+    test_case<DM_mEAD<F_SQRT>, Cut_Dummy>(context, "DM_mEAD", 3 * 2);
+    test_case<DM_mEAD<F_SQRT>, Cut_Cos>(context, "DM_mEAD", 3 * 2);
+    test_case<DM_mEAD<F_SQRT>, Cut_Tanh>(context, "DM_mEAD", 3 * 2);
+    test_case<DM_mEAD<F_SQRT>, Cut_PolyS>(context, "DM_mEAD", 3 * 2);
+}
+TEST_CASE_METHOD(TestFixture, "Testing DM_mEAD<F_SQRT> 2", "[DM]") {
+    Context context;
+    context.add("RCUTMB", 10);
+    context.remove("INITMB");
+    context.add("INITMB", "true");
+    context.add("TYPEMB", "DM_mSQRT");
+    context.add("TYPEMB", 3);
+    context.add("TYPEMB", 3);
+    context.add("TYPEMB", 3);
+    context.add("TYPEMB", 0);
+    context.add("TYPEMB", 0);
+    context.add("CGRIDMB", "1 2 3");
+    context.add("SGRIDMB", "0.1 0.2 0.3");
+    context.add("SEMBFUNC", "1 1 1");
+    test_case<DM_mEAD<F_SQRT>, Cut_Dummy>(context, "DM_mEAD", 4 * 3);
+    test_case<DM_mEAD<F_SQRT>, Cut_Cos>(context, "DM_mEAD", 4 * 3);
+    test_case<DM_mEAD<F_SQRT>, Cut_Tanh>(context, "DM_mEAD", 4 * 3);
+    test_case<DM_mEAD<F_SQRT>, Cut_PolyS>(context, "DM_mEAD", 4 * 3);
+}
+TEST_CASE_METHOD(TestFixture, "Testing DM_mEAD<F_SQ> 1", "[DM]") {
+    Context context;
+    context.add("RCUTMB", 10);
+    context.remove("INITMB");
+    context.add("INITMB", "true");
+    context.add("TYPEMB", "DM_mSQ");
+    context.add("TYPEMB", 2);
+    context.add("TYPEMB", 2);
+    context.add("TYPEMB", 2);
+    context.add("TYPEMB", 0);
+    context.add("TYPEMB", 0);
+    context.add("CGRIDMB", "1 2");
+    context.add("SGRIDMB", "0.1 0.2");
+    test_case<DM_mEAD<F_SQ>, Cut_Dummy>(context, "DM_mEAD", 3 * 2);
+    test_case<DM_mEAD<F_SQ>, Cut_Cos>(context, "DM_mEAD", 3 * 2);
+    test_case<DM_mEAD<F_SQ>, Cut_Tanh>(context, "DM_mEAD", 3 * 2);
+    test_case<DM_mEAD<F_SQ>, Cut_PolyS>(context, "DM_mEAD", 3 * 2);
+}
+TEST_CASE_METHOD(TestFixture, "Testing DM_mEAD<F_SQ> 2", "[DM]") {
+    Context context;
+    context.add("RCUTMB", 10);
+    context.remove("INITMB");
+    context.add("INITMB", "true");
+    context.add("TYPEMB", "DM_mSQ");
+    context.add("TYPEMB", 3);
+    context.add("TYPEMB", 3);
+    context.add("TYPEMB", 3);
+    context.add("TYPEMB", 0);
+    context.add("TYPEMB", 0);
+    context.add("CGRIDMB", "1 2 3");
+    context.add("SGRIDMB", "0.1 0.2 0.3");
+    test_case<DM_mEAD<F_SQ>, Cut_Dummy>(context, "DM_mEAD", 4 * 3);
+    test_case<DM_mEAD<F_SQ>, Cut_Cos>(context, "DM_mEAD", 4 * 3);
+    test_case<DM_mEAD<F_SQ>, Cut_Tanh>(context, "DM_mEAD", 4 * 3);
+    test_case<DM_mEAD<F_SQ>, Cut_PolyS>(context, "DM_mEAD", 4 * 3);
+}
+
+// TEST_CASE_METHOD(TestFixture, "Testing DM_EAD 2", "[DM]") {
+//     Context context;
+//     context.add("RCUTMB", 6);
+//     context.remove("INITMB");
+//     context.add("INITMB", "true");
+//     context.add("TYPEMB", "DM_EAD");
+//     context.add("TYPEMB", 3);
+//     context.add("TYPEMB", 3);
+//     context.add("TYPEMB", 3);
+//     context.add("CGRIDMB", "1 2 3");
+//     context.add("SGRIDMB", "0.1 0.2 0.9");
+//     test_case<DM_EAD, Cut_Dummy>(context, "DM_EAD", 4 * 3);
+//     test_case<DM_EAD, Cut_Cos>(context, "DM_EAD", 4 * 3);
+//     test_case<DM_EAD, Cut_Tanh>(context, "DM_EAD", 4 * 3);
+//     test_case<DM_EAD, Cut_PolyS>(context, "DM_EAD", 4 * 3);
+// }
 
 TEST_CASE_METHOD(TestFixture, "Testing DM_EAM 1", "[DM]") {
     Context context;

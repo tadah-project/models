@@ -147,79 +147,82 @@ void DM_Blip::calc_aed(core::rho_type& rhoi, core::aed_type& aed)
     Lshift+=ng;
   }
 }
-
-/* -------------------- dXij/dr_i & dXji/dr_i ----------------------- */
+/* ------------------------------------------------------------------ *
+ *  dX_ij / dr_i   &   dX_ji / dr_i  (pair contribution, symmetric)
+ *  --- single-evaluation version (no duplicate j-branch) ------------
+ * ------------------------------------------------------------------ */
 void DM_Blip::calc_dXijdri_dXjidri(
         int Zi,int Zj,double rij,double,
         const core::Vec3d& v,
-        core::rho_type&    rhoi,
-        core::rho_type&    rhoj,
-        core::fd_type&     fd_ij,
-        double             scale)
+        core::rho_type&  rhoi,
+        core::rho_type&  rhoj,
+        core::fd_type&   fd_ij,
+        double           scale)
 {
   if(!is_init_for_atoms(Zi,Zj) || rij>get_rcut()) return;
 
-  const double x=v[0],y=v[1],z=v[2];
-  const double wi=weights[Zi], wj=weights[Zj];
+  const double x=v[0], y=v[1], z=v[2];
+  const double wi = weights[Zi];
+  const double wj = weights[Zj];
 
-  const double fc = fcut->calc       (rij);
-  const double fp = fcut->calc_prime (rij);
+  /* --- radial part ------------------------------------------------- */
+  const double fc  = fcut->calc       (rij);
+  const double fcp = fcut->calc_prime (rij);
 
-  const std::size_t ng=cgrid.size();
+  const std::size_t ng = cgrid.size();
   StackOrHeapBuffer<MAX_GRID> buf(ng);
-  precompute_radials(rij,fc,fp,sgrid,cgrid,buf.g(),buf.dg(),ng);
+  precompute_radials(rij,fc,fcp,sgrid,cgrid,buf.g(),buf.dg(),ng);
 
+  /* --- Cartesian powers (and derivatives) -------------------------- */
   double px[7],py[7],pz[7],dpx[7],dpy[7],dpz[7];
   precompute_powers(x,Lmax,px,dpx);
   precompute_powers(y,Lmax,py,dpy);
   precompute_powers(z,Lmax,pz,dpz);
 
-  std::size_t Lshift=0, ii=rhoisize+rfidx;
-  const double rinv=1.0/rij;
+  const double rinv = 1.0/rij;
+  std::size_t   Lshift = 0;
+  std::size_t   ii     = rhoisize + rfidx;      // derivative part
 
-  for(int L=0;L<=Lmax;++L){
-    for(std::size_t o=0;o<orbitals[L].size();++o){
-      const int lx=orbitals[L][o][0],
-                ly=orbitals[L][o][1],
-                lz=orbitals[L][o][2];
+  for(int L=0; L<=Lmax; ++L)
+  {
+    const double s_L = (L & 1) ? 1.0 : -1.0;    //  (-1)^{L+1}
 
-      const double pxij= px[lx], pyij= py[ly], pzij= pz[lz];
-      const double pxji= neg(pxij,lx),
-                    pyji= neg(pyij,ly),
-                    pzji= neg(pzij,lz);
+    for(std::size_t o=0; o<orbitals[L].size(); ++o)
+    {
+      const int lx = orbitals[L][o][0],
+                ly = orbitals[L][o][1],
+                lz = orbitals[L][o][2];
 
-      const double pqrij=pxij*pyij*pzij;
-      const double pqrji=pxji*pyji*pzji;
+      /* polynomials and their Cartesian derivatives (partner i) ----- */
+      const double pxij = px[lx],   pyij = py[ly],   pzij = pz[lz];
+      const double pqrij = pxij*pyij*pzij;
 
-      const double txij=dpx[lx]*pyij*pzij;
-      const double tyij=dpy[ly]*pxij*pzij;
-      const double tzij=dpz[lz]*pyij*pxij;
+      const double txij = dpx[lx]*pyij*pzij;
+      const double tyij = dpy[ly]*pxij*pzij;
+      const double tzij = dpz[lz]*pyij*pxij;
 
-      const double txji=neg(txij,lx-1);
-      const double tyji=neg(tyij,ly-1);
-      const double tzji=neg(tzij,lz-1);
+      for(std::size_t c=0; c<ng; ++c, ++ii)
+      {
+        const double g  = buf.g ()[c];
+        const double dg = buf.dg()[c];
 
-      for(std::size_t c=0;c<ng;++c,++ii){
-        const double b  = buf.g() [c];
-        const double db = buf.dg()[c];
+        /* common Cartesian brackets --------------------------------- */
+        const double Bx = g*txij + pqrij*dg*x*rinv;
+        const double By = g*tyij + pqrij*dg*y*rinv;
+        const double Bz = g*tzij + pqrij*dg*z*rinv;
 
-        const double term2x=db*rinv*x;
-        const double term2y=db*rinv*y;
-        const double term2z=db*rinv*z;
+        /* i/j prefactor --------------------------------------------- */
+        const double coef = scale *
+                            ( rhoi(ii)*wj      /* i-side  */
+                            - s_L * rhoj(ii)*wi ); /* j-side */
 
-        const double f_ri=rhoi(ii);
-        const double f_rj=rhoj(ii);
-        const std::size_t row=c+Lshift+fidx;
-
-        fd_ij(row,0)+=scale*( f_ri*(b*txij + pqrij*term2x)*wj
-                            - f_rj*(b*txji + pqrji*term2x)*wi );
-        fd_ij(row,1)+=scale*( f_ri*(b*tyij + pqrij*term2y)*wj
-                            - f_rj*(b*tyji + pqrji*term2y)*wi );
-        fd_ij(row,2)+=scale*( f_ri*(b*tzij + pqrij*term2z)*wj
-                            - f_rj*(b*tzji + pqrji*term2z)*wi );
+        const std::size_t row = c + Lshift + fidx;
+        fd_ij(row,0) += coef * Bx;
+        fd_ij(row,1) += coef * By;
+        fd_ij(row,2) += coef * Bz;
       }
     }
-    Lshift+=ng;
+    Lshift += ng;
   }
 }
 
@@ -227,60 +230,77 @@ void DM_Blip::calc_dXijdri_dXjidri(
 void DM_Blip::calc_dXijdri(
         int Zi,int Zj,double rij,double,
         const core::Vec3d& v,
-        core::rho_type&    rhoi,
-        core::fd_type&     fd_ij,
-        double             scale)
+        core::rho_type&   rhoi,
+        core::fd_type&    fd_ij,
+        double            scale)
 {
-  if(!is_init_for_atoms(Zi,Zj) || rij>get_rcut()) return;
+  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
 
-  const double x=v[0],y=v[1],z=v[2];
-  const double wj=weights[Zj];
+  const double x = v[0],  y = v[1],  z = v[2];
+  const double wj = weights[Zj];
 
-  const double fc = scale*wj*fcut->calc       (rij);
-  const double fp = scale*wj*fcut->calc_prime (rij);
+  const double fc  = scale*wj * fcut->calc       (rij);
+  const double fcp = scale*wj * fcut->calc_prime (rij);
 
-  const std::size_t ng=cgrid.size();
+  const double rinv = 1.0/rij;
+  const std::size_t ng = cgrid.size();
+
+  /* radial arrays -------------------------------------------------- */
   StackOrHeapBuffer<MAX_GRID> buf(ng);
-  precompute_radials(rij,fc,fp,sgrid,cgrid,buf.g(),buf.dg(),ng);
+  precompute_radials(rij,fc,fcp,sgrid,cgrid,buf.g(),buf.dg(),ng);
 
+  /* Cartesian powers & derivatives --------------------------------- */
   double px[7],py[7],pz[7],dpx[7],dpy[7],dpz[7];
-  precompute_powers(x,Lmax,px,dpx);
-  precompute_powers(y,Lmax,py,dpy);
-  precompute_powers(z,Lmax,pz,dpz);
+  precompute_powers(x,Lmax,px ,dpx);
+  precompute_powers(y,Lmax,py ,dpy);
+  precompute_powers(z,Lmax,pz ,dpz);
 
-  std::size_t Lshift=0, ii=rhoisize+rfidx;
-  const double rinv=1.0/rij;
+  std::size_t Lshift = 0;                 // row offset in fd
+  std::size_t ii     = rhoisize + rfidx;  // derivative part of rho_i
 
-  for(int L=0;L<=Lmax;++L){
-    for(std::size_t o=0;o<orbitals[L].size();++o){
-      const int lx=orbitals[L][o][0],
-                ly=orbitals[L][o][1],
-                lz=orbitals[L][o][2];
+  /* ========================== main loops ========================== */
+  for (int L = 0; L <= Lmax; ++L)
+  {
+    for (std::size_t o = 0; o < orbitals[L].size(); ++o)
+    {
+      const int lx = orbitals[L][o][0],
+                ly = orbitals[L][o][1],
+                lz = orbitals[L][o][2];
 
-      const double pxij=px[lx], pyij=py[ly], pzij=pz[lz];
-      const double pqrij=pxij*pyij*pzij;
+      const double pxij = px[lx],  pyij = py[ly],  pzij = pz[lz];
 
-      const double txij=dpx[lx]*pyij*pzij;
-      const double tyij=dpy[ly]*pxij*pzij;
-      const double tzij=dpz[lz]*pyij*pxij;
+      const double pqrij = pxij*pyij*pzij;          // x^lx y^ly z^lz
 
-      for(std::size_t c=0;c<ng;++c,++ii){
-        const double b = buf.g()[c];
-        const double db= buf.dg()[c];
+      const double txij = dpx[lx]*pyij*pzij;        // ∂/∂x
+      const double tyij = dpy[ly]*pxij*pzij;        // ∂/∂y
+      const double tzij = dpz[lz]*pyij*pxij;        // ∂/∂z
 
-        const double term2x=pqrij*db*x*rinv;
-        const double term2y=pqrij*db*y*rinv;
-        const double term2z=pqrij*db*z*rinv;
+      /* coord-dependent part of radial derivative (constant for c) -- */
+      const double t2x_pref = pqrij * rinv * x;
+      const double t2y_pref = pqrij * rinv * y;
+      const double t2z_pref = pqrij * rinv * z;
 
-        const double f_r = rhoi(ii);
-        const std::size_t row=c+Lshift+fidx;
+      /* ----------------------- grid loop --------------------------- */
+#pragma omp simd
+      for (std::size_t c = 0; c < ng; ++c)
+      {
+        const double g  = buf.g ()[c];
+        const double dg = buf.dg()[c];
 
-        fd_ij(row,0)+=f_r*(b*txij+term2x);
-        fd_ij(row,1)+=f_r*(b*tyij+term2y);
-        fd_ij(row,2)+=f_r*(b*tzij+term2z);
+        const double termx = g*txij + dg*t2x_pref;
+        const double termy = g*tyij + dg*t2y_pref;
+        const double termz = g*tzij + dg*t2z_pref;
+
+        const double f_r = rhoi(ii + c);            // ρ′_i for (o,c)
+
+        const std::size_t row = c + Lshift + fidx;
+        fd_ij(row,0) += f_r * termx;
+        fd_ij(row,1) += f_r * termy;
+        fd_ij(row,2) += f_r * termz;
       }
+      ii += ng;                                     // advance derivative index
     }
-    Lshift+=ng;
+    Lshift += ng;
   }
 }
 
