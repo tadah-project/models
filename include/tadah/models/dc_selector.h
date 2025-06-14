@@ -11,31 +11,20 @@ namespace tadah {
 
     class DC_Selector {
       public:
+        int bias = 0;
+        size_t dsize =0;  // size of the descriptor (bias + 2b + mb)
+        size_t rsize =0;  // size of the density array (rhoi + rhoip)
         Cut_Base *c2b=nullptr;
         Cut_Base *cmb=nullptr;
         D2_Base *d2b=nullptr;
         DM_Base *dmb=nullptr;
 
-        //tadah::core::Context context;
-
         DC_Selector ()
         {};
 
         // Copy constructor
-        DC_Selector(const DC_Selector& )
-        {
-        }
-        // Const Assignment operator
-        // Instead of deep copying
-        // we use a trick where we just copy
-        // the context file and run init()
-        // as in a costructor
-        // DC_Selector& operator=(const DC_Selector& dc)
-        // {
-        //     //context=dc.context;
-        //     //init();
-        //     return *this;
-        // }
+        DC_Selector(const DC_Selector& ) {}
+
         // Assignment operator
         DC_Selector& operator=(DC_Selector& dc)
         {
@@ -52,7 +41,7 @@ namespace tadah {
         void init(const tadah::core::Context &context) {
           double rcutzero = 0.0; // for dummies
 
-          if (context.get<bool>("BIAS")) bias++;
+          if (context.get<bool>("BIAS")) bias=1;
 
           if (context.get<bool>("INIT2B")) {
             double rcut2b = context.get<double>("RCUT2BMAX");
@@ -63,7 +52,6 @@ namespace tadah {
           else {
             c2b = tadah::core::factory<Cut_Base,double&>( "Cut_Dummy", rcutzero );
             d2b = tadah::core::factory<D2_Base,const tadah::core::Context&>( "D2_Dummy", context );
-            // d2b->set_fidx(bias);
           }
 
           if (context.get<bool>("INITMB")) {
@@ -75,12 +63,16 @@ namespace tadah {
           else {
             cmb = tadah::core::factory<Cut_Base,double&>( "Cut_Dummy", rcutzero );
             dmb = tadah::core::factory<DM_Base,const tadah::core::Context&>( "DM_Dummy", context );
-            // dmb->set_fidx(bias + d2b->size());
           }
 
-          desc_size = bias + d2b->size() + dmb->size();
+          // Set the size of the descriptor and density arrays
+          dsize = bias + d2b->size() + dmb->size();
+          rsize = dmb->rhoi_size()+ dmb->rhoip_size();
         }
-        size_t descriptor_size() const { return desc_size; }
+
+        size_t descriptor_size() const { return dsize; }
+        size_t density_size() const { return rsize; }
+
         ~DC_Selector()
         {
           if (d2b)
@@ -93,9 +85,6 @@ namespace tadah {
             delete dmb;
         }
 
-        int bias = 0;
-      private:
-        size_t desc_size = 0;
     };
   } // namespace models
 } // namespace tadah
