@@ -23,7 +23,7 @@ void D2_LJ::calc_aed(
   const double rij,
   const double rij_sq,
   tadah::core::aed_type &aed,
-  const double scale)
+  const double scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   double r2_inv = 1.0/rij_sq;
@@ -39,7 +39,7 @@ void D2_LJ::calc_dXijdri(
   const double rij,
   const double rij_sq,
   tadah::core::fd_type &fd_ij,
-  const double scale)
+  const double scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
 
@@ -58,7 +58,7 @@ void D2_LJ::calc_all(
   const double rij_sq,
   tadah::core::aed_type &aed,
   tadah::core::fd_type &fd_ij,
-  const double scale)
+  const double scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   double r2_inv = 1.0/rij_sq;
@@ -72,7 +72,7 @@ void D2_LJ::calc_all(
   fd_ij(fidx,0) = scale*weights[Zj]*(6.0*r6_inv*r2_inv*rij*fc_ij - fcp_ij*r6_inv);
   fd_ij(fidx+1,0) = scale*weights[Zj]*(-12.0*r6_inv*r6_inv*r2_inv*rij*fc_ij + fcp_ij*r6_inv*r6_inv);
 }
-std::string D2_LJ::label() {
+std::string D2_LJ::label() const {
   return lab;
 }
 void D2_LJ::init() {

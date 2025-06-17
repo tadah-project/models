@@ -48,7 +48,7 @@ void D2_EAM::calc_aed(
   const double rij,
   const double,
   tadah::core::aed_type &aed,
-  const double scale)
+  const double scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   double r = rij;
@@ -67,7 +67,7 @@ void D2_EAM::calc_dXijdri(
   const double rij,
   const double,
   tadah::core::fd_type &fd_ij,
-  const double scale)
+  const double scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   const double r = rij;
@@ -93,7 +93,7 @@ void D2_EAM::calc_all(
   const double,
   tadah::core::aed_type &aed,
   tadah::core::fd_type &fd_ij,
-  const double scale)
+  const double scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   double r = rij;
@@ -110,7 +110,7 @@ void D2_EAM::calc_all(
   // 0.5 b/c full neighbour list is used TODO check
   fd_ij(fidx,0) = scale*(z2p*recip - z2*recip*recip);
 }
-std::string D2_EAM::label() {
+std::string D2_EAM::label() const {
   return lab;
 }
 

@@ -51,10 +51,10 @@ namespace models {
 class D2_ZBL : public D2_Base {
 private:
   std::string lab="D2_ZBL";
-  double phi(const double x); // x = r/a
+  double phi(const double x) const; // x = r/a
   // dphi/dx
-  double dphi(const double x); // x = r/a
-  double screening_length(int, int); // a = 
+  double dphi(const double x) const; // x = r/a
+  double screening_length(int, int) const; // a = 
   double a0=0.52917721067; // bohr radius
   double s0=0.88534; // bohr radius
   double p0=0.23; // bohr radius
@@ -72,14 +72,14 @@ public:
     const double rij,
     const double ,
     tadah::core::aed_type &aed,
-    const double scale=1) override;
+    const double scale=1) const override;
   void calc_dXijdri(
     const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
     tadah::core::fd_type &fd_ij,
-    const double scale=1) override;
+    const double scale=1) const override;
   void calc_all(
     const int Zi,
     const int Zj,
@@ -87,9 +87,9 @@ public:
     const double rij_sq,
     tadah::core::aed_type &aed,
     tadah::core::fd_type &fd_ij,
-    const double scale=1) override;
+    const double scale=1) const override;
 
-  std::string label() override;
+  std::string label() const override;
   void init() override;
 };
 } // namespace models

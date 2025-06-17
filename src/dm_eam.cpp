@@ -45,7 +45,7 @@ DM_EAM::DM_EAM(core::Context &c): DM_Base(c)
 
 void DM_EAM::calc_aed(
   tadah::core::rho_type& rho,
-  tadah::core::aed_type &aed)
+  tadah::core::aed_type &aed) const
 {
   //std::cout << "rho[i]:   " << rho(0) << std::endl;
   double p = rho(rfidx)*ef.rdrho + 1.0;
@@ -75,7 +75,7 @@ void DM_EAM::calc_dXijdri_dXjidri(
   tadah::core::rho_type& rhoi,
   tadah::core::rho_type& rhoj,
   tadah::core::fd_type &fd_ij,
-  const double scale)
+  const double scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   double r = rij;
@@ -105,7 +105,7 @@ void DM_EAM::calc_dXijdri(
   const tadah::core::Vec3d &vec_ij,
   tadah::core::rho_type& rhoi,
   tadah::core::fd_type &fd_ij,
-  const double scale)
+  const double scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   double r = rij;
@@ -125,7 +125,7 @@ void DM_EAM::calc_dXijdri(
   fd_ij(fidx,1) = f*vec_ij[1];
   fd_ij(fidx,2) = f*vec_ij[2];
 }
-std::string DM_EAM::label() {
+std::string DM_EAM::label() const {
   return lab;
 }
 
@@ -209,7 +209,7 @@ void DM_EAM::calc_rho(
   const double,
   const tadah::core::Vec3d &,
   tadah::core::rho_type& rho,
-  const double scale)
+  const double scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   double r = rij;

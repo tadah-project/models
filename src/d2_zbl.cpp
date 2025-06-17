@@ -59,7 +59,7 @@ void D2_ZBL::calc_aed(
   const double rij,
   const double,
   tadah::core::aed_type &aed,
-  const double scale)
+  const double scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   double fc_ij = fcut->calc(rij);
@@ -74,7 +74,7 @@ void D2_ZBL::calc_dXijdri(
   const double rij,
   const double,
   tadah::core::fd_type &fd_ij,
-  const double scale)
+  const double scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   double r_inv = 1.0/rij;
@@ -96,7 +96,7 @@ void D2_ZBL::calc_all(
   const double,
   tadah::core::aed_type &aed,
   tadah::core::fd_type &fd_ij,
-  const double scale)
+  const double scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   double r_inv = 1.0/rij;
@@ -113,25 +113,25 @@ void D2_ZBL::calc_all(
   double dE_ZBL_r = -(Zi * Zj * r_inv*r_inv)*p + dp*(Zi * Zj * r_inv) / a_ ;
   fd_ij(fidx,0) = scale*weights[Zj]*(E_ZBL*fcp_ij + dE_ZBL_r*fc_ij);
 }
-std::string D2_ZBL::label() {
+std::string D2_ZBL::label() const {
   return lab;
 }
 void D2_ZBL::init() {
   nparams=4;
 }
-double D2_ZBL::phi(double x) {
+double D2_ZBL::phi(double x) const {
   return 0.1818 * std::exp(-3.2 * x) +
   0.5099 * std::exp(-0.9423 * x) +
   0.2802 * std::exp(-0.4029 * x) +
   0.02817 * std::exp(-0.2016 * x);
 }
-double D2_ZBL::dphi(double x) {
+double D2_ZBL::dphi(double x) const {
   return -3.2 * 0.1818 * std::exp(-3.2 * x) -
   0.9423 * 0.5099 * std::exp(-0.9423 * x) -
   0.4029 * 0.2802 * std::exp(-0.4029 * x) -
   0.2016 * 0.02817 * std::exp(-0.2016 * x);
 }
-double D2_ZBL::screening_length(int Zi, int Zj) {
+double D2_ZBL::screening_length(int Zi, int Zj) const {
   return (s0 * a0) / (std::pow(Zi, p0) + std::pow(Zj, p1));
 }
 

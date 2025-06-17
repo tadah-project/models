@@ -130,7 +130,7 @@ DM_Blip::DM_Blip(const core::Context& ctx)
 }
 
 /* ------------------ embedding energy / derivative ----------------- */
-void DM_Blip::calc_aed(core::rho_type& rhoi, core::aed_type& aed)
+void DM_Blip::calc_aed(core::rho_type& rhoi, core::aed_type& aed) const
 {
   std::size_t Lshift=0, ii=rfidx;
   const std::size_t ng=cgrid.size();
@@ -157,7 +157,7 @@ void DM_Blip::calc_dXijdri_dXjidri(
         core::rho_type&  rhoi,
         core::rho_type&  rhoj,
         core::fd_type&   fd_ij,
-        double           scale)
+        double           scale) const
 {
   if(!is_init_for_atoms(Zi,Zj) || rij>get_rcut()) return;
 
@@ -232,7 +232,7 @@ void DM_Blip::calc_dXijdri(
         const core::Vec3d& v,
         core::rho_type&   rhoi,
         core::fd_type&    fd_ij,
-        double            scale)
+        double            scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
 
@@ -308,7 +308,7 @@ void DM_Blip::calc_dXijdri(
 void DM_Blip::calc_rho(int Zi,int Zj,double rij,double,
                        const core::Vec3d& v,
                        core::rho_type&    rhoi,
-                       double             scale)
+                       double             scale) const
 {
   if(!is_init_for_atoms(Zi,Zj) || rij>get_rcut()) return;
 
@@ -370,7 +370,7 @@ std::size_t DM_Blip::gen_atomic_orbitals(int Lm)
 }
 
 /* ------------------------------- misc ----------------------------- */
-std::string DM_Blip::label(){ return lab; }
+std::string DM_Blip::label() const { return lab; }
 
 void DM_Blip::init()
 {

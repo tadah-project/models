@@ -37,7 +37,7 @@ public:
    */
   virtual void calc_aed(
     tadah::core::rho_type& rho,
-    tadah::core::aed_type &aed)=0;
+    tadah::core::aed_type &aed) const=0;
 
   /** \brief Calculate \ref FD
    *
@@ -61,7 +61,7 @@ public:
     tadah::core::rho_type& rhoi,
     tadah::core::rho_type& rhoj,
     tadah::core::fd_type &fd_ij,
-    const double scale=1)=0;
+    const double scale=1) const=0;
 
   /** \brief Calculate \ref FD
    *
@@ -86,7 +86,7 @@ public:
     const tadah::core::Vec3d &vec_ij,
     tadah::core::rho_type& rhoi,
     tadah::core::fd_type &fd_ij,
-    const double scale=1)=0;
+    const double scale=1) const=0;
 
   /** \brief Resize arrays for a density and F' */
   virtual void init_rhoi(tadah::core::rho_type& rhoi)=0;
@@ -99,12 +99,12 @@ public:
     const double rij_sq,
     const tadah::core::Vec3d &vec_ij,
     tadah::core::rho_type& rho,
-    const double scale=1)=0;
+    const double scale=1) const =0;
 
 
   /** \brief This is just a convenient wrapper.
    */
-  void calc_dXijdri(const int Zi, const int Zj, tadah::core::Vec3d &del, tadah::core::rho_type &rhoi, tadah::core::fd_type &fdij, double scale=1) {
+  void calc_dXijdri(const int Zi, const int Zj, tadah::core::Vec3d &del, tadah::core::rho_type &rhoi, tadah::core::fd_type &fdij, double scale=1) const{
     double rsq = del*del;
     double r = sqrt(rsq);
     //(p->*func)(r,rsq,del,1.0,0.0,rhoi,fdij);
@@ -113,25 +113,25 @@ public:
 
   /** \brief This is just a convenient wrapper.
    */
-  void calc_rho_mb(const int Zi, const int Zj, tadah::core::Vec3d &del, tadah::core::rho_type &rhoi, double scale=1) {
+  void calc_rho_mb(const int Zi, const int Zj, tadah::core::Vec3d &del, tadah::core::rho_type &rhoi, double scale=1) const {
     double rsq = del*del;
     double r = sqrt(rsq);
     ((*this).calc_rho)(Zi, Zj,r,rsq,del,rhoi,scale);
   }
   /** \brief Return size of the density array */
-  virtual size_t rhoi_size() {
+  virtual size_t rhoi_size() const{
     return rhoisize;
   }
   /** \brief Return size of the derivative of the embedding energy array */
-  virtual size_t rhoip_size() {
+  virtual size_t rhoip_size() const{
     return rhoisize;
   }
   // virtual size_t size() {
   //   return s;
   // }
-  virtual std::string label()=0;
+  virtual std::string label() const=0;
 
-  virtual size_t get_rfidx();
+  virtual size_t get_rfidx() const;
   virtual void set_rfidx(size_t fidx_);
 };
 } // namespace models

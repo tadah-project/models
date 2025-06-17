@@ -41,7 +41,7 @@ void D2_Blip::calc_aed(
   const double rij,
   const double,
   tadah::core::aed_type &aed,
-  const double scale)
+  const double scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   size_t i=fidx;
@@ -58,7 +58,7 @@ void D2_Blip::calc_dXijdri(
   const double rij,
   const double ,
   tadah::core::fd_type &fd_ij,
-  const double scale)
+  const double scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   size_t i=fidx;
@@ -75,7 +75,7 @@ void D2_Blip::calc_all(
   const double ,
   tadah::core::aed_type &aed,
   tadah::core::fd_type &fd_ij,
-  const double scale)
+  const double scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
 
@@ -89,7 +89,7 @@ void D2_Blip::calc_all(
   }
 }
 
-std::string D2_Blip::label() {
+std::string D2_Blip::label() const {
   return lab;
 }
 void D2_Blip::init() {

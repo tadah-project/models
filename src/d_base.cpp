@@ -85,7 +85,7 @@ size_t D_Base::size() const { return s; }
 double D_Base::get_rcut() const { 
   return fcut->get_rcut(); 
 }
-bool D_Base::is_init_for_atoms(int Zi, int Zj) {
+bool D_Base::is_init_for_atoms(int Zi, int Zj) const {
   return init_for_atoms_map.is_init(Zi,Zj) ;
 }
 void D_Base::init_for_atoms(int Zi, int Zj) {

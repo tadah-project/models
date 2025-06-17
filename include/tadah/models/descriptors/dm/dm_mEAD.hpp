@@ -154,7 +154,7 @@ template <typename F>
   init_for_atoms(init_atoms);
 }
 template <typename F>
-  void DM_mEAD<F>::calc_aed(core::rho_type& rhoi, core::aed_type& aed)
+  void DM_mEAD<F>::calc_aed(core::rho_type& rhoi, core::aed_type& aed) const
   {
     std::size_t Lshift = 0;
     std::size_t ii     = rfidx;
@@ -187,7 +187,7 @@ void DM_mEAD<F>::calc_dXijdri_dXjidri(
         core::rho_type&   rhoi,
         core::rho_type&   rhoj,
         core::fd_type&    fd_ij,
-        double            scale)
+        double            scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
 
@@ -270,7 +270,7 @@ void DM_mEAD<F>::calc_dXijdri(
         const core::Vec3d& v,
         core::rho_type&    rhoi,
         core::fd_type&     fd_ij,
-        double             scale)
+        double             scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
 
@@ -348,7 +348,7 @@ void DM_mEAD<F>::calc_dXijdri(
 
 
 template <typename F>
-  std::string DM_mEAD<F>::label() {
+  std::string DM_mEAD<F>::label() const {
     return lab;
   }
 
@@ -361,7 +361,7 @@ template <typename F>
 template <typename F>
   void DM_mEAD<F>::calc_rho(
       int Zi,int Zj,double rij,double,const core::Vec3d& v,
-      core::rho_type& rhoi,double scale)
+      core::rho_type& rhoi,double scale) const
   {
     if(!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
 
