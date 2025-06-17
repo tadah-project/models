@@ -126,9 +126,9 @@ public:
   virtual size_t rhoip_size() {
     return rhoisize;
   }
-  virtual size_t size() {
-    return s;
-  }
+  // virtual size_t size() {
+  //   return s;
+  // }
   virtual std::string label()=0;
 
   virtual size_t get_rfidx();

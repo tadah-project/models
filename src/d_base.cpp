@@ -66,7 +66,7 @@ void D_Base::printGrid(core::v_type &v, const std::string &key, core::LogLevel l
 }
 
 void D_Base::set_fidx(size_t fidx_) { fidx=fidx_; }
-size_t D_Base::get_fidx() { return fidx; }
+size_t D_Base::get_fidx() const { return fidx; }
 void D_Base::set_fcut(Cut_Base* cut, bool manage_memory) {
   if (this->manage_memory && fcut != cut) {
     delete fcut;
@@ -81,8 +81,8 @@ int D_Base::get_arg_pos(const std::string &key) const {
 
   return std::distance(keys.begin(), it)+(nparams-keys.size());
 }
-size_t D_Base::size() { return s; }
-double D_Base::get_rcut() { 
+size_t D_Base::size() const { return s; }
+double D_Base::get_rcut() const { 
   return fcut->get_rcut(); 
 }
 bool D_Base::is_init_for_atoms(int Zi, int Zj) {
