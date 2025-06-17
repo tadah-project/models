@@ -2,7 +2,7 @@
 #define TADAH_MODELS_SVD_IMPL_H
 
 #include <tadah/models/svd.h>
-#include <tadah/models/memory/ModelsWorkspaceManager.h>
+#include <tadah/models/memory/models_workspace_manager.h>
 #include <tadah/core/lapack.h>
 #include <algorithm>
 #include <stdexcept>
