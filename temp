@@ -242,7 +242,7 @@ void DM_EAD::calc_rho(
   const double,
   const tadah::core::Vec3d &vec_ij,
   tadah::core::rho_type& rhoi,
-  const double scale)
+  const double scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   size_t ii=rfidx;

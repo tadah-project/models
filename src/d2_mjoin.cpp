@@ -25,27 +25,27 @@ D2_mJoin::D2_mJoin(tadah::core::Context &c) : D2_Base(c) {
 }
 
 void D2_mJoin::calc_aed(const int Zi, const int Zj, const double rij,
-                        const double rij_sq, tadah::core::aed_type &aed, const double scale) {
+                        const double rij_sq, tadah::core::aed_type &aed, const double scale) const {
   for (auto d : ds) {
     d->calc_aed(Zi, Zj, rij, rij_sq, aed, scale);
   }
 }
 
 void D2_mJoin::calc_dXijdri(const int Zi, const int Zj, const double rij,
-                            const double rij_sq, tadah::core::fd_type &fd_ij, const double scale) {
+                            const double rij_sq, tadah::core::fd_type &fd_ij, const double scale) const {
   for (auto d : ds) {
     d->calc_dXijdri(Zi, Zj, rij, rij_sq, fd_ij, scale);
   }
 }
 
 void D2_mJoin::calc_all(const int Zi, const int Zj, const double rij,
-                        const double rij_sq, tadah::core::aed_type &aed, tadah::core::fd_type &fd_ij, const double scale) {
+                        const double rij_sq, tadah::core::aed_type &aed, tadah::core::fd_type &fd_ij, const double scale) const {
   for (auto d : ds) {
     d->calc_all(Zi, Zj, rij, rij_sq, aed, fd_ij, scale);
   }
 }
 
-std::string D2_mJoin::label() {
+std::string D2_mJoin::label() const {
   return lab;
 }
 

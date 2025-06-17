@@ -58,7 +58,7 @@ public:
 
   /** \brief Return label of this descriptor.
    */
-  virtual std::string label()=0;
+  virtual std::string label() const=0;
   double weights[119] = {1};  // ignore zero index; w[1]->H
   D_Base();
   D_Base(const tadah::core::Context &c);
@@ -71,7 +71,7 @@ public:
   void printGrid(core::v_type &v, const std::string &key, core::LogLevel logLevel=core::LogLevel::INFO);
 
   virtual void set_fidx(size_t fidx_);
-  virtual size_t get_fidx();
+  virtual size_t get_fidx() const;
 
   /**
  * @brief Initialize the descriptor.
@@ -89,13 +89,13 @@ public:
 
   virtual void set_fcut(Cut_Base* cut, bool manage_memory);
 
-  double get_rcut();
+  double get_rcut() const;
 
   /** \brief Return dimension of the descriptor.
   */
-  virtual size_t size();
+  virtual size_t size() const;
 
-  virtual bool is_init_for_atoms(int Zi, int Zj);
+  virtual bool is_init_for_atoms(int Zi, int Zj) const;
   virtual void init_for_atoms(int Zi, int Zj);
   virtual void init_for_atoms(const std::vector<std::string> &Zs);
   virtual void uninit_for_atoms(int Zi, int Zj);

@@ -136,7 +136,7 @@ DM_EAD::DM_EAD(const core::Context& ctx)
 /* ------------------------------------------------------------------ *
  *  embedding energy + derivative store                               *
  * ------------------------------------------------------------------ */
-void DM_EAD::calc_aed(core::rho_type& rhoi, core::aed_type& aed)
+void DM_EAD::calc_aed(core::rho_type& rhoi, core::aed_type& aed) const
 {
   std::size_t Lshift = 0;
   std::size_t ii     = rfidx;          // start of density part
@@ -166,7 +166,7 @@ void DM_EAD::calc_dXijdri_dXjidri(
         core::rho_type&  rhoi,
         core::rho_type&  rhoj,
         core::fd_type&   fd_ij,
-        double           scale)
+        double           scale) const
 {
   if(!is_init_for_atoms(Zi,Zj) || rij>get_rcut()) return;
 
@@ -243,7 +243,7 @@ void DM_EAD::calc_dXijdri(
         const core::Vec3d& v,
         core::rho_type&   rhoi,
         core::fd_type&    fd_ij,
-        double            scale)
+        double            scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
 
@@ -321,7 +321,7 @@ void DM_EAD::calc_dXijdri(
 void DM_EAD::calc_rho(int Zi,int Zj,double rij,double,
                       const core::Vec3d& v,
                       core::rho_type&    rhoi,
-                      double             scale)
+                      double             scale) const
 {
   if(!is_init_for_atoms(Zi,Zj) || rij>get_rcut()) return;
 
@@ -389,7 +389,7 @@ std::size_t DM_EAD::gen_atomic_orbitals(int Lmax)
 }
 
 /* ------------------------------------------------------------------ */
-std::string DM_EAD::label(){ return lab; }
+std::string DM_EAD::label() const { return lab; }
 
 /* ------------------------------------------------------------------ */
 void DM_EAD::init()

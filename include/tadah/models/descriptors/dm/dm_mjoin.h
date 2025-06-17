@@ -58,7 +58,7 @@ public:
   DM_mJoin(const tadah::core::Context &c);
   void calc_aed(
     tadah::core::rho_type& rho,
-    tadah::core::aed_type &aed) override;
+    tadah::core::aed_type &aed) const override;
   void calc_dXijdri_dXjidri(
     const int Zi,
     const int Zj,
@@ -68,7 +68,7 @@ public:
     tadah::core::rho_type& rhoi,
     tadah::core::rho_type& rhoj,
     tadah::core::fd_type &fd_ij,
-    const double scale=1) override;
+    const double scale=1) const override;
   void calc_dXijdri(
     const int Zi,
     const int Zj,
@@ -77,8 +77,8 @@ public:
     const tadah::core::Vec3d &vec_ij,
     tadah::core::rho_type& rhoi,
     tadah::core::fd_type &fd_ij, 
-    const double scale=1) override;
-  std::string label() override;
+    const double scale=1) const override;
+  std::string label() const override;
   void init_rhoi(tadah::core::rho_type& rhoi) override;
   void calc_rho(
     const int Zi,
@@ -87,7 +87,7 @@ public:
     const double rij_sq,
     const tadah::core::Vec3d &vec_ij,
     tadah::core::rho_type& rho,
-    const double scale=1) override;
+    const double scale=1) const override;
   void set_fidx(size_t fidx_) override;
   void set_rfidx(size_t rfidx_) override;
 

@@ -12,7 +12,7 @@ DM_Dummy::DM_Dummy(const tadah::core::Context&c): DM_Base(c) {
 }
 void DM_Dummy::calc_aed(
   tadah::core::rho_type&,
-  tadah::core::aed_type & ) {}
+  tadah::core::aed_type & ) const {}
 void DM_Dummy::calc_dXijdri_dXjidri(
   const int,
   const int,
@@ -22,7 +22,7 @@ void DM_Dummy::calc_dXijdri_dXjidri(
   tadah::core::rho_type&,
   tadah::core::rho_type&,
   tadah::core::fd_type &,
-  const double) {}
+  const double) const {}
 void DM_Dummy::calc_dXijdri(
   const int,
   const int,
@@ -31,8 +31,8 @@ void DM_Dummy::calc_dXijdri(
   const tadah::core::Vec3d &,
   tadah::core::rho_type&,
   tadah::core::fd_type &,
-  const double) {}
-std::string DM_Dummy::label() {return lab;}
+  const double) const {}
+std::string DM_Dummy::label() const {return lab;}
 void DM_Dummy::init_rhoi(tadah::core::rho_type&) {}
 void DM_Dummy::calc_rho(
   const int,
@@ -41,7 +41,7 @@ void DM_Dummy::calc_rho(
   const double,
   const tadah::core::Vec3d &,
   tadah::core::rho_type&,
-  const double) {}
+  const double) const {}
 
 void DM_Dummy::init() {
   nparams=0;

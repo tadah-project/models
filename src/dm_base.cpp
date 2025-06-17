@@ -3,7 +3,7 @@ namespace tadah {
 namespace models {
 
 void DM_Base::set_rfidx(size_t rfidx_) { rfidx=rfidx_; }
-size_t DM_Base::get_rfidx() { return rfidx; }
+size_t DM_Base::get_rfidx() const { return rfidx; }
 
 std::vector<std::string> DM_Base::get_init_atoms(const tadah::core::Context &c) {
   if (!c.contains("TYPEMB")) {

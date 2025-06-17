@@ -18,7 +18,7 @@ void D2_Dummy::calc_aed(
   const double,
   const double,
   tadah::core::aed_type&,
-  const double) {}
+  const double) const {}
 
 void D2_Dummy::calc_dXijdri(
   const int,
@@ -26,7 +26,7 @@ void D2_Dummy::calc_dXijdri(
   const double,
   const double,
   tadah::core::fd_type &,
-  const double) {}
+  const double) const {}
 void D2_Dummy::calc_all(
   const int,
   const int,
@@ -34,8 +34,8 @@ void D2_Dummy::calc_all(
   const double,
   tadah::core::aed_type & ,
   tadah::core::fd_type &,
-  const double) {}
-std::string D2_Dummy::label() { return lab; }
+  const double) const {}
+std::string D2_Dummy::label() const { return lab; }
 void D2_Dummy::init() {
   nparams=0;
 }

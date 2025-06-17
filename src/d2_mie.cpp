@@ -27,7 +27,7 @@ void D2_MIE::calc_aed(
   const double rij,
   const double,
   tadah::core::aed_type &aed,
-  const double scale)
+  const double scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   double rn_inv = 1.0/pow(rij,n);
@@ -43,7 +43,7 @@ void D2_MIE::calc_dXijdri(
   const double rij,
   const double,
   tadah::core::fd_type &fd_ij,
-  const double scale)
+  const double scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   double fc_ij = fcut->calc(rij);
@@ -59,7 +59,7 @@ void D2_MIE::calc_all(
   const double,
   tadah::core::aed_type &aed,
   tadah::core::fd_type &fd_ij,
-  const double scale)
+  const double scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
 
@@ -76,7 +76,7 @@ void D2_MIE::calc_all(
   fd_ij(fidx+1,0) = scale*weights[Zj]*(-m*rm_inv/rij*fc_ij + fcp_ij*rm_inv);
 
 }
-std::string D2_MIE::label() {
+std::string D2_MIE::label() const {
   return lab;
 }
 void D2_MIE::init() {

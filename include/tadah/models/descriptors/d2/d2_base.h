@@ -37,7 +37,7 @@ public:
     const double rij,
     const double rij_sq,
     tadah::core::aed_type& aed,
-    const double scale=1)=0;
+    const double scale=1)const=0;
 
   /** \brief Calculate \ref FD
    *
@@ -58,7 +58,7 @@ public:
     const double rij,
     const double rij_sq,
     tadah::core::fd_type &fd_ij,
-    const double scale=1)=0;
+    const double scale=1) const=0;
 
   /** \brief Calculate \ref AED + \ref FD */
   virtual void calc_all(
@@ -68,7 +68,7 @@ public:
     const double rij_sq,
     tadah::core::aed_type& aed,
     tadah::core::fd_type &fd_ij,
-    const double scale=1)=0;
+    const double scale=1) const=0;
 
   /** Central difference approximation to \ref FD 
    *
@@ -80,7 +80,7 @@ public:
    * fd: appropriate size container to store computation
    * h: central difference parameter
    */
-  void calc_fd_approx(const int Zi, const int Zj, double r, tadah::core::fd_type &fd, double h=1e-8) {
+  void calc_fd_approx(const int Zi, const int Zj, double r, tadah::core::fd_type &fd, double h=1e-8)  const{
     tadah::core::aed_type aed_n((*this).size()); // r+h
     tadah::core::aed_type aed_p((*this).size()); // r-h
     aed_n.set_zero();

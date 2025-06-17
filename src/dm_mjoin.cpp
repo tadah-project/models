@@ -26,7 +26,7 @@ DM_mJoin::DM_mJoin(tadah::core::Context &c) : DM_Base(c) {
   set_rfidx(0);
 }
 
-void DM_mJoin::calc_aed(tadah::core::rho_type& rho, tadah::core::aed_type &aed) {
+void DM_mJoin::calc_aed(tadah::core::rho_type& rho, tadah::core::aed_type &aed) const {
   for (auto d : ds) {
     d->calc_aed(rho, aed);
   }
@@ -40,7 +40,7 @@ void DM_mJoin::calc_dXijdri_dXjidri(
   tadah::core::rho_type& rhoi,
   tadah::core::rho_type& rhoj,
   tadah::core::fd_type &fd_ij,
-  const double scale) {
+  const double scale) const {
   for (auto d : ds) {
     d->calc_dXijdri_dXjidri(Zi,Zj,rij,rij_sq,vec_ij,rhoi,rhoj,fd_ij,scale); 
   }
@@ -53,7 +53,7 @@ void DM_mJoin::calc_dXijdri(
   const tadah::core::Vec3d &vec_ij,
   tadah::core::rho_type& rhoi,
   tadah::core::fd_type &fd_ij, 
-  const double scale) {
+  const double scale) const {
   for (auto d : ds) { 
     d->calc_dXijdri(Zi,Zj,rij,rij_sq,vec_ij,rhoi,fd_ij,scale);
   }
@@ -69,12 +69,12 @@ void DM_mJoin::calc_rho(
   const double rij_sq,
   const tadah::core::Vec3d &vec_ij,
   tadah::core::rho_type& rho,
-  const double scale) {
+  const double scale) const {
   for (auto d : ds) {
       d->calc_rho(Zi,Zj,rij,rij_sq,vec_ij,rho,scale);
   }
 }
-std::string DM_mJoin::label() {
+std::string DM_mJoin::label() const {
   return lab;
 }
 
