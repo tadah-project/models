@@ -9,7 +9,7 @@
 #include <tadah/models/functions/function_base.h>
 #include <tadah/models/functions/basis_functions/bf_base.h>
 #include <tadah/core/context.h>
-#include <tadah/models/memory/IModelsWorkspaceManager.h>
+#include <tadah/models/memory/imodels_workspace_manager.h>
 
 #include <iostream>
 #include <vector>

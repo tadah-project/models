@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <tadah/core/maths.h>
-#include <tadah/models/memory/ModelsWorkspaceManager.h>
+#include <tadah/models/memory/models_workspace_manager.h>
 #include <tadah/models/svd.h>
 
 using namespace tadah::core;

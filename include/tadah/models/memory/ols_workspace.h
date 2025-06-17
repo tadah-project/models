@@ -1,7 +1,7 @@
 #ifndef TADAH_MODELS_MEMORY_OLSWORKSPACE_H
 #define TADAH_MODELS_MEMORY_OLSWORKSPACE_H
 
-#include <tadah/models/Algorithm.h> // For Algorithm
+#include <tadah/models/algorithm.h> // For Algorithm
 
 namespace tadah {
 namespace models {

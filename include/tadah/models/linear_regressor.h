@@ -8,7 +8,7 @@
 #include <tadah/models/ea.h>
 #include <tadah/models/ols.h>
 #include <tadah/models/svd.h>
-#include <tadah/models/memory/IModelsWorkspaceManager.h>
+#include <tadah/models/memory/imodels_workspace_manager.h>
 
 #include <vector>
 

@@ -3,8 +3,8 @@
 
 #include <tadah/core/core_types.h>
 #include <tadah/core/utils.h>
-#include <tadah/models/memory/IModelsWorkspaceManager.h>
-#include <tadah/models/memory/ModelsWorkspaceManager.h>
+#include <tadah/models/memory/imodels_workspace_manager.h>
+#include <tadah/models/memory/models_workspace_manager.h>
 
 namespace tadah {
 namespace models {

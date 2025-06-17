@@ -9,7 +9,7 @@
 #include <tadah/models/ekm.h>
 #include <tadah/core/maths.h>
 #include <tadah/core/context.h>
-#include <tadah/models/memory/IModelsWorkspaceManager.h>
+#include <tadah/models/memory/imodels_workspace_manager.h>
 
 #include <iostream>
 #include <limits>
