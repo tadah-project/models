@@ -3,7 +3,7 @@
 #include "catch2/catch.hpp"
 #include <tadah/models/ols.h>
 #include <tadah/models/svd.h>
-#include <tadah/models/memory/ModelsWorkspaceManager.h>
+#include <tadah/models/memory/models_workspace_manager.h>
 #include <tadah/core/maths.h>
 #include <cmath>
 #include <algorithm>

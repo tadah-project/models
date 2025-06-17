@@ -1,8 +1,8 @@
 #ifndef TADAH_MODELS_SVD_H
 #define TADAH_MODELS_SVD_H
 
-#include <tadah/models/memory/IModelsWorkspaceManager.h>
-#include <tadah/models/memory/SVDWorkspace.h>
+#include <tadah/models/memory/imodels_workspace_manager.h>
+#include <tadah/models/memory/svd_workspace.h>
 
 namespace tadah {
 namespace models {

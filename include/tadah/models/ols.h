@@ -1,8 +1,8 @@
 #ifndef TADAH_MODELS_OLS_H
 #define TADAH_MODELS_OLS_H
 
-#include <tadah/models/Algorithm.h> // Include the Algorithm enum
-#include <tadah/models/memory/IModelsWorkspaceManager.h>
+#include <tadah/models/algorithm.h> // Include the Algorithm enum
+#include <tadah/models/memory/imodels_workspace_manager.h>
 #include <cmath>
 #include <stdexcept>
 #include <cstdlib>
