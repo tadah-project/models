@@ -3,6 +3,9 @@
 
 #include <tadah/models/descriptors/d2/d2_base.h>
 
+namespace tadah {
+namespace models {
+
 /**
  * \brief ZBL Descriptor
  *
@@ -34,7 +37,7 @@
  * \phi(x) = 0.1818 e^{-3.2x} + 0.5099 e^{-0.9423x} + 0.2802 e^{-0.4029x} + 0.02817 e^{-0.2016x}
  * \f]
  *
- * Required Config Key: \ref INIT2B \ref TYPE2B
+ * Required tadah::core::Context Key: \ref INIT2B \ref TYPE2B
  *
  * - TYPE2B D2_ZBL \f$ a_0 \f$ \f$ s_0 \f$ \f$ p_0 \f$ \f$ p_1 \f$ ELEMENT1 ELEMENT2
  *
@@ -61,31 +64,34 @@ private:
   int ntypes=0; // number of elements for this calc
 public:
   D2_ZBL();
-  D2_ZBL(Config &config);
+  D2_ZBL(const tadah::core::Context &context);
   ~D2_ZBL();
   void calc_aed(
     const int Zi,
     const int Zj,
     const double rij,
     const double ,
-    aed_type &aed,
+    tadah::core::aed_type &aed,
     const double scale=1) override;
   void calc_dXijdri(
     const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
-    fd_type &fd_ij,
+    tadah::core::fd_type &fd_ij,
     const double scale=1) override;
   void calc_all(
     const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
-    aed_type &aed,
-    fd_type &fd_ij,
+    tadah::core::aed_type &aed,
+    tadah::core::fd_type &fd_ij,
     const double scale=1) override;
+
   std::string label() override;
   void init() override;
 };
+} // namespace models
+} // namespace tadah
 #endif

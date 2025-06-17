@@ -1,56 +1,79 @@
 #include <tadah/models/descriptors/dm/dm_func.h>
+#include <cmath>
 
-#include <tadah/core/config.h>
+namespace tadah {
+namespace models {
 
-F_RLR::F_RLR(Config &conf):
-  config(&conf)
+F_RLR::F_RLR(const tadah::core::Context &c, size_t cSize, size_t sSize):
+  context(&c)
 {
-  if (!config->get<bool>("INITMB")) return;
-  D_Base::get_grid(*config,"SEMBFUNC",sgrid);
-  D_Base::get_grid(*config,"CEMBFUNC",cgrid);
-
+  if (!context->get<bool>("INITMB")) return;
+  D_Base::get_grid(*context,"SEMBFUNC",sfuncgrid);
+  D_Base::get_grid(*context,"CEMBFUNC",cfuncgrid);
+  // check if size is correct, throw otherwise
+  if (sfuncgrid.size() != sSize) {
+    throw std::runtime_error("F_RLR: size of SEMBFUNC does not match declared size.");
+  }
+  if (cfuncgrid.size() != cSize) {
+    throw std::runtime_error("F_RLR: size of CEMBFUNC does not match declared size.");
+  }
 }
-F_RLR::F_RLR():
-  config(nullptr)
-{}
-double F_RLR::calc_F(double rho,size_t p) {
-  if (rho>0)
-    return sgrid[p]*rho*log(cgrid[p]*rho);
-  return 0;
+double F_RLR::calc_F(double rho,size_t p) const {
+  return sfuncgrid[p]*std::abs(rho)*std::log(cfuncgrid[p]*std::abs(rho) + eps);
 }
-double F_RLR::calc_dF(double rho,size_t p) {
-  if (rho>0)
-    return sgrid[p]*(log(cgrid[p]*rho)+1);
-  return sgrid[p];
+double F_RLR::calc_dF(double rho,size_t p) const {
+  if (rho < 0.0) {
+    return -sfuncgrid[p]*(std::log(cfuncgrid[p]*std::abs(rho) + eps) + 1.0);
+  } else {
+    return sfuncgrid[p]*(std::log(cfuncgrid[p]*std::abs(rho) + eps)+1);
+  }
 }
 
 //////////////////////////
 // F_SQRT
-F_SQRT::F_SQRT(Config &conf):
-  config(&conf)
+//////////////////////////
+F_SQRT::F_SQRT(const tadah::core::Context &c, size_t, size_t sSize):
+  context(&c)
 {
-  if (!config->get<bool>("INITMB"))
-    return;
-  if (config->exist("SEMBFUNC")) {
-    D_Base::get_grid(*config, "SEMBFUNC", sgrid);
+  if (!context->get<bool>("INITMB")) return;
+  if (context->contains("SEMBFUNC") && context->size("SEMBFUNC") > 0) {
+    D_Base::get_grid(*context, "SEMBFUNC", sfuncgrid);
+    // check if size is correct, throw otherwise
+    if (sfuncgrid.size() != sSize) {
+      throw std::runtime_error("F_SQRT: size of SEMBFUNC does not match declared size.");
+    }
   } else {
-    sgrid.resize(1);
-    sgrid[0] = 1.0;
+    sfuncgrid.resize(sSize);
+    for (size_t i=0; i<sSize; ++i) {
+      sfuncgrid[i] = 1.0;
+    }
   }
 }
-F_SQRT::F_SQRT():
-  config(nullptr)
+double F_SQRT::calc_F(double rho,size_t p) const {
+    return sfuncgrid[p]*std::sqrt(std::abs(rho) + eps);
+}
+double F_SQRT::calc_dF(double rho,size_t p) const {
+  if (rho < 0.0) {
+    return -0.5*sfuncgrid[p]/(std::sqrt(std::abs(rho) + eps));
+  } else {
+    return 0.5*sfuncgrid[p]/(std::sqrt(rho + eps));
+  }
+}
+
+//////////////////////////
+// F_SQ
+//////////////////////////
+F_SQ::F_SQ(const tadah::core::Context &c, size_t, size_t ):
+  context(&c)
 {
-  sgrid.resize(1);
-  sgrid[0] = 1.0;
+  if (!context->get<bool>("INITMB")) return;
 }
-double F_SQRT::calc_F(double rho,size_t p) {
-  if (rho>0)
-    return sgrid[p]*std::sqrt(rho);
-  return 0;
+double F_SQ::calc_F(double rho,size_t ) const {
+    return rho*rho;
 }
-double F_SQRT::calc_dF(double rho,size_t p) {
-  if (rho>0)
-    return 0.5*sgrid[p]/(std::sqrt(rho));
-  return 0;
+double F_SQ::calc_dF(double rho,size_t ) const {
+  return 2.0*rho;
 }
+
+} // namespace models
+} // namespace tadah

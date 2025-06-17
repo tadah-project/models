@@ -1,4 +1,4 @@
-#include <tadah/models/memory/IModelsWorkspaceManager.h>
+#include <tadah/models/memory/imodels_workspace_manager.h>
 
 namespace tadah {
 namespace models {

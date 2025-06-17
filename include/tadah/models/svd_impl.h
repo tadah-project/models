@@ -40,7 +40,7 @@ void SVD::compute(M& A) {
     int info;
 
     // Perform SVD
-    ::dgesdd_(&jobz, &m, &n, A.ptr(), &lda, svdWorkspace_->S, svdWorkspace_->U, &ldu,
+  tadah::core::dgesdd_(&jobz, &m, &n, A.ptr(), &lda, svdWorkspace_->S, svdWorkspace_->U, &ldu,
               svdWorkspace_->VT, &ldvt, svdWorkspace_->work, &svdWorkspace_->lwork, svdWorkspace_->iwork, &info);
 
     if (info != 0) {

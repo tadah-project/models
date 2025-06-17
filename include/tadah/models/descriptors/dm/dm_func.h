@@ -1,10 +1,13 @@
 #ifndef DM_func_H
 #define DM_func_H
 
-#include <tadah/core/config.h>
+#include <tadah/core/context.h>
 #include <tadah/models/descriptors/d_base.h>
 
 #include <cstdlib>
+
+namespace tadah {
+namespace models {
 
 class F_Base {
 public:
@@ -14,7 +17,7 @@ public:
    * @param p Index for model parameters.
    * @return Function value F(rho).
    */
-  virtual double calc_F(double rho, size_t p) = 0;
+  virtual double calc_F(double rho, size_t p) const = 0;
 
   /**
    * @brief Calculates the first derivative of the embedding function.
@@ -22,7 +25,7 @@ public:
    * @param p Index for model parameters.
    * @return Derivative dF/d(rho).
    */
-  virtual double calc_dF(double rho, size_t p) = 0;
+  virtual double calc_dF(double rho, size_t p) const = 0;
 };
 
 /**
@@ -33,23 +36,25 @@ public:
  * - **SEMBFUNC**: Controls the depth, \f$ s \f$, of the embedding function. 
  * - **CEMBFUNC**: Determines the x-intercept, with the x-intercept at \f$ 1/c \f$.
  * 
- *  Require: size(**SEMBFUNC**)=size(**CEMBFUNC**)=1
+ *  Require: size(**SEMBFUNC**)=size(**CEMBFUNC**)=size(**[C/S]GRIDMB**)
  * 
  * The number of keys for these parameters must match the entries in the mEAD descriptor.
  *
  */
 class F_RLR:  public F_Base {
 private:
-  Config *config=nullptr;
-  v_type sgrid;   // controls depth
-  v_type cgrid;   // control x-intercep at 1/c
+  const tadah::core::Context *context=nullptr;
+  tadah::core::v_type sfuncgrid;   // controls depth
+  tadah::core::v_type cfuncgrid;   // control x-intercep at 1/c
+  double eps=1e-10; // small value to avoid log(0)
 public:
-  F_RLR(Config &conf);
-  F_RLR();
-  double calc_F(double rho,size_t p) override;
-  double calc_dF(double rho,size_t p) override;
+  F_RLR(const tadah::core::Context &context, size_t cSize, size_t sSize);
+  F_RLR() = default;
+  double calc_F(double rho,size_t p) const override;
+  double calc_dF(double rho,size_t p) const override;
   //~F_RLR() {
-  // Do not delete config!
+
+  // Do not delete context!
   //}
 };
 
@@ -59,33 +64,30 @@ public:
  *
  * Optional parameter:
  * - **SEMBFUNC**: Controls the strength, \f$ s \f$, of the embedding function.
- *   If no; value is provided, the default is 1.
+ *   If no; value is provided, the default is 1 for every s/cgrid point.
  *
- *  Require: size(**SEMBFUNC**)=(0 or 1) and size(**CEMBFUNC**)=0
+ *  Require: size(**SEMBFUNC**)=(0 or size(**[C/S]GRIDMB**)) and size(**CEMBFUNC**)=0
  *
  */
 class F_SQRT : public F_Base {
 private:
-  Config *config = nullptr; ///< Configuration object (not owned by this class).
-  v_type sgrid;             ///< Controls depth or scaling factor.
+  const tadah::core::Context *context=nullptr;
+  tadah::core::v_type sfuncgrid;   // controls depth
+  double eps=1e-10; // small value to avoid sqrt(0)
 
 public:
   /**
-   * @brief Constructs F_SQRT from a Config object.
-   * @param conf Reference to a Config instance.
+   * @brief Constructs F_SQRT from a Context object.
+   * @param context Reference to a Context instance.
    *
    * The constructor extracts or initializes relevant parameter for the model from
-   * the provided configuration.  SEMBFUNC is set to 1 if not specified in the Config.
-   */
-  F_SQRT(Config &conf);
-
-  /**
-   * @brief Default constructor for F_SQRT.
+   * the provided configuration.
    *
-   * This version does not initialize from a Config object. Users must
-   * manually set sgrid if this constructor is used. SEMBFUNC is set to 1.
+   * SEMBFUNC valuas are set to 1 if not specified in the Context.
    */
-  F_SQRT();
+  F_SQRT(const tadah::core::Context &context, size_t, size_t sSize);
+
+  F_SQRT() = default;
 
   /**
    * @brief Calculates the embedding function value using a square-root dependence.
@@ -93,7 +95,7 @@ public:
    * @param p Index for model parameters. Here p=0
    * @return Embedding function value \f$ F(\rho) = s_{p} \sqrt{ c_{p} \rho } \f$.
    */
-  double calc_F(double rho, size_t p) override;
+  double calc_F(double rho, size_t p) const override;
 
   /**
    * @brief Calculates the derivative of the square-root embedding function.
@@ -101,8 +103,24 @@ public:
    * @param p Index for model parameters. Here p=0
    * @return First derivative \f$ dF/d\rho = \frac{s_{p} \, {2 \sqrt{\rho}} \f$.
    */
-  double calc_dF(double rho, size_t p) override;
+  double calc_dF(double rho, size_t p) const override;
 };
 
+class F_SQ : public F_Base {
+private:
+  const tadah::core::Context *context=nullptr;
+
+public:
+  F_SQ(const tadah::core::Context &context, size_t, size_t);
+
+  F_SQ() = default;
+
+  double calc_F(double rho, size_t p) const override;
+
+  double calc_dF(double rho, size_t p) const override;
+};
+
+} // namespace models
+} // namespace tadah
 
 #endif

@@ -3,6 +3,9 @@
 
 #include <tadah/models/functions/kernels/kern_base.h>
 
+namespace tadah {
+namespace models {
+
 /** \brief Sigmoid kernel.
  *
  * Defined for two vectors **x** and **y**:
@@ -12,7 +15,7 @@
  * + \mathrm{c} \big)
  * \f]
  *
- *  Required Config key: \ref MPARAMS <double> \f$ \gamma \f$  c
+ *  Required tadah::core::Context key: \ref MPARAMS <double> \f$ \gamma \f$  c
  *
  *  @see Kern_Base
  */
@@ -24,12 +27,15 @@ class Kern_Sigmoid : public virtual Kern_Base {
          * Label used for this class
          */
         Kern_Sigmoid ();
-        Kern_Sigmoid (const Config &c);
+        Kern_Sigmoid (const tadah::core::Context &c);
         std::string label = "Kern_Sigmoid";
-        double operator() (const aed_type& b, const aed_type& af) const override;
-        aed_type derivative(const aed_type& b, const aed_type& af) const override;
-        double prime(const aed_type& b, const aed_type& af, const aed_type& ff) const override;
+        double operator() (const tadah::core::aed_type& b, const tadah::core::aed_type& af) const override;
+        tadah::core::aed_type derivative(const tadah::core::aed_type& b, const tadah::core::aed_type& af) const override;
+        double prime(const tadah::core::aed_type& b, const tadah::core::aed_type& af, const tadah::core::aed_type& ff) const override;
+
         std::string get_label() const override;
 
 };
+} // namespace models
+} // namespace tadah
 #endif

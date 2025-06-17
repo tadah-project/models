@@ -3,6 +3,9 @@
 
 #include <tadah/models/descriptors/d2/d2_base.h>
 
+namespace tadah {
+namespace models {
+
 /** \anchor D2_LJ \brief Standard Lennard - Jones descriptor
  *
  * \f[
@@ -28,37 +31,40 @@
  * It is ok thought to set them to true it's just that
  * numerical values will be different.
  *
- * Required Config Key: \ref INIT2B
+ * Required tadah::core::Context Key: \ref INIT2B
  */
 class D2_LJ : public D2_Base {
 private:
   std::string lab="D2_LJ";
 public:
   D2_LJ();
-  D2_LJ(Config &config);
+  D2_LJ(const tadah::core::Context &context);
   void calc_aed(
     const int Zi,
     const int Zj,
     const double rij,
     const double ,
-    aed_type &aed,
+    tadah::core::aed_type &aed,
     const double scale=1) override;
   void calc_dXijdri(
     const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
-    fd_type &fd_ij,
+    tadah::core::fd_type &fd_ij,
     const double scale=1) override;
   void calc_all(
     const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
-    aed_type &aed,
-    fd_type &fd_ij,
+    tadah::core::aed_type &aed,
+    tadah::core::fd_type &fd_ij,
     const double scale=1) override;
+
   std::string label() override;
   void init() override;
 };
+} // namespace models
+} // namespace tadah
 #endif

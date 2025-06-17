@@ -2,6 +2,9 @@
 #define D2_EAM_H
 #include <tadah/models/descriptors/d2/d2_base.h>
 
+namespace tadah {
+namespace models {
+
 /** \brief Pair-wise part for the Embedded Atom Method descriptor.
  *
  * \f[
@@ -18,7 +21,7 @@
  * This descriptor will enforce cutoff distance as specified in a \ref SETFL file.
  * Set \ref RCUT2B to the same value to suppress the warning message.
  *
- * Required Config keys:
+ * Required tadah::core::Context keys:
  * \ref INIT2B \ref SETFL
  */
 class D2_EAM : public D2_Base {
@@ -52,30 +55,34 @@ private:
 
 public:
   D2_EAM();
-  D2_EAM(Config &config);
+  D2_EAM(tadah::core::Context &context);
+  D2_EAM(const tadah::core::Context& c);
   void calc_aed(
     const int Zi,
     const int Zj,
     const double rij,
     const double ,
-    aed_type &aed,
+    tadah::core::aed_type &aed,
     const double scale=1) override;
   void calc_dXijdri(
     const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
-    fd_type &fd_ij,
+    tadah::core::fd_type &fd_ij,
     const double scale=1) override;
   void calc_all(
     const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
-    aed_type &aed,
-    fd_type &fd_ij,
+    tadah::core::aed_type &aed,
+    tadah::core::fd_type &fd_ij,
     const double scale=1) override;
+
   std::string label() override;
   void init() override;
 };
+} // namespace models
+} // namespace tadah
 #endif

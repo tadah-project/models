@@ -39,7 +39,7 @@ public:
             double beta = 0.0;
             int incy = 1;
 
-            dgemv_(&trans, &m, &n, &alpha, VT_, &lda, x, &incx, &beta, y_.data(), &incy);
+      tadah::core::dgemv_(&trans, &m, &n, &alpha, VT_, &lda, x, &incx, &beta, y_.data(), &incy);
         }
 
         // Step 2: Compute z = S * y (element-wise multiplication)
@@ -58,7 +58,7 @@ public:
             double beta = 0.0;
             int incy = 1;
 
-            dgemv_(&trans, &m, &n, &alpha, U_, &lda, z_.data(), &incx, &beta, result, &incy);
+      tadah::core::dgemv_(&trans, &m, &n, &alpha, U_, &lda, z_.data(), &incx, &beta, result, &incy);
         }
     }
 
@@ -79,21 +79,24 @@ private:
 #ifndef M_EA_H
 #define M_EA_H
 
-#include <tadah/core/config.h>
+#include <tadah/core/context.h>
 #include <tadah/models/svd.h>
 #include <tadah/models/ols.h>
 #include <tadah/core/core_types.h>
 #include <tadah/core/lapack.h>
 
+namespace tadah {
+namespace models {
+
 class EA {
   private:
-    const Config &config;
+    const tadah::core::Context &context;
     tadah::models::SVD &svd;
-    t_type &T;
+    tadah::core::t_type &T;
     int verbose;
   public:
-    EA(const Config &c, tadah::models::SVD &svd, t_type &T):
-      config(c),
+    EA(const tadah::core::Context &c, tadah::models::SVD &svd, tadah::core::t_type &T):
+      context(c),
       svd(svd),
       T(T),
       verbose(c.get<int>("VERBOSE"))
@@ -125,13 +128,13 @@ class EA {
       // D is a filter factors matrix
       double *d = new double[sizeS];
 
-      int outprec=config.get<int>("OUTPREC");
+      int numeric=context.get<int>("NUMERIC");
 
-      t_type m_n(sizeS);
+      tadah::core::t_type m_n(sizeS);
       int m = svd.rows();
       int n = svd.cols();
-      t_type Tpred(m);
-    double rcond = config.size("OALGO")==2 ? config.get<double>("OALGO",1) : 1e-8;
+      tadah::core::t_type Tpred(m);
+    double rcond = context.size("OALGO")==2 ? context.get<double>("OALGO",1) : 1e-8;
     //
         // Create a workspace manager
         tadah::models::memory::ModelsWorkspaceManager workspaceManager;
@@ -155,7 +158,7 @@ class EA {
         }
         alpha = gamma / (m_n*m_n);
 
-        /*t_type Tpred = svd.predict(m_n,t,x);*/
+        /*tadah::core::t_type Tpred = svd.predict(m_n,t,x);*/
         svdMultiplier.compute(m_n.data(), Tpred.data());
         double temp = (T-Tpred)*(T-Tpred);
 
@@ -174,14 +177,17 @@ class EA {
           break;
         }
       }
-      if (convergence_status && verbose) std::cout << "Number of steps for convergence: " + to_string(counter,outprec) << std::endl;
-      if (!convergence_status && verbose) std::cout << "Max number of steps reached: " + to_string(counter,outprec) << std::endl;
+      if (convergence_status && verbose) std::cout << "Number of steps for convergence: " + tadah::core::to_string(counter,numeric) << std::endl;
+      if (!convergence_status && verbose) std::cout << "Max number of steps reached: " + tadah::core::to_string(counter,numeric) << std::endl;
 
       delete [] eval;
       delete [] d;
 
+
       return convergence_status;
     };
 };
+} // namespace models
+} // namespace tadah
 #endif
 

@@ -10,6 +10,8 @@
 #include <stdexcept>
 #include <vector>
 
+using namespace tadah::core;
+using namespace tadah::models;
 TEST_CASE("Testing OLS") {
     using Matrix = Matrix_T<>;
     using Vector = aed_type;

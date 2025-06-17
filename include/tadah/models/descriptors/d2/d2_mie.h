@@ -3,6 +3,9 @@
 
 #include <tadah/models/descriptors/d2/d2_base.h>
 
+namespace tadah {
+namespace models {
+
 /** \brief Mie descriptor
  *
  * \f[
@@ -17,7 +20,7 @@
  *
  * Any cutoff can be used
  *
- * Required Config Key: \ref INIT2B \ref TYPE2B
+ * Required tadah::core::Context Key: \ref INIT2B \ref TYPE2B
  *
  * TYPE2B D2_MIE 12 6 ELEMENT1 ELEMENT2
  *
@@ -27,33 +30,36 @@ class D2_MIE : public D2_Base {
 private:
   std::string lab="D2_MIE";
   double m,n;
-  v_type etas;
+  tadah::core::v_type etas;
 public:
   D2_MIE();
-  D2_MIE(Config &config);
+  D2_MIE(const tadah::core::Context &context);
   void calc_aed(
     const int Zi,
     const int Zj,
     const double rij,
     const double ,
-    aed_type &aed,
+    tadah::core::aed_type &aed,
     const double scale=1) override;
   void calc_dXijdri(
     const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
-    fd_type &fd_ij,
+    tadah::core::fd_type &fd_ij,
     const double scale=1) override;
   void calc_all(
     const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
-    aed_type &aed,
-    fd_type &fd_ij,
+    tadah::core::aed_type &aed,
+    tadah::core::fd_type &fd_ij,
     const double scale=1) override;
+
   std::string label() override;
   void init() override;
 };
+} // namespace models
+} // namespace tadah
 #endif

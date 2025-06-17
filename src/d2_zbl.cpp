@@ -1,9 +1,12 @@
 #include <tadah/models/descriptors/d2/d2_zbl.h>
+namespace tadah {
+namespace models {
+
 
 D2_ZBL::D2_ZBL() {
   init();
 }
-D2_ZBL::D2_ZBL(Config &c): D2_Base(c)
+D2_ZBL::D2_ZBL(const tadah::core::Context &c): D2_Base(c)
 {
   if (!c.get<bool>("INIT2B")) return;
   init();
@@ -22,18 +25,18 @@ D2_ZBL::D2_ZBL(Config &c): D2_Base(c)
     std::cout << label() << ": " << a0 << " "
       << s0 << " " << p0 << " " << p1 << std::endl;
 
-  ntypes = c.size("ATOMS");
+  ntypes = c.size("ATOM");
   a = new double*[ntypes];
   for (int i = 0; i < ntypes; ++i) {
     a[i] = new double[ntypes];
   }
   for (int i=0; i<ntypes; ++i) {
-    std::string symboli = c.get<std::string>("ATOMS",i);
-    int Zi = PeriodicTable::find_by_symbol(symboli).Z;
+    std::string symboli = c.get<std::string>("ATOM",i);
+    int Zi = tadah::core::PeriodicTable::find_by_symbol(symboli).Z;
     types[Zi] = i;
     for (int j=0; j<ntypes; ++j) {
-      std::string symbolj = c.get<std::string>("ATOMS",j);
-      int Zj = PeriodicTable::find_by_symbol(symbolj).Z;
+      std::string symbolj = c.get<std::string>("ATOM",j);
+      int Zj = tadah::core::PeriodicTable::find_by_symbol(symbolj).Z;
       a[i][j] = screening_length(Zi,Zj);
     }
   }
@@ -55,7 +58,7 @@ void D2_ZBL::calc_aed(
   const int Zj,
   const double rij,
   const double,
-  aed_type &aed,
+  tadah::core::aed_type &aed,
   const double scale)
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
@@ -70,7 +73,7 @@ void D2_ZBL::calc_dXijdri(
   const int Zj,
   const double rij,
   const double,
-  fd_type &fd_ij,
+  tadah::core::fd_type &fd_ij,
   const double scale)
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
@@ -91,8 +94,8 @@ void D2_ZBL::calc_all(
   const int Zj,
   const double rij,
   const double,
-  aed_type &aed,
-  fd_type &fd_ij,
+  tadah::core::aed_type &aed,
+  tadah::core::fd_type &fd_ij,
   const double scale)
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
@@ -131,3 +134,7 @@ double D2_ZBL::dphi(double x) {
 double D2_ZBL::screening_length(int Zi, int Zj) {
   return (s0 * a0) / (std::pow(Zi, p0) + std::pow(Zj, p1));
 }
+
+} // namespace models
+} // namespace tadah
+

@@ -3,6 +3,9 @@
 
 #include <tadah/models/functions/kernels/kern_base.h>
 
+namespace tadah {
+namespace models {
+
 /**
  * Linear + Quadratic kernel
  *
@@ -19,15 +22,18 @@
 class Kern_LQ : public virtual Kern_Base {
     public:
         Kern_LQ ();
-        Kern_LQ (const Config &c);
+        Kern_LQ (const tadah::core::Context &c);
         /**
          * Label used for this class
          */
         std::string label = "Kern_LQ";
-        double operator() (const aed_type& b, const aed_type& af) const override;
-        aed_type derivative(const aed_type& b, const aed_type& af) const override;
-        double prime(const aed_type& b, const aed_type& af, const aed_type& ff) const override;
+        double operator() (const tadah::core::aed_type& b, const tadah::core::aed_type& af) const override;
+        tadah::core::aed_type derivative(const tadah::core::aed_type& b, const tadah::core::aed_type& af) const override;
+        double prime(const tadah::core::aed_type& b, const tadah::core::aed_type& af, const tadah::core::aed_type& ff) const override;
+
         std::string get_label() const override;
 
 };
+} // namespace models
+} // namespace tadah
 #endif

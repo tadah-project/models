@@ -2,6 +2,8 @@
 #define DM_mEAD_H
 #include <tadah/models/descriptors/dm/dm_base.h>
 
+namespace tadah {
+namespace models {
 
 /** Modified Embedded Atom Descriptor
  *
@@ -63,53 +65,54 @@ class DM_mEAD: public DM_Base {
 private:
   int Lmax=0;
   std::string lab="DM_mEAD";
-  v_type sgrid;
-  v_type cgrid;
+  tadah::core::v_type sgrid;
+  tadah::core::v_type cgrid;
   std::vector<std::vector<std::vector<int>>> orbitals;
   std::vector<std::vector<double>> fac;
   size_t gen_atomic_orbitals(int L);
-  double fact(int n);
-  double my_pow(double,int);
   double rc;
   F emb;
 
 public:
   DM_mEAD();
-  DM_mEAD(Config&);
+  DM_mEAD(const tadah::core::Context&);
   void calc_aed(
-    rho_type& rho,
-    aed_type &aed) override;
+    tadah::core::rho_type& rho,
+    tadah::core::aed_type &aed) override;
   void calc_dXijdri_dXjidri(
     const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
-    const Vec3d &vec_ij,
-    rho_type& rhoi,
-    rho_type& rhoj,
-    fd_type &fd_ij,
+    const tadah::core::Vec3d &vec_ij,
+    tadah::core::rho_type& rhoi,
+    tadah::core::rho_type& rhoj,
+    tadah::core::fd_type &fd_ij,
     const double scale=1) override;
   void calc_dXijdri(
     const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
-    const Vec3d &vec_ij,
-    rho_type& rhoi,
-    fd_type &fd_ij, 
+    const tadah::core::Vec3d &vec_ij,
+    tadah::core::rho_type& rhoi,
+    tadah::core::fd_type &fd_ij, 
     const double scale=1) override;
   std::string label() override;
-  void init_rhoi(rho_type& rhoi) override;
+  void init_rhoi(tadah::core::rho_type& rhoi) override;
   void calc_rho(
     const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
-    const Vec3d &vec_ij,
-    rho_type& rho,
+    const tadah::core::Vec3d &vec_ij,
+    tadah::core::rho_type& rho,
     const double scale=1) override;
   void init() override;
 };
+} // namespace models
+} // namespace tadah
 
 #include "dm_mEAD.hpp"
+
 #endif

@@ -1,116 +1,91 @@
 #ifndef DC_SELECTOR_H
 #define DC_SELECTOR_H
 
-#include <tadah/core/config.h>
+#include <tadah/core/context.h>
 #include <tadah/models/descriptors/d_all.h>
 #include <tadah/models/cut_all.h>
 #include <tadah/core/registry.h>
 
-class DC_Selector {
-    public:
+namespace tadah {
+  namespace models {
+
+    class DC_Selector {
+      public:
+        int bias = 0;
+        size_t dsize =0;  // size of the descriptor (bias + 2b + mb)
+        size_t rsize =0;  // size of the density array (rhoi + rhoip)
         Cut_Base *c2b=nullptr;
-        Cut_Base *c3b=nullptr;
         Cut_Base *cmb=nullptr;
         D2_Base *d2b=nullptr;
-        D3_Base *d3b=nullptr;
         DM_Base *dmb=nullptr;
-
-        //Config config;
 
         DC_Selector ()
         {};
 
         // Copy constructor
-        DC_Selector(const DC_Selector& )
-        {
-            std::cout << "Copy constructor called\n";
-        }
-         // Const Assignment operator
-         // Instead of deep copying
-         // we use a trick where we just copy
-         // the config file and run init()
-         // as in a costructor
-         // DC_Selector& operator=(const DC_Selector& dc)
-         // {
-         //     //config=dc.config;
-         //     //init();
-         //     return *this;
-         // }
+        DC_Selector(const DC_Selector& ) {}
+
         // Assignment operator
         DC_Selector& operator=(DC_Selector& dc)
         {
-            //std::swap(config,dc.config);
-            std::swap(c2b,dc.c2b);
-            std::swap(c3b,dc.c3b);
-            std::swap(cmb,dc.cmb);
-            std::swap(d2b,dc.d2b);
-            std::swap(d3b,dc.d3b);
-            std::swap(dmb,dc.dmb);
-            return *this;
+          //std::swap(context,dc.context);
+          std::swap(c2b,dc.c2b);
+          std::swap(cmb,dc.cmb);
+          std::swap(d2b,dc.d2b);
+          std::swap(dmb,dc.dmb);
+          return *this;
         }
 
-        DC_Selector (Config &c)
-            //config(c)
-    {
-        init(c);
-    };
-        void init(Config &config) {
-            double rcutzero = 0.0; // for dummies
+        explicit DC_Selector(const tadah::core::Context& c) { init(c); }
 
-            size_t bias=0;
-            if (config.get<bool>("BIAS"))
-                bias++;
+        void init(const tadah::core::Context &context) {
+          double rcutzero = 0.0; // for dummies
 
-            if (config.get<bool>("INIT2B")) {
-                double rcut2b = config.get<double>("RCUT2BMAX");
-                c2b = CONFIG::factory<Cut_Base,double>( config.get<std::string>("RCTYPE2B"), rcut2b );
-                d2b = CONFIG::factory<D2_Base,Config&>( config.get<std::string>("TYPE2B"), config );
-                d2b->set_fidx(bias);
-            }
-            else {
-                c2b = CONFIG::factory<Cut_Base,double>( "Cut_Dummy", rcutzero );
-                d2b = CONFIG::factory<D2_Base,Config&>( "D2_Dummy", config );
-                d2b->set_fidx(bias);
-            }
+          if (context.get<bool>("BIAS")) bias=1;
 
-            if (config.get<bool>("INIT3B")) {
-                double rcut3b = config.get<double>("RCUT3BMAX");
-                c3b = CONFIG::factory<Cut_Base,double>( config.get<std::string>("RCTYPE3B"), rcut3b );
-                d3b = CONFIG::factory<D3_Base,Config&>( config.get<std::string>("TYPE3B"), config );
-                // d3b->fidx = bias;
-            }
-            else {
-                c3b = CONFIG::factory<Cut_Base,double>( "Cut_Dummy", rcutzero );
-                d3b = CONFIG::factory<D3_Base,Config&>( "D3_Dummy", config );
-                // d3b->fidx = bias;
-            }
+          if (context.get<bool>("INIT2B")) {
+            double rcut2b = context.get<double>("RCUT2BMAX");
+            c2b = tadah::core::factory<Cut_Base,double&>( context.get<std::string>("RCTYPE2B"), rcut2b );
+            d2b = tadah::core::factory<D2_Base,const tadah::core::Context&>( context.get<std::string>("TYPE2B"), context );
+            d2b->set_fidx(bias);
+          }
+          else {
+            c2b = tadah::core::factory<Cut_Base,double&>( "Cut_Dummy", rcutzero );
+            d2b = tadah::core::factory<D2_Base,const tadah::core::Context&>( "D2_Dummy", context );
+          }
 
-            if (config.get<bool>("INITMB")) {
-                double rcutmb = config.get<double>("RCUTMBMAX");
-                cmb = CONFIG::factory<Cut_Base,double>( config.get<std::string>("RCTYPEMB"), rcutmb );
-                dmb = CONFIG::factory<DM_Base,Config&>( config.get<std::string>("TYPEMB"), config );
-                dmb->set_fidx(bias + d2b->size());
-            }
-            else {
-                cmb = CONFIG::factory<Cut_Base,double>( "Cut_Dummy", rcutzero );
-                dmb = CONFIG::factory<DM_Base,Config&>( "DM_Dummy", config );
-                dmb->set_fidx(bias + d2b->size());
-            }
+          if (context.get<bool>("INITMB")) {
+            double rcutmb = context.get<double>("RCUTMBMAX");
+            cmb = tadah::core::factory<Cut_Base,double&>( context.get<std::string>("RCTYPEMB"), rcutmb );
+            dmb = tadah::core::factory<DM_Base,const tadah::core::Context&>( context.get<std::string>("TYPEMB"), context );
+            dmb->set_fidx(bias + d2b->size());
+          }
+          else {
+            cmb = tadah::core::factory<Cut_Base,double&>( "Cut_Dummy", rcutzero );
+            dmb = tadah::core::factory<DM_Base,const tadah::core::Context&>( "DM_Dummy", context );
+          }
+
+          // Set the size of the descriptor and density arrays
+          dsize = bias + d2b->size() + dmb->size();
+          rsize = dmb->rhoi_size()+ dmb->rhoip_size();
         }
+
+        size_t descriptor_size() const { return dsize; }
+        size_t density_size() const { return rsize; }
+
         ~DC_Selector()
         {
-            if (d2b)
-                delete d2b;
-            if (c2b)
-                delete c2b;
-            if (c3b)
-                delete c3b;
-            if (d3b)
-                delete d3b;
-            if (cmb)
-                delete cmb;
-            if (dmb)
-                delete dmb;
+          if (d2b)
+            delete d2b;
+          if (c2b)
+            delete c2b;
+          if (cmb)
+            delete cmb;
+          if (dmb)
+            delete dmb;
         }
-};
+
+    };
+  } // namespace models
+} // namespace tadah
 #endif

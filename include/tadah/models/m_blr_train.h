@@ -8,11 +8,14 @@
 #include <tadah/models/linear_regressor.h>
 #include <tadah/models/functions/function_base.h>
 #include <tadah/models/functions/basis_functions/bf_base.h>
-#include <tadah/core/config.h>
+#include <tadah/core/context.h>
 #include <tadah/models/memory/IModelsWorkspaceManager.h>
 
 #include <iostream>
 #include <vector>
+
+namespace tadah {
+namespace models {
 
 /**
  * @class M_BLR_Train
@@ -26,7 +29,7 @@ template <class BF = Function_Base&>
 class M_BLR_Train : public M_BLR_Core<BF>, public M_Train {
 public:
     using M_BLR_Core<BF>::trained;
-    using M_BLR_Core<BF>::config;
+    using M_BLR_Core<BF>::context;
     using M_BLR_Core<BF>::weights;
     using M_BLR_Core<BF>::Sigma;
 
@@ -37,7 +40,7 @@ public:
      *
      * @param c Configuration object reference.
      */
-    M_BLR_Train(Config &c) : M_BLR_Core<BF>(c) {}
+    M_BLR_Train(tadah::core::Context &c) : M_BLR_Core<BF>(c) {}
 
     /**
      * @brief Constructor using a basis function and configuration object.
@@ -47,8 +50,8 @@ public:
      * @param bf Basis function object.
      * @param c Configuration object reference.
      */
-    M_BLR_Train(BF &bf, Config &c) : M_BLR_Core<BF>(bf, c) {}
-    M_BLR_Train(BF &bf, Config &c, tadah::models::memory::IModelsWorkspaceManager &workspaceManager) :
+    M_BLR_Train(BF &bf, tadah::core::Context &c) : M_BLR_Core<BF>(bf, c) {}
+    M_BLR_Train(BF &bf, tadah::core::Context &c, tadah::models::memory::IModelsWorkspaceManager &workspaceManager) :
     M_BLR_Core<BF>(bf, c),
     M_Train(workspaceManager)
   {}
@@ -62,17 +65,17 @@ public:
      * @param T Target vector.
      * @throws std::runtime_error if the object is already trained.
      */
-  void train(phi_type &Phi, t_type &T) {
+  void train(tadah::core::phi_type &Phi, tadah::core::t_type &T) {
     if (trained) {
       throw std::runtime_error("This object is already trained!");
     }
 
-    if (config.exist("FIXWEIGHT") && config.exist("FIXINDEX")) {
-      std::vector<std::string> indices_str(config.size("FIXINDEX"));
-      config.get("FIXINDEX", indices_str);
+    if (context.contains("FIXWEIGHT") && context.contains("FIXINDEX")) {
+      std::vector<std::string> indices_str(context.size("FIXINDEX"));
+      context.get("FIXINDEX", indices_str);
 
       // Parse indices and perform checks
-      std::vector<size_t> indices = parse_indices(indices_str);
+      std::vector<size_t> indices = tadah::core::parse_indices(indices_str);
 
       // Check that the min index is >= 1 and max index is <= Phi.cols()
       if (!indices.empty()) {
@@ -85,22 +88,22 @@ public:
       // Adjust for 0-based indexing
       for (auto &i : indices) i--;
 
-      t_type w_f(config.size("FIXWEIGHT"));
+      tadah::core::t_type w_f(context.size("FIXWEIGHT"));
       if (w_f.size() != indices.size()) {
         throw std::runtime_error("FIXWEIGHT and FIXINDEX differ in size: " + std::to_string(w_f.size()) + " and " + std::to_string(indices.size()));
       }
 
-      config.get("FIXWEIGHT", w_f);
+      context.get("FIXWEIGHT", w_f);
 
-      t_type T_r;
+      tadah::core::t_type T_r;
       auto move_map = prep_train_with_residuals(Phi, T, indices, w_f, T_r);
 
       // Resize Phi for training
       Phi.resize(Phi.rows(), Phi.cols() - indices.size());
 
-      LinearRegressor::train(config, Phi, T_r, weights, Sigma,*workspaceManager_);
+      LinearRegressor::train(context, Phi, T_r, weights, Sigma,*workspaceManager_);
 
-      t_type w_temp(weights.size() + indices.size());
+      tadah::core::t_type w_temp(weights.size() + indices.size());
 
       for (size_t i = 0; i < w_f.size(); ++i) {
         w_temp[w_temp.size() - w_f.size() + i] = w_f[i];
@@ -115,11 +118,14 @@ public:
       trained = true;
     }
     else {
-      LinearRegressor::train(config, Phi, T, weights, Sigma,*workspaceManager_);
+      LinearRegressor::train(context, Phi, T, weights, Sigma,*workspaceManager_);
       trained = true;
     }
+
   }
 };
 
+} // namespace models
+} // namespace tadah
 #endif // M_BLR_TRAIN_H
 

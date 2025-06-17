@@ -2,8 +2,11 @@
 #define CUTOFFS_H
 
 #include <string>
-#include <tadah/core/config.h>
+#include <tadah/core/context.h>
 #include <tadah/core/registry.h>
+
+namespace tadah {
+namespace models {
 
 /** Base class to be inherited by all cutoffs */
 class Cut_Base {
@@ -301,7 +304,10 @@ class Cut_PT : public Cut_Base {
         double get_rcut();
         double get_rcut_sq();
         double calc(double r);
+
         double calc_prime(double r);
 };
 
+} // namespace models
+} // namespace tadah
 #endif

@@ -1,6 +1,6 @@
-#include <tadah/models/memory/ModelsWorkspaceManager.h>
-#include <tadah/models/memory/OLSWorkspace.h>
-#include <tadah/models/memory/SVDWorkspace.h>
+#include <tadah/models/memory/models_workspace_manager.h>
+#include <tadah/models/memory/ols_workspace.h>
+#include <tadah/models/memory/svd_workspace.h>
 
 namespace tadah {
 namespace models {
@@ -51,4 +51,3 @@ void ModelsWorkspaceManager::releaseSVDWorkspace(SVDWorkspace* workspace) {
 } // namespace memory
 } // namespace models
 } // namespace tadah
-

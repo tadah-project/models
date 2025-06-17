@@ -1,19 +1,22 @@
 #include <tadah/models/functions/kernels/kern_linear.h>
+namespace tadah {
+namespace models {
+
 
 Kern_Linear::Kern_Linear() {}
-Kern_Linear::Kern_Linear (const Config &c):
+Kern_Linear::Kern_Linear (const tadah::core::Context &c):
     Function_Base(c),
     Kern_Base(c)
 {}
-double Kern_Linear::operator() (const aed_type& b, const aed_type& af) const
+double Kern_Linear::operator() (const tadah::core::aed_type& b, const tadah::core::aed_type& af) const
 {
     return b*af;;
 }
-aed_type Kern_Linear::derivative(const aed_type& b, const aed_type&) const
+tadah::core::aed_type Kern_Linear::derivative(const tadah::core::aed_type& b, const tadah::core::aed_type&) const
 {
     return b;
 }
-double Kern_Linear::prime(const aed_type& b, const aed_type& , const aed_type& ff) const
+double Kern_Linear::prime(const tadah::core::aed_type& b, const tadah::core::aed_type& , const tadah::core::aed_type& ff) const
 {
     // return derivative(b,af).transpose() * ff;
     return b * ff;
@@ -22,17 +25,21 @@ std::string Kern_Linear::get_label() const
 {
     return label;
 }
-double Kern_Linear::epredict(const t_type &weights, const aed_type& aed) const
+double Kern_Linear::epredict(const tadah::core::t_type &weights, const tadah::core::aed_type& aed) const
 {
     return weights*aed;
 }
-double Kern_Linear::fpredict(const t_type &weights, const fd_type &fdij,
-        const aed_type& , const size_t k) const
+double Kern_Linear::fpredict(const tadah::core::t_type &weights, const tadah::core::fd_type &fdij,
+        const tadah::core::aed_type& , const size_t k) const
 {
     return -(fdij(k) * weights);
 }
-force_type Kern_Linear::fpredict(const t_type &weights, const fd_type &fdij,
-        const aed_type& ) const
+tadah::core::force_type Kern_Linear::fpredict(const tadah::core::t_type &weights, const tadah::core::fd_type &fdij,
+        const tadah::core::aed_type& ) const
 {
     return -(fdij * weights);
 }
+
+} // namespace models
+} // namespace tadah
+

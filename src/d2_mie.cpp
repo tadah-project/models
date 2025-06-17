@@ -1,10 +1,13 @@
 #include "tadah/models/descriptors/d2/d2_base.h"
 #include <tadah/models/descriptors/d2/d2_mie.h>
+namespace tadah {
+namespace models {
+
 
 D2_MIE::D2_MIE() {
   init();
 }
-D2_MIE::D2_MIE(Config &c): D2_Base(c)
+D2_MIE::D2_MIE(const tadah::core::Context &c): D2_Base(c)
 {
   if (!c.get<bool>("INIT2B")) return;
   init();
@@ -23,7 +26,7 @@ void D2_MIE::calc_aed(
   const int Zj,
   const double rij,
   const double,
-  aed_type &aed,
+  tadah::core::aed_type &aed,
   const double scale)
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
@@ -39,7 +42,7 @@ void D2_MIE::calc_dXijdri(
   const int Zj,
   const double rij,
   const double,
-  fd_type &fd_ij,
+  tadah::core::fd_type &fd_ij,
   const double scale)
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
@@ -54,8 +57,8 @@ void D2_MIE::calc_all(
   const int Zj,
   const double rij,
   const double,
-  aed_type &aed,
-  fd_type &fd_ij,
+  tadah::core::aed_type &aed,
+  tadah::core::fd_type &fd_ij,
   const double scale)
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
@@ -79,3 +82,7 @@ std::string D2_MIE::label() {
 void D2_MIE::init() {
   nparams=2;
 }
+
+} // namespace models
+} // namespace tadah
+

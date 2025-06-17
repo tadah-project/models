@@ -6,6 +6,9 @@
 #include <tadah/models/memory/IModelsWorkspaceManager.h>
 #include <tadah/models/memory/ModelsWorkspaceManager.h>
 
+namespace tadah {
+namespace models {
+
 /**
  * @class M_Train
  * @brief Abstract base class for training models.
@@ -45,7 +48,7 @@ public:
      * @param Phi Design matrix containing input features.
      * @param T Target vector for training.
      */
-  virtual void train(phi_type &Phi, t_type &T) = 0;
+  virtual void train(tadah::core::phi_type &Phi, tadah::core::t_type &T) = 0;
 
   /**
  * Swaps columns and fits a reduced matrix to obtain residuals.
@@ -70,7 +73,7 @@ public:
  */
   template <typename M>
   std::vector<size_t> prep_train_with_residuals(
-    Matrix_Base<M> &Phi, t_type &T, std::vector<size_t> &indices, const t_type w_f, t_type &T_r) {
+    tadah::core::Matrix_Base<M> &Phi, tadah::core::t_type &T, std::vector<size_t> &indices, const tadah::core::t_type w_f, tadah::core::t_type &T_r) {
 
     if (w_f.size() != indices.size()) {
       throw std::runtime_error("Size of w_f must be equal to size of indices.");
@@ -93,9 +96,9 @@ public:
     //    move_map = {0,2,1}
 
     // the fixed columns are to the right
-    MatrixView Phi_f(Phi, Phi.cols()-indices.size());
+    tadah::core::MatrixView Phi_f(Phi, Phi.cols()-indices.size());
 
-    t_type T_f = Phi_f * w_f;
+    tadah::core::t_type T_f = Phi_f * w_f;
 
     T_r = T-T_f;
 
@@ -109,6 +112,9 @@ public:
     workspaceManager_ = workspaceManager;
   }
 
+
 };
 
+} // namespace models
+} // namespace tadah
 #endif // M_TRAIN_H

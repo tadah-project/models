@@ -130,7 +130,7 @@ for (int i = m; i < maxmn; ++i) {
         int rank;
 
         // Solve using DGELSD
-        ::dgelsd_(&m, &n, &nrhs, a, &lda, b, &ldb, ws->s, &rcond, &rank,
+    tadah::core::dgelsd_(&m, &n, &nrhs, a, &lda, b, &ldb, ws->s, &rcond, &rank,
                   ws->work, &ws->lwork, ws->iwork, &info);
 
         if (info != 0) {
@@ -155,7 +155,7 @@ for (int i = m; i < maxmn; ++i) {
         char trans = 'N';
 
         // Solve using DGELS
-        ::dgels_(&trans, &m, &n, &nrhs, a, &lda, b, &ldb, ws->work, &ws->lwork, &info);
+    tadah::core::dgels_(&trans, &m, &n, &nrhs, a, &lda, b, &ldb, ws->work, &ws->lwork, &info);
 
         if (info != 0) {
             throw std::runtime_error("Error in DGELS: info = " + std::to_string(info));
@@ -177,7 +177,7 @@ for (int i = m; i < maxmn; ++i) {
         int lda = m;
         int ldu = m;
         int ldvt = n;  // For 'S', VT has dimensions (n x min(m, n))
-    ::dgesdd_(&jobz, &m, &n, A.ptr(), &lda, ws->S, ws->U, &ldu,
+    tadah::core::dgesdd_(&jobz, &m, &n, A.ptr(), &lda, ws->S, ws->U, &ldu,
               ws->VT, &ldvt, ws->work, &ws->lwork, ws->iwork, &info);
 
         if (info != 0) {
@@ -190,7 +190,7 @@ for (int i = m; i < maxmn; ++i) {
         double beta = 0.0;
         int incx = 1;
         int incy = 1;
-        ::dgemv_(&trans, &m, &minmn, &alpha, ws->U, &lda, B.ptr(), &incx, &beta, ws->UtB, &incy);
+    tadah::core::dgemv_(&trans, &m, &minmn, &alpha, ws->U, &lda, B.ptr(), &incx, &beta, ws->UtB, &incy);
 
         // Apply threshold to singular values (for handling rank deficiency)
         double smax = *std::max_element(ws->S, ws->S + minmn);
@@ -207,7 +207,7 @@ for (int i = m; i < maxmn; ++i) {
         // Compute x = V * (pseudoinverse solution)
         trans = 'T'; // Use V (not transposed)
         /*int ldvt = n;*/
-        ::dgemv_(&trans, &minmn, &n, &alpha, ws->VT, &ldvt, ws->UtB, &incx, &beta, weights.ptr(), &incy);
+    tadah::core::dgemv_(&trans, &minmn, &n, &alpha, ws->VT, &ldvt, ws->UtB, &incx, &beta, weights.ptr(), &incy);
 
     } else if (algorithm == Algorithm::NormalEquations) {
         // Solve using normal equations (A^T A x = A^T B)
@@ -219,22 +219,22 @@ for (int i = m; i < maxmn; ++i) {
         int lda = m;
         int ldc = n;
 
-        ::dsyrk_(&uplo, &trans, &n, &m, &alpha, A.ptr(), &lda, &beta, ws->AtA, &ldc);
+    tadah::core::dsyrk_(&uplo, &trans, &n, &m, &alpha, A.ptr(), &lda, &beta, ws->AtA, &ldc);
 
         // Compute A^T B
         int incx = 1;
         int incy = 1;
-        ::dgemv_(&trans, &m, &n, &alpha, A.ptr(), &lda, B.ptr(), &incx, &beta, ws->Atb, &incy);
+    tadah::core::dgemv_(&trans, &m, &n, &alpha, A.ptr(), &lda, B.ptr(), &incx, &beta, ws->Atb, &incy);
 
         // Perform Cholesky factorization of A^T A
-        ::dpotrf_(&uplo, &n, ws->AtA, &ldc, &info);
+    tadah::core::dpotrf_(&uplo, &n, ws->AtA, &ldc, &info);
         if (info != 0) {
-            throw std::runtime_error("Error in DPOTRF: Matrix is not positive definite; info = " + std::to_string(info));
+            throw std::runtime_error("Error in DPOTRF: tadah::core::Matrix is not positive definite; info = " + std::to_string(info));
         }
 
         // Solve A^T A x = A^T B
         int nrhs = 1;
-        ::dpotrs_(&uplo, &n, &nrhs, ws->AtA, &ldc, ws->Atb, &n, &info);
+    tadah::core::dpotrs_(&uplo, &n, &nrhs, ws->AtA, &ldc, ws->Atb, &n, &info);
         if (info != 0) {
             throw std::runtime_error("Error in DPOTRS: info = " + std::to_string(info));
         }
@@ -282,7 +282,7 @@ void OLS::solveWithPseudoinverse(int m, int n, V1& B, V2& weights, memory::SVDWo
     int incx = 1;
     int incy = 1;
     int lda = m;
-    ::dgemv_(&trans, &m, &minmn, &alpha, U, &lda, B.ptr(), &incx, &beta, ws->UtB, &incy);
+  tadah::core::dgemv_(&trans, &m, &minmn, &alpha, U, &lda, B.ptr(), &incx, &beta, ws->UtB, &incy);
 
     // Find the maximum singular value
     double smax = *std::max_element(S, S + minmn);
@@ -302,7 +302,7 @@ void OLS::solveWithPseudoinverse(int m, int n, V1& B, V2& weights, memory::SVDWo
     // Compute x = V * (pseudoinverse solution)
     trans = 'T'; // Use V
     int ldvt = n;
-    ::dgemv_(&trans, &minmn, &n, &alpha, VT, &ldvt, ws->UtB, &incx, &beta, weights.ptr(), &incy);
+  tadah::core::dgemv_(&trans, &minmn, &n, &alpha, VT, &ldvt, ws->UtB, &incx, &beta, weights.ptr(), &incy);
 }
 
 } // namespace models

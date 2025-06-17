@@ -1,10 +1,15 @@
 #include "tadah/models/descriptors/dm/dm_base.h"
 #include <tadah/models/descriptors/dm/dm_eam.h>
+namespace tadah {
+namespace models {
+
+DM_EAM::DM_EAM(const tadah::core::Context& c)             // new, const version
+  : DM_EAM::DM_EAM(const_cast<tadah::core::Context&>(c)) {}      // delegates to old one
 
 DM_EAM::DM_EAM() {
   init();
 }
-DM_EAM::DM_EAM(Config &c): DM_Base(c)
+DM_EAM::DM_EAM(core::Context &c): DM_Base(c)
 {
   init();
   if (!c.get<bool>("INITMB")) return;
@@ -13,14 +18,16 @@ DM_EAM::DM_EAM(Config &c): DM_Base(c)
   read_setfl();
 
   if (std::abs(ef.rcut - c.get<double>("RCUTMB")) > std::numeric_limits<double>::min()) {
-    if (verbose) {
-      std::cout << "Config file cutoff and setfl file cutoff differ: "
-        << c.get<double>("RCUTMB") << " " << ef.rcut << std::endl;
-      std::cout << "Enforcing SETFL file cutoff: " << ef.rcut << std::endl;
-    }
+    core::Logger::instance().log(
+        core::LogLevel::WARNING,
+        "tadah::core::Context file cutoff and setfl file cutoff differ: " +
+            std::to_string(c.get<double>("RCUTMB")) + " " +
+            std::to_string(ef.rcut));
+    core::Logger::instance().log(
+        core::LogLevel::WARNING,
+        "Enforcing SETFL file cutoff: " + std::to_string(ef.rcut));
     c.remove("RCUTMB");
     c.add("RCUTMB", ef.rcut);
-    c.postprocess();
   }
 
   frho_spline.resize(ef.nrho+1, std::vector<double>(7));
@@ -37,8 +44,8 @@ DM_EAM::DM_EAM(Config &c): DM_Base(c)
 }
 
 void DM_EAM::calc_aed(
-  rho_type& rho,
-  aed_type &aed)
+  tadah::core::rho_type& rho,
+  tadah::core::aed_type &aed)
 {
   //std::cout << "rho[i]:   " << rho(0) << std::endl;
   double p = rho(rfidx)*ef.rdrho + 1.0;
@@ -64,10 +71,10 @@ void DM_EAM::calc_dXijdri_dXjidri(
   const int Zj,
   const double rij,
   const double,
-  const Vec3d &vec_ij,
-  rho_type& rhoi,
-  rho_type& rhoj,
-  fd_type &fd_ij,
+  const tadah::core::Vec3d &vec_ij,
+  tadah::core::rho_type& rhoi,
+  tadah::core::rho_type& rhoj,
+  tadah::core::fd_type &fd_ij,
   const double scale)
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
@@ -95,9 +102,9 @@ void DM_EAM::calc_dXijdri(
   const int Zj,
   const double rij,
   const double,
-  const Vec3d &vec_ij,
-  rho_type& rhoi,
-  fd_type &fd_ij,
+  const tadah::core::Vec3d &vec_ij,
+  tadah::core::rho_type& rhoi,
+  tadah::core::fd_type &fd_ij,
   const double scale)
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
@@ -190,7 +197,7 @@ void DM_EAM::gen_splines(int &n, double &delta, std::vector<double> &f,
     spline[m][0] = 3.0*spline[m][3]/delta;
   }
 }
-void DM_EAM::init_rhoi(rho_type& rhoi)
+void DM_EAM::init_rhoi(tadah::core::rho_type& rhoi)
 {
   rhoi.resize(2);
   rhoi.set_zero();
@@ -200,8 +207,8 @@ void DM_EAM::calc_rho(
   const int Zj,
   const double rij,
   const double,
-  const Vec3d &,
-  rho_type& rho,
+  const tadah::core::Vec3d &,
+  tadah::core::rho_type& rho,
   const double scale)
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
@@ -218,3 +225,7 @@ void DM_EAM::calc_rho(
 void DM_EAM::init() {
   nparams=1;
 }
+
+} // namespace models
+} // namespace tadah
+

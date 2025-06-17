@@ -4,6 +4,9 @@
 #include <cmath>
 #include <cassert>
 
+namespace tadah {
+namespace models {
+
 /**
  * @test Checks F_RLR behavior with a simple configuration.
  * Ensures no NaN is returned and verifies plausibility of results.
@@ -11,13 +14,13 @@
 TEST_CASE("F_RLR: Basic Function and Derivative", "[F_RLR]")
 {
   // Reason: "INITMB=true" triggers parameter grid load in F_RLR constructor
-  Config c;
+  tadah::core::Context c;
   c.remove("INITMB");
   c.add("INITMB", "true");
   c.add("SEMBFUNC", 0.2);
   c.add("CEMBFUNC", 0.3);
 
-  F_RLR rlr(c);
+  F_RLR rlr(c, 1, 1);
 
   double rho = 2.0;
   size_t p = 0; // Single parameter index
@@ -42,12 +45,12 @@ TEST_CASE("F_RLR: Basic Function and Derivative", "[F_RLR]")
 TEST_CASE("F_SQRT: Basic Function and Derivative", "[F_SQRT]")
 {
   // Reason: "INITMB=true" triggers sgrid load in F_SQRT constructor
-  Config c;
+  tadah::core::Context c;
   c.remove("INITMB");
   c.add("INITMB", "true");
   c.add("SEMBFUNC", 0.2);
 
-  F_SQRT sqrt_func(c);
+  F_SQRT sqrt_func(c, 0,1);
 
   double rho = 4.0;
   size_t p = 0; // Single parameter index
@@ -67,3 +70,6 @@ TEST_CASE("F_SQRT: Basic Function and Derivative", "[F_SQRT]")
   // Derivative: 0.5*s / sqrt(rho) => 0.5*0.2/2.0 = 0.05
   REQUIRE(valdF == Approx(0.05).margin(1e-12));
 }
+
+} // namespace models
+} // namespace tadah

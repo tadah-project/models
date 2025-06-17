@@ -1,9 +1,8 @@
-#include <tadah/models/memory/SVDWorkspace.h>
+#include <tadah/models/memory/svd_workspace.h>
 #include <tadah/core/lapack.h>
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
-
 namespace tadah {
 namespace models {
 namespace memory {
@@ -56,7 +55,7 @@ void SVDWorkspace::allocate(int m_, int n_) {
     double wkopt;
     double* aDummy = nullptr;
     int infoQuery;
-    ::dgesdd_(&jobz, &m, &n, aDummy, &lda, S, U, &ldu, VT, &ldvt, &wkopt, &lwork, iwork, &infoQuery);
+  ::tadah::core::dgesdd_(&jobz, &m, &n, aDummy, &lda, S, U, &ldu, VT, &ldvt, &wkopt, &lwork, iwork, &infoQuery);
 
     if (infoQuery != 0) {
         throw std::runtime_error("Error in DGESDD (workspace query in SVDWorkspace): info = " + std::to_string(infoQuery));
@@ -73,4 +72,3 @@ bool SVDWorkspace::isSufficient(int m_, int n_) const {
 } // namespace memory
 } // namespace models
 } // namespace tadah
-

@@ -1,7 +1,7 @@
 #ifndef TADAH_MODELS_MEMORY_IMODELSWORKSPACEMANAGER_H
 #define TADAH_MODELS_MEMORY_IMODELSWORKSPACEMANAGER_H
 
-#include <tadah/core/memory/IWorkspaceManager.h>
+#include <tadah/core/memory/iworkspace_manager.h>
 #include <tadah/models/Algorithm.h> // Include the Algorithm enum
 
 namespace tadah {
@@ -18,7 +18,7 @@ class SVDWorkspace; ///< Forward declaration of SVDWorkspace
  * Extends the core IWorkspaceManager interface and provides methods for
  * obtaining and releasing OLS and SVD workspaces.
  */
-class IModelsWorkspaceManager : public virtual tadah::core::memory::IWorkspaceManager {
+class IModelsWorkspaceManager : public virtual ::tadah::core::memory::IWorkspaceManager {
 public:
     /**
      * @brief Virtual destructor.

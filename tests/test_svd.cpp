@@ -7,6 +7,8 @@
 #include <tadah/models/memory/ModelsWorkspaceManager.h>
 #include <tadah/models/svd.h>
 
+using namespace tadah::core;
+using namespace tadah::models;
 TEST_CASE("Testing SVD") {
   using Matrix = Matrix_T<>;
   /*using Vector = aed_type;*/

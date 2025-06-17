@@ -1,5 +1,10 @@
 #include <cstddef>
 #include <tadah/models/descriptors/d2/d2_mjoin.h>
+namespace tadah {
+namespace models {
+
+D2_mJoin::D2_mJoin(const tadah::core::Context& c)             // new, const version
+  : D2_mJoin::D2_mJoin(const_cast<tadah::core::Context&>(c)) {}      // delegates to old one
 
 D2_mJoin::D2_mJoin() {
   init();
@@ -8,33 +13,33 @@ D2_mJoin::~D2_mJoin() {
   for (auto d : ds) if (d) delete d;
 }
 
-D2_mJoin::D2_mJoin(Config &c) : D2_Base(c) {
+D2_mJoin::D2_mJoin(tadah::core::Context &c) : D2_Base(c) {
   init();
-  configs = parse_config(c, "TYPE2B");
-  expand_grids(c, configs, "TYPE2B");
+  contexts = parse_context(c, "TYPE2B");
+  expand_grids(c, contexts, "TYPE2B");
 
-  for (auto &c1 : configs) {
-    ds.push_back(CONFIG::factory<D2_Base, Config&>(c1.get<std::string>("TYPE2B"), c1));
+  for (auto &c1 : contexts) {
+    ds.push_back(tadah::core::factory<D2_Base, tadah::core::Context&>(c1.get<std::string>("TYPE2B"), c1));
     s += ds.back()->size();
   }
 }
 
 void D2_mJoin::calc_aed(const int Zi, const int Zj, const double rij,
-                        const double rij_sq, aed_type &aed, const double scale) {
+                        const double rij_sq, tadah::core::aed_type &aed, const double scale) {
   for (auto d : ds) {
     d->calc_aed(Zi, Zj, rij, rij_sq, aed, scale);
   }
 }
 
 void D2_mJoin::calc_dXijdri(const int Zi, const int Zj, const double rij,
-                            const double rij_sq, fd_type &fd_ij, const double scale) {
+                            const double rij_sq, tadah::core::fd_type &fd_ij, const double scale) {
   for (auto d : ds) {
     d->calc_dXijdri(Zi, Zj, rij, rij_sq, fd_ij, scale);
   }
 }
 
 void D2_mJoin::calc_all(const int Zi, const int Zj, const double rij,
-                        const double rij_sq, aed_type &aed, fd_type &fd_ij, const double scale) {
+                        const double rij_sq, tadah::core::aed_type &aed, tadah::core::fd_type &fd_ij, const double scale) {
   for (auto d : ds) {
     d->calc_all(Zi, Zj, rij, rij_sq, aed, fd_ij, scale);
   }
@@ -59,3 +64,7 @@ void D2_mJoin::init() {
   keys.push_back("RCUT2B");
   nparams=std::numeric_limits<size_t>::max();
 }
+
+} // namespace models
+} // namespace tadah
+

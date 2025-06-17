@@ -5,6 +5,7 @@ stages:
   - trigger
 
 cache:
+    key: "$CI_PIPELINE_ID"
     paths:
     - ${BUILD_DIR}
 
@@ -24,10 +25,24 @@ build_debug:
 run_unit_tests:
   stage: run_unit_tests
   script:
-    - cd ${DEBUG_DIR}
+    - cd "${DEBUG_DIR}"
     - make test
-    - cd ..; gcovr -e '.*tests.*|.*lib.*|build' -r .
-  coverage: /^TOTAL.*\s+(\d+\%)$/
+    # Return to the repo root so --root . aligns with actual paths:
+    - cd "${CI_PROJECT_DIR}"
+
+    # Run gcovr in a more permissive way:
+    - |
+      gcovr \
+        --root . \
+        --object-directory build/debug \
+        --exclude '.*CompilerIdCXX.*' \
+        --exclude '.*build\/debug\/CMakeFiles\/3.*' \
+        --exclude '.*CMakeFiles.*' \
+        --exclude 'tests' \
+        --exclude 'build' \
+        --exclude 'external' \
+        --gcov-ignore-errors=no_working_dir_found \
+  coverage: "/^TOTAL.*\\s+(\\d+\\%)$/"
 
 build_release_shared:
   stage: build_release

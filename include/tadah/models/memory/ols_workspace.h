@@ -73,7 +73,7 @@ public:
   double *UtB;   ///< Intermediate vector for U^T * B.
 
   // For Cholesky
-  double *AtA; ///< Matrix to store A^T * A.
+  double *AtA; ///< tadah::core::Matrix to store A^T * A.
   double *Atb; ///< Vector to store A^T * b.
 
 private:
