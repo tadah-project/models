@@ -6,16 +6,22 @@
 
 #include <iostream>
 
+namespace tadah {
+namespace models {
+
 /** \brief Base class to be used by all basis functions */
 struct BF_Base: public virtual Function_Base {
   BF_Base();
-  BF_Base(const Config &c);
+  BF_Base(const tadah::core::Context &c);
   virtual ~BF_Base();
 
-  // virtual double epredict(const t_type &, const aed_type& ) const=0;
-  // virtual double fpredict(const t_type &, const fd_type &,
-  //         const aed_type& , const size_t ) const=0;
-  // virtual force_type fpredict(const t_type &, const fd_type &,
-  //         const aed_type& ) const=0;
+  // virtual double epredict(const tadah::core::t_type &, const tadah::core::aed_type& ) const=0;
+  // virtual double fpredict(const tadah::core::t_type &, const tadah::core::fd_type &,
+  //         const tadah::core::aed_type& , const size_t ) const=0;
+
+  // virtual tadah::core::force_type fpredict(const tadah::core::t_type &, const tadah::core::fd_type &,
+  //         const tadah::core::aed_type& ) const=0;
 };
+} // namespace models
+} // namespace tadah
 #endif

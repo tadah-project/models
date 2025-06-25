@@ -2,13 +2,17 @@
 #define D_BASE_H
 
 #include <string>
-#include <tadah/core/config.h>
+#include <tadah/core/context.h>
 #include <tadah/core/core_types.h>
 #include <tadah/core/periodic_table.h>
+#include <tadah/core/logger.h>
 #include <tadah/core/registry.h>
 #include <tadah/models/cut_all.h>
 #include <vector>
 #include <bitset>
+
+namespace tadah {
+namespace models {
 
 class Bitset2D {
   static constexpr size_t N = 119;
@@ -42,8 +46,8 @@ public:
   std::vector<std::string> keys;    // keys required by this descriptor
   size_t nparams;  // number of params which follow TYPExB
   std::vector<bool> is_optimizable;
-  static void get_grid(const Config &c, std::string key, v_type &v);
-  static v_type get_grid(std::vector<std::string>&);  // expand joined grids
+  static void get_grid(const tadah::core::Context &c, const std::string &key, tadah::core::v_type &v);
+  static tadah::core::v_type get_grid(const std::vector<std::string>&);  // expand joined grids
   int verbose;
   virtual ~D_Base();
 
@@ -54,13 +58,20 @@ public:
 
   /** \brief Return label of this descriptor.
    */
-  virtual std::string label()=0;
+  virtual std::string label() const=0;
   double weights[119] = {1};  // ignore zero index; w[1]->H
   D_Base();
-  D_Base(Config &c);
+  D_Base(const tadah::core::Context &c);
+
+  /** \brief Print grid to the log.
+   *
+   * @param v Vector to print.
+   * @param key Key name for the vector.
+   */
+  void printGrid(core::v_type &v, const std::string &key, core::LogLevel logLevel=core::LogLevel::INFO);
 
   virtual void set_fidx(size_t fidx_);
-  virtual size_t get_fidx();
+  virtual size_t get_fidx() const;
 
   /**
  * @brief Initialize the descriptor.
@@ -68,7 +79,7 @@ public:
  * This method sets up the required keys names and number of parameters for the descriptor.
  *
  * Note: The implementation of the descriptor should not rely on these initial values,
- * allowing for greater flexibility in how the Config file is parsed.
+ * allowing for greater flexibility in how the tadah::core::Context file is parsed.
  *
  * The keys and parameters are utilized by other classes inheriting from this implementation,
  * such as meta-descriptors.
@@ -78,21 +89,24 @@ public:
 
   virtual void set_fcut(Cut_Base* cut, bool manage_memory);
 
-  double get_rcut();
+  double get_rcut() const;
 
   /** \brief Return dimension of the descriptor.
   */
-  virtual size_t size();
+  virtual size_t size() const;
 
-  virtual bool is_init_for_atoms(int Zi, int Zj);
+  virtual bool is_init_for_atoms(int Zi, int Zj) const;
   virtual void init_for_atoms(int Zi, int Zj);
   virtual void init_for_atoms(const std::vector<std::string> &Zs);
   virtual void uninit_for_atoms(int Zi, int Zj);
-  static std::vector<std::string> get_init_atoms(Config &c, std::string type);
-  virtual std::vector<std::string> get_init_atoms(Config &c)=0;
+  static std::vector<std::string> get_init_atoms(const tadah::core::Context &c, std::string type);
+  virtual std::vector<std::string> get_init_atoms(const tadah::core::Context &c)=0;
 
 private:
+
   bool manage_memory=false; // who owns fcut
   Bitset2D init_for_atoms_map;  // 0th is unused
 };
+} // namespace models
+} // namespace tadah
 #endif

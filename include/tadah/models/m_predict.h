@@ -3,6 +3,9 @@
 
 #include <tadah/core/core_types.h>
 
+namespace tadah {
+namespace models {
+
 class M_Predict {
     public:
 
@@ -17,13 +20,16 @@ class M_Predict {
          *  If aed contains sum over all nearest neighbours than the result is
          *  a local atomic energy \f$ E_i \f$.
          * */
-        virtual double epredict(const aed_type &aed) const=0;
+        virtual double epredict(const tadah::core::aed_type &aed) const=0;
 
         /** \brief Predict force between a pair of atoms in a k-direction. */
-        virtual double fpredict(const fd_type &fdij, const aed_type &aedi, size_t k) const=0;
+        virtual double fpredict(const tadah::core::fd_type &fdij, const tadah::core::aed_type &aedi, size_t k) const=0;
 
         /** \brief Predict force between a pair of atoms. */
-        virtual force_type fpredict(const fd_type &fdij,
-                const aed_type &aedi) const=0;
+
+        virtual tadah::core::force_type fpredict(const tadah::core::fd_type &fdij,
+                const tadah::core::aed_type &aedi) const=0;
 };
+} // namespace models
+} // namespace tadah
 #endif

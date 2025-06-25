@@ -2,6 +2,9 @@
 #define D2_DUMMY_H
 #include <tadah/models/descriptors/d2/d2_base.h>
 
+namespace tadah {
+namespace models {
+
 /**
  * Dummy two-body descriptor.
  *
@@ -14,30 +17,33 @@ private:
   std::string lab="D2_Dummy";
 public:
   D2_Dummy();
-  D2_Dummy(Config &);
+  D2_Dummy(const tadah::core::Context &);
   void calc_aed(
     const int Zi,
     const int Zj,
     const double rij,
     const double ,
-    aed_type &aed,
-    const double scale=1) override;
+    tadah::core::aed_type &aed,
+    const double scale=1) const override;
   void calc_dXijdri(
     const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
-    fd_type &fd_ij,
-    const double scale=1) override;
+    tadah::core::fd_type &fd_ij,
+    const double scale=1) const override;
   void calc_all(
     const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
-    aed_type &aed,
-    fd_type &fd_ij,
-    const double scale=1) override;
-  std::string label() override;
+    tadah::core::aed_type &aed,
+    tadah::core::fd_type &fd_ij,
+    const double scale=1) const override;
+
+  std::string label() const override;
   void init() override;
 };
+} // namespace models
+} // namespace tadah
 #endif

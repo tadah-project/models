@@ -1,12 +1,15 @@
 #ifndef M_KRR_Core_H
 #define M_KRR_Core_H
 
-#include <tadah/core/config.h>
+#include <tadah/core/context.h>
 #include <tadah/models/functions/function_base.h>
 #include <tadah/models/functions/kernels/kern_base.h>
 #include <tadah/models/m_core.h>
 
 #include <iostream>
+
+namespace tadah {
+namespace models {
 
 /**
  * @class M_KRR_Core
@@ -19,8 +22,8 @@
 template <class K = Function_Base&>
 class M_KRR_Core : public virtual M_Core {
 public:
-    Matrix Sigma; ///< Covariance matrix.
-    Config &config; ///< Configuration reference.
+    tadah::core::Matrix Sigma; ///< Covariance matrix.
+    tadah::core::Context &context; ///< Configuration reference.
     K kernel; ///< Kernel function.
 
     /**
@@ -30,8 +33,8 @@ public:
      *
      * @param c Configuration object reference.
      */
-    M_KRR_Core(Config &c) :
-        config(c),
+    M_KRR_Core(tadah::core::Context &c) :
+        context(c),
         kernel(c)
     {
         static_assert(std::is_base_of<Kern_Base, K>::value,
@@ -49,8 +52,8 @@ public:
      * @param kernel Kernel object.
      * @param c Configuration object reference.
      */
-    M_KRR_Core(K &kernel, Config &c) :
-        config(c),
+    M_KRR_Core(K &kernel, tadah::core::Context &c) :
+        context(c),
         kernel(kernel)
     {
         if (dynamic_cast<Kern_Base*>(&kernel) == nullptr)
@@ -64,7 +67,7 @@ public:
      * @param v Input vector for prediction.
      * @return Predicted value.
      */
-    double predict(const aed_type &v) const {
+    double predict(const tadah::core::aed_type &v) const {
         return kernel.epredict(weights, v);
     }
 
@@ -76,9 +79,9 @@ public:
      * @return Vector of uncertainties based on the Sigma diagonal.
      * @throws std::runtime_error if LAMBDA is not zero.
      */
-    t_type get_weights_uncertainty() const {
-        double lambda = config.template get<double>("LAMBDA");
-        if(lambda != 0) 
+    tadah::core::t_type get_weights_uncertainty() const {
+        double lambda = context.template get<double>("LAMBDA");
+        if(lambda == 0) 
             throw std::runtime_error("Sigma matrix is only computed for LAMBDA != 0");
         return Sigma.diagonal();
     }
@@ -90,13 +93,16 @@ private:
      * Loads weights if available in the configuration and sets the verbose level.
      */
     void init() {
-        if (config.exist("WEIGHTS")) {
-            weights.resize(config.size("WEIGHTS"));
-            config.get<t_type>("WEIGHTS", weights);
+        if (context.contains("WEIGHTS")) {
+            weights.resize(context.size("WEIGHTS"));
+            context.get<tadah::core::t_type>("WEIGHTS", weights);
             trained = true;
         }
-        verbose = config.get<int>("VERBOSE");
+        verbose = context.get<int>("VERBOSE");
+
     }
 };
 
+} // namespace models
+} // namespace tadah
 #endif // M_KRR_Core_H

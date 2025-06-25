@@ -3,6 +3,9 @@
 
 #include <tadah/models/functions/kernels/kern_base.h>
 
+namespace tadah {
+namespace models {
+
 /** \brief Polynomial kernel.
  *
  * Defined for two vectors **x** and **y**:
@@ -12,14 +15,14 @@
  * \mathrm{c} \big)^{\mathrm{d}}
  * \f]
  *
- *  Required Config key: \ref MPARAMS <int> d  <double> \f$ \gamma \f$  c
+ *  Required tadah::core::Context key: \ref MPARAMS <int> d  <double> \f$ \gamma \f$  c
  *
  *  @see Kern_Base
  */
 class Kern_Polynomial : public virtual Kern_Base {
     public:
         Kern_Polynomial ();
-        Kern_Polynomial (const Config &c);
+        Kern_Polynomial (const tadah::core::Context &c);
         int d; // power
         double gamma;   // scalling
         double c;   // shift
@@ -28,9 +31,12 @@ class Kern_Polynomial : public virtual Kern_Base {
          */
         std::string label = "Kern_Polynomial";
         std::string get_label() const override;
-        double operator() (const aed_type& b, const aed_type& af) const override;
-        aed_type derivative(const aed_type& b, const aed_type& af) const override;
-        double prime(const aed_type& b, const aed_type& af, const aed_type& ff) const override;
+        double operator() (const tadah::core::aed_type& b, const tadah::core::aed_type& af) const override;
+        tadah::core::aed_type derivative(const tadah::core::aed_type& b, const tadah::core::aed_type& af) const override;
+
+        double prime(const tadah::core::aed_type& b, const tadah::core::aed_type& af, const tadah::core::aed_type& ff) const override;
 
 };
+} // namespace models
+} // namespace tadah
 #endif

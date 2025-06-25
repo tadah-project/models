@@ -1,10 +1,13 @@
 #include "tadah/models/descriptors/d2/d2_base.h"
 #include <tadah/models/descriptors/d2/d2_lj.h>
+namespace tadah {
+namespace models {
+
 
 D2_LJ::D2_LJ() {
   init();
 }
-D2_LJ::D2_LJ(Config &c): D2_Base(c)
+D2_LJ::D2_LJ(const tadah::core::Context &c): D2_Base(c)
 {
   if (!c.get<bool>("INIT2B")) return;
   init();
@@ -19,8 +22,8 @@ void D2_LJ::calc_aed(
   const int Zj,
   const double rij,
   const double rij_sq,
-  aed_type &aed,
-  const double scale)
+  tadah::core::aed_type &aed,
+  const double scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   double r2_inv = 1.0/rij_sq;
@@ -35,8 +38,8 @@ void D2_LJ::calc_dXijdri(
   const int Zj,
   const double rij,
   const double rij_sq,
-  fd_type &fd_ij,
-  const double scale)
+  tadah::core::fd_type &fd_ij,
+  const double scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
 
@@ -53,9 +56,9 @@ void D2_LJ::calc_all(
   const int Zj,
   const double rij,
   const double rij_sq,
-  aed_type &aed,
-  fd_type &fd_ij,
-  const double scale)
+  tadah::core::aed_type &aed,
+  tadah::core::fd_type &fd_ij,
+  const double scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   double r2_inv = 1.0/rij_sq;
@@ -69,9 +72,13 @@ void D2_LJ::calc_all(
   fd_ij(fidx,0) = scale*weights[Zj]*(6.0*r6_inv*r2_inv*rij*fc_ij - fcp_ij*r6_inv);
   fd_ij(fidx+1,0) = scale*weights[Zj]*(-12.0*r6_inv*r6_inv*r2_inv*rij*fc_ij + fcp_ij*r6_inv*r6_inv);
 }
-std::string D2_LJ::label() {
+std::string D2_LJ::label() const {
   return lab;
 }
 void D2_LJ::init() {
   nparams=0;
 }
+
+} // namespace models
+} // namespace tadah
+

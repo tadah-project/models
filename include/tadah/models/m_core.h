@@ -3,6 +3,9 @@
 
 #include <tadah/core/core_types.h>
 
+namespace tadah {
+namespace models {
+
 /**
  * @class M_Core
  * @brief Abstract base class for model cores.
@@ -14,7 +17,7 @@ class M_Core {
 public:
     int verbose = 0; ///< Verbose level for logging.
     bool trained = false; ///< Indicates if the model has been trained.
-    t_type weights; ///< Weights vector for the model.
+    tadah::core::t_type weights; ///< Weights vector for the model.
 
   int is_verbose() {return verbose;}
 
@@ -37,7 +40,7 @@ public:
      *
      * @return Constant reference to the weights vector.
      */
-    const t_type &get_weights() const {
+    const tadah::core::t_type &get_weights() const {
         return weights;
     }
 
@@ -46,7 +49,7 @@ public:
      *
      * @param w New weights vector to be set.
      */
-    void set_weights(const t_type w) {
+    void set_weights(const tadah::core::t_type w) {
         weights = w;
     }
 
@@ -58,7 +61,7 @@ public:
      * @param v Input vector for prediction.
      * @return Predicted value.
      */
-    virtual double predict(const aed_type &v) const = 0;
+    virtual double predict(const tadah::core::aed_type &v) const = 0;
 
     /**
      * @brief Pure virtual function to get weights' uncertainty.
@@ -67,8 +70,11 @@ public:
      *
      * @return Vector of uncertainties for the weights.
      */
-    virtual t_type get_weights_uncertainty() const = 0;
+
+    virtual tadah::core::t_type get_weights_uncertainty() const = 0;
 };
 
+} // namespace models
+} // namespace tadah
 #endif // M_CORE_H
 

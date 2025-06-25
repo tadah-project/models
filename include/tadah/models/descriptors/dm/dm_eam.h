@@ -2,6 +2,9 @@
 #define DM_EAM_H
 #include <tadah/models/descriptors/dm/dm_base.h>
 
+namespace tadah {
+namespace models {
+
 /** \brief many-body part for the Embedded Atom Method descriptor.
  *
  * \f[
@@ -18,7 +21,7 @@
  * This descriptor will enforce cutoff distance as specified in a \ref SETFL file.
  * Set \ref RCUTMB to the same value to suppress the warning message.
  *
- * Required Config keys:
+ * Required tadah::core::Context keys:
  * \ref INITMB \ref SETFL
  */
 class DM_EAM: public DM_Base {
@@ -54,39 +57,42 @@ private:
 
 public:
   DM_EAM();
-  DM_EAM(Config&);
+  DM_EAM(tadah::core::Context&);
+  DM_EAM(const tadah::core::Context&);
   void calc_aed(
-    rho_type& rho,
-    aed_type &aed) override;
+    tadah::core::rho_type& rho,
+    tadah::core::aed_type &aed) const override;
   void calc_dXijdri_dXjidri(
     const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
-    const Vec3d &vec_ij,
-    rho_type& rhoi,
-    rho_type& rhoj,
-    fd_type &fd_ij,
-    const double scale=1) override;
+    const tadah::core::Vec3d &vec_ij,
+    tadah::core::rho_type& rhoi,
+    tadah::core::rho_type& rhoj,
+    tadah::core::fd_type &fd_ij,
+    const double scale=1) const override;
   void calc_dXijdri(
     const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
-    const Vec3d &vec_ij,
-    rho_type& rhoi,
-    fd_type &fd_ij, 
-    const double scale=1) override;
-  std::string label() override;
-  void init_rhoi(rho_type& rhoi) override;
+    const tadah::core::Vec3d &vec_ij,
+    tadah::core::rho_type& rhoi,
+    tadah::core::fd_type &fd_ij, 
+    const double scale=1) const override;
+  std::string label() const override;
+  void init_rhoi(tadah::core::rho_type& rhoi) override;
   void calc_rho(
     const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
-    const Vec3d &vec_ij,
-    rho_type& rho,
-    const double scale=1) override;
+    const tadah::core::Vec3d &vec_ij,
+    tadah::core::rho_type& rho,
+    const double scale=1) const override;
   void init() override;
 };
+} // namespace models
+} // namespace tadah
 #endif

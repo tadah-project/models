@@ -5,11 +5,13 @@
 #include <tadah/models/functions/f_all.h>
 #include <string>
 
+using namespace tadah::core;
+using namespace tadah::models;
 TEST_CASE( "Testing Factory: Functions", "[factory_functions]" ) {
 
-  for (auto f:CONFIG::Registry<Function_Base>::registry) {
+  for (auto f:Registry<Function_Base>::registry) {
     std::string fb_name = f.first;
-    Function_Base *fb = CONFIG::factory<Function_Base>(fb_name);
+    Function_Base *fb = factory<Function_Base>(fb_name);
 
     REQUIRE( fb->get_label() == fb_name );
 
@@ -38,7 +40,7 @@ TEST_CASE( "Testing Factory: Functions", "[factory_functions]" ) {
 
     //// cutoff cannot be negative
     //double temp = -0.1;
-    //REQUIRE_THROWS(CONFIG::factory<Cut_Base,double>( cuttype, temp ));
+    //REQUIRE_THROWS(factory<Cut_Base,double>( cuttype, temp ));
     //REQUIRE_THROWS_AS(c2b->set_rcut(temp), std::runtime_error);
     //REQUIRE_THROWS_AS(c2b->test_rcut(temp), std::runtime_error);
 

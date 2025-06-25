@@ -4,20 +4,23 @@
 #include <tadah/core/core_types.h>
 #include <tadah/core/lapack.h>
 
+namespace tadah {
+namespace models {
+
 template <typename Kern>
 class EKM {
     private:
         Kern kernel;
-        // TODO add to config? Experiment with value
+        // TODO add to context? Experiment with value
         double eps = std::numeric_limits<double>::epsilon()*0;
         std::vector<size_t> indices;
     public:
-        Matrix EKM_mat;
+        tadah::core::Matrix EKM_mat;
         template <typename T>
             EKM(T &t):
                 kernel(t)
     {}
-        void configure(Matrix &basis) {
+        void configure(tadah::core::Matrix &basis) {
 
             // check norm of basis vectors and keep indices
             for (size_t i=0; i<basis.cols(); i++) {
@@ -28,7 +31,7 @@ class EKM {
             // Copy basis vectors with non zero norm
             // to new basis b
             // basis vectors are stored as columns in basis
-            Matrix b(basis.rows(), indices.size());
+            tadah::core::Matrix b(basis.rows(), indices.size());
             for (const auto &i:indices) {
                 for (size_t j=0; j<basis.rows(); ++j) {
                     b(j,i) = basis(j,i);
@@ -37,20 +40,20 @@ class EKM {
             // Update old basis with new one
             basis=b;
 
-            Matrix K(b.cols(), b.cols());
+            tadah::core::Matrix K(b.cols(), b.cols());
             for (size_t i=0; i<K.cols(); i++) {
                 for (size_t j=0; j<K.cols(); j++) {
                     K(i,j) = kernel(b.col(i),b.col(j));
                 }
             }
 
-            // Matrix balancing
+            // tadah::core::Matrix balancing
             double *a = K.ptr();
             int n = K.cols();
             char job='B';
             int ilo; int ihi; int info;
             double *scale = new double[n];
-            dgebal_(&job, &n, a, &n, &ilo, &ihi, scale, &info);
+    tadah::core::dgebal_(&job, &n, a, &n, &ilo, &ihi, scale, &info);
             delete [] scale;
 
             // Find max value in K diagonal
@@ -61,12 +64,13 @@ class EKM {
             }
             eps *= max_val;
 
-            SVD svd(K);
+            tadah::models::SVD svd;
+            svd.compute(K);
 
             double *s = svd.getS();
             double *vt = svd.getVT();
-            t_type S(s,svd.sizeS());
-            Matrix VT(vt,svd.shapeVT().first, svd.shapeVT().second);
+            tadah::core::t_type S(s,svd.cols());
+            tadah::core::Matrix VT(vt,svd.cols(), svd.cols());
 
             // First count number of non zero singular values, then
             // filter out corresponding right singular vectors from
@@ -74,7 +78,7 @@ class EKM {
             size_t nonzero_sv=0;
             for (size_t i=0; i<S.size(); ++i) if (s[i]>eps) nonzero_sv++;
 
-            EKM_mat = Matrix(nonzero_sv, svd.shapeVT().second);
+            EKM_mat = tadah::core::Matrix(nonzero_sv, svd.cols());
 
             for (size_t i=0; i<S.size(); ++i) {
                 if (s[i]>eps) {
@@ -85,7 +89,7 @@ class EKM {
             }
 
         }
-        void inverse(Matrix &A) {
+        void inverse(tadah::core::Matrix &A) {
             double *a = &A.data()[0];
             int n = A.rows();   // A is square
             int *ipiv = new int[n];
@@ -93,21 +97,21 @@ class EKM {
             double *work = new double[lwork];
             int info;
 
-            dgetrf_(&n,&n,a,&n,ipiv,&info);
-            dgetri_(&n,a,&n,ipiv,work,&lwork,&info);
+    tadah::core::dgetrf_(&n,&n,a,&n,ipiv,&info);
+    tadah::core::dgetri_(&n,a,&n,ipiv,work,&lwork,&info);
 
             delete[] ipiv;
             delete[] work;
         }
-        void cholesky(Matrix &A, char uplo) {
+        void cholesky(tadah::core::Matrix &A, char uplo) {
             // matrix must be either U or L
             int n = A.cols(); // A is square
             double *a = &A.data()[0];
             int info;
-            dpotrf_(&uplo, &n, a, &n, &info);
+    tadah::core::dpotrf_(&uplo, &n, a, &n, &info);
         }
 
-        void project(phi_type &Phi) {
+        void project(tadah::core::phi_type &Phi) {
             // Phi'=Phi*EKM_mat
             char transa = 'N';
             char transb = 'N';
@@ -118,20 +122,23 @@ class EKM {
             double *c = new double[m*n];
             double alpha = 1.0;
             double beta = 0.0;
-            dgemm_(&transa, &transb, &m, &n, &n, &alpha, a, &m, b, &n,
+    tadah::core::dgemm_(&transa, &transb, &m, &n, &n, &alpha, a, &m, b, &n,
                     &beta, c, &m);
 
-            Phi = Matrix(c,m,n);
+            Phi = tadah::core::Matrix(c,m,n);
 
             delete[] c;
 
         }
-        aed_type project(aed_type &aed, Matrix &basis) {
-            aed_type temp(basis.cols());
+        tadah::core::aed_type project(tadah::core::aed_type &aed, tadah::core::Matrix &basis) {
+            tadah::core::aed_type temp(basis.cols());
             for (size_t b=0; b<basis.cols(); b++) {
                 temp(b) = kernel(aed,basis[b]);
             }
+
             return  EKM_mat*temp;
         }
 };
+} // namespace models
+} // namespace tadah
 #endif

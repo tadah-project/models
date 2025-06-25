@@ -4,6 +4,9 @@
 #include <tadah/models/cut_all.h>
 #include <tadah/models/descriptors/d_base.h>
 
+namespace tadah {
+namespace models {
+
 /** \brief Base class for all two-body type descriptors.
  *
  * All two-body descriptors **must** inherit this class.
@@ -11,18 +14,18 @@
 class D2_Base: public D_Base {
 public:
   D2_Base() {};
-  D2_Base(Config &c): D_Base(c) {
+  D2_Base(const tadah::core::Context &c): D_Base(c) {
     //if (c.get<bool>("INIT2B")) {
-    if (c.exist("RCUT2BMAX") && c.exist("RCTYPE2B")) {
+    if (c.contains("RCUT2BMAX") && c.contains("RCTYPE2B")) {
       double rcut2b = c.get<double>("RCUT2BMAX");
-      set_fcut(CONFIG::factory<Cut_Base,double>( c.get<std::string>("RCTYPE2B"), rcut2b ), true);
+      set_fcut(tadah::core::factory<Cut_Base,double&>( c.get<std::string>("RCTYPE2B"), rcut2b ), true);
     }
     else {
       set_fcut(new Cut_Dummy(0), true);
     }
   }
   virtual ~D2_Base() {};
-  virtual std::vector<std::string> get_init_atoms(Config &c) override;
+  virtual std::vector<std::string> get_init_atoms(const tadah::core::Context &c) override;
 
   /** \brief Calculate \ref AED
    *
@@ -33,8 +36,8 @@ public:
     const int Zj,
     const double rij,
     const double rij_sq,
-    aed_type& aed,
-    const double scale=1)=0;
+    tadah::core::aed_type& aed,
+    const double scale=1)const=0;
 
   /** \brief Calculate \ref FD
    *
@@ -54,8 +57,8 @@ public:
     const int Zj,
     const double rij,
     const double rij_sq,
-    fd_type &fd_ij,
-    const double scale=1)=0;
+    tadah::core::fd_type &fd_ij,
+    const double scale=1) const=0;
 
   /** \brief Calculate \ref AED + \ref FD */
   virtual void calc_all(
@@ -63,9 +66,9 @@ public:
     const int Zj,
     const double rij,
     const double rij_sq,
-    aed_type& aed,
-    fd_type &fd_ij,
-    const double scale=1)=0;
+    tadah::core::aed_type& aed,
+    tadah::core::fd_type &fd_ij,
+    const double scale=1) const=0;
 
   /** Central difference approximation to \ref FD 
    *
@@ -77,16 +80,19 @@ public:
    * fd: appropriate size container to store computation
    * h: central difference parameter
    */
-  void calc_fd_approx(const int Zi, const int Zj, double r, fd_type &fd, double h=1e-8) {
-    aed_type aed_n((*this).size()); // r+h
-    aed_type aed_p((*this).size()); // r-h
+  void calc_fd_approx(const int Zi, const int Zj, double r, tadah::core::fd_type &fd, double h=1e-8)  const{
+    tadah::core::aed_type aed_n((*this).size()); // r+h
+    tadah::core::aed_type aed_p((*this).size()); // r-h
     aed_n.set_zero();
     aed_p.set_zero();
     double rn = r-h;
     double rp = r+h;
     (*this).calc_aed(Zi,Zj,rn,rn*rn,aed_n);
     (*this).calc_aed(Zi,Zj,rp,rp*rp,aed_p);
+
     fd(0) = (0.5/h)*(aed_p - aed_n);
   }
 };
+} // namespace models
+} // namespace tadah
 #endif

@@ -4,6 +4,8 @@
 #include <tadah/models/cutoffs.h>
 #include <string>
 
+using namespace tadah::core;
+using namespace tadah::models;
 TEST_CASE( "Testing Cutoffs: Cut_Dummy", "[Cut_Dummy]" ) {
 
     REQUIRE_NOTHROW(Cut_Dummy());

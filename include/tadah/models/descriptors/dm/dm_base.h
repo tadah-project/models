@@ -4,6 +4,9 @@
 #include <tadah/models/descriptors/d_base.h>
 #include <string>
 
+namespace tadah {
+namespace models {
+
 /** \brief Base class for all many-body type descriptors.
  *
  * All many-body descriptors **must** inherit this class.
@@ -15,26 +18,26 @@ protected:
   size_t rhoisize=0;
 public:
   DM_Base() {};
-  DM_Base(Config &c): D_Base(c) {
+  DM_Base(const tadah::core::Context &c): D_Base(c) {
     //if (c.get<bool>("INITMB")) {
-    if (c.exist("RCUTMBMAX") && c.exist("RCTYPEMB")) {
+    if (c.contains("RCUTMBMAX") && c.contains("RCTYPEMB")) {
       double rcutmb = c.get<double>("RCUTMBMAX");
-      set_fcut(CONFIG::factory<Cut_Base,double>( c.get<std::string>("RCTYPEMB"), rcutmb ), true);
+      set_fcut(tadah::core::factory<Cut_Base,double&>( c.get<std::string>("RCTYPEMB"), rcutmb ), true);
     }
     else {
       set_fcut(new Cut_Dummy(0), true);
     }
   }
   virtual ~DM_Base() {};
-  virtual std::vector<std::string> get_init_atoms(Config &c) override;
+  virtual std::vector<std::string> get_init_atoms(const tadah::core::Context &c) override;
 
   /** \brief Calculate \ref AED
    *
    * Calculate Atomic Energy Descriptor for the atom local environment.
    */
   virtual void calc_aed(
-    rho_type& rho,
-    aed_type &aed)=0;
+    tadah::core::rho_type& rho,
+    tadah::core::aed_type &aed) const=0;
 
   /** \brief Calculate \ref FD
    *
@@ -54,11 +57,11 @@ public:
     const int Zj,
     const double rij,
     const double rij_sq,
-    const Vec3d &vec_ij,
-    rho_type& rhoi,
-    rho_type& rhoj,
-    fd_type &fd_ij,
-    const double scale=1)=0;
+    const tadah::core::Vec3d &vec_ij,
+    tadah::core::rho_type& rhoi,
+    tadah::core::rho_type& rhoj,
+    tadah::core::fd_type &fd_ij,
+    const double scale=1) const=0;
 
   /** \brief Calculate \ref FD
    *
@@ -80,13 +83,13 @@ public:
     const int Zj,
     const double rij,
     const double rij_sq,
-    const Vec3d &vec_ij,
-    rho_type& rhoi,
-    fd_type &fd_ij,
-    const double scale=1)=0;
+    const tadah::core::Vec3d &vec_ij,
+    tadah::core::rho_type& rhoi,
+    tadah::core::fd_type &fd_ij,
+    const double scale=1) const=0;
 
   /** \brief Resize arrays for a density and F' */
-  virtual void init_rhoi(rho_type& rhoi)=0;
+  virtual void init_rhoi(tadah::core::rho_type& rhoi)=0;
 
   /** \brief Calculate density */
   virtual void calc_rho(
@@ -94,14 +97,14 @@ public:
     const int Zj,
     const double rij,
     const double rij_sq,
-    const Vec3d &vec_ij,
-    rho_type& rho,
-    const double scale=1)=0;
+    const tadah::core::Vec3d &vec_ij,
+    tadah::core::rho_type& rho,
+    const double scale=1) const =0;
 
 
   /** \brief This is just a convenient wrapper.
    */
-  void calc_dXijdri(const int Zi, const int Zj, Vec3d &del, rho_type &rhoi, fd_type &fdij, double scale=1) {
+  void calc_dXijdri(const int Zi, const int Zj, tadah::core::Vec3d &del, tadah::core::rho_type &rhoi, tadah::core::fd_type &fdij, double scale=1) const{
     double rsq = del*del;
     double r = sqrt(rsq);
     //(p->*func)(r,rsq,del,1.0,0.0,rhoi,fdij);
@@ -110,24 +113,27 @@ public:
 
   /** \brief This is just a convenient wrapper.
    */
-  void calc_rho_mb(const int Zi, const int Zj, Vec3d &del, rho_type &rhoi, double scale=1) {
+  void calc_rho_mb(const int Zi, const int Zj, tadah::core::Vec3d &del, tadah::core::rho_type &rhoi, double scale=1) const {
     double rsq = del*del;
     double r = sqrt(rsq);
     ((*this).calc_rho)(Zi, Zj,r,rsq,del,rhoi,scale);
   }
   /** \brief Return size of the density array */
-  virtual size_t rhoi_size() {
+  virtual size_t rhoi_size() const{
     return rhoisize;
   }
   /** \brief Return size of the derivative of the embedding energy array */
-  virtual size_t rhoip_size() {
+  virtual size_t rhoip_size() const{
     return rhoisize;
   }
-  virtual size_t size() {
-    return s;
-  }
-  virtual std::string label()=0;
-  virtual size_t get_rfidx();
+  // virtual size_t size() {
+  //   return s;
+  // }
+  virtual std::string label() const=0;
+
+  virtual size_t get_rfidx() const;
   virtual void set_rfidx(size_t fidx_);
 };
+} // namespace models
+} // namespace tadah
 #endif

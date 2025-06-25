@@ -6,6 +6,9 @@
 #include <tadah/models/descriptors/dm/dm_base.h>
 #include <tadah/models/descriptors/d_mjoin.h>
 
+namespace tadah {
+namespace models {
+
 /** \brief Meta many-body descriptor for combining multiple DM descriptors.
  *
  * This descriptor provides an interface for concatenating various many-body descriptors.
@@ -46,47 +49,51 @@
 class DM_mJoin : public DM_Base, public D_mJoin {
 private:
   std::vector<DM_Base*> ds;
-  std::vector<Config> configs;
+  std::vector<tadah::core::Context> contexts;
   std::string lab = "DM_mJoin";
 public:
   DM_mJoin();
   ~DM_mJoin();
-  DM_mJoin(Config &c);
+  DM_mJoin(tadah::core::Context &c);
+  DM_mJoin(const tadah::core::Context &c);
   void calc_aed(
-    rho_type& rho,
-    aed_type &aed) override;
+    tadah::core::rho_type& rho,
+    tadah::core::aed_type &aed) const override;
   void calc_dXijdri_dXjidri(
     const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
-    const Vec3d &vec_ij,
-    rho_type& rhoi,
-    rho_type& rhoj,
-    fd_type &fd_ij,
-    const double scale=1) override;
+    const tadah::core::Vec3d &vec_ij,
+    tadah::core::rho_type& rhoi,
+    tadah::core::rho_type& rhoj,
+    tadah::core::fd_type &fd_ij,
+    const double scale=1) const override;
   void calc_dXijdri(
     const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
-    const Vec3d &vec_ij,
-    rho_type& rhoi,
-    fd_type &fd_ij, 
-    const double scale=1) override;
-  std::string label() override;
-  void init_rhoi(rho_type& rhoi) override;
+    const tadah::core::Vec3d &vec_ij,
+    tadah::core::rho_type& rhoi,
+    tadah::core::fd_type &fd_ij, 
+    const double scale=1) const override;
+  std::string label() const override;
+  void init_rhoi(tadah::core::rho_type& rhoi) override;
   void calc_rho(
     const int Zi,
     const int Zj,
     const double rij,
     const double rij_sq,
-    const Vec3d &vec_ij,
-    rho_type& rho,
-    const double scale=1) override;
+    const tadah::core::Vec3d &vec_ij,
+    tadah::core::rho_type& rho,
+    const double scale=1) const override;
   void set_fidx(size_t fidx_) override;
   void set_rfidx(size_t rfidx_) override;
+
   void init() override;
 };
 
+} // namespace models
+} // namespace tadah
 #endif
