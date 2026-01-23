@@ -98,15 +98,21 @@ public:
       tadah::core::t_type T_r;
       auto move_map = prep_train_with_residuals(Phi, T, indices, w_f, T_r);
 
-      // Resize Phi for training
+      // Resize Phi for training, the rightmost columns correspon to FIXINDEX
       Phi.resize(Phi.rows(), Phi.cols() - indices.size());
+
 
       LinearRegressor::train(context, Phi, T_r, weights, Sigma,*workspaceManager_);
 
       tadah::core::t_type w_temp(weights.size() + indices.size());
 
-      for (size_t i = 0; i < w_f.size(); ++i) {
-        w_temp[w_temp.size() - w_f.size() + i] = w_f[i];
+      // for (size_t i = 0; i < indices.size(); ++i) {
+      //   w_temp[w_temp.size() - indices.size() + i] = w_f[i];
+      // }
+
+      // Insert fixed weights into their original positions but shifted by the size of weights
+      for (size_t i = 0; i < indices.size(); ++i) {
+        w_temp[i+weights.size()] = w_f[move_map[i+weights.size()]];
       }
 
       for (size_t i = 0; i < weights.size(); ++i) {

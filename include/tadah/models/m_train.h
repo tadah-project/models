@@ -79,9 +79,10 @@ public:
       throw std::runtime_error("Size of w_f must be equal to size of indices.");
     }
 
-    std::sort(indices.begin(), indices.end());
-
-    if (indices.back() >= Phi.cols()) {
+    // std::sort(indices.begin(), indices.end());
+    //
+    // if (indices.back() >= Phi.cols()) {
+    if (*std::max_element(indices.begin(), indices.end()) >= Phi.cols()) {
       throw std::runtime_error("Largest index is greater than the number of columns in Phi.");
     }
 
