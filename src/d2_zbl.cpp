@@ -21,9 +21,9 @@ D2_ZBL::D2_ZBL(const tadah::core::Context &c): D2_Base(c)
   temp = c.get<double>("TYPE2B",4);
   if (temp!=-1) p1=temp;
   
-  if (verbose) 
-    std::cout << label() << ": " << a0 << " "
-      << s0 << " " << p0 << " " << p1 << std::endl;
+  // if (verbose) 
+  //   std::cout << label() << ": " << a0 << " "
+  //     << s0 << " " << p0 << " " << p1 << std::endl;
 
   ntypes = c.size("ATOM");
   a = new double*[ntypes];
