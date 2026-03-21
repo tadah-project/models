@@ -13,6 +13,7 @@ tadah::core::Registry<D_Base>::Register<DM_EAD> DM_EAD_0( "DM_EAD" );
 tadah::core::Registry<D_Base>::Register<DM_EAM> DM_EAM_0( "DM_EAM" );
 tadah::core::Registry<D_Base>::Register<DM_mEAD<F_RLR>> DM_mEAD_0("DM_mRLR");
 tadah::core::Registry<D_Base>::Register<DM_mEAD<F_SQRT>> DM_mEAD_00("DM_mSQRT");
+tadah::core::Registry<D_Base>::Register<DM_mEAD<F_Blip>> DM_mEAD_000("DM_mBlip");
 tadah::core::Registry<D_Base>::Register<DM_mJoin> DM_mJoin_0("DM_mJoin");
 
 tadah::core::Registry<DM_Base>::Register<DM_Blip> DM_Blip_1( "DM_Blip" );
@@ -21,6 +22,7 @@ tadah::core::Registry<DM_Base>::Register<DM_EAD> DM_EAD_1( "DM_EAD" );
 tadah::core::Registry<DM_Base>::Register<DM_EAM> DM_EAM_1( "DM_EAM" );
 tadah::core::Registry<DM_Base>::Register<DM_mEAD<F_RLR>> DM_mEAD_1("DM_mRLR");
 tadah::core::Registry<DM_Base>::Register<DM_mEAD<F_SQRT>> DM_mEAD_11("DM_mSQRT");
+tadah::core::Registry<DM_Base>::Register<DM_mEAD<F_Blip>> DM_mEAD_111("DM_mBlip");
 tadah::core::Registry<DM_Base>::Register<DM_mJoin> DM_mJoin_1("DM_mJoin");
 
 tadah::core::Registry<DM_Base,tadah::core::Context&>::Register<DM_Blip> DM_Blip_2( "DM_Blip" );
@@ -29,6 +31,7 @@ tadah::core::Registry<DM_Base,tadah::core::Context&>::Register<DM_EAD> DM_EAD_2(
 tadah::core::Registry<DM_Base,tadah::core::Context&>::Register<DM_EAM> DM_EAM_2( "DM_EAM" );
 tadah::core::Registry<DM_Base,tadah::core::Context&>::Register<DM_mEAD<F_RLR>> DM_mEAD_2("DM_mRLR");
 tadah::core::Registry<DM_Base,tadah::core::Context&>::Register<DM_mEAD<F_SQRT>> DM_mEAD_22("DM_mSQRT");
+tadah::core::Registry<DM_Base,tadah::core::Context&>::Register<DM_mEAD<F_Blip>> DM_mEAD_222("DM_mBlip");
 tadah::core::Registry<DM_Base,tadah::core::Context&>::Register<DM_mJoin> DM_mJoin_2( "DM_mJoin" );
 
 tadah::core::Registry<DM_Base,const tadah::core::Context&>::Register<DM_Blip> cDM_Blip_2( "DM_Blip" );
@@ -37,6 +40,7 @@ tadah::core::Registry<DM_Base,const tadah::core::Context&>::Register<DM_EAD> cDM
 tadah::core::Registry<DM_Base,const tadah::core::Context&>::Register<DM_EAM> cDM_EAM_2( "DM_EAM" );
 tadah::core::Registry<DM_Base,const tadah::core::Context&>::Register<DM_mEAD<F_RLR>> cDM_mEAD_2("DM_mRLR");
 tadah::core::Registry<DM_Base,const tadah::core::Context&>::Register<DM_mEAD<F_SQRT>> cDM_mEAD_22("DM_mSQRT");
+tadah::core::Registry<DM_Base,const tadah::core::Context&>::Register<DM_mEAD<F_Blip>> cDM_mEAD_222("DM_mBlip");
 tadah::core::Registry<DM_Base,const tadah::core::Context&>::Register<DM_mJoin> cDM_mJoin_2( "DM_mJoin" );
 //template<> Registry<DM_Base,F_Base&,tadah::core::Context&>::Map Registry<DM_Base,F_Base&,tadah::core::Context&>::registry{};
 //Registry<DM_Base,tadah::core::Context&>::Register<DM_mEAD<F_RLR>> DM_mEAD_1( "DM_mEAD" );

@@ -1,4 +1,5 @@
 #include <tadah/models/descriptors/dm/dm_func.h>
+#include <tadah/models/descriptors/d_basis_functions.h>
 #include <cmath>
 
 namespace tadah {
@@ -73,6 +74,32 @@ double F_SQ::calc_F(double rho,size_t ) const {
 }
 double F_SQ::calc_dF(double rho,size_t ) const {
   return 2.0*rho;
+}
+
+//////////////////////////
+// F_Blip
+//////////////////////////
+F_Blip::F_Blip(const tadah::core::Context &c, size_t cSize, size_t sSize):
+  context(&c)
+{
+  if (!context->get<bool>("INITMB")) return;
+  D_Base::get_grid(*context,"SEMBFUNC",sfuncgrid);
+  D_Base::get_grid(*context,"CEMBFUNC",cfuncgrid);
+  // check if size is correct, throw otherwise
+  if (sfuncgrid.size() != sSize) {
+    throw std::runtime_error("F_Blip: size of SEMBFUNC does not match declared size.");
+  }
+  if (cfuncgrid.size() != cSize) {
+    throw std::runtime_error("F_Blip: size of CEMBFUNC does not match declared size.");
+  }
+}
+double F_Blip::calc_F(double rho,size_t p) const {
+  double eta = sfuncgrid[p]; 
+  double miu = cfuncgrid[p]; 
+  return B(rho, eta, miu); 
+}
+double F_Blip::calc_dF(double rho,size_t p) const {
+  return dB(rho, sfuncgrid[p], cfuncgrid[p]);
 }
 
 } // namespace models

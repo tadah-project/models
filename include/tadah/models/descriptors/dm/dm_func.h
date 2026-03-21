@@ -52,10 +52,6 @@ public:
   F_RLR() = default;
   double calc_F(double rho,size_t p) const override;
   double calc_dF(double rho,size_t p) const override;
-  //~F_RLR() {
-
-  // Do not delete context!
-  //}
 };
 
 /**
@@ -118,6 +114,23 @@ public:
   double calc_F(double rho, size_t p) const override;
 
   double calc_dF(double rho, size_t p) const override;
+};
+
+  /**
+   * @brief Constructs F_Blip from a Context object.
+   * @param context Reference to a Context instance.
+   */
+class F_Blip:  public F_Base {
+private:
+  const tadah::core::Context *context=nullptr;
+  tadah::core::v_type sfuncgrid;   // controls width of the "blip"
+  tadah::core::v_type cfuncgrid;   // control blip offset
+public:
+  F_Blip(const tadah::core::Context &context, size_t cSize, size_t sSize);
+  F_Blip() = default;
+  double calc_F(double rho,size_t p) const override;
+  double calc_dF(double rho,size_t p) const override;
+
 };
 
 } // namespace models
