@@ -5,29 +5,46 @@
 namespace tadah {
 namespace models {
 
-/**  Blip Many Body Descriptor.
+/** \brief Blip Many-Body Descriptor.
+ *
+ * Angular-momentum-projected descriptor built from blip (cubic B-spline) basis
+ * functions.  For each angular-momentum channel \f$ L \f$ and each grid point
+ * \f$(\eta,r_s)\f$ the descriptor component is:
  *
  * \f[
- * V_i^{L,\eta,r_s} = \sum_{l_x,l_y,l_z}^{l_x+l_y+l_z=L} \frac{L!}{l_x!l_y!l_z!}
- * \Big( \rho_i^{\eta,r_s,l_x,l_y,l_z} \Big)^2
+ *   V_i^{L,\eta,r_s} = \sum_{\substack{l_x,l_y,l_z \ge 0 \\ l_x+l_y+l_z=L}}
+ *   \frac{L!}{l_x!\,l_y!\,l_z!}
+ *   \Bigl(\rho_i^{\eta,r_s,l_x,l_y,l_z}\Bigr)^2
  * \f]
  *
- * where density \f$ \rho \f$ is calculated using modified Gaussian Type Orbitals
- * (expansion in the Blip basis instead of usual Gaussians):
+ * where the projected density is
+ *
  * \f[
- * \rho_i^{\eta,r_s,l_x,l_y,l_z} = \sum_{j \neq i} x_{ij}^{l_x}y_{ij}^{l_y}z_{ij}^{l_z}
- * \mathcal{B}{\Big(-\eta(r_{ij}-r_s)^2\Big)}f_c(r_{ij})
+ *   \rho_i^{\eta,r_s,l_x,l_y,l_z}
+ *   = \sum_{j \neq i} x_{ij}^{l_x}\,y_{ij}^{l_y}\,z_{ij}^{l_z}\,
+ *     \mathcal{B}\!\Bigl(\eta(r_{ij}-r_s)\Bigr)\,f_c(r_{ij})
  * \f]
  *
- * \ref CGRIDMB parameters control position \f$ r_s \f$ of the gaussian basis function.
+ * Here \f$ \mathcal{B} \f$ is the blip (cubic B-spline) basis function with
+ * compact support \f$ |\eta(r-r_s)| < 2 \f$ (see tadah::models::B), and
+ * \f$ f_c \f$ is the cutoff function.
  *
- * \ref SGRIDMB parameters control width \f$ \eta \f$ of the gaussian basis function.
+ * The multinomial prefactor \f$ L!/({l_x!\,l_y!\,l_z!}) \f$ is normalised by
+ * \f$(4r_c)^L\f$ so that descriptor components at different \f$ L \f$ have
+ * comparable magnitudes.
  *
- * e.g. \f$L_{max}=2\f$ will calculate descriptors with \f$ L=0,1,2 \f$ (s,p,d orbitals).
+ * \ref CGRIDMB parameters control the centre \f$ r_s \f$ of each blip basis
+ * function.
  *
- * More information about this descriptor:
+ * \ref SGRIDMB parameters control the inverse width \f$ \eta \f$; the full
+ * support of each blip in \f$ r \f$-space is \f$ 4/\eta \f$.
  *
- * <div class="csl-entry">Zhang, Y., Hu, C.,Jiang, B.
+ * Setting \f$ L_{\max}=2 \f$ generates descriptors for \f$ L=0,1,2 \f$
+ * (s-, p-, d-orbital channels). Maximum supported \f$ L_{\max} = 6 \f$.
+ *
+ * More information about this descriptor family:
+ *
+ * <div class="csl-entry">Zhang, Y., Hu, C., Jiang, B.
  * (2019). Embedded atom neural network potentials: efficient and accurate
  * machine learning with a physically inspired representation.
  * <i>Journal of Physical Chemistry Letters</i>, <i>10</i>(17),
