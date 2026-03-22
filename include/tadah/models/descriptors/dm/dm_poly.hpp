@@ -4,6 +4,7 @@
 #include <tadah/models/descriptors/dm/radial_policies.h>
 
 #include <stdexcept>
+#include <type_traits>
 
 constexpr std::size_t DM_POLY_MAX_GRID = 64;
 static_assert(DM_POLY_MAX_GRID >= 1, "DM_POLY_MAX_GRID must be > 0");
@@ -15,11 +16,11 @@ using namespace tadah::models::detail;
 namespace tadah {
 namespace models {
 
-template <typename ChannelFn, typename RadialBasis>
-DM_Poly<ChannelFn, RadialBasis>::DM_Poly() { init(); }
+template <typename ChannelFn, typename RadialBasis, typename AggMode>
+DM_Poly<ChannelFn, RadialBasis, AggMode>::DM_Poly() { init(); }
 
-template <typename ChannelFn, typename RadialBasis>
-DM_Poly<ChannelFn, RadialBasis>::DM_Poly(const tadah::core::Context& ctx)
+template <typename ChannelFn, typename RadialBasis, typename AggMode>
+DM_Poly<ChannelFn, RadialBasis, AggMode>::DM_Poly(const tadah::core::Context& ctx)
 : DM_Base(ctx)
 , rc(ctx.get<double>("RCUTMBMAX"))
 {
@@ -41,6 +42,14 @@ DM_Poly<ChannelFn, RadialBasis>::DM_Poly(const tadah::core::Context& ctx)
     throw std::runtime_error("DM_Poly: Lmax > 6 is not supported (requested "
         + std::to_string(Lmax) + ").");
 
+  /* OrbitalWise + F≠F_SQ + L>0 is not rotationally invariant */
+  if constexpr (std::is_same_v<AggMode, OrbitalWise>) {
+    if (!ChannelFn::rotationally_invariant && Lmax > 0)
+      core::Logger::instance().log(core::LogLevel::WARNING,
+        label() + " (OrbitalWise): channel function is not F_SQ — descriptor"
+        " is NOT rotationally invariant for L>0. Use PowerSpectrum mode.");
+  }
+
   s        = cgrid.size() * (Lmax + 1);
   rhoisize = gen_atomic_orbitals(Lmax) * cgrid.size();
 
@@ -48,42 +57,60 @@ DM_Poly<ChannelFn, RadialBasis>::DM_Poly(const tadah::core::Context& ctx)
 }
 
 /* ================================================================== *
- *  calc_aed — power spectrum then channel function                   *
- *                                                                    *
- *  rhoi layout (each half of size rhoisize):                         *
- *    [0, rhoisize)          — orbital densities ρ[L,o,c]            *
- *    [rhoisize, 2*rhoisize) — per-orbital derivatives                *
- *                             ∂aed/∂ρ[L,o,c] = F'(ρ_L) · 2·fac·ρ  *
+ *  calc_aed                                                           *
+ *                                                                     *
+ *  PowerSpectrum mode:                                                *
+ *    ρ_L[c] = Σ_o fac · ρ[o,c]²   then  V = F(ρ_L[c])              *
+ *    derivative: ∂V/∂ρ[o,c] = F'(ρ_L) · 2·fac · ρ[o,c]             *
+ *                                                                     *
+ *  OrbitalWise mode:                                                  *
+ *    V[L,c] = Σ_o fac · F(ρ[o,c])                                   *
+ *    derivative: ∂V/∂ρ[o,c] = fac · F'(ρ[o,c])                      *
+ *                                                                     *
+ *  rhoi layout (each half of size rhoisize):                          *
+ *    [0, rhoisize)          — orbital densities ρ[L,o,c]             *
+ *    [rhoisize, 2*rhoisize) — per-orbital derivatives (see above)     *
  * ================================================================== */
-template <typename ChannelFn, typename RadialBasis>
-void DM_Poly<ChannelFn, RadialBasis>::calc_aed(
+template <typename ChannelFn, typename RadialBasis, typename AggMode>
+void DM_Poly<ChannelFn, RadialBasis, AggMode>::calc_aed(
     tadah::core::rho_type& rhoi,
     tadah::core::aed_type& aed) const
 {
   const std::size_t ng = cgrid.size();
   std::size_t Lshift  = 0;
-  std::size_t ii_base = rfidx;   // start of density part for current L
+  std::size_t ii_base = rfidx;
 
   for (int L = 0; L <= Lmax; ++L) {
     const std::size_t N_orb = orbitals[L].size();
 
-    for (std::size_t c = 0; c < ng; ++c) {
-      /* pass 1: power spectrum  ρ_L[c] = Σ_o fac[o] · ρ[o,c]² */
-      double rho_L = 0.0;
-      for (std::size_t o = 0; o < N_orb; ++o) {
-        const double rho_oc = rhoi(ii_base + o*ng + c);
-        rho_L += fac[L][o] * rho_oc * rho_oc;
+    if constexpr (std::is_same_v<AggMode, PowerSpectrum>) {
+      /* ---- PowerSpectrum: F applied after invariant quadratic sum ---- */
+      for (std::size_t c = 0; c < ng; ++c) {
+        double rho_L = 0.0;
+        for (std::size_t o = 0; o < N_orb; ++o) {
+          const double rho_oc = rhoi(ii_base + o*ng + c);
+          rho_L += fac[L][o] * rho_oc * rho_oc;
+        }
+        const double FF  = emb.calc_F (rho_L, c);
+        const double dFF = emb.calc_dF(rho_L, c);
+        aed(c + Lshift + fidx) += FF;
+        for (std::size_t o = 0; o < N_orb; ++o) {
+          const double rho_oc = rhoi(ii_base + o*ng + c);
+          rhoi(ii_base + o*ng + c + rhoisize) = dFF * 2.0 * fac[L][o] * rho_oc;
+        }
       }
-
-      /* apply channel function */
-      const double FF  = emb.calc_F (rho_L, c);
-      const double dFF = emb.calc_dF(rho_L, c);
-      aed(c + Lshift + fidx) += FF;
-
-      /* store per-orbital derivatives ∂aed/∂ρ[o,c] = dFF · 2·fac·ρ[o,c] */
+    } else {
+      /* ---- OrbitalWise: F applied per orbital before sum ------------ */
+      std::size_t ii = ii_base;
       for (std::size_t o = 0; o < N_orb; ++o) {
-        const double rho_oc = rhoi(ii_base + o*ng + c);
-        rhoi(ii_base + o*ng + c + rhoisize) = dFF * 2.0 * fac[L][o] * rho_oc;
+        const double f = fac[L][o];
+        for (std::size_t c = 0; c < ng; ++c, ++ii) {
+          const double rho  = rhoi(ii);
+          const double FF   = emb.calc_F (rho, c);
+          const double dFF  = emb.calc_dF(rho, c);
+          aed(c + Lshift + fidx) += f * FF;
+          rhoi(ii + rhoisize)     = f * dFF;
+        }
       }
     }
 
@@ -94,9 +121,10 @@ void DM_Poly<ChannelFn, RadialBasis>::calc_aed(
 
 /* ================================================================== *
  *  calc_dXijdri_dXjidri — half-list, symmetric pair contribution     *
+ *  (identical for both AggModes — derivative layout is the same)     *
  * ================================================================== */
-template <typename ChannelFn, typename RadialBasis>
-void DM_Poly<ChannelFn, RadialBasis>::calc_dXijdri_dXjidri(
+template <typename ChannelFn, typename RadialBasis, typename AggMode>
+void DM_Poly<ChannelFn, RadialBasis, AggMode>::calc_dXijdri_dXjidri(
     int Zi, int Zj, double rij, double,
     const tadah::core::Vec3d& v,
     tadah::core::rho_type& rhoi,
@@ -124,10 +152,10 @@ void DM_Poly<ChannelFn, RadialBasis>::calc_dXijdri_dXjidri(
 
   const double   rinv   = 1.0/rij;
   std::size_t    Lshift = 0;
-  std::size_t    ii     = rhoisize + rfidx;   // derivative part
+  std::size_t    ii     = rhoisize + rfidx;
 
   for (int L = 0; L <= Lmax; ++L) {
-    const double s_L = (L & 1) ? 1.0 : -1.0; // (-1)^{L+1}
+    const double s_L = (L & 1) ? 1.0 : -1.0;
 
     for (std::size_t o = 0; o < orbitals[L].size(); ++o) {
       const int lx = orbitals[L][o][0],
@@ -164,8 +192,8 @@ void DM_Poly<ChannelFn, RadialBasis>::calc_dXijdri_dXjidri(
 /* ================================================================== *
  *  calc_dXijdri — full-list, one-sided                               *
  * ================================================================== */
-template <typename ChannelFn, typename RadialBasis>
-void DM_Poly<ChannelFn, RadialBasis>::calc_dXijdri(
+template <typename ChannelFn, typename RadialBasis, typename AggMode>
+void DM_Poly<ChannelFn, RadialBasis, AggMode>::calc_dXijdri(
     int Zi, int Zj, double rij, double,
     const tadah::core::Vec3d& v,
     tadah::core::rho_type& rhoi,
@@ -233,10 +261,10 @@ void DM_Poly<ChannelFn, RadialBasis>::calc_dXijdri(
 }
 
 /* ================================================================== *
- *  calc_rho — density accumulation                                   *
+ *  calc_rho — density accumulation (same for both AggModes)          *
  * ================================================================== */
-template <typename ChannelFn, typename RadialBasis>
-void DM_Poly<ChannelFn, RadialBasis>::calc_rho(
+template <typename ChannelFn, typename RadialBasis, typename AggMode>
+void DM_Poly<ChannelFn, RadialBasis, AggMode>::calc_rho(
     int Zi, int Zj, double rij, double,
     const tadah::core::Vec3d& v,
     tadah::core::rho_type& rhoi,
@@ -274,25 +302,25 @@ void DM_Poly<ChannelFn, RadialBasis>::calc_rho(
 /* ================================================================== *
  *  Utilities                                                          *
  * ================================================================== */
-template <typename ChannelFn, typename RadialBasis>
-void DM_Poly<ChannelFn, RadialBasis>::init_rhoi(tadah::core::rho_type& rhoi)
+template <typename ChannelFn, typename RadialBasis, typename AggMode>
+void DM_Poly<ChannelFn, RadialBasis, AggMode>::init_rhoi(tadah::core::rho_type& rhoi)
 {
   rhoi.resize(2*rhoisize);
   rhoi.set_zero();
 }
 
-template <typename ChannelFn, typename RadialBasis>
-std::string DM_Poly<ChannelFn, RadialBasis>::label() const { return lab; }
+template <typename ChannelFn, typename RadialBasis, typename AggMode>
+std::string DM_Poly<ChannelFn, RadialBasis, AggMode>::label() const { return lab; }
 
-template <typename ChannelFn, typename RadialBasis>
-void DM_Poly<ChannelFn, RadialBasis>::init()
+template <typename ChannelFn, typename RadialBasis, typename AggMode>
+void DM_Poly<ChannelFn, RadialBasis, AggMode>::init()
 {
   keys = {"CGRIDMB", "SGRIDMB"};
   nparams = 2 + 1;
 }
 
-template <typename ChannelFn, typename RadialBasis>
-size_t DM_Poly<ChannelFn, RadialBasis>::gen_atomic_orbitals(int Lm)
+template <typename ChannelFn, typename RadialBasis, typename AggMode>
+size_t DM_Poly<ChannelFn, RadialBasis, AggMode>::gen_atomic_orbitals(int Lm)
 {
   orbitals.resize(Lm + 1);
   fac     .resize(Lm + 1);

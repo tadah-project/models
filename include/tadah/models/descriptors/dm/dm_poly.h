@@ -6,63 +6,93 @@
 namespace tadah {
 namespace models {
 
-/** \brief Power-Spectrum Many-Body Descriptor with swappable radial basis.
+/* =========================================================================
+ * Aggregation mode tags — select how the channel function F is applied.
+ * ========================================================================= */
+
+/**
+ * \brief PowerSpectrum aggregation: \f$V_{L,c} = \mathcal{F}(\varrho_{L,c})\f$
  *
- * Generalisation of DM_Blip in which:
- * 1. The radial basis is a compile-time policy (`RadialBasis`).
- * 2. A channel function \f$\mathcal{F}\f$ is applied to the rotationally
- *    invariant power-spectrum scalar \f$\varrho_i^{L,c}\f$.
+ * The orbital densities are first squared and summed to give the invariant
+ * power-spectrum scalar
+ * \f$ \varrho_{L,c} = \sum_o \frac{L!}{l_x!\,l_y!\,l_z!}\,\rho_{L,o,c}^2 \f$,
+ * then \f$\mathcal{F}\f$ is applied.  **Rotationally invariant for any F.**
+ */
+struct PowerSpectrum {};
+
+/**
+ * \brief OrbitalWise aggregation: \f$V_{L,c} = \sum_o \frac{L!}{l_x!\,l_y!\,l_z!}\,\mathcal{F}(\rho_{L,o,c})\f$
  *
- * For any choice of \f$\mathcal{F}\f$ **and** any radial basis the descriptor
- * is rotationally invariant.
+ * \f$\mathcal{F}\f$ is applied to each individual orbital density before
+ * the weighted sum.  Equivalent to DM_mEAD for BlipRadial.
+ *
+ * \warning Rotationally invariant **only** when \f$\mathcal{F}=\rho^2\f$ (F_SQ)
+ * and \f$L>0\f$.  For any other F and L>0 the descriptor is NOT invariant.
+ * See \ref DM_mEAD for the proof.  Prefer PowerSpectrum for invariance.
+ */
+struct OrbitalWise {};
+
+/* =========================================================================
+ * DM_Poly
+ * ========================================================================= */
+
+/** \brief Generalised many-body descriptor with swappable radial basis,
+ *  channel function, and aggregation mode.
  *
  * \f[
- *   V_i^{L,c} = \mathcal{F}\!\left(
- *     \sum_{\substack{l_x,l_y,l_z \ge 0 \\ l_x+l_y+l_z=L}}
- *     \frac{L!}{l_x!\,l_y!\,l_z!}\,
- *     \Bigl(\rho_i^{L,c,l_x,l_y,l_z}\Bigr)^2
- *   \right)
- * \f]
- *
- * where the projected density is
- *
- * \f[
- *   \rho_i^{L,c,l_x,l_y,l_z}
+ *   \rho_{i}^{L,c,l_x,l_y,l_z}
  *   = \sum_{j \neq i} x_{ij}^{l_x}\,y_{ij}^{l_y}\,z_{ij}^{l_z}\,
  *     \phi_c(r_{ij})\,f_c(r_{ij})
  * \f]
  *
- * with \f$\phi_c\f$ provided by the `RadialBasis` policy.
+ * **PowerSpectrum mode** (default, always invariant):
+ * \f[
+ *   V_{i}^{L,c} = \mathcal{F}\!\left(
+ *     \sum_{\substack{l_x+l_y+l_z=L}} \frac{L!}{l_x!\,l_y!\,l_z!}\,
+ *     (\rho_{i}^{L,c,l_x,l_y,l_z})^2
+ *   \right)
+ * \f]
+ *
+ * **OrbitalWise mode** (DM_mEAD-equivalent, invariant only for F_SQ and L=0):
+ * \f[
+ *   V_{i}^{L,c} = \sum_{\substack{l_x+l_y+l_z=L}} \frac{L!}{l_x!\,l_y!\,l_z!}\,
+ *   \mathcal{F}(\rho_{i}^{L,c,l_x,l_y,l_z})
+ * \f]
  *
  * The multinomial prefactor is normalised by \f$(4r_c)^L\f$.
  *
- * **Compare to DM_Blip / DM_mEAD:**
- * - DM_Blip: \f$\mathcal{F}=\mathrm{id}\f$, BlipRadial — raw power spectrum.
- * - DM_mEAD: \f$\mathcal{F}\f$ applied *before* the quadratic sum
- *   (orbital-wise); only rotationally invariant when \f$\mathcal{F}=\rho^2\f$.
- * - DM_Poly: \f$\mathcal{F}\f$ applied *after* the quadratic sum;
- *   invariant for any \f$\mathcal{F}\f$ and any `RadialBasis`.
- *
- * \tparam ChannelFn  Channel function (F_SQ, F_SQRT, F_RLR, F_Blip, …).
- * \tparam RadialBasis  Radial basis policy (BlipRadial, GaussianRadial, …).
- *                      Default: BlipRadial.
+ * \tparam ChannelFn   Channel function (F_SQ, F_SQRT, F_RLR, F_Blip, …).
+ * \tparam RadialBasis Radial basis policy (BlipRadial, GaussianRadial, …).
+ *                     Default: BlipRadial.
+ * \tparam AggMode     Aggregation mode (PowerSpectrum, OrbitalWise).
+ *                     Default: PowerSpectrum.
  *
  * Available instantiations registered in dm_all.cpp:
- * | Config name         | ChannelFn | RadialBasis      |
- * |---------------------|-----------|------------------|
- * | `DM_PS_SQ`          | F_SQ      | BlipRadial       |
- * | `DM_PS_SQRT`        | F_SQRT    | BlipRadial       |
- * | `DM_PS_RLR`         | F_RLR     | BlipRadial       |
- * | `DM_PS_Blip`        | F_Blip    | BlipRadial       |
- * | `DM_GPS_SQ`         | F_SQ      | GaussianRadial   |
- * | `DM_GPS_SQRT`       | F_SQRT    | GaussianRadial   |
- * | `DM_GPS_RLR`        | F_RLR     | GaussianRadial   |
- * | `DM_GPS_Blip`       | F_Blip    | GaussianRadial   |
+ * | Config name      | ChannelFn | RadialBasis     | AggMode       |
+ * |------------------|-----------|-----------------|---------------|
+ * | `DM_PS_SQ`       | F_SQ      | BlipRadial      | PowerSpectrum |
+ * | `DM_PS_SQRT`     | F_SQRT    | BlipRadial      | PowerSpectrum |
+ * | `DM_PS_RLR`      | F_RLR     | BlipRadial      | PowerSpectrum |
+ * | `DM_PS_Blip`     | F_Blip    | BlipRadial      | PowerSpectrum |
+ * | `DM_GPS_SQ`      | F_SQ      | GaussianRadial  | PowerSpectrum |
+ * | `DM_GPS_SQRT`    | F_SQRT    | GaussianRadial  | PowerSpectrum |
+ * | `DM_GPS_RLR`     | F_RLR     | GaussianRadial  | PowerSpectrum |
+ * | `DM_GPS_Blip`    | F_Blip    | GaussianRadial  | PowerSpectrum |
+ * | `DM_OW_SQ`       | F_SQ      | BlipRadial      | OrbitalWise   |
+ * | `DM_OW_SQRT`     | F_SQRT    | BlipRadial      | OrbitalWise   |
+ * | `DM_OW_RLR`      | F_RLR     | BlipRadial      | OrbitalWise   |
+ * | `DM_OW_Blip`     | F_Blip    | BlipRadial      | OrbitalWise   |
+ * | `DM_GOW_SQ`      | F_SQ      | GaussianRadial  | OrbitalWise   |
+ * | `DM_GOW_SQRT`    | F_SQRT    | GaussianRadial  | OrbitalWise   |
+ * | `DM_GOW_RLR`     | F_RLR     | GaussianRadial  | OrbitalWise   |
+ * | `DM_GOW_Blip`    | F_Blip    | GaussianRadial  | OrbitalWise   |
  *
  * Required Config keys:
  * \ref INITMB \ref CGRIDMB \ref SGRIDMB (plus channel-function keys)
  */
-template <typename ChannelFn, typename RadialBasis = BlipRadial>
+template <typename ChannelFn,
+          typename RadialBasis = BlipRadial,
+          typename AggMode     = PowerSpectrum>
 class DM_Poly : public DM_Base {
 private:
   int Lmax = 0;
