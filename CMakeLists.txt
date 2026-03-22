@@ -55,6 +55,8 @@ if(NOT TARGET tadah::compile_options)
   FetchContent_MakeAvailable(tadah_cmake)   # defines tadah::compile_options
 endif()
 
+option(TADAH_ENABLE_ASAN "Enable AddressSanitizer (-fsanitize=address -fno-omit-frame-pointer)" OFF)
+
 # (option) Developer builds -DTADAH_DEVELOP=ON
 tadah_use_local_module(Tadah.CORE CORE)  # FetchContent name + folder name
 
@@ -80,6 +82,11 @@ target_link_libraries(tadah.models
   PUBLIC
     tadah::compile_options    # get warnings/asan/-pg flags
     tadah.core)
+
+if(TADAH_ENABLE_ASAN)
+  target_compile_options(tadah.models PUBLIC -fsanitize=address -fno-omit-frame-pointer -g)
+  target_link_libraries(tadah.models PUBLIC -fsanitize=address)
+endif()
 
 if(TADAH_ENABLE_OPENMP)
   find_package(OpenMP REQUIRED)
