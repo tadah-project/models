@@ -60,8 +60,8 @@ private:
 public:
   F_RLR(const tadah::core::Context &context, size_t cSize, size_t sSize);
   F_RLR() = default;
-  double calc_F(double rho,size_t p) const override;
-  double calc_dF(double rho,size_t p) const override;
+  double calc_F(double rho,size_t p) const override final;
+  double calc_dF(double rho,size_t p) const override final;
 };
 
 /**
@@ -101,7 +101,7 @@ public:
    * @param p Index for model parameters. Here p=0
    * @return Embedding function value \f$ F(\rho) = s_{p} \sqrt{ c_{p} \rho } \f$.
    */
-  double calc_F(double rho, size_t p) const override;
+  double calc_F(double rho, size_t p) const override final;
 
   /**
    * @brief Calculates the derivative of the square-root embedding function.
@@ -109,7 +109,7 @@ public:
    * @param p Index for model parameters. Here p=0
    * @return First derivative \f$ dF/d\rho = \frac{s_{p} \, {2 \sqrt{\rho}} \f$.
    */
-  double calc_dF(double rho, size_t p) const override;
+  double calc_dF(double rho, size_t p) const override final;
 };
 
 class F_SQ : public F_Base {
@@ -125,9 +125,9 @@ public:
 
   F_SQ() = default;
 
-  double calc_F(double rho, size_t p) const override;
+  double calc_F(double rho, size_t p) const override final;
 
-  double calc_dF(double rho, size_t p) const override;
+  double calc_dF(double rho, size_t p) const override final;
 };
 
   /**
@@ -142,8 +142,8 @@ private:
 public:
   F_Blip(const tadah::core::Context &context, size_t cSize, size_t sSize);
   F_Blip() = default;
-  double calc_F(double rho,size_t p) const override;
-  double calc_dF(double rho,size_t p) const override;
+  double calc_F(double rho,size_t p) const override final;
+  double calc_dF(double rho,size_t p) const override final;
 
 };
 
