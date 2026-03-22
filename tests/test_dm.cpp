@@ -337,6 +337,8 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_EAD 2", "[DM]") {
     test_case<DM_EAD, Cut_PolyS>(context, "DM_EAD", 4 * 3);
 }
 
+// SUPERSEDED: DM_Blip is equivalent to DM_OW_SQ (= DM_Poly<F_SQ,BlipRadial,OrbitalWise>).
+// Kept for regression; see test_dm_poly.cpp for the equivalence cross-validation.
 TEST_CASE_METHOD(TestFixture, "Testing DM_Blip 1", "[DM]") {
     Context context;
     context.add("RCUTMB", 10);
@@ -448,6 +450,8 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_mEAD<F_SQRT> 2", "[DM]") {
     test_case<DM_mEAD<F_SQRT>, Cut_Tanh>(context, "DM_mEAD", 4 * 3);
     test_case<DM_mEAD<F_SQRT>, Cut_PolyS>(context, "DM_mEAD", 4 * 3);
 }
+// SUPERSEDED: DM_mEAD<F_SQ> is equivalent to DM_GOW_SQ (= DM_Poly<F_SQ,GaussianRadial,OrbitalWise>).
+// Kept for regression; see test_dm_poly.cpp for the equivalence cross-validation.
 TEST_CASE_METHOD(TestFixture, "Testing DM_mEAD<F_SQ> 1", "[DM]") {
     Context context;
     context.add("RCUTMB", 10);

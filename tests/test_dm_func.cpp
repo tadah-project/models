@@ -71,5 +71,59 @@ TEST_CASE("F_SQRT: Basic Function and Derivative", "[F_SQRT]")
   REQUIRE(valdF == Approx(0.05).margin(1e-12));
 }
 
+/**
+ * @test F_SQ: F(rho)=rho^2, F'(rho)=2*rho.  Exact for all rho.
+ */
+TEST_CASE("F_SQ: Function and Derivative", "[F_SQ]")
+{
+    tadah::core::Context c;
+    c.remove("INITMB");
+    c.add("INITMB", "true");
+
+    F_SQ sq(c, 1, 1);
+    const size_t p = 0;
+
+    // Exact values
+    REQUIRE(sq.calc_F (3.0, p) == Approx(9.0));
+    REQUIRE(sq.calc_dF(3.0, p) == Approx(6.0));
+
+    // General: F(rho)=rho^2, F'(rho)=2*rho
+    for (double rho : {0.5, 1.0, 2.0, 5.0}) {
+        REQUIRE_FALSE(std::isnan(sq.calc_F (rho, p)));
+        REQUIRE(sq.calc_F (rho, p) == Approx(rho * rho));
+        REQUIRE(sq.calc_dF(rho, p) == Approx(2.0 * rho));
+    }
+}
+
+/**
+ * @test F_Blip: no NaN/inf; derivative consistent with central differences.
+ */
+TEST_CASE("F_Blip: Function and Derivative", "[F_Blip]")
+{
+    tadah::core::Context c;
+    c.remove("INITMB");
+    c.add("INITMB", "true");
+    // sgrid=0.5, cgrid=1.0 → blip support in rho: |0.5*(rho-1.0)| < 2  →  rho ∈ (-3, 5)
+    c.add("CEMBFUNC", "1.0");
+    c.add("SEMBFUNC", "0.5");
+
+    F_Blip fb(c, 1, 1);
+    const size_t p = 0;
+    const double rho = 1.5;   // x = 0.5*(1.5-1.0) = 0.25 — well inside support
+
+    const double F_val  = fb.calc_F (rho, p);
+    const double dF_val = fb.calc_dF(rho, p);
+    REQUIRE_FALSE(std::isnan (F_val));
+    REQUIRE_FALSE(std::isinf (F_val));
+    REQUIRE_FALSE(std::isnan (dF_val));
+    REQUIRE_FALSE(std::isinf (dF_val));
+    REQUIRE(std::fabs(F_val) > 0.0);
+
+    // Numerical FD verification of derivative
+    const double h    = 1e-7;
+    const double dF_fd = (fb.calc_F(rho + h, p) - fb.calc_F(rho - h, p)) / (2.0 * h);
+    REQUIRE(dF_val == Approx(dF_fd).margin(1e-5));
+}
+
 } // namespace models
 } // namespace tadah
