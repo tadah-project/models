@@ -146,6 +146,13 @@ template <typename F>
         "DM_mEAD: Lmax > 6 is not supported (requested "
         + std::to_string(Lmax) + ").");
 
+  if constexpr (!F::rotationally_invariant) {
+    if (Lmax > 0)
+      core::Logger::instance().log(core::LogLevel::WARNING,
+        label() + ": channel function is not F_SQ — descriptor is NOT"
+        " rotationally invariant for L>0. Consider DM_mBlipL instead.");
+  }
+
   s=sgrid.size()*(Lmax+1);
   rhoisize = gen_atomic_orbitals(Lmax);
   rhoisize *= sgrid.size();

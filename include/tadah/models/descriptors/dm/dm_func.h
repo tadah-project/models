@@ -11,6 +11,16 @@ namespace models {
 
 class F_Base {
 public:
+  /** \brief True only for \f$\mathcal{F}(\rho)=\rho^2\f$ (F_SQ).
+   *
+   * DM_mEAD applies \f$\mathcal{F}\f$ to individual orbital densities
+   * \f$\rho^{\eta,r_s,l_x,l_y,l_z}\f$ before the rotational-invariance
+   * restoring quadratic sum.  This is invariant only when
+   * \f$\mathcal{F}=\rho^2\f$; any other choice breaks SO(3) invariance for
+   * \f$L>0\f$.
+   */
+  static constexpr bool rotationally_invariant = false;
+
   /**
    * @brief Calculates the embedding function value.
    * @param rho Electron density.
@@ -107,6 +117,10 @@ private:
   const tadah::core::Context *context=nullptr;
 
 public:
+  /** F_SQ = ρ² is the only channel function that preserves rotational
+   *  invariance in DM_mEAD for all L. */
+  static constexpr bool rotationally_invariant = true;
+
   F_SQ(const tadah::core::Context &context, size_t, size_t);
 
   F_SQ() = default;

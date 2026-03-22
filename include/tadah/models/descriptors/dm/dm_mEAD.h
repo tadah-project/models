@@ -7,6 +7,13 @@ namespace models {
 
 /** Modified Embedded Atom Descriptor
  *
+ * \warning **Rotational invariance** holds only when \f$\mathcal{F}=\rho^2\f$
+ * (i.e.\ F_SQ).  For any other channel function and \f$L>0\f$ the descriptor
+ * is **not** rotationally invariant because \f$\mathcal{F}\f$ is applied to
+ * individual orbital densities before the invariance-restoring quadratic sum.
+ * A runtime warning is emitted in that case.  Use DM_mBlipL for a descriptor
+ * that is invariant for arbitrary \f$\mathcal{F}_L\f$.
+ *
  * REQUIRED KEYS: SGRIDMB, CGRIDMB, and KEYS OF THE EMBEDDING FUNCTION
  *
  * This descriptor has a mathematical form very similar to DM_EAD
