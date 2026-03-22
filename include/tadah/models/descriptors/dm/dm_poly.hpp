@@ -1,7 +1,7 @@
 #include <tadah/models/descriptors/dm/dm_func.h>
 #include <tadah/models/descriptors/dm/dm_poly.h>
 #include <tadah/models/descriptors/dm/dm_impl_utils.h>
-#include <tadah/models/descriptors/d_basis_functions.h>
+#include <tadah/models/descriptors/dm/radial_policies.h>
 
 #include <stdexcept>
 
@@ -9,40 +9,17 @@ constexpr std::size_t DM_POLY_MAX_GRID = 64;
 static_assert(DM_POLY_MAX_GRID >= 1, "DM_POLY_MAX_GRID must be > 0");
 
 namespace {
-using namespace tadah::models;
 using namespace tadah::models::detail;
-
-/* Blip radial pre-computation (will become a policy in Stage 2) */
-inline void poly_precompute_radials(double r, double fc,
-    const std::vector<double>& sg, const std::vector<double>& cg,
-    double* g, std::size_t n)
-{
-  for (std::size_t i = 0; i < n; ++i) {
-    const double x = sg[i]*(r - cg[i]);
-    g[i] = B(x, fc);
-  }
-}
-inline void poly_precompute_radials(double r, double fc, double fcp,
-    const std::vector<double>& sg, const std::vector<double>& cg,
-    double* g, double* dg, std::size_t n)
-{
-  for (std::size_t i = 0; i < n; ++i) {
-    const double s = sg[i];
-    const double x = s*(r - cg[i]);
-    g [i] = B (x, fc);
-    dg[i] = dB(x, s, fc, fcp);
-  }
-}
 } // namespace
 
 namespace tadah {
 namespace models {
 
-template <typename ChannelFn>
-DM_Poly<ChannelFn>::DM_Poly() { init(); }
+template <typename ChannelFn, typename RadialBasis>
+DM_Poly<ChannelFn, RadialBasis>::DM_Poly() { init(); }
 
-template <typename ChannelFn>
-DM_Poly<ChannelFn>::DM_Poly(const tadah::core::Context& ctx)
+template <typename ChannelFn, typename RadialBasis>
+DM_Poly<ChannelFn, RadialBasis>::DM_Poly(const tadah::core::Context& ctx)
 : DM_Base(ctx)
 , rc(ctx.get<double>("RCUTMBMAX"))
 {
@@ -78,8 +55,8 @@ DM_Poly<ChannelFn>::DM_Poly(const tadah::core::Context& ctx)
  *    [rhoisize, 2*rhoisize) — per-orbital derivatives                *
  *                             ∂aed/∂ρ[L,o,c] = F'(ρ_L) · 2·fac·ρ  *
  * ================================================================== */
-template <typename ChannelFn>
-void DM_Poly<ChannelFn>::calc_aed(
+template <typename ChannelFn, typename RadialBasis>
+void DM_Poly<ChannelFn, RadialBasis>::calc_aed(
     tadah::core::rho_type& rhoi,
     tadah::core::aed_type& aed) const
 {
@@ -118,8 +95,8 @@ void DM_Poly<ChannelFn>::calc_aed(
 /* ================================================================== *
  *  calc_dXijdri_dXjidri — half-list, symmetric pair contribution     *
  * ================================================================== */
-template <typename ChannelFn>
-void DM_Poly<ChannelFn>::calc_dXijdri_dXjidri(
+template <typename ChannelFn, typename RadialBasis>
+void DM_Poly<ChannelFn, RadialBasis>::calc_dXijdri_dXjidri(
     int Zi, int Zj, double rij, double,
     const tadah::core::Vec3d& v,
     tadah::core::rho_type& rhoi,
@@ -138,7 +115,7 @@ void DM_Poly<ChannelFn>::calc_dXijdri_dXjidri(
 
   const std::size_t ng = cgrid.size();
   StackOrHeapBuffer<DM_POLY_MAX_GRID> buf(ng);
-  poly_precompute_radials(rij, fc, fcp, sgrid, cgrid, buf.g(), buf.dg(), ng);
+  RadialBasis::eval(rij, fc, fcp, sgrid, cgrid, buf.g(), buf.dg(), ng);
 
   double px[7], py[7], pz[7], dpx[7], dpy[7], dpz[7];
   precompute_powers(x, Lmax, px, dpx);
@@ -159,10 +136,9 @@ void DM_Poly<ChannelFn>::calc_dXijdri_dXjidri(
 
       const double pxij  = px[lx], pyij = py[ly], pzij = pz[lz];
       const double pqrij = pxij*pyij*pzij;
-
-      const double txij = dpx[lx]*pyij*pzij;
-      const double tyij = dpy[ly]*pxij*pzij;
-      const double tzij = dpz[lz]*pyij*pxij;
+      const double txij  = dpx[lx]*pyij*pzij;
+      const double tyij  = dpy[ly]*pxij*pzij;
+      const double tzij  = dpz[lz]*pyij*pxij;
 
       for (std::size_t c = 0; c < ng; ++c, ++ii) {
         const double g  = buf.g ()[c];
@@ -188,8 +164,8 @@ void DM_Poly<ChannelFn>::calc_dXijdri_dXjidri(
 /* ================================================================== *
  *  calc_dXijdri — full-list, one-sided                               *
  * ================================================================== */
-template <typename ChannelFn>
-void DM_Poly<ChannelFn>::calc_dXijdri(
+template <typename ChannelFn, typename RadialBasis>
+void DM_Poly<ChannelFn, RadialBasis>::calc_dXijdri(
     int Zi, int Zj, double rij, double,
     const tadah::core::Vec3d& v,
     tadah::core::rho_type& rhoi,
@@ -204,11 +180,11 @@ void DM_Poly<ChannelFn>::calc_dXijdri(
   const double fc  = scale*wj * fcut->calc       (rij);
   const double fcp = scale*wj * fcut->calc_prime (rij);
 
-  const double       rinv = 1.0/rij;
-  const std::size_t  ng   = cgrid.size();
+  const double      rinv = 1.0/rij;
+  const std::size_t ng   = cgrid.size();
 
   StackOrHeapBuffer<DM_POLY_MAX_GRID> buf(ng);
-  poly_precompute_radials(rij, fc, fcp, sgrid, cgrid, buf.g(), buf.dg(), ng);
+  RadialBasis::eval(rij, fc, fcp, sgrid, cgrid, buf.g(), buf.dg(), ng);
 
   double px[7], py[7], pz[7], dpx[7], dpy[7], dpz[7];
   precompute_powers(x, Lmax, px, dpx);
@@ -257,10 +233,10 @@ void DM_Poly<ChannelFn>::calc_dXijdri(
 }
 
 /* ================================================================== *
- *  calc_rho — density accumulation (identical to DM_Blip)            *
+ *  calc_rho — density accumulation                                   *
  * ================================================================== */
-template <typename ChannelFn>
-void DM_Poly<ChannelFn>::calc_rho(
+template <typename ChannelFn, typename RadialBasis>
+void DM_Poly<ChannelFn, RadialBasis>::calc_rho(
     int Zi, int Zj, double rij, double,
     const tadah::core::Vec3d& v,
     tadah::core::rho_type& rhoi,
@@ -272,7 +248,7 @@ void DM_Poly<ChannelFn>::calc_rho(
 
   const std::size_t ng = cgrid.size();
   StackOrHeapBuffer<DM_POLY_MAX_GRID> buf(ng);
-  poly_precompute_radials(rij, fc, sgrid, cgrid, buf.g(), ng);
+  RadialBasis::eval(rij, fc, sgrid, cgrid, buf.g(), ng);
 
   double px[7], py[7], pz[7];
   precompute_powers(v[0], Lmax, px);
@@ -298,25 +274,25 @@ void DM_Poly<ChannelFn>::calc_rho(
 /* ================================================================== *
  *  Utilities                                                          *
  * ================================================================== */
-template <typename ChannelFn>
-void DM_Poly<ChannelFn>::init_rhoi(tadah::core::rho_type& rhoi)
+template <typename ChannelFn, typename RadialBasis>
+void DM_Poly<ChannelFn, RadialBasis>::init_rhoi(tadah::core::rho_type& rhoi)
 {
   rhoi.resize(2*rhoisize);
   rhoi.set_zero();
 }
 
-template <typename ChannelFn>
-std::string DM_Poly<ChannelFn>::label() const { return lab; }
+template <typename ChannelFn, typename RadialBasis>
+std::string DM_Poly<ChannelFn, RadialBasis>::label() const { return lab; }
 
-template <typename ChannelFn>
-void DM_Poly<ChannelFn>::init()
+template <typename ChannelFn, typename RadialBasis>
+void DM_Poly<ChannelFn, RadialBasis>::init()
 {
   keys = {"CGRIDMB", "SGRIDMB"};
   nparams = 2 + 1;
 }
 
-template <typename ChannelFn>
-size_t DM_Poly<ChannelFn>::gen_atomic_orbitals(int Lm)
+template <typename ChannelFn, typename RadialBasis>
+size_t DM_Poly<ChannelFn, RadialBasis>::gen_atomic_orbitals(int Lm)
 {
   orbitals.resize(Lm + 1);
   fac     .resize(Lm + 1);
