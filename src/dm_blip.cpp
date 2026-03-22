@@ -1,71 +1,17 @@
 #include <tadah/models/descriptors/dm/dm_func.h>
 #include <tadah/models/descriptors/dm/dm_blip.h>
+#include <tadah/models/descriptors/dm/dm_impl_utils.h>
 #include <tadah/models/descriptors/d_basis_functions.h>
 
-#include <array>
-#include <memory>
 #include <vector>
 #include <stdexcept>
-#include <cmath>
 
 constexpr std::size_t MAX_GRID = 64;
 static_assert(MAX_GRID>=1,"MAX_GRID must be > 0");
 
 namespace {
 using namespace tadah::models;
-
-/* ------------------------------------------------------------------ *
- *  Stack-or-Heap scratch buffer                                       *
- * ------------------------------------------------------------------ */
-template<std::size_t N=64>
-class StackOrHeapBuffer {
-public:
-  explicit StackOrHeapBuffer(std::size_t n)
-  : sz(n), use_heap(n>N), heap(use_heap?new double[2*n]:nullptr) {}
-
-  double* g ()       { return use_heap?  heap.get()      : stack;     }
-  double* dg()       { return use_heap? &heap.get()[sz] : &stack[N]; }
-  std::size_t size() const { return sz; }
-
-private:
-  std::size_t              sz;
-  bool                     use_heap;
-  std::unique_ptr<double[]> heap;
-  alignas(64) double       stack[2*N];
-};
-
-/* ------------ factorials & 0…6 integer powers --------------------- */
-constexpr std::array<double,7> FACT_TBL={1.,1.,2.,6.,24.,120.,720.};
-
-inline double fact_cached(int n)      { return FACT_TBL[n]; }
-
-inline double pow_i06(double x,int n){
-  switch(n){
-    case 0: return 1.;
-    case 1: return x;
-    case 2: return x*x;
-    case 3: return x*x*x;
-    case 4: { double x2=x*x; return x2*x2; }
-    case 5: { double x2=x*x; return x2*x2*x; }
-    case 6: { double x2=x*x; return x2*x2*x2; }
-    default:return std::pow(x,n);
-  }
-}
-
-/* ------------ Cartesian powers and derivatives -------------------- */
-inline void precompute_powers(double x,int L,double p[7]){
-  p[0]=1.; for(int n=1;n<=L;++n) p[n]=p[n-1]*x;
-#if defined(__SANITIZE_ADDRESS__)||defined(ADDRESS_SANITIZER)
-  for(int n=L+1;n<=6;++n){ p[n]=0.; }
-#endif
-}
-inline void precompute_powers(double x,int L,double p[7],double dp[7]){
-  p[0]=1.; dp[0]=0.;
-  for(int n=1;n<=L;++n){ p[n]=p[n-1]*x; dp[n]=n*p[n-1]; }
-#if defined(__SANITIZE_ADDRESS__)||defined(ADDRESS_SANITIZER)
-  for(int n=L+1;n<=6;++n){ p[n]=0.; dp[n]=0.; }
-#endif
-}
+using namespace tadah::models::detail;
 
 /* ------------ radial pre-computation (Blip) ----------------------- */
 inline void precompute_radials(double r,double fc,
@@ -91,8 +37,6 @@ inline void precompute_radials(double r,double fc,double fcp,
   }
 }
 
-/* sign helper */
-inline double neg(double v,int n){ return (n&1)?-v:v; }
 } // namespace
 
 /* ================================================================== *

@@ -1,84 +1,14 @@
 #include <tadah/models/descriptors/dm/dm_func.h>
 #include <tadah/models/descriptors/dm/dm_mEAD.h>
+#include <tadah/models/descriptors/dm/dm_impl_utils.h>
 #include <tadah/models/descriptors/d_basis_functions.h>
 
-#include <array>
-#include <memory>
-
-constexpr std::size_t MAX_GRID = 64;          // <-- adjust to your input deck
+constexpr std::size_t MAX_GRID = 64;
 static_assert(MAX_GRID >= 1, "MAX_GRID must be > 0");
-
-
 
 namespace {
 using namespace tadah::models;
-
-template<std::size_t N = 64>
-class StackOrHeapBuffer
-{
-  public:
-    explicit StackOrHeapBuffer(std::size_t n)
-      : sz(n)
-        , use_heap(n > N)
-        , heap(use_heap ? new double[2*n] : nullptr)   // ×2 for g and dg
-        {}
-
-    /* first half: G(r)   second half: dG/dr (if needed) */
-    double* g ()       { return use_heap ?  heap.get()      : stack; }
-    double* dg()       { return use_heap ? &heap.get()[sz] : &stack[N]; }
-    std::size_t size() const { return sz; }
-
-  private:
-    std::size_t  sz;
-    bool         use_heap;
-    std::unique_ptr<double[]> heap;
-    alignas(64) double stack[2*N];    // on-stack contiguous block
-};
-
-/* Factorials 0! … 6! at compile time */
-constexpr std::array<double,7> FACT_TBL =
-{1.0, 1.0, 2.0, 6.0, 24.0, 120.0, 720.0};
-
-inline double fact_cached(int n)
-{
-  return FACT_TBL[n];          // n is guaranteed 0…6
-}
-
-inline double pow_i06(double x, int n)
-{
-  switch (n) {
-    case 0:  return 1.0;
-    case 1:  return x;
-    case 2:  return x * x;
-    case 3:  return x * x * x;
-    case 4:  { double x2 = x * x;  return x2 * x2; }                // x⁴
-    case 5:  { double x2 = x * x;  return x2 * x2 * x; }            // x⁵
-    case 6:  { double x2 = x * x;  return x2 * x2 * x2; }           // x⁶
-    default: return std::pow(x, n);  // should never hit (L ≤ 6)
-  }
-}
-inline void precompute_powers(double x, int L, double powp[7])
-{
-  powp[0] = 1.0;
-  for(int n=1; n<=L; ++n) powp[n] = powp[n-1]*x;
-#if defined(__SANITIZE_ADDRESS__) || defined(ADDRESS_SANITIZER)
-  for(int n=L+1; n<=6; ++n){ powp[n]=0.0; }
-#endif
-}
-inline void precompute_powers(double x,           // coordinate
-      int    L,           // 0 ≤ L ≤ 6
-      double powp[7],     // x⁰ … xᴸ   (output)
-      double dpow[7])     // ∂/∂x x⁰ … xᴸ (output)
-  {
-    powp[0] = 1.0;      dpow[0] = 0.0;
-    for(int n = 1; n <= L; ++n){
-      powp[n] = powp[n-1] * x;           // xⁿ
-      dpow[n] = n * powp[n-1];           // n·xⁿ⁻¹
-    }
-#if defined(__SANITIZE_ADDRESS__) || defined(ADDRESS_SANITIZER)
-    for(int n=L+1; n<=6; ++n){ powp[n]=0.0; dpow[n]=0.0; }
-#endif
-  }
+using namespace tadah::models::detail;
 
 inline void precompute_radials(double rij,
       double fc,
