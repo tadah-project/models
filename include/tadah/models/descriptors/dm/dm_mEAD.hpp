@@ -80,7 +80,7 @@ template <typename F>
     if (Lmax > 0)
       core::Logger::instance().log(core::LogLevel::WARNING,
         label() + ": channel function is not F_SQ — descriptor is NOT"
-        " rotationally invariant for L>0. Consider DM_mBlipL instead.");
+        " rotationally invariant for L>0. Use DM_PS_* descriptors instead.");
   }
 
   s=sgrid.size()*(Lmax+1);
