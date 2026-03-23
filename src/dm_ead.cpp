@@ -366,8 +366,8 @@ void DM_EAD::init_rhoi(core::rho_type& rhoi)
  * ------------------------------------------------------------------ */
 std::size_t DM_EAD::gen_atomic_orbitals(int Lmax)
 {
-  orbitals.resize(Lmax+1);
-  fac     .resize(Lmax+1);
+  orbitals.assign(Lmax+1, {});   // clear inner vectors so re-calls don't accumulate
+  fac     .assign(Lmax+1, {});
 
   std::size_t count=0;
   for(int L=0;L<=Lmax;++L){
@@ -396,6 +396,18 @@ void DM_EAD::init()
 {
   keys = {"CGRIDMB","SGRIDMB"};
   nparams = 2+1;  // (two grids + r_c)
+}
+bool DM_EAD::reinit(const tadah::core::Context& ctx) {
+  const size_t old_s = s;
+  get_grid(ctx, "CGRIDMB", cgrid);
+  get_grid(ctx, "SGRIDMB", sgrid);
+  Lmax = ctx.get<int>("TYPEMB", 1);
+  // rc must be updated before gen_atomic_orbitals: fac[][] depends on rc
+  rc = ctx.get<double>("RCUTMBMAX");
+  if (fcut) fcut->set_rcut(rc);
+  s        = cgrid.size() * static_cast<size_t>(Lmax + 1);
+  rhoisize = gen_atomic_orbitals(Lmax) * cgrid.size();
+  return s != old_s;
 }
 
 } // namespace models

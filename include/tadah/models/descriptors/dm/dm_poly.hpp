@@ -320,10 +320,27 @@ void DM_Poly<ChannelFn, RadialBasis, AggMode>::init()
 }
 
 template <typename ChannelFn, typename RadialBasis, typename AggMode>
+bool DM_Poly<ChannelFn, RadialBasis, AggMode>::reinit(const tadah::core::Context& ctx)
+{
+  const size_t old_s = s;
+  get_grid(ctx, "CGRIDMB", cgrid);
+  get_grid(ctx, "SGRIDMB", sgrid);
+  Lmax = ctx.get<int>("TYPEMB", 1);
+  // rc must be updated before gen_atomic_orbitals: fac[][] depends on rc
+  rc = ctx.get<double>("RCUTMBMAX");
+  if (fcut) fcut->set_rcut(rc);
+  // Re-construct embedding function (re-reads its keys, e.g. CEMBFUNC/SEMBFUNC)
+  emb = ChannelFn(ctx, cgrid.size(), sgrid.size());
+  s        = cgrid.size() * static_cast<size_t>(Lmax + 1);
+  rhoisize = gen_atomic_orbitals(Lmax) * cgrid.size();
+  return s != old_s;
+}
+
+template <typename ChannelFn, typename RadialBasis, typename AggMode>
 size_t DM_Poly<ChannelFn, RadialBasis, AggMode>::gen_atomic_orbitals(int Lm)
 {
-  orbitals.resize(Lm + 1);
-  fac     .resize(Lm + 1);
+  orbitals.assign(Lm + 1, {});   // clear inner vectors so re-calls don't accumulate
+  fac     .assign(Lm + 1, {});
 
   size_t cnt = 0;
   for (int L = 0; L <= Lm; ++L) {

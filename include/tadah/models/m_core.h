@@ -35,6 +35,11 @@ public:
         return trained;
     }
 
+    /** Reset trained state so the model can be re-trained in-place. */
+    void reset_trained() {
+        trained = false;
+    }
+
     /**
      * @brief Retrieves the weights of the model.
      *

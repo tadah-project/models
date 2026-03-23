@@ -293,8 +293,8 @@ void DM_Blip::init_rhoi(core::rho_type& rhoi)
 /* ------------------- orbital enumeration & factors ---------------- */
 std::size_t DM_Blip::gen_atomic_orbitals(int Lm)
 {
-  orbitals.resize(Lm+1);
-  fac     .resize(Lm+1);
+  orbitals.assign(Lm+1, {});   // clear inner vectors so re-calls don't accumulate
+  fac     .assign(Lm+1, {});
 
   std::size_t cnt=0;
   for(int L=0;L<=Lm;++L){
@@ -320,6 +320,20 @@ void DM_Blip::init()
 {
   keys = {"CGRIDMB","SGRIDMB"};
   nparams = 2+1;
+}
+
+bool DM_Blip::reinit(const tadah::core::Context& ctx) {
+  const size_t old_s = s;
+  get_grid(ctx, "CGRIDMB", cgrid);
+  get_grid(ctx, "SGRIDMB", sgrid);
+
+  Lmax = ctx.get<int>("TYPEMB", 1);
+  // rc must be updated before gen_atomic_orbitals: fac[][] depends on rc
+  rc = ctx.get<double>("RCUTMBMAX");
+  if (fcut) fcut->set_rcut(rc);
+  s        = cgrid.size() * static_cast<size_t>(Lmax + 1);
+  rhoisize = gen_atomic_orbitals(Lmax) * cgrid.size();
+  return s != old_s;
 }
 
 } // namespace models

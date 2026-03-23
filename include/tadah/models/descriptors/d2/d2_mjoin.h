@@ -60,6 +60,7 @@ public:
 
   void set_fidx(size_t fidx_) override;
   void init() override;
+  bool reinit(const tadah::core::Context& ctx) override;
 };
 } // namespace models
 } // namespace tadah

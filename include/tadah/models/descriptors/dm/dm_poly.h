@@ -141,6 +141,7 @@ public:
     tadah::core::rho_type& rho,
     const double scale = 1) const override;
   void init() override;
+  bool reinit(const tadah::core::Context& ctx) override;
 };
 
 } // namespace models

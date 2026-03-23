@@ -73,6 +73,27 @@ namespace tadah {
         size_t descriptor_size() const { return dsize; }
         size_t density_size() const { return rsize; }
 
+        /** Update descriptor parameters in-place from context.
+         *  Returns true if descriptor size changed (Trainer must be rebuilt). */
+        bool reinit(const tadah::core::Context& ctx) {
+          bool changed = false;
+          if (d2b) {
+            changed |= d2b->reinit(ctx);
+            if (c2b && ctx.get<bool>("INIT2B"))
+              c2b->set_rcut(ctx.get<double>("RCUT2BMAX"));
+          }
+          if (dmb) {
+            changed |= dmb->reinit(ctx);
+            if (cmb && ctx.get<bool>("INITMB"))
+              cmb->set_rcut(ctx.get<double>("RCUTMBMAX"));
+          }
+          if (changed) {
+            dsize = static_cast<size_t>(bias) + d2b->size() + dmb->size();
+            rsize = dmb->rhoi_size() + dmb->rhoip_size();
+          }
+          return changed;
+        }
+
         ~DC_Selector()
         {
           if (d2b)

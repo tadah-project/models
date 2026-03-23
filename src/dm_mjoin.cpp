@@ -105,8 +105,28 @@ void DM_mJoin::init() {
   keys.push_back("RCUTMB");
   nparams=std::numeric_limits<size_t>::max();
 }
+bool DM_mJoin::reinit(const tadah::core::Context& ctx) {
+  // Re-derive per-child sub-contexts from the updated master context.
+  // Copy ctx because expand_grids may add default keys to the context.
+  // Note: contexts[0] is the first child (DM_mJoin itself is filtered by parse_context).
+  tadah::core::Context ctx_copy = ctx;
+  contexts = D_mJoin::parse_context(ctx_copy, "TYPEMB");
+  D_mJoin::expand_grids(ctx_copy, contexts, "TYPEMB");
+  // Update the outer (container-level) fcut with the global RCUTMBMAX.
+  // This is used by DescriptorsCalc::calc_rho() as the MB prefilter.
+  if (fcut) fcut->set_rcut(ctx.get<double>("RCUTMBMAX"));
+  bool any_changed = false;
+  for (size_t i = 0; i < ds.size(); ++i)
+    any_changed |= ds[i]->reinit(contexts[i]);
+  // TODO CLAUDE CODE: why would this be required? I don't see the point.
+  // Recompute aggregated sizes from children (always, not just when changed).
+  // s = 0; rhoisize = 0;
+  // for (auto d : ds) { s += d->size(); rhoisize += d->rhoi_size(); }
+  // Re-propagate rfidx offsets so each child reads from the correct rho slice.
+  // if (any_changed) set_rfidx(rfidx);
+  return any_changed;
+}
 
 
 } // namespace models
 } // namespace tadah
-

@@ -95,6 +95,14 @@ public:
   */
   virtual size_t size() const;
 
+  /** \brief Update descriptor parameters in-place from context.
+   *
+   * Re-reads all parameters that were baked in at construction time.
+   * Returns true if the descriptor's output size changed, requiring a
+   * full Trainer rebuild.  Default: no-op (for file-based or fixed descriptors).
+   */
+  virtual bool reinit(const tadah::core::Context& /*ctx*/) { return false; }
+
   virtual bool is_init_for_atoms(int Zi, int Zj) const;
   virtual void init_for_atoms(int Zi, int Zj);
   virtual void init_for_atoms(const std::vector<std::string> &Zs);

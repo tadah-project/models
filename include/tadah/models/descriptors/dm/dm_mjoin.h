@@ -92,6 +92,7 @@ public:
   void set_rfidx(size_t rfidx_) override;
 
   void init() override;
+  bool reinit(const tadah::core::Context& ctx) override;
 };
 
 } // namespace models

@@ -119,6 +119,24 @@ std::string D2_ZBL::label() const {
 void D2_ZBL::init() {
   nparams=4;
 }
+bool D2_ZBL::reinit(const tadah::core::Context& ctx) {
+  double temp;
+  temp = ctx.get<double>("TYPE2B", 1); if (temp != -1) a0 = temp;
+  temp = ctx.get<double>("TYPE2B", 2); if (temp != -1) s0 = temp;
+  temp = ctx.get<double>("TYPE2B", 3); if (temp != -1) p0 = temp;
+  temp = ctx.get<double>("TYPE2B", 4); if (temp != -1) p1 = temp;
+  if (fcut) fcut->set_rcut(ctx.get<double>("RCUT2BMAX"));
+  for (int i = 0; i < ntypes; ++i) {
+    std::string si = ctx.get<std::string>("ATOM", i);
+    int Zi = tadah::core::PeriodicTable::find_by_symbol(si).Z;
+    for (int j = 0; j < ntypes; ++j) {
+      std::string sj = ctx.get<std::string>("ATOM", j);
+      int Zj = tadah::core::PeriodicTable::find_by_symbol(sj).Z;
+      a[i][j] = screening_length(Zi, Zj);
+    }
+  }
+  return false;  // s = 2 always
+}
 double D2_ZBL::phi(double x) const {
   return 0.1818 * std::exp(-3.2 * x) +
   0.5099 * std::exp(-0.9423 * x) +
