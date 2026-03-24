@@ -99,7 +99,6 @@ void DM_mJoin::set_rfidx(size_t rfidx_) {
 }
 
 void DM_mJoin::init() {
-  // not really sure about this
   keys.push_back("TYPEMB");
   keys.push_back("RCTYPEMB");
   keys.push_back("RCUTMB");
@@ -118,12 +117,12 @@ bool DM_mJoin::reinit(const tadah::core::Context& ctx) {
   bool any_changed = false;
   for (size_t i = 0; i < ds.size(); ++i)
     any_changed |= ds[i]->reinit(contexts[i]);
-  // TODO CLAUDE CODE: why would this be required? I don't see the point.
+  // TODO : why would this be required? I don't see the point.
   // Recompute aggregated sizes from children (always, not just when changed).
   // s = 0; rhoisize = 0;
   // for (auto d : ds) { s += d->size(); rhoisize += d->rhoi_size(); }
   // Re-propagate rfidx offsets so each child reads from the correct rho slice.
-  // if (any_changed) set_rfidx(rfidx);
+  // if (any_changed) set_rfidx(rfidx); // TODO this looks wrong its either zero or caller should pass in the correct rfidx initial value.
   return any_changed;
 }
 
