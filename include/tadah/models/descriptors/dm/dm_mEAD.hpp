@@ -84,8 +84,9 @@ template <typename F>
   }
 
   s=sgrid.size()*(Lmax+1);
-  rhoisize = gen_atomic_orbitals(Lmax);
-  rhoisize *= sgrid.size();
+  rhoisize = gen_atomic_orbitals(Lmax) * cgrid.size();
+  set_rfidx(0);
+  set_drfidx(rhoisize);
 
   auto init_atoms = get_init_atoms(context);
   init_for_atoms(init_atoms);
@@ -95,19 +96,20 @@ template <typename F>
   {
     std::size_t Lshift = 0;
     std::size_t ii     = rfidx;
+    std::size_t dii    = drfidx;
 
     for(int L=0; L<=Lmax; ++L){
       const std::size_t ng = cgrid.size();
       for(std::size_t o=0; o<orbitals[L].size(); ++o){
         const double f = fac[L][o];
 
-        for(std::size_t c=0; c<ng; ++c, ++ii){
+        for(std::size_t c=0; c<ng; ++c, ++ii, ++dii){
           const double rho = rhoi(ii);                // load once
           const double FF  = emb.calc_F (rho, c);
           const double dFF = emb.calc_dF(rho, c);
 
           aed (c+Lshift+fidx) += f * FF;
-          rhoi(ii+rhoisize )  = f * dFF;
+          rhoi(dii)  = f * dFF;
         }
       }
       Lshift += ng;
@@ -151,7 +153,7 @@ void DM_mEAD<F>::calc_dXijdri_dXjidri(
 
   /* --------------------------------------------------------------- */
   std::size_t Lshift = 0;                 // offset into fd_ij
-  std::size_t ii     = rhoisize + rfidx;  // start of derivative part
+  std::size_t ii     = drfidx;  // start of derivative part
 
   for (int L = 0; L <= Lmax; ++L)
   {
@@ -233,7 +235,7 @@ void DM_mEAD<F>::calc_dXijdri(
 
   /* ---- main loops ------------------------------------------------ */
   std::size_t Lshift = 0;                 // row offset in fd_ij
-  std::size_t ii     = rhoisize + rfidx;  // derivative part of ρ_i
+  std::size_t ii     = drfidx;  // derivative part of ρ_i
 
   for (int L = 0; L <= Lmax; ++L)
   {

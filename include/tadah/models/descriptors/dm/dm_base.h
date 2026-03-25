@@ -14,7 +14,8 @@ namespace models {
 class DM_Base: public D_Base {
 
 protected:
-  size_t rfidx=0;
+  size_t rfidx=0; // index of the first density component in the rhoi array
+  size_t drfidx=0; // index of the first component of the derivative of the density component in the rhoi array
   size_t rhoisize=0;
 public:
   DM_Base() {};
@@ -132,7 +133,9 @@ public:
   virtual std::string label() const=0;
 
   virtual size_t get_rfidx() const;
-  virtual void set_rfidx(size_t fidx_);
+  virtual void set_rfidx(size_t rfidx_);
+  virtual size_t get_drfidx() const;
+  virtual void set_drfidx(size_t drfidx_);
 };
 } // namespace models
 } // namespace tadah

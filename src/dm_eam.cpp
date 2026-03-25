@@ -39,6 +39,10 @@ DM_EAM::DM_EAM(core::Context &c): DM_Base(c)
   gen_splines(ef.nr, ef.dr, ef.z2r, z2r_spline);
 
   rhoisize = 1;
+
+  set_rfidx(0);
+  set_drfidx(rhoisize);
+
   auto init_atoms = get_init_atoms(c);
   init_for_atoms(init_atoms);
 }
@@ -56,10 +60,10 @@ void DM_EAM::calc_aed(
   //std::vector<double> coeff = frho_spline[m];
   double phi = ((frho_spline[m][3]*p + frho_spline[m][4])*p + frho_spline[m][5])*p + frho_spline[m][6];
 
-  rho(1+rfidx) = (frho_spline[m][0]*p + frho_spline[m][1])*p + frho_spline[m][2];    // lammps fp[i]
+  rho(drfidx) = (frho_spline[m][0]*p + frho_spline[m][1])*p + frho_spline[m][2];    // lammps fp[i]
   //std::cout << "fp[i]:   " << rho(1) << std::endl;
 
-  if (rho(rfidx) > ef.rhomax) phi += rho(1+rfidx) * (rho(rfidx)-ef.rhomax);
+  if (rho(rfidx) > ef.rhomax) phi += rho(drfidx) * (rho(rfidx)-ef.rhomax);
   //phi *= scale[type[i]][type[i]];
 
   aed(fidx) += phi;
@@ -90,7 +94,7 @@ void DM_EAM::calc_dXijdri_dXjidri(
 
   // here rho_i[1] is a derivative of rho_i at local atom, similarly for rho_j
   //double psip = rho_i[1]*rhojp + rho_j[1]*rhoip;
-  double psip = rhoi(rfidx+1)*rhojp + rhoj(rfidx+1)*rhoip;
+  double psip = rhoi(drfidx)*rhojp + rhoj(drfidx)*rhoip;
 
   double f = scale*psip*rinv;
   fd_ij(fidx,0) = f*vec_ij[0]; 
@@ -118,7 +122,7 @@ void DM_EAM::calc_dXijdri(
   double rhojp = (rhor_spline[m][0]*p + rhor_spline[m][1])*p + rhor_spline[m][2];
 
   // here rho_i[1] is a derivative of rho_i at local atom
-  double psip = rhoi(rfidx+1)*rhojp;
+  double psip = rhoi(drfidx)*rhojp;
 
   double f = scale*psip*rinv;
   fd_ij(fidx,0) = f*vec_ij[0];

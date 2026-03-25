@@ -129,6 +129,8 @@ DM_EAD::DM_EAD(const core::Context& ctx)
 
   s         = cgrid.size()*(Lmax+1);
   rhoisize  = gen_atomic_orbitals(Lmax)*cgrid.size();
+  set_rfidx(0);
+  set_drfidx(rhoisize);
 
   init_for_atoms(get_init_atoms(ctx));
 }
@@ -140,16 +142,17 @@ void DM_EAD::calc_aed(core::rho_type& rhoi, core::aed_type& aed) const
 {
   std::size_t Lshift = 0;
   std::size_t ii     = rfidx;          // start of density part
+  std::size_t dii    = drfidx;         // start of derivative part
 
   for(int L=0; L<=Lmax; ++L){
     const std::size_t ng = cgrid.size();
     for(std::size_t o=0;o<orbitals[L].size();++o){
       const double f = fac[L][o];
 
-      for(std::size_t c=0;c<ng;++c,++ii){
+      for(std::size_t c=0;c<ng;++c,++ii,++dii){
         const double rho =  rhoi(ii);
         aed (c+Lshift+fidx) += f * rho * rho;   // F(ρ)=ρ²
-        rhoi(ii+rhoisize )  = 2.0 * f * rho;   // F′(ρ)=2ρ
+        rhoi(dii)  = 2.0 * f * rho;   // F′(ρ)=2ρ
       }
     }
     Lshift += ng;
@@ -190,7 +193,7 @@ void DM_EAD::calc_dXijdri_dXjidri(
 
   const double rinv = 1.0/rij;
   std::size_t   Lshift = 0;
-  std::size_t   ii     = rhoisize + rfidx;      // derivative part
+  std::size_t   ii     = drfidx;      // derivative part
 
   for(int L=0; L<=Lmax; ++L)
   {
@@ -267,7 +270,7 @@ void DM_EAD::calc_dXijdri(
   precompute_powers(z,Lmax,pz ,dpz);
 
   std::size_t Lshift = 0;                 // row offset in fd
-  std::size_t ii     = rhoisize + rfidx;  // derivative part of rho_i
+  std::size_t ii     = drfidx;  // derivative part of rho_i
 
   /* ========================== main loops ========================== */
   for (int L = 0; L <= Lmax; ++L)
@@ -405,6 +408,7 @@ bool DM_EAD::reinit(const tadah::core::Context& ctx) {
   // rc must be updated before gen_atomic_orbitals: fac[][] depends on rc
   rc = ctx.get<double>("RCUTMBMAX");
   if (fcut) fcut->set_rcut(rc);
+  // TODO Probablky we do not need to do that:
   s        = cgrid.size() * static_cast<size_t>(Lmax + 1);
   rhoisize = gen_atomic_orbitals(Lmax) * cgrid.size();
   return s != old_s;

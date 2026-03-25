@@ -90,6 +90,7 @@ public:
     const double scale=1) const override;
   void set_fidx(size_t fidx_) override;
   void set_rfidx(size_t rfidx_) override;
+  void set_drfidx(size_t drfidx_) override;
 
   void init() override;
   bool reinit(const tadah::core::Context& ctx) override;

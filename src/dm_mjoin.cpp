@@ -24,6 +24,7 @@ DM_mJoin::DM_mJoin(tadah::core::Context &c) : DM_Base(c) {
     rhoisize += ds.back()->rhoi_size();
   }
   set_rfidx(0);
+  set_drfidx(rhoisize);
 }
 
 void DM_mJoin::calc_aed(tadah::core::rho_type& rho, tadah::core::aed_type &aed) const {
@@ -59,6 +60,7 @@ void DM_mJoin::calc_dXijdri(
   }
 }
 void DM_mJoin::init_rhoi(tadah::core::rho_type& rhoi) {
+  // this should not call child descriptors
   rhoi.resize(2*rhoisize);
   rhoi.set_zero();
 }
@@ -93,12 +95,23 @@ void DM_mJoin::set_rfidx(size_t rfidx_) {
   size_t s = 0;
   for (size_t i = 1; i < ds.size(); ++i) {
     s += ds[i - 1]->rhoi_size();
-    s += ds[i - 1]->rhoip_size();
+    // s += ds[i - 1]->rhoip_size();
     ds[i]->set_rfidx(rfidx_ + s);
+  }
+}
+void DM_mJoin::set_drfidx(size_t drfidx_) {
+  drfidx = drfidx_;
+  ds[0]->set_drfidx(drfidx_);
+  size_t s = 0;
+  for (size_t i = 1; i < ds.size(); ++i) {
+    // s += ds[i - 1]->rhoi_size();
+    s += ds[i - 1]->rhoip_size();
+    ds[i]->set_drfidx(drfidx_ + s);
   }
 }
 
 void DM_mJoin::init() {
+  // not really sure about this
   keys.push_back("TYPEMB");
   keys.push_back("RCTYPEMB");
   keys.push_back("RCUTMB");

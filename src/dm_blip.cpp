@@ -69,6 +69,8 @@ DM_Blip::DM_Blip(const core::Context& ctx)
 
   s         = cgrid.size()*(Lmax+1);
   rhoisize  = gen_atomic_orbitals(Lmax)*cgrid.size();
+  set_rfidx(0);
+  set_drfidx(rhoisize);
 
   init_for_atoms( get_init_atoms(ctx) );
 }
@@ -76,16 +78,16 @@ DM_Blip::DM_Blip(const core::Context& ctx)
 /* ------------------ embedding energy / derivative ----------------- */
 void DM_Blip::calc_aed(core::rho_type& rhoi, core::aed_type& aed) const
 {
-  std::size_t Lshift=0, ii=rfidx;
+  std::size_t Lshift=0, ii=rfidx, dii=drfidx;
   const std::size_t ng=cgrid.size();
 
   for(int L=0;L<=Lmax;++L){
     for(std::size_t o=0;o<orbitals[L].size();++o){
       const double f=fac[L][o];
-      for(std::size_t c=0;c<ng;++c,++ii){
+      for(std::size_t c=0;c<ng;++c,++ii,++dii){
         const double rho=rhoi(ii);
         aed (c+Lshift+fidx) += f*rho*rho;    // F(ρ)=ρ²
-        rhoi(ii+rhoisize)   = 2.0*f*rho;     // F′(ρ)=2ρ
+        rhoi(dii)   = 2.0*f*rho;     // F′(ρ)=2ρ
       }
     }
     Lshift+=ng;
@@ -125,7 +127,7 @@ void DM_Blip::calc_dXijdri_dXjidri(
 
   const double rinv = 1.0/rij;
   std::size_t   Lshift = 0;
-  std::size_t   ii     = rhoisize + rfidx;      // derivative part
+  std::size_t   ii     = drfidx;      // derivative part
 
   for(int L=0; L<=Lmax; ++L)
   {
@@ -200,7 +202,7 @@ void DM_Blip::calc_dXijdri(
   precompute_powers(z,Lmax,pz ,dpz);
 
   std::size_t Lshift = 0;                 // row offset in fd
-  std::size_t ii     = rhoisize + rfidx;  // derivative part of rho_i
+  std::size_t ii     = drfidx;  // derivative part of rho_i
 
   /* ========================== main loops ========================== */
   for (int L = 0; L <= Lmax; ++L)

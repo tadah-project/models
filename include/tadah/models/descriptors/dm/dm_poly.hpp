@@ -52,6 +52,8 @@ DM_Poly<ChannelFn, RadialBasis, AggMode>::DM_Poly(const tadah::core::Context& ct
 
   s        = cgrid.size() * (Lmax + 1);
   rhoisize = gen_atomic_orbitals(Lmax) * cgrid.size();
+  set_rfidx(0);
+  set_drfidx(rhoisize);
 
   init_for_atoms(get_init_atoms(ctx));
 }
@@ -79,6 +81,7 @@ void DM_Poly<ChannelFn, RadialBasis, AggMode>::calc_aed(
   const std::size_t ng = cgrid.size();
   std::size_t Lshift  = 0;
   std::size_t ii_base = rfidx;
+  std::size_t dii_base = drfidx;
 
   for (int L = 0; L <= Lmax; ++L) {
     const std::size_t N_orb = orbitals[L].size();
@@ -96,26 +99,28 @@ void DM_Poly<ChannelFn, RadialBasis, AggMode>::calc_aed(
         aed(c + Lshift + fidx) += FF;
         for (std::size_t o = 0; o < N_orb; ++o) {
           const double rho_oc = rhoi(ii_base + o*ng + c);
-          rhoi(ii_base + o*ng + c + rhoisize) = dFF * 2.0 * fac[L][o] * rho_oc;
+          rhoi(dii_base + o*ng + c) = dFF * 2.0 * fac[L][o] * rho_oc;
         }
       }
     } else {
       /* ---- OrbitalWise: F applied per orbital before sum ------------ */
       std::size_t ii = ii_base;
+      std::size_t dii = dii_base;
       for (std::size_t o = 0; o < N_orb; ++o) {
         const double f = fac[L][o];
-        for (std::size_t c = 0; c < ng; ++c, ++ii) {
+        for (std::size_t c = 0; c < ng; ++c, ++ii, ++dii) {
           const double rho  = rhoi(ii);
           const double FF   = emb.calc_F (rho, c);
           const double dFF  = emb.calc_dF(rho, c);
           aed(c + Lshift + fidx) += f * FF;
-          rhoi(ii + rhoisize)     = f * dFF;
+          rhoi(dii)     = f * dFF;
         }
       }
     }
 
     Lshift  += ng;
     ii_base += N_orb * ng;
+    dii_base += N_orb * ng;
   }
 }
 
@@ -152,7 +157,7 @@ void DM_Poly<ChannelFn, RadialBasis, AggMode>::calc_dXijdri_dXjidri(
 
   const double   rinv   = 1.0/rij;
   std::size_t    Lshift = 0;
-  std::size_t    ii     = rhoisize + rfidx;
+  std::size_t    ii     = drfidx;
 
   for (int L = 0; L <= Lmax; ++L) {
     const double s_L = (L & 1) ? 1.0 : -1.0;
@@ -220,7 +225,7 @@ void DM_Poly<ChannelFn, RadialBasis, AggMode>::calc_dXijdri(
   precompute_powers(z, Lmax, pz, dpz);
 
   std::size_t Lshift = 0;
-  std::size_t ii     = rhoisize + rfidx;
+  std::size_t ii     = drfidx;
 
   for (int L = 0; L <= Lmax; ++L) {
     for (std::size_t o = 0; o < orbitals[L].size(); ++o) {
@@ -331,6 +336,7 @@ bool DM_Poly<ChannelFn, RadialBasis, AggMode>::reinit(const tadah::core::Context
   if (fcut) fcut->set_rcut(rc);
   // Re-construct embedding function (re-reads its keys, e.g. CEMBFUNC/SEMBFUNC)
   emb = ChannelFn(ctx, cgrid.size(), sgrid.size());
+  // TODO Probablky we do not need to do that:
   s        = cgrid.size() * static_cast<size_t>(Lmax + 1);
   rhoisize = gen_atomic_orbitals(Lmax) * cgrid.size();
   return s != old_s;
