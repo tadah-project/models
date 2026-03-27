@@ -16,7 +16,8 @@ class DM_Base: public D_Base {
 protected:
   size_t rfidx=0; // index of the first density component in the rhoi array
   size_t drfidx=0; // index of the first component of the derivative of the density component in the rhoi array
-  size_t rhoisize=0;
+  size_t rhoisize=0;   // size of the density (rho) part
+  size_t rhoipsize=0;  // size of the derivative (dF/drho) part
 public:
   DM_Base() {};
   DM_Base(const tadah::core::Context &c): D_Base(c) {
@@ -125,7 +126,8 @@ public:
   }
   /** \brief Return size of the derivative of the embedding energy array */
   virtual size_t rhoip_size() const{
-    return rhoisize;
+    return rhoipsize > 0 ? rhoipsize : rhoisize;
+    // return rhoipsize;
   }
   // virtual size_t size() {
   //   return s;

@@ -22,6 +22,7 @@ DM_mJoin::DM_mJoin(tadah::core::Context &c) : DM_Base(c) {
     ds.push_back(tadah::core::factory<DM_Base, tadah::core::Context&>(c1.get<std::string>("TYPEMB"), c1));
     s += ds.back()->size();
     rhoisize += ds.back()->rhoi_size();
+    rhoipsize += ds.back()->rhoip_size();
   }
   set_rfidx(0);
   set_drfidx(rhoisize);
@@ -61,7 +62,7 @@ void DM_mJoin::calc_dXijdri(
 }
 void DM_mJoin::init_rhoi(tadah::core::rho_type& rhoi) {
   // this should not call child descriptors
-  rhoi.resize(2*rhoisize);
+  rhoi.resize(rhoisize + rhoipsize);
   rhoi.set_zero();
 }
 void DM_mJoin::calc_rho(

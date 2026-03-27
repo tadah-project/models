@@ -64,8 +64,8 @@ double F_SQRT::calc_dF(double rho,size_t p) const {
 //////////////////////////
 // F_SQ
 //////////////////////////
-F_SQ::F_SQ(const tadah::core::Context &c, size_t, size_t ):
-  context(&c)
+F_SQ::F_SQ(const tadah::core::Context &c, size_t, size_t sSize):
+  context(&c), out_dim(sSize)
 {
   if (!context->get<bool>("INITMB")) return;
 }
@@ -85,12 +85,18 @@ F_Blip::F_Blip(const tadah::core::Context &c, size_t cSize, size_t sSize):
   if (!context->get<bool>("INITMB")) return;
   D_Base::get_grid(*context,"SEMBFUNC",sfuncgrid);
   D_Base::get_grid(*context,"CEMBFUNC",cfuncgrid);
-  // check if size is correct, throw otherwise
-  if (sfuncgrid.size() != sSize) {
-    throw std::runtime_error("F_Blip: size of SEMBFUNC does not match declared size.");
+  // F_Blip is a dimension-expanding function: it requires a single
+  // radial basis (CGRID/SGRID size 1) but arbitrary CEMBFUNC/SEMBFUNC.
+  if (cSize != 1 || sSize != 1) {
+    throw std::runtime_error(
+        "F_Blip: requires CGRIDMB and SGRIDMB of size 1, got "
+        + std::to_string(cSize) + " and " + std::to_string(sSize) + ".");
   }
-  if (cfuncgrid.size() != cSize) {
-    throw std::runtime_error("F_Blip: size of CEMBFUNC does not match declared size.");
+  if (sfuncgrid.size() != cfuncgrid.size()) {
+    throw std::runtime_error(
+        "F_Blip: SEMBFUNC and CEMBFUNC must have the same size, got "
+        + std::to_string(sfuncgrid.size()) + " and "
+        + std::to_string(cfuncgrid.size()) + ".");
   }
 }
 double F_Blip::calc_F(double rho,size_t p) const {

@@ -49,13 +49,17 @@ DM_Poly<ChannelFn, RadialBasis, AggMode>::DM_Poly(const tadah::core::Context& ct
         label() + " (OrbitalWise): channel function is not F_SQ — descriptor"
         " is NOT rotationally invariant for L>0. Use PowerSpectrum mode.");
   }
-
-  s        = cgrid.size() * (Lmax + 1);
-  rhoisize = gen_atomic_orbitals(Lmax) * cgrid.size();
+  odim     = emb.output_dim();
+  const std::size_t ng = cgrid.size();
+  s        = odim * (Lmax + 1);
+  const std::size_t norbs = gen_atomic_orbitals(Lmax);
+  rhoisize  = norbs * ng;      // ρ storage
+  rhoipsize = norbs * odim;    // dF/dρ storage
   set_rfidx(0);
   set_drfidx(rhoisize);
 
   init_for_atoms(get_init_atoms(ctx));
+
 }
 
 /* ================================================================== *
@@ -87,40 +91,81 @@ void DM_Poly<ChannelFn, RadialBasis, AggMode>::calc_aed(
     const std::size_t N_orb = orbitals[L].size();
 
     if constexpr (std::is_same_v<AggMode, PowerSpectrum>) {
-      /* ---- PowerSpectrum: F applied after invariant quadratic sum ---- */
-      for (std::size_t c = 0; c < ng; ++c) {
+
+      if constexpr (ChannelFn::expands_dimensions) {
+        /* PowerSpectrum + dimension-expanding (ng==1):
+         * ρ_L = Σ_o fac · ρ[o]²  (single ρ per orbital)
+         * then V[p] = F(ρ_L, p) for each embedding point p */
         double rho_L = 0.0;
         for (std::size_t o = 0; o < N_orb; ++o) {
-          const double rho_oc = rhoi(ii_base + o*ng + c);
-          rho_L += fac[L][o] * rho_oc * rho_oc;
+          const double rho_o = rhoi(ii_base + o);
+          rho_L += fac[L][o] * rho_o * rho_o;
         }
-        const double FF  = emb.calc_F (rho_L, c);
-        const double dFF = emb.calc_dF(rho_L, c);
-        aed(c + Lshift + fidx) += FF;
-        for (std::size_t o = 0; o < N_orb; ++o) {
-          const double rho_oc = rhoi(ii_base + o*ng + c);
-          rhoi(dii_base + o*ng + c) = dFF * 2.0 * fac[L][o] * rho_oc;
+        for (std::size_t p = 0; p < odim; ++p) {
+          const double FF  = emb.calc_F (rho_L, p);
+          const double dFF = emb.calc_dF(rho_L, p);
+          aed(p + Lshift + fidx) += FF;
+          for (std::size_t o = 0; o < N_orb; ++o) {
+            const double rho_o = rhoi(ii_base + o);
+            rhoi(dii_base + o*odim + p) = dFF * 2.0 * fac[L][o] * rho_o;
+          }
+        }
+      } else {
+        /* PowerSpectrum + standard (odim == ng) */
+        for (std::size_t c = 0; c < ng; ++c) {
+          double rho_L = 0.0;
+          for (std::size_t o = 0; o < N_orb; ++o) {
+            const double rho_oc = rhoi(ii_base + o*ng + c);
+            rho_L += fac[L][o] * rho_oc * rho_oc;
+          }
+          const double FF  = emb.calc_F (rho_L, c);
+          const double dFF = emb.calc_dF(rho_L, c);
+          aed(c + Lshift + fidx) += FF;
+          for (std::size_t o = 0; o < N_orb; ++o) {
+            const double rho_oc = rhoi(ii_base + o*ng + c);
+            rhoi(dii_base + o*ng + c) = dFF * 2.0 * fac[L][o] * rho_oc;
+          }
         }
       }
+
     } else {
-      /* ---- OrbitalWise: F applied per orbital before sum ------------ */
-      std::size_t ii = ii_base;
-      std::size_t dii = dii_base;
-      for (std::size_t o = 0; o < N_orb; ++o) {
-        const double f = fac[L][o];
-        for (std::size_t c = 0; c < ng; ++c, ++ii, ++dii) {
-          const double rho  = rhoi(ii);
-          const double FF   = emb.calc_F (rho, c);
-          const double dFF  = emb.calc_dF(rho, c);
-          aed(c + Lshift + fidx) += f * FF;
-          rhoi(dii)     = f * dFF;
+      /* ---- OrbitalWise ---- */
+
+      if constexpr (ChannelFn::expands_dimensions) {
+        /* OrbitalWise + dimension-expanding (ng==1):
+         * V[p] = Σ_o fac · F(ρ[o], p) */
+        std::size_t ii = ii_base;
+        std::size_t dii = dii_base;
+        for (std::size_t o = 0; o < N_orb; ++o, ++ii) {
+          const double f   = fac[L][o];
+          const double rho = rhoi(ii);
+          for (std::size_t p = 0; p < odim; ++p, ++dii) {
+            const double FF  = emb.calc_F (rho, p);
+            const double dFF = emb.calc_dF(rho, p);
+            aed(p + Lshift + fidx) += f * FF;
+            rhoi(dii) = f * dFF;
+          }
+        }
+      } else {
+        /* OrbitalWise + standard (odim == ng) */
+        std::size_t ii = ii_base;
+        std::size_t dii = dii_base;
+        for (std::size_t o = 0; o < N_orb; ++o) {
+          const double f = fac[L][o];
+          for (std::size_t c = 0; c < ng; ++c, ++ii, ++dii) {
+            const double rho  = rhoi(ii);
+            const double FF   = emb.calc_F (rho, c);
+            const double dFF  = emb.calc_dF(rho, c);
+            aed(c + Lshift + fidx) += f * FF;
+            rhoi(dii) = f * dFF;
+          }
         }
       }
     }
 
-    Lshift  += ng;
+    Lshift  += odim;
     ii_base += N_orb * ng;
-    dii_base += N_orb * ng;
+    dii_base += N_orb * (ChannelFn::expands_dimensions ? odim : ng);
   }
 }
 
@@ -173,24 +218,41 @@ void DM_Poly<ChannelFn, RadialBasis, AggMode>::calc_dXijdri_dXjidri(
       const double tyij  = dpy[ly]*pxij*pzij;
       const double tzij  = dpz[lz]*pyij*pxij;
 
-      for (std::size_t c = 0; c < ng; ++c, ++ii) {
-        const double g  = buf.g ()[c];
-        const double dg = buf.dg()[c];
-
+      if constexpr (ChannelFn::expands_dimensions) {
+        const double g  = buf.g ()[0];
+        const double dg = buf.dg()[0];
         const double Bx = g*txij + pqrij*dg*x*rinv;
         const double By = g*tyij + pqrij*dg*y*rinv;
         const double Bz = g*tzij + pqrij*dg*z*rinv;
 
-        const double coef = scale *
-            ( rhoi(ii)*wj - s_L * rhoj(ii)*wi );
+        for (std::size_t p = 0; p < odim; ++p, ++ii) {
+          const double coef = scale *
+              ( rhoi(ii)*wj - s_L * rhoj(ii)*wi );
+          const std::size_t row = p + Lshift + fidx;
+          fd_ij(row, 0) += coef * Bx;
+          fd_ij(row, 1) += coef * By;
+          fd_ij(row, 2) += coef * Bz;
+        }
+      } else {
+        for (std::size_t c = 0; c < ng; ++c, ++ii) {
+          const double g  = buf.g ()[c];
+          const double dg = buf.dg()[c];
 
-        const std::size_t row = c + Lshift + fidx;
-        fd_ij(row, 0) += coef * Bx;
-        fd_ij(row, 1) += coef * By;
-        fd_ij(row, 2) += coef * Bz;
+          const double Bx = g*txij + pqrij*dg*x*rinv;
+          const double By = g*tyij + pqrij*dg*y*rinv;
+          const double Bz = g*tzij + pqrij*dg*z*rinv;
+
+          const double coef = scale *
+              ( rhoi(ii)*wj - s_L * rhoj(ii)*wi );
+
+          const std::size_t row = c + Lshift + fidx;
+          fd_ij(row, 0) += coef * Bx;
+          fd_ij(row, 1) += coef * By;
+          fd_ij(row, 2) += coef * Bz;
+        }
       }
     }
-    Lshift += ng;
+    Lshift += odim;
   }
 }
 
@@ -239,29 +301,45 @@ void DM_Poly<ChannelFn, RadialBasis, AggMode>::calc_dXijdri(
       const double tyij  = dpy[ly]*pxij*pzij;
       const double tzij  = dpz[lz]*pyij*pxij;
 
-      const double t2x = pqrij * rinv * x;
-      const double t2y = pqrij * rinv * y;
-      const double t2z = pqrij * rinv * z;
+      if constexpr (ChannelFn::expands_dimensions) {
+        const double g  = buf.g ()[0];
+        const double dg = buf.dg()[0];
+        const double termx = g*txij + dg*pqrij*rinv*x;
+        const double termy = g*tyij + dg*pqrij*rinv*y;
+        const double termz = g*tzij + dg*pqrij*rinv*z;
+
+        for (std::size_t p = 0; p < odim; ++p, ++ii) {
+          const double f_r = rhoi(ii);
+          const std::size_t row = p + Lshift + fidx;
+          fd_ij(row, 0) += f_r * termx;
+          fd_ij(row, 1) += f_r * termy;
+          fd_ij(row, 2) += f_r * termz;
+        }
+      } else {
+        const double t2x = pqrij * rinv * x;
+        const double t2y = pqrij * rinv * y;
+        const double t2z = pqrij * rinv * z;
 
 #pragma omp simd
-      for (std::size_t c = 0; c < ng; ++c) {
-        const double g  = buf.g ()[c];
-        const double dg = buf.dg()[c];
+        for (std::size_t c = 0; c < ng; ++c) {
+          const double g  = buf.g ()[c];
+          const double dg = buf.dg()[c];
 
-        const double termx = g*txij + dg*t2x;
-        const double termy = g*tyij + dg*t2y;
-        const double termz = g*tzij + dg*t2z;
+          const double termx = g*txij + dg*t2x;
+          const double termy = g*tyij + dg*t2y;
+          const double termz = g*tzij + dg*t2z;
 
-        const double f_r = rhoi(ii + c);
+          const double f_r = rhoi(ii + c);
 
-        const std::size_t row = c + Lshift + fidx;
-        fd_ij(row, 0) += f_r * termx;
-        fd_ij(row, 1) += f_r * termy;
-        fd_ij(row, 2) += f_r * termz;
+          const std::size_t row = c + Lshift + fidx;
+          fd_ij(row, 0) += f_r * termx;
+          fd_ij(row, 1) += f_r * termy;
+          fd_ij(row, 2) += f_r * termz;
+        }
+        ii += ng;
       }
-      ii += ng;
     }
-    Lshift += ng;
+    Lshift += odim;
   }
 }
 
@@ -310,7 +388,7 @@ void DM_Poly<ChannelFn, RadialBasis, AggMode>::calc_rho(
 template <typename ChannelFn, typename RadialBasis, typename AggMode>
 void DM_Poly<ChannelFn, RadialBasis, AggMode>::init_rhoi(tadah::core::rho_type& rhoi)
 {
-  rhoi.resize(2*rhoisize);
+  rhoi.resize(rhoisize+rhoipsize);
   rhoi.set_zero();
 }
 
@@ -336,9 +414,13 @@ bool DM_Poly<ChannelFn, RadialBasis, AggMode>::reinit(const tadah::core::Context
   if (fcut) fcut->set_rcut(rc);
   // Re-construct embedding function (re-reads its keys, e.g. CEMBFUNC/SEMBFUNC)
   emb = ChannelFn(ctx, cgrid.size(), sgrid.size());
-  // TODO Probablky we do not need to do that:
-  s        = cgrid.size() * static_cast<size_t>(Lmax + 1);
-  rhoisize = gen_atomic_orbitals(Lmax) * cgrid.size();
+  odim     = emb.output_dim();
+  const std::size_t ng = cgrid.size();
+  const std::size_t norbs = gen_atomic_orbitals(Lmax);
+  s         = odim * static_cast<size_t>(Lmax + 1);
+  rhoisize  = norbs * ng;
+  rhoipsize = norbs * odim;
+  set_drfidx(rhoisize);
   return s != old_s;
 }
 

@@ -42,7 +42,7 @@ template <typename F>
   }
 
 /* Index ii iterates rhoi array
- * rhoi array is split 50/50 into density and derivative
+ * rhoi array is split into density and derivative
  * of the embedding function
  */
 template <typename F>
@@ -65,7 +65,7 @@ template <typename F>
       label()+" - No valid task found.");
 
   if (cgrid.size()!=sgrid.size()) {
-    throw std::runtime_error("SGRID2B and CGRID2B arrays differ in size.\n");
+    throw std::runtime_error("SGRIDMB and CGRIDMB arrays differ in size.\n");
   }
 
   emb = F(context, cgrid.size(), sgrid.size());
@@ -83,41 +83,77 @@ template <typename F>
         " rotationally invariant for L>0. Use DM_PS_* descriptors instead.");
   }
 
-  s=sgrid.size()*(Lmax+1);
-  rhoisize = gen_atomic_orbitals(Lmax) * cgrid.size();
+  odim = emb.output_dim();
+  const std::size_t ng = cgrid.size();
+  const std::size_t norbs = gen_atomic_orbitals(Lmax);
+
+  s = odim * (Lmax+1);
+  rhoisize  = norbs * ng;      // ρ storage
+  rhoipsize = norbs * odim;    // dF/dρ storage
+
   set_rfidx(0);
   set_drfidx(rhoisize);
 
   auto init_atoms = get_init_atoms(context);
   init_for_atoms(init_atoms);
 }
+
+/* ================================================================== *
+ *  calc_aed – compute atomic energy descriptor from accumulated ρ    *
+ * ================================================================== */
 template <typename F>
   void DM_mEAD<F>::calc_aed(core::rho_type& rhoi, core::aed_type& aed) const
   {
-    std::size_t Lshift = 0;
-    std::size_t ii     = rfidx;
-    std::size_t dii    = drfidx;
+    const std::size_t ng = cgrid.size();
 
-    for(int L=0; L<=Lmax; ++L){
-      const std::size_t ng = cgrid.size();
-      for(std::size_t o=0; o<orbitals[L].size(); ++o){
-        const double f = fac[L][o];
+    if constexpr (F::expands_dimensions) {
+      /* --- dimension-expanding path (e.g. F_Blip, ng==1) ------------ */
+      std::size_t Lshift = 0;           // offset into aed / fd_ij rows
+      std::size_t ii_rho = rfidx;       // index into ρ   (one per orbital)
+      std::size_t ii_drho = drfidx;     // index into dF/dρ storage
 
-        for(std::size_t c=0; c<ng; ++c, ++ii, ++dii){
-          const double rho = rhoi(ii);                // load once
-          const double FF  = emb.calc_F (rho, c);
-          const double dFF = emb.calc_dF(rho, c);
+      for (int L = 0; L <= Lmax; ++L) {
+        for (std::size_t o = 0; o < orbitals[L].size(); ++o) {
+          const double f = fac[L][o];
+          const double rho = rhoi(ii_rho);     // single ρ for this orbital
+          ++ii_rho;
 
-          aed (c+Lshift+fidx) += f * FF;
-          rhoi(dii)  = f * dFF;
+          for (std::size_t p = 0; p < odim; ++p, ++ii_drho) {
+            const double FF  = emb.calc_F (rho, p);
+            const double dFF = emb.calc_dF(rho, p);
+
+            aed(p + Lshift + fidx) += f * FF;
+            rhoi(ii_drho)           = f * dFF;
+          }
         }
+        Lshift += odim;
       }
-      Lshift += ng;
+    } else {
+      /* --- standard path (odim == ng) ------------------------------- */
+      std::size_t Lshift = 0;
+      std::size_t ii     = rfidx;
+      std::size_t dii    = drfidx;
+
+      for (int L = 0; L <= Lmax; ++L) {
+        for (std::size_t o = 0; o < orbitals[L].size(); ++o) {
+          const double f = fac[L][o];
+
+          for (std::size_t c = 0; c < ng; ++c, ++ii, ++dii) {
+            const double rho = rhoi(ii);
+            const double FF  = emb.calc_F (rho, c);
+            const double dFF = emb.calc_dF(rho, c);
+
+            aed(c + Lshift + fidx) += f * FF;
+            rhoi(dii) = f * dFF;
+          }
+        }
+        Lshift += ng;
+      }
     }
   }
+
 /* ------------------------------------------------------------------ *
- *  dX_ij/dr_i  and  dX_ji/dr_i   (pair contribution, symmetric)
- *  – corrected and de-duplicated version –                           *
+ *  dX_ij/dr_i  and  dX_ji/dr_i   (pair contribution, symmetric)     *
  * ------------------------------------------------------------------ */
 template <typename F>
 void DM_mEAD<F>::calc_dXijdri_dXjidri(
@@ -151,57 +187,99 @@ void DM_mEAD<F>::calc_dXijdri_dXjidri(
   precompute_powers(y,Lmax,py ,dpy);
   precompute_powers(z,Lmax,pz ,dpz);
 
-  /* --------------------------------------------------------------- */
-  std::size_t Lshift = 0;                 // offset into fd_ij
-  std::size_t ii     = drfidx;  // start of derivative part
+  if constexpr (F::expands_dimensions) {
+    /* --- dimension-expanding path --------------------------------- */
+    std::size_t Lshift = 0;
+    std::size_t ii_drho = drfidx;  // dF/dρ storage index
 
-  for (int L = 0; L <= Lmax; ++L)
-  {
-    const double s_L = (L & 1) ?  1.0   /* odd  L →  +1  */
-                               : -1.0;  /* even L →  -1  = (-1)^{L+1} */
-
-    for (std::size_t o = 0; o < orbitals[L].size(); ++o)
+    for (int L = 0; L <= Lmax; ++L)
     {
-      const int lx = orbitals[L][o][0],
-                ly = orbitals[L][o][1],
-                lz = orbitals[L][o][2];
+      const double s_L = (L & 1) ?  1.0 : -1.0;
 
-      /* -------- i-partner Cartesian polynomial & derivatives ------- */
-      const double pxij = px[lx],   pyij = py[ly],   pzij = pz[lz];
-      const double pqrij = pxij*pyij*pzij;
-
-      const double txij = dpx[lx]*pyij*pzij;
-      const double tyij = dpy[ly]*pxij*pzij;
-      const double tzij = dpz[lz]*pyij*pxij;
-
-      for (std::size_t c = 0; c < ng; ++c, ++ii)
+      for (std::size_t o = 0; o < orbitals[L].size(); ++o)
       {
-        const double g  = buf.g ()[c];
-        const double dg = buf.dg()[c];
+        const int lx = orbitals[L][o][0],
+                  ly = orbitals[L][o][1],
+                  lz = orbitals[L][o][2];
 
-        /* --- common Cartesian bracket (evaluated once) ------------- */
+        const double pxij = px[lx], pyij = py[ly], pzij = pz[lz];
+        const double pqrij = pxij*pyij*pzij;
+
+        const double txij = dpx[lx]*pyij*pzij;
+        const double tyij = dpy[ly]*pxij*pzij;
+        const double tzij = dpz[lz]*pyij*pxij;
+
+        /* single radial basis (ng==1) */
+        const double g  = buf.g ()[0];
+        const double dg = buf.dg()[0];
+
         const double Bx = g*txij + pqrij*dg*x*rinv;
         const double By = g*tyij + pqrij*dg*y*rinv;
         const double Bz = g*tzij + pqrij*dg*z*rinv;
 
-        /* --- i/j prefactor ---------------------------------------- */
-        const double coef = scale *
-                            (  rhoi(ii)*wj          /* i-side        */
-                            - s_L * rhoj(ii)*wi );  /* j-side, sign */
+        /* loop over embedding output channels */
+        for (std::size_t p = 0; p < odim; ++p, ++ii_drho)
+        {
+          const double coef = scale *
+                              (  rhoi(ii_drho)*wj
+                              - s_L * rhoj(ii_drho)*wi );
 
-        const std::size_t row = c + Lshift + fidx;
-        fd_ij(row,0) += coef * Bx;
-        fd_ij(row,1) += coef * By;
-        fd_ij(row,2) += coef * Bz;
+          const std::size_t row = p + Lshift + fidx;
+          fd_ij(row,0) += coef * Bx;
+          fd_ij(row,1) += coef * By;
+          fd_ij(row,2) += coef * Bz;
+        }
       }
+      Lshift += odim;
     }
-    Lshift += ng;
+  } else {
+    /* --- standard path -------------------------------------------- */
+    std::size_t Lshift = 0;
+    std::size_t ii     = drfidx;
+
+    for (int L = 0; L <= Lmax; ++L)
+    {
+      const double s_L = (L & 1) ?  1.0 : -1.0;
+
+      for (std::size_t o = 0; o < orbitals[L].size(); ++o)
+      {
+        const int lx = orbitals[L][o][0],
+                  ly = orbitals[L][o][1],
+                  lz = orbitals[L][o][2];
+
+        const double pxij = px[lx], pyij = py[ly], pzij = pz[lz];
+        const double pqrij = pxij*pyij*pzij;
+
+        const double txij = dpx[lx]*pyij*pzij;
+        const double tyij = dpy[ly]*pxij*pzij;
+        const double tzij = dpz[lz]*pyij*pxij;
+
+        for (std::size_t c = 0; c < ng; ++c, ++ii)
+        {
+          const double g  = buf.g ()[c];
+          const double dg = buf.dg()[c];
+
+          const double Bx = g*txij + pqrij*dg*x*rinv;
+          const double By = g*tyij + pqrij*dg*y*rinv;
+          const double Bz = g*tzij + pqrij*dg*z*rinv;
+
+          const double coef = scale *
+                              (  rhoi(ii)*wj
+                              - s_L * rhoj(ii)*wi );
+
+          const std::size_t row = c + Lshift + fidx;
+          fd_ij(row,0) += coef * Bx;
+          fd_ij(row,1) += coef * By;
+          fd_ij(row,2) += coef * Bz;
+        }
+      }
+      Lshift += ng;
+    }
   }
 }
 
 /* ================================================================== *
  *  one–sided descriptor derivative     dX_ij / dr_i                  *
- *  – streamlined, SIMD–friendly version                              *
  * ================================================================== */
 template <typename F>
 void DM_mEAD<F>::calc_dXijdri(
@@ -233,55 +311,97 @@ void DM_mEAD<F>::calc_dXijdri(
   precompute_powers(y,Lmax,py ,dpy);
   precompute_powers(z,Lmax,pz ,dpz);
 
-  /* ---- main loops ------------------------------------------------ */
-  std::size_t Lshift = 0;                 // row offset in fd_ij
-  std::size_t ii     = drfidx;  // derivative part of ρ_i
+  if constexpr (F::expands_dimensions) {
+    /* ---- dimension-expanding path -------------------------------- */
+    std::size_t Lshift = 0;
+    std::size_t ii_drho = drfidx;
 
-  for (int L = 0; L <= Lmax; ++L)
-  {
-    const auto& orbs = orbitals[L];
-
-    for (std::size_t o = 0; o < orbs.size(); ++o)
+    for (int L = 0; L <= Lmax; ++L)
     {
-      const int lx = orbs[o][0],
-                ly = orbs[o][1],
-                lz = orbs[o][2];
+      const auto& orbs = orbitals[L];
 
-      /* --- polynomial and Cartesian derivatives (constant for grid) */
-      const double pxij = px[lx],  pyij = py[ly],  pzij = pz[lz];
-
-      const double pqrij = pxij*pyij*pzij;          //  x^{lx} y^{ly} z^{lz}
-
-      const double txij = dpx[lx]*pyij*pzij;        // ∂P/∂x
-      const double tyij = dpy[ly]*pxij*pzij;        // ∂P/∂y
-      const double tzij = dpz[lz]*pyij*pxij;        // ∂P/∂z
-
-      /* --- parts of the radial derivative that are constant in c --- */
-      const double t2x_pref = pqrij * rinv * x;
-      const double t2y_pref = pqrij * rinv * y;
-      const double t2z_pref = pqrij * rinv * z;
-
-      /* --- inner loop over radial grid – SIMD friendly ------------- */
-#pragma omp simd
-      for (std::size_t c = 0; c < ng; ++c)
+      for (std::size_t o = 0; o < orbs.size(); ++o)
       {
-        const double g  = buf.g ()[c];       //   G(r)
-        const double dg = buf.dg()[c];       // dG/dr
+        const int lx = orbs[o][0],
+                  ly = orbs[o][1],
+                  lz = orbs[o][2];
 
-        const double termx = g*txij + dg*t2x_pref;
-        const double termy = g*tyij + dg*t2y_pref;
-        const double termz = g*tzij + dg*t2z_pref;
+        const double pxij = px[lx], pyij = py[ly], pzij = pz[lz];
+        const double pqrij = pxij*pyij*pzij;
 
-        const double f_r = rhoi(ii + c);     // ρ_i′ for that (o,c)
+        const double txij = dpx[lx]*pyij*pzij;
+        const double tyij = dpy[ly]*pxij*pzij;
+        const double tzij = dpz[lz]*pyij*pxij;
 
-        const std::size_t row = c + Lshift + fidx;
-        fd_ij(row,0) += f_r * termx;
-        fd_ij(row,1) += f_r * termy;
-        fd_ij(row,2) += f_r * termz;
+        /* single radial basis (ng==1) */
+        const double g  = buf.g ()[0];
+        const double dg = buf.dg()[0];
+
+        const double termx = g*txij + dg*pqrij*rinv*x;
+        const double termy = g*tyij + dg*pqrij*rinv*y;
+        const double termz = g*tzij + dg*pqrij*rinv*z;
+
+        /* loop over embedding output channels */
+        for (std::size_t p = 0; p < odim; ++p, ++ii_drho)
+        {
+          const double f_r = rhoi(ii_drho);
+
+          const std::size_t row = p + Lshift + fidx;
+          fd_ij(row,0) += f_r * termx;
+          fd_ij(row,1) += f_r * termy;
+          fd_ij(row,2) += f_r * termz;
+        }
       }
-      ii += ng;                              // advance derivative index
+      Lshift += odim;
     }
-    Lshift += ng;
+  } else {
+    /* ---- standard path ------------------------------------------- */
+    std::size_t Lshift = 0;
+    std::size_t ii     = drfidx;
+
+    for (int L = 0; L <= Lmax; ++L)
+    {
+      const auto& orbs = orbitals[L];
+
+      for (std::size_t o = 0; o < orbs.size(); ++o)
+      {
+        const int lx = orbs[o][0],
+                  ly = orbs[o][1],
+                  lz = orbs[o][2];
+
+        const double pxij = px[lx],  pyij = py[ly],  pzij = pz[lz];
+
+        const double pqrij = pxij*pyij*pzij;
+
+        const double txij = dpx[lx]*pyij*pzij;
+        const double tyij = dpy[ly]*pxij*pzij;
+        const double tzij = dpz[lz]*pyij*pxij;
+
+        const double t2x_pref = pqrij * rinv * x;
+        const double t2y_pref = pqrij * rinv * y;
+        const double t2z_pref = pqrij * rinv * z;
+
+#pragma omp simd
+        for (std::size_t c = 0; c < ng; ++c)
+        {
+          const double g  = buf.g ()[c];
+          const double dg = buf.dg()[c];
+
+          const double termx = g*txij + dg*t2x_pref;
+          const double termy = g*tyij + dg*t2y_pref;
+          const double termz = g*tzij + dg*t2z_pref;
+
+          const double f_r = rhoi(ii + c);
+
+          const std::size_t row = c + Lshift + fidx;
+          fd_ij(row,0) += f_r * termx;
+          fd_ij(row,1) += f_r * termy;
+          fd_ij(row,2) += f_r * termz;
+        }
+        ii += ng;
+      }
+      Lshift += ng;
+    }
   }
 }
 
@@ -294,7 +414,7 @@ template <typename F>
 template <typename F>
   void DM_mEAD<F>::init_rhoi(tadah::core::rho_type& rhoi)
   {
-    rhoi.resize(2*rhoisize);
+    rhoi.resize(rhoisize+rhoipsize);
     rhoi.set_zero();
   }
 template <typename F>
@@ -369,8 +489,13 @@ template <typename F>
     if (fcut) fcut->set_rcut(rc);
     // Re-construct embedding function (re-reads CEMBFUNC/SEMBFUNC from ctx)
     emb = F(ctx, cgrid.size(), sgrid.size());
-    s        = cgrid.size() * static_cast<size_t>(Lmax + 1);
-    rhoisize = gen_atomic_orbitals(Lmax) * cgrid.size();
+    odim     = emb.output_dim();
+    const std::size_t ng = cgrid.size();
+    const std::size_t norbs = gen_atomic_orbitals(Lmax);
+    s         = odim * static_cast<size_t>(Lmax + 1);
+    rhoisize  = norbs * ng;
+    rhoipsize = norbs * odim;
+    set_drfidx(rhoisize);
     return s != old_s;
   }
 

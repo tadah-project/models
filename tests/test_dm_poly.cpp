@@ -212,8 +212,17 @@ static Context make_ctx_rlr(double rcut, int Lmax, const std::string &label)
 
 static Context make_ctx_blipf(double rcut, int Lmax, const std::string &label)
 {
-    Context ctx = make_ctx_sq(rcut, Lmax, label);
-    ctx.add("CEMBFUNC", "1 2");
+    Context ctx;
+    ctx.add("RCUTMB", rcut);
+    ctx.remove("INITMB");
+    ctx.add("INITMB", "true");
+    ctx.add("TYPEMB", label);
+    ctx.add("TYPEMB", Lmax);
+    ctx.add("TYPEMB", Lmax);
+    ctx.add("TYPEMB", Lmax);
+    ctx.add("CGRIDMB", "0.0");
+    ctx.add("SGRIDMB", "-1.5");
+    ctx.add("CEMBFUNC", "0.5 1.5");
     ctx.add("SEMBFUNC", "0.5 0.8");
     return ctx;
 }

@@ -22,6 +22,25 @@ public:
   static constexpr bool rotationally_invariant = false;
 
   /**
+   * @brief Whether this embedding function expands dimensions.
+   *
+   * When true, the embedding function takes a single rho value (from
+   * radial grid of size 1) and produces multiple output channels
+   * (one per embedding grid point).  DM_mEAD uses this to adjust
+   * its inner loops accordingly.
+   */
+  static constexpr bool expands_dimensions = false;
+
+  /**
+   * @brief Returns the number of output channels per orbital per L.
+   *
+   * For most embedding functions this equals the radial grid size (ng).
+   * For expanding functions (e.g. F_Blip) this equals the embedding
+   * function grid size.
+   */
+  virtual size_t output_dim() const = 0;
+
+  /**
    * @brief Calculates the embedding function value.
    * @param rho Electron density.
    * @param p Index for model parameters.
@@ -36,6 +55,8 @@ public:
    * @return Derivative dF/d(rho).
    */
   virtual double calc_dF(double rho, size_t p) const = 0;
+
+  virtual ~F_Base() = default;
 };
 
 /**
@@ -60,6 +81,7 @@ private:
 public:
   F_RLR(const tadah::core::Context &context, size_t cSize, size_t sSize);
   F_RLR() = default;
+  size_t output_dim() const override final { return sfuncgrid.size(); }
   double calc_F(double rho,size_t p) const override final;
   double calc_dF(double rho,size_t p) const override final;
 };
@@ -95,6 +117,8 @@ public:
 
   F_SQRT() = default;
 
+  size_t output_dim() const override final { return sfuncgrid.size(); }
+
   /**
    * @brief Calculates the embedding function value using a square-root dependence.
    * @param rho Electron density.
@@ -115,6 +139,7 @@ public:
 class F_SQ : public F_Base {
 private:
   const tadah::core::Context *context=nullptr;
+  size_t out_dim = 0;
 
 public:
   /** F_SQ = ρ² is the only channel function that preserves rotational
@@ -125,13 +150,23 @@ public:
 
   F_SQ() = default;
 
+  size_t output_dim() const override final { return out_dim; }
+
   double calc_F(double rho, size_t p) const override final;
 
   double calc_dF(double rho, size_t p) const override final;
 };
 
   /**
-   * @brief Constructs F_Blip from a Context object.
+   * @class F_Blip
+   * @brief Implements a "blip" embedding function.
+   *
+   * F_Blip is a dimension-expanding embedding function:
+   * it requires CGRID/SGRID of size 1 (a single radial basis function
+   * producing one ρ per orbital) and CEMBFUNC/SEMBFUNC of size ≥ 1.
+   * Each (orbital, embedding-grid-point) pair produces one descriptor
+   * component, so the descriptor dimension per L is CEMBFUNC.size().
+   *
    * @param context Reference to a Context instance.
    */
 class F_Blip:  public F_Base {
@@ -140,8 +175,11 @@ private:
   tadah::core::v_type sfuncgrid;   // controls width of the "blip"
   tadah::core::v_type cfuncgrid;   // control blip offset
 public:
+  static constexpr bool expands_dimensions = true;
+
   F_Blip(const tadah::core::Context &context, size_t cSize, size_t sSize);
   F_Blip() = default;
+  size_t output_dim() const override final { return sfuncgrid.size(); }
   double calc_F(double rho,size_t p) const override final;
   double calc_dF(double rho,size_t p) const override final;
 

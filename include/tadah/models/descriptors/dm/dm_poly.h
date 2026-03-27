@@ -104,6 +104,10 @@ private:
   size_t gen_atomic_orbitals(int L);
   double rc;
   ChannelFn emb;
+  /** Output dimension per L channel.
+   *  For standard functions: odim == cgrid.size().
+   *  For dimension-expanding functions (F_Blip): odim == emb.output_dim(). */
+  size_t odim = 0;
 
 public:
   DM_Poly();

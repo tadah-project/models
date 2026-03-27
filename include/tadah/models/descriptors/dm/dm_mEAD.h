@@ -63,6 +63,20 @@ namespace models {
  * SEMBFUNC   1.5
  * ```
  *
+ * For dimension-expanding embedding functions (e.g. F_Blip), CGRIDMB and
+ * SGRIDMB must have size 1, while CEMBFUNC/SEMBFUNC determine the
+ * descriptor output dimension:
+ *
+ * ```
+ * TYPEMB    DM_mBlip 1 1 1 5 5 Ta Ta
+ * RCTYPEMB  Cut_Cos
+ * RCUTMB    5.0
+ * CGRIDMB   0.0
+ * SGRIDMB   -1.5
+ * CEMBFUNC  0.0 0.5 1.0 1.5 2.0
+ * SEMBFUNC  1.0 1.0 1.0 1.0 1.0
+ * ```
+ *
  * Required Config keys:
  * \ref INITMB \ref CGRIDMB \ref SGRIDMB
  */
@@ -79,6 +93,10 @@ private:
   size_t gen_atomic_orbitals(int L);
   double rc;
   F emb;
+  /** Output dimension per L channel.
+   *  For standard functions: odim == cgrid.size().
+   *  For dimension-expanding functions (F_Blip): odim == emb.output_dim(). */
+  size_t odim = 0;
 
 public:
   DM_mEAD();
