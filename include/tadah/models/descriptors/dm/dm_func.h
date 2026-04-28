@@ -2,7 +2,9 @@
 #define DM_func_H
 
 #include <tadah/core/context.h>
+#include <tadah/models/cutoffs.h>
 #include <tadah/models/descriptors/d_base.h>
+#include <tadah/models/descriptors/d_basis_functions.h>
 
 #include <cstdlib>
 
@@ -183,6 +185,58 @@ public:
   double calc_F(double rho,size_t p) const override final;
   double calc_dF(double rho,size_t p) const override final;
 
+};
+
+/**
+ * @class F_mEnv
+ * @brief F_Blip multiplied by an envelope cutoff that suppresses ρ near 0.
+ *
+ * Identical interface to F_Blip (dimension-expanding, requires CGRID/SGRID
+ * of size 1 and equal-length CEMBFUNC/SEMBFUNC) but the embedded value is:
+ * \f$ F(\rho) = f_{\text{env}}(\rho)\, B(\rho, \eta_p, \mu_p) \f$,
+ * where \f$ f_{\text{env}} \f$ is a cutoff-style function (template parameter)
+ * with width set by the new \ref RCUTENV key.
+ *
+ * Required Config keys: \ref RCUTENV \ref CEMBFUNC \ref SEMBFUNC.
+ */
+template <typename F>
+class F_mEnv : public F_Base {
+private:
+  const tadah::core::Context *context=nullptr;
+  tadah::core::v_type sfuncgrid;   // controls width of the "blip"
+  tadah::core::v_type cfuncgrid;   // control blip offset
+  F fcut;
+public:
+  static constexpr bool expands_dimensions = true;
+
+  F_mEnv(const tadah::core::Context &c, size_t cSize, size_t sSize):
+    context(&c),
+    fcut(c.get<double>("RCUTENV"))
+  {
+    if (!context->get<bool>("INITMB")) return;
+    D_Base::get_grid(*context,"SEMBFUNC",sfuncgrid);
+    D_Base::get_grid(*context,"CEMBFUNC",cfuncgrid);
+    if (cSize != 1 || sSize != 1) {
+      throw std::runtime_error(
+          "F_mEnv: requires CGRIDMB and SGRIDMB of size 1, got "
+          + std::to_string(cSize) + " and " + std::to_string(sSize) + ".");
+    }
+    if (sfuncgrid.size() != cfuncgrid.size()) {
+      throw std::runtime_error(
+          "F_mEnv: SEMBFUNC and CEMBFUNC must have the same size, got "
+          + std::to_string(sfuncgrid.size()) + " and "
+          + std::to_string(cfuncgrid.size()) + ".");
+    }
+  }
+  F_mEnv() = default;
+  size_t output_dim() const override final { return sfuncgrid.size(); }
+  double calc_F(double rho, size_t p) const override final {
+    return fcut.calc(rho) * B(rho, sfuncgrid[p], cfuncgrid[p]);
+  }
+  double calc_dF(double rho, size_t p) const override final {
+    return fcut.calc(rho) * dB(rho, sfuncgrid[p], cfuncgrid[p])
+         + fcut.calc_prime(rho) * B(rho, sfuncgrid[p], cfuncgrid[p]);
+  }
 };
 
 } // namespace models

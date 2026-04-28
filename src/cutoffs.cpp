@@ -11,6 +11,7 @@ tadah::core::Registry<Cut_Base,double&>::Register<Cut_Dummy> Cut_Dummy_1( "Cut_D
 tadah::core::Registry<Cut_Base,double&>::Register<Cut_Poly> Cut_Poly_1( "Cut_Poly" );
 tadah::core::Registry<Cut_Base,double&>::Register<Cut_PolyS> Cut_Poly_2( "Cut_PolyS" );
 tadah::core::Registry<Cut_Base,double&>::Register<Cut_PT> Cut_PT_1( "Cut_PT" );
+tadah::core::Registry<Cut_Base,double&>::Register<Cut_SinInv> Cut_SinInv_1( "Cut_SinInv" );
 tadah::core::Registry<Cut_Base,double&>::Register<Cut_Tanh> Cut_Tanh_1( "Cut_Tanh" );
 
 
@@ -290,6 +291,42 @@ double Cut_Poly::calc_prime(double r) {
         double x4 = x3 * x;
         return (-30.0 * x2 + 60.0 * x3 - 30.0 * x4) * rcut_inv;
     }
+}
+
+Cut_SinInv::Cut_SinInv() {}
+Cut_SinInv::Cut_SinInv(double rc)
+{
+    set_rcut(rc);
+    test_rcut(rc);
+}
+std::string Cut_SinInv::label() {
+    return lab;
+}
+void Cut_SinInv::set_rcut(const double r) {
+    test_rcut(r);
+    rcut = r;
+    rcut_sq = r*r;
+    rcut_inv = r <= 0 ? 0.0 : 1.0/r;
+}
+double Cut_SinInv::get_rcut()    { return rcut; }
+double Cut_SinInv::get_rcut_sq() { return rcut_sq; }
+double Cut_SinInv::calc(double r) {
+    if (r >= rcut) return 1.0;
+    return std::sin(M_PI * r * rcut_inv * 0.5);
+}
+double Cut_SinInv::calc_prime(double r) {
+    if (r >= rcut) return 0.0;
+    double t = M_PI * rcut_inv * 0.5;
+    return t * std::cos(t * r);
+}
+double Cut_SinInv::calc(double r) const {
+    if (r >= rcut) return 1.0;
+    return std::sin(M_PI * r * rcut_inv * 0.5);
+}
+double Cut_SinInv::calc_prime(double r) const {
+    if (r >= rcut) return 0.0;
+    double t = M_PI * rcut_inv * 0.5;
+    return t * std::cos(t * r);
 }
 
 } // namespace models

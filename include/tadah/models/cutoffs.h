@@ -308,6 +308,40 @@ class Cut_PT : public Cut_Base {
         double calc_prime(double r);
 };
 
+/* @class Cut_SinInv
+ * @brief Smooth envelope function which transitions from 0 to 1 ("inverse cutoff").
+ *
+ * Used as a multiplicative envelope by F_mEnv to suppress the embedding-function
+ * contribution near r=0 (where the radial Gaussian is largest) and recover full
+ * amplitude at r >= rcut. Definition:
+ * \f[
+ *  f(r) =
+ *  \begin{cases}
+ *     \sin\!\left(\dfrac{\pi r}{2 r_{\text{cut}}}\right), & r \le r_{\text{cut}}\\
+ *     1,                                                  & r >  r_{\text{cut}}
+ *  \end{cases}
+ * \f]
+ */
+class Cut_SinInv : public Cut_Base {
+    private:
+        std::string lab = "Cut_SinInv";
+        double rcut, rcut_sq, rcut_inv;
+    public:
+        Cut_SinInv();
+        Cut_SinInv(double rcut);
+        std::string label();
+        void set_rcut(const double r);
+        double get_rcut();
+        double get_rcut_sq();
+        double calc(double r);
+        double calc_prime(double r);
+        // Const overloads — F_mEnv::calc_F/calc_dF call calc/calc_prime
+        // through a const member, so the underlying envelope must be
+        // callable on a const Cut_SinInv as well.
+        double calc(double r) const;
+        double calc_prime(double r) const;
+};
+
 } // namespace models
 } // namespace tadah
 #endif
