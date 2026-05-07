@@ -4,7 +4,9 @@
 namespace tadah {
 namespace models {
 
-template<> tadah::core::Registry<Cut_Base,double&>::Map tadah::core::Registry<Cut_Base,double&>::registry{};
+template<>
+tadah::core::Registry<Cut_Base,double&>::Map& tadah::core::Registry<Cut_Base,double&>::registry =
+  tadah::core::Registry<tadah::models::Cut_Base,double&>::instance();
 tadah::core::Registry<Cut_Base,double&>::Register<Cut_Cos> Cut_Cos_1( "Cut_Cos" );
 tadah::core::Registry<Cut_Base,double&>::Register<Cut_CosS> Cut_Cos_2( "Cut_CosS" );
 tadah::core::Registry<Cut_Base,double&>::Register<Cut_Dummy> Cut_Dummy_1( "Cut_Dummy" );
