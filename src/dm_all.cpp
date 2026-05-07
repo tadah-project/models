@@ -3,9 +3,15 @@ namespace tadah {
 namespace models {
 
 
-template<> tadah::core::Registry<DM_Base>::Map tadah::core::Registry<DM_Base>::registry{};
-template<> tadah::core::Registry<DM_Base,tadah::core::Context&>::Map tadah::core::Registry<DM_Base,tadah::core::Context&>::registry{};
-template<> tadah::core::Registry<DM_Base,const tadah::core::Context&>::Map tadah::core::Registry<DM_Base,const tadah::core::Context&>::registry{};
+template<>
+tadah::core::Registry<DM_Base>::Map& tadah::core::Registry<DM_Base>::registry =
+  tadah::core::Registry<tadah::models::DM_Base>::instance();
+template<>
+tadah::core::Registry<DM_Base,tadah::core::Context&>::Map& tadah::core::Registry<DM_Base,tadah::core::Context&>::registry =
+  tadah::core::Registry<tadah::models::DM_Base,tadah::core::Context&>::instance();
+template<>
+tadah::core::Registry<DM_Base,const tadah::core::Context&>::Map& tadah::core::Registry<DM_Base,const tadah::core::Context&>::registry =
+  tadah::core::Registry<tadah::models::DM_Base,const tadah::core::Context&>::instance();
 
 tadah::core::Registry<D_Base>::Register<DM_Blip> DM_Blip_0( "DM_Blip" );
 tadah::core::Registry<D_Base>::Register<DM_Dummy> DM_Dummy_0( "DM_Dummy" );
@@ -110,7 +116,6 @@ tadah::core::Registry<DM_Base,const tadah::core::Context&>::Register<DM_Poly<F_S
 tadah::core::Registry<DM_Base,const tadah::core::Context&>::Register<DM_Poly<F_RLR,  GaussianRadial,OrbitalWise>> cDM_GOW_RLR_2 ("DM_GOW_RLR");
 tadah::core::Registry<DM_Base,const tadah::core::Context&>::Register<DM_Poly<F_Blip, GaussianRadial,OrbitalWise>> cDM_GOW_Blip_2("DM_GOW_Blip");
 tadah::core::Registry<DM_Base,const tadah::core::Context&>::Register<DM_mJoin> cDM_mJoin_2( "DM_mJoin" );
-//template<> Registry<DM_Base,F_Base&,tadah::core::Context&>::Map Registry<DM_Base,F_Base&,tadah::core::Context&>::registry{};
 //Registry<DM_Base,tadah::core::Context&>::Register<DM_mEAD<F_RLR>> DM_mEAD_1( "DM_mEAD" );
 
 } // namespace models

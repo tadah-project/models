@@ -5,6 +5,7 @@
 #include <limits>
 #include <tadah/core/context.h>
 #include <tadah/core/core_types.h>
+#include <tadah/core/intercept_layout.h>
 #include <tadah/models/ea.h>
 #include <tadah/models/ols.h>
 #include <tadah/models/svd.h>
@@ -55,10 +56,16 @@ public:
       throw std::runtime_error("LAMBDA -1 requires OALGO 3");
     }
 
+    const size_t n_bias = tadah::core::n_intercept_columns(context);
+
     if (lambda > 0 && oalgo != 3 ) {
-      // Augment the design matrix with the regularization term
-      size_t j = 0;
-      for (size_t i = Phi.rows() - Phi.cols(); i < Phi.rows(); ++i) {
+      // Augment the design matrix with the regularization term.
+      // Skip the first n_bias rows of the augmentation block: intercept
+      // columns are unpenalised (standard practice — regularising an intercept
+      // biases the fit toward zero mean).
+      const size_t aug_start = Phi.rows() - Phi.cols();
+      size_t j = n_bias;
+      for (size_t i = aug_start + n_bias; i < Phi.rows(); ++i) {
         Phi(i, j++) = std::sqrt(lambda);
       }
     }
@@ -70,6 +77,17 @@ public:
     } else if (oalgo == 2) {
       ols.solve(Phi, T, weights, rcond, tadah::models::Algorithm::GELS);
     } else if (oalgo == 3) {
+      // SVD path applies a uniform ridge across all singular values; there is
+      // no per-column knob, so intercept-aware regularisation is not
+      // supported here. Reject loudly and point at the alternatives.
+      // TODO: implement Path B (residualise intercepts, run SVD on the
+      //       descriptor block only) so OALGO=3 + BIAS=true becomes valid.
+      if (n_bias > 0 && lambda != 0.0) {
+        throw std::runtime_error(
+            "OALGO=3 (SVD with uniform ridge) does not support intercept "
+            "exclusion from regularisation. With BIAS=true and LAMBDA != 0, "
+            "use OALGO=1 or OALGO=2 instead.");
+      }
       tadah::models::SVD svd;
       svd.compute(Phi);
       if (lambda < 0) {

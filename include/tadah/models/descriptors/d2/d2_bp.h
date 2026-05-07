@@ -62,6 +62,23 @@ public:
   std::string label() const override;
   void init() override;
   bool reinit(const tadah::core::Context& ctx) override;
+
+  /** Hook for the HPO PRIOR initialisation strategy.
+   *
+   * D2_BP ships no descriptor-specific defaults: physically-meaningful
+   * values for CGRID2B / SGRID2B / RCUT2B are tightly coupled to the
+   * RCUT and the user's coordination shells, and the user's bounds
+   * encode that range better than any global constant could. PRIOR
+   * therefore falls back to the bounds-midpoint for D2_BP parameters,
+   * which is always inside the search space.
+   *
+   * Overriding this method in a project-specific subclass remains the
+   * intended extension point for descriptor authors with strong
+   * literature priors for their parameters. */
+  std::optional<double>
+  suggested_value(const std::string& /*key*/, int /*arg_pos*/) const override {
+    return std::nullopt;
+  }
 };
 } // namespace models
 } // namespace tadah

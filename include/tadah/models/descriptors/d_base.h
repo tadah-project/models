@@ -2,6 +2,7 @@
 #define D_BASE_H
 
 #include <string>
+#include <optional>
 #include <tadah/core/context.h>
 #include <tadah/core/core_types.h>
 #include <tadah/core/periodic_table.h>
@@ -63,6 +64,11 @@ public:
   D_Base();
   D_Base(const tadah::core::Context &c);
 
+  /** Refresh per-element weights[] from WATOM in the (possibly updated)
+   *  context. Intended for HPO reinit paths where WATOM may change
+   *  between iters but the descriptor object is reused. */
+  void refresh_atom_weights(const tadah::core::Context &c);
+
   /** \brief Print grid to the log.
    *
    * @param v Vector to print.
@@ -109,6 +115,29 @@ public:
   virtual void uninit_for_atoms(int Zi, int Zj);
   static std::vector<std::string> get_init_atoms(const tadah::core::Context &c, std::string type);
   virtual std::vector<std::string> get_init_atoms(const tadah::core::Context &c)=0;
+
+  /** \brief Suggested physically-motivated default for an OPTIM-able
+   * parameter belonging to this descriptor.
+   *
+   * Used by the HPO PRIOR initialisation strategy. Returns std::nullopt
+   * (the base-class default) when no prior is known for the (key,
+   * arg_pos) pair; HPO will then fall back to the geometric/arithmetic
+   * mid-point of the [low, high] bounds.
+   *
+   * Concrete descriptors are encouraged to override this whenever the
+   * literature suggests a sensible default for a given parameter (e.g.
+   * typical RCUT for a given coordination shell, typical SIGMA width
+   * for a Gaussian basis).
+   *
+   * @param key      OPTIM key (e.g. "RCUT2B", "SGRID2B", "CEMBFUNC").
+   * @param arg_pos  Numeric ordinal of the parameter within the key's
+   *                 value list (1-based, matching the OPTIM (n) syntax).
+   *                 Pass -1 when the descriptor is scalar in this key.
+   */
+  virtual std::optional<double>
+  suggested_value(const std::string& /*key*/, int /*arg_pos*/) const {
+    return std::nullopt;
+  }
 
 private:
 

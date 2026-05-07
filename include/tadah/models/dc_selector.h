@@ -2,6 +2,7 @@
 #define DC_SELECTOR_H
 
 #include <tadah/core/context.h>
+#include <tadah/core/intercept_layout.h>
 #include <tadah/models/descriptors/d_all.h>
 #include <tadah/models/cut_all.h>
 #include <tadah/core/registry.h>
@@ -41,7 +42,7 @@ namespace tadah {
         void init(const tadah::core::Context &context) {
           double rcutzero = 0.0; // for dummies
 
-          if (context.get<bool>("BIAS")) bias=1;
+          bias = static_cast<int>(tadah::core::n_intercept_columns(context));
 
           if (context.get<bool>("INIT2B")) {
             double rcut2b = context.get<double>("RCUT2BMAX");
@@ -79,11 +80,13 @@ namespace tadah {
           bool changed = false;
           if (d2b) {
             changed |= d2b->reinit(ctx);
+            d2b->refresh_atom_weights(ctx);
             if (c2b && ctx.get<bool>("INIT2B"))
               c2b->set_rcut(ctx.get<double>("RCUT2BMAX"));
           }
           if (dmb) {
             changed |= dmb->reinit(ctx);
+            dmb->refresh_atom_weights(ctx);
             if (cmb && ctx.get<bool>("INITMB"))
               cmb->set_rcut(ctx.get<double>("RCUTMBMAX"));
           }

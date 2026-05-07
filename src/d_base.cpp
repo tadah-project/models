@@ -51,6 +51,9 @@ D_Base::D_Base() {}
 D_Base::D_Base(const tadah::core::Context &c):
   verbose(c.get<int>("VERBOSE"))
 {
+  refresh_atom_weights(c);
+}
+void D_Base::refresh_atom_weights(const tadah::core::Context &c) {
   std::fill_n(weights, 119, 1.0);
   if (c.contains("ATOM")) {
     for (size_t i=0; i<c.size("ATOM"); ++i) {
