@@ -11,6 +11,7 @@ namespace models {
 /** Base class to be inherited by all cutoffs */
 class Cut_Base {
     public:
+        enum class Kind { Standard, Discontinuous, Inverse };
         virtual ~Cut_Base();
         virtual std::string label()=0;
         virtual double calc(double r)=0;
@@ -19,6 +20,10 @@ class Cut_Base {
         virtual double get_rcut_sq()=0;
         virtual double calc_prime(double r)=0;
         void test_rcut(const double r);
+        /** Behavioural kind; drives test dispatch without string comparisons. */
+        virtual Kind kind() const { return Kind::Standard; }
+        /** Expected value of calc() at exactly r == rcut. */
+        virtual double val_at_rcut() const { return 0.0; }
 };
 
 /**
@@ -62,6 +67,7 @@ class Cut_Dummy : public Cut_Base {
         double get_rcut_sq();
         double calc(double r);
         double calc_prime(double r);
+        Kind kind() const override { return Kind::Discontinuous; }
 };
 
 /**
@@ -295,6 +301,7 @@ class Cut_PT : public Cut_Base {
         double rcut_sq;
         double rcut_inv;
         double rcut_inner;
+        double norm = 1.0;  // precomputed 1/f(0) so that calc(0)==1
 
     public:
         Cut_PT();
@@ -340,6 +347,8 @@ class Cut_SinInv : public Cut_Base {
         // callable on a const Cut_SinInv as well.
         double calc(double r) const;
         double calc_prime(double r) const;
+        Kind kind() const override { return Kind::Inverse; }
+        double val_at_rcut() const override { return 1.0; }
 };
 
 } // namespace models

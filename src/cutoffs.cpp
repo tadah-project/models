@@ -229,6 +229,8 @@ void Cut_PT::set_rcut(const double r) {
     rcut_sq=r*r;
     rcut_inv= r<=0 ? 0.0 : 1.0/r;
     rcut_inner=-rcut/2;
+    double u0 = 0.5 * (rcut / (0.0 - rcut_inner) + rcut / (0.0 - rcut));
+    norm = 1.0 / (0.5 + 0.5 * std::tanh(u0));
 }
 double Cut_PT::get_rcut() {
   return rcut;
@@ -239,7 +241,7 @@ double Cut_PT::get_rcut_sq() {
 double Cut_PT::calc(double r) {
   if (r>=rcut) return 0.0;
   double u = 0.5 * ((rcut / (r - rcut_inner)) + (rcut / (r - rcut)));
-  return 0.5 + 0.5 * tanh(u);
+  return (0.5 + 0.5 * tanh(u)) * norm;
 }
 double Cut_PT::calc_prime(double r) {
   if (r>=rcut) return 0.0;
@@ -251,7 +253,7 @@ double Cut_PT::calc_prime(double r) {
   double term2 = 1.0 / ((r - rcut) * (r - rcut));
   double sum_terms = term1 + term2;
 
-  return - (rcut / 4.0) * sech2_u * sum_terms;
+  return - (rcut / 4.0) * sech2_u * sum_terms * norm;
 }
 Cut_Poly::Cut_Poly() {}
 Cut_Poly::Cut_Poly(double rcut_value) {
@@ -333,4 +335,3 @@ double Cut_SinInv::calc_prime(double r) const {
 
 } // namespace models
 } // namespace tadah
-

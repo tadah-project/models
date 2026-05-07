@@ -240,13 +240,13 @@ TEST_CASE( "Testing Cutoffs: Cut_PT", "[Cut_PT]" ) {
     REQUIRE( std::abs(c2b->get_rcut_sq()-rcut2bsq)<std::numeric_limits<double>::min() );
 
   REQUIRE_THAT(c2b->calc(2.0),
-               Catch::Matchers::WithinAbs(0.180990296913, 1e-12));
+               Catch::Matchers::WithinAbs(0.2475729061984162, 1e-12));
   REQUIRE_THAT(c2b->calc_prime(2.0),
-               Catch::Matchers::WithinAbs(-0.293953123268, 1e-12));
+               Catch::Matchers::WithinAbs(-0.4020924339864764, 1e-12));
 
   REQUIRE_THAT(c2b->calc(3.0),
-               Catch::Matchers::WithinAbs(0.000419261765536, 1e-10));
+               Catch::Matchers::WithinAbs(0.0005734995495457, 1e-10));
   REQUIRE_THAT(c2b->calc_prime(3.0),
-               Catch::Matchers::WithinAbs(-0.00897008113779, 1e-10));
+               Catch::Matchers::WithinAbs(-0.0122699895740221, 1e-10));
     delete c2b;
 }
