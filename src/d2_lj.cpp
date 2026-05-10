@@ -1,5 +1,6 @@
 #include "tadah/models/descriptors/d2/d2_base.h"
 #include <tadah/models/descriptors/d2/d2_lj.h>
+#include <tadah/models/descriptors/closed_form_meta.h>
 namespace tadah {
 namespace models {
 
@@ -77,6 +78,10 @@ std::string D2_LJ::label() const {
 }
 void D2_LJ::init() {
   nparams=0;
+}
+
+std::optional<DescriptorMeta> D2_LJ::meta() const {
+  return make_closed_form_meta("D2_LJ", "RCUT2B");
 }
 
 } // namespace models

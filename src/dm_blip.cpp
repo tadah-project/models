@@ -338,6 +338,133 @@ bool DM_Blip::reinit(const tadah::core::Context& ctx) {
   return s != old_s;
 }
 
+std::optional<DescriptorMeta> DM_Blip::meta() const {
+  using DataStats = tadah::core::stats::DataStats;
+  static constexpr std::size_t I_P10 = tadah::core::stats::IDX_P10;
+  static constexpr std::size_t I_P50 = tadah::core::stats::IDX_P50;
+  static constexpr std::size_t I_P90 = tadah::core::stats::IDX_P90;
+  static constexpr std::size_t I_P99 = tadah::core::stats::IDX_P99;
+  static constexpr std::size_t I_P1  = tadah::core::stats::IDX_P1;
+
+  DescriptorMeta dm;
+  dm.label = "DM_Blip";
+
+  // RCUTMB — real-space cutoff for the MB neighbour sum.
+  ParamMeta p_rcut;
+  p_rcut.key      = "RCUTMB";
+  p_rcut.arg_pos  = -1;
+  p_rcut.scale    = Scale::Distance;
+  p_rcut.units    = "Å";
+  p_rcut.role     = "Real-space cutoff for the MB neighbour sum.";
+  p_rcut.hard.lo  = 0.0;
+  p_rcut.crit     = Criticality::Critical;
+  p_rcut.scope    = PairScope::Global;
+  p_rcut.suggest  = [](const DataStats& d, const SeedView&, int) {
+    if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
+    const auto& pp = d.per_pair[0];
+    double low = pp.r_percentiles[I_P50];
+    if (pp.r_peaks.size() >= 2) low = pp.r_peaks[1].position * 1.05;
+    return std::make_pair(low, pp.r_percentiles[I_P99]);
+  };
+  dm.params.push_back(std::move(p_rcut));
+
+  // CGRIDMB — vector: i-th radial Gaussian centre.
+  ParamMeta p_cgrid;
+  p_cgrid.key      = "CGRIDMB";
+  p_cgrid.arg_pos  = 0;
+  p_cgrid.scale    = Scale::Distance;
+  p_cgrid.units    = "Å";
+  p_cgrid.role     = "Centre of the i-th MB radial Gaussian. "
+                     "Must lie within the dataset r_ij range or ρ collapses.";
+  p_cgrid.hard.lo  = 0.0;
+  p_cgrid.crit     = Criticality::Critical;
+  p_cgrid.scope    = PairScope::PerElementPair;
+  p_cgrid.suggest  = [](const DataStats& d, const SeedView&, int) {
+    if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
+    const auto& pp = d.per_pair[0];
+    if (!pp.r_peaks.empty()) {
+      const auto& pk = pp.r_peaks.front();
+      return std::make_pair(std::max(0.0, pk.position - pk.fwhm),
+                            pk.position + pk.fwhm);
+    }
+    return std::make_pair(pp.r_percentiles[I_P10],
+                          pp.r_percentiles[I_P50]);
+  };
+  p_cgrid.check    = [](const DataStats& d, const SeedView& s) -> HealthVerdict {
+    if (!s.contains("CGRIDMB") || d.per_pair.empty()) return HealthOk{};
+    const auto& pp = d.per_pair[0];
+    const std::size_t n = s.size("CGRIDMB");
+    for (std::size_t i = 0; i < n; ++i) {
+      const double mu = s.get<double>("CGRIDMB", i);
+      if (mu < pp.r_min || mu > pp.r_max) {
+        return HealthFail{"CGRIDMB[" + std::to_string(i) + "]=" +
+                          std::to_string(mu) +
+                          " is outside the dataset's r_ij range — "
+                          "ρ will be ~0 for every atom."};
+      }
+    }
+    return HealthOk{};
+  };
+  dm.params.push_back(std::move(p_cgrid));
+
+  // SGRIDMB — vector: inverse Gaussian width.
+  ParamMeta p_sgrid;
+  p_sgrid.key      = "SGRIDMB";
+  p_sgrid.arg_pos  = 0;
+  p_sgrid.scale    = Scale::InverseDistanceSq;
+  p_sgrid.units    = "Å^-2";
+  p_sgrid.role     = "Inverse width of the i-th MB radial Gaussian.";
+  p_sgrid.hard.lo  = 1.0e-6;
+  p_sgrid.crit     = Criticality::Critical;
+  p_sgrid.scope    = PairScope::Global;
+  p_sgrid.suggest  = [](const DataStats& d, const SeedView&, int) {
+    if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
+    const auto& pp = d.per_pair[0];
+    double w = pp.r_percentiles[I_P90] - pp.r_percentiles[I_P10];
+    if (!pp.r_peaks.empty()) w = pp.r_peaks[0].fwhm;
+    if (!(w > 0.0)) return std::make_pair(0.1, 1.0);
+    return std::make_pair(0.25 / (w * w),
+                          9.0  / (w * w));
+  };
+  dm.params.push_back(std::move(p_sgrid));
+
+  // Cross-param: CGRIDMB.size() == SGRIDMB.size()
+  dm.cross_param_checks.push_back(
+    [](const DataStats&, const SeedView& s) -> HealthVerdict {
+      if (!s.contains("CGRIDMB") || !s.contains("SGRIDMB")) return HealthOk{};
+      if (s.size("CGRIDMB") != s.size("SGRIDMB"))
+        return HealthFail{"CGRIDMB and SGRIDMB sizes differ."};
+      return HealthOk{};
+    });
+
+  // Cross-param: ρ-collapse warning (uses descriptor stats if available)
+  dm.cross_param_checks.push_back(
+    [](const DataStats& d, const SeedView&) -> HealthVerdict {
+      auto it = d.rho_percentiles_per_descriptor.find("DM_Blip");
+      if (it == d.rho_percentiles_per_descriptor.end()) return HealthOk{};
+      const auto& rho = it->second;
+      if (rho[I_P99] < 1.0e-6)
+        return HealthFail{"ρ collapses to ≤ 1e-6 for 99% of atoms — "
+                          "MB radial GTOs do not overlap the data's r_ij range."};
+      const double ratio_p1 = rho[tadah::core::stats::IDX_P1];
+      const double ratio_denom = ratio_p1 > 0 ? ratio_p1 : 1.0e-30;
+      if (rho[I_P99] / ratio_denom < 1.05)
+        return HealthWarn{"ρ varies < 5% across the training pool — "
+                          "DM_Blip carries little information."};
+      return HealthOk{};
+    });
+
+  dm.expected_columns = [](const SeedView& s) -> std::size_t {
+    if (!s.contains("CGRIDMB") || !s.contains("TYPEMB")) return 0;
+    const std::size_t ng = s.size("CGRIDMB");
+    int Lmax = 0;
+    try { Lmax = s.get<int>("TYPEMB", 1); } catch (...) { Lmax = 0; }
+    return ng * static_cast<std::size_t>(Lmax + 1);
+  };
+
+  return dm;
+}
+
 } // namespace models
 } // namespace tadah
 

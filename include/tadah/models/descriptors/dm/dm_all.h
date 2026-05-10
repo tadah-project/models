@@ -12,6 +12,15 @@
 
 namespace tadah {
 namespace models {
+
+// Forward-declare the explicit specialisation of DM_mEAD::meta() for
+// the F_mEnv<Cut_SinInv> instantiation registered as "DM_mBlipEnv".
+// This prevents implicit instantiation of the (nullopt) default in
+// other TUs and guarantees the override is the one linked.
+template<>
+std::optional<DescriptorMeta>
+DM_mEAD<F_mEnv<Cut_SinInv>>::meta() const;
+
 } // namespace models
 } // namespace tadah
 

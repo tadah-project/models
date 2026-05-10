@@ -92,6 +92,7 @@ public:
     tadah::core::rho_type& rho,
     const double scale=1) const override;
   void init() override;
+  std::optional<DescriptorMeta> meta() const override;
 };
 } // namespace models
 } // namespace tadah

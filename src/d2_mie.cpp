@@ -1,5 +1,6 @@
 #include "tadah/models/descriptors/d2/d2_base.h"
 #include <tadah/models/descriptors/d2/d2_mie.h>
+#include <tadah/models/descriptors/closed_form_meta.h>
 namespace tadah {
 namespace models {
 
@@ -88,6 +89,10 @@ bool D2_MIE::reinit(const tadah::core::Context& ctx) {
   temp = ctx.get<double>("TYPE2B", 2); if (temp != -1) m = temp;
   if (fcut) fcut->set_rcut(ctx.get<double>("RCUT2BMAX"));
   return false;  // s = 2 always
+}
+
+std::optional<DescriptorMeta> D2_MIE::meta() const {
+  return make_closed_form_meta("D2_MIE", "RCUT2B");
 }
 
 } // namespace models

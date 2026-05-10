@@ -1,5 +1,6 @@
 #include "tadah/models/descriptors/d2/d2_base.h"
 #include <tadah/models/descriptors/d2/d2_eam.h>
+#include <tadah/models/descriptors/closed_form_meta.h>
 namespace tadah {
 namespace models {
 
@@ -182,6 +183,9 @@ void D2_EAM::init() {
   nparams=1;
 }
 
+std::optional<DescriptorMeta> D2_EAM::meta() const {
+  return make_closed_form_meta("D2_EAM", "RCUT2B");
+}
 
 } // namespace models
 } // namespace tadah

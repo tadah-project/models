@@ -1,6 +1,8 @@
 #include <tadah/models/descriptors/dm/dm_func.h>
 #include <tadah/models/descriptors/dm/dm_ead.h>
 #include <tadah/models/descriptors/d_basis_functions.h>
+#include <tadah/models/descriptors/param_meta.h>
+#include <tadah/core/stats/data_stats.h>
 
 #include <array>
 #include <memory>
@@ -412,6 +414,135 @@ bool DM_EAD::reinit(const tadah::core::Context& ctx) {
   s        = cgrid.size() * static_cast<size_t>(Lmax + 1);
   rhoisize = gen_atomic_orbitals(Lmax) * cgrid.size();
   return s != old_s;
+}
+
+// ----------------------------------------------------------------
+// meta() — DM_EAD shares the (RCUTMB, CGRIDMB, SGRIDMB) parameter
+// shape with the BASINS-fix DM_mBlipEnv: per-pair radial GTO with
+// centre/width vectors. The ρ-collapse cross-param check applies to
+// the same per-descriptor key (`DM_EAD`) — the suggester anchors all
+// numbers to the dataset's r_ij percentiles.
+// ----------------------------------------------------------------
+std::optional<DescriptorMeta> DM_EAD::meta() const {
+  using DataStats = tadah::core::stats::DataStats;
+  static constexpr std::size_t I_P10 = tadah::core::stats::IDX_P10;
+  static constexpr std::size_t I_P50 = tadah::core::stats::IDX_P50;
+  static constexpr std::size_t I_P90 = tadah::core::stats::IDX_P90;
+  static constexpr std::size_t I_P99 = tadah::core::stats::IDX_P99;
+
+  DescriptorMeta dm;
+  dm.label = "DM_EAD";
+
+  // RCUTMB — real-space cutoff for the MB neighbour sum.
+  ParamMeta p_rcut;
+  p_rcut.key      = "RCUTMB";
+  p_rcut.arg_pos  = -1;
+  p_rcut.scale    = Scale::Distance;
+  p_rcut.units    = "Å";
+  p_rcut.role     = "Real-space cutoff for the MB neighbour sum.";
+  p_rcut.hard.lo  = 0.0;
+  p_rcut.crit     = Criticality::Critical;
+  p_rcut.scope    = PairScope::Global;
+  p_rcut.suggest  = [](const DataStats& d, const SeedView&, int) {
+    if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
+    const auto& pp = d.per_pair[0];
+    double low = pp.r_percentiles[I_P50];
+    if (pp.r_peaks.size() >= 2) low = pp.r_peaks[1].position * 1.05;
+    return std::make_pair(low, pp.r_percentiles[I_P99]);
+  };
+  p_rcut.check    = [](const DataStats& d, const SeedView& s) -> HealthVerdict {
+    if (!s.contains("RCUTMB")) return HealthOk{};
+    if (d.per_pair.empty()) return HealthOk{};
+    const double rc = s.get<double>("RCUTMB");
+    if (rc < d.per_pair[0].r_min)
+      return HealthFail{"RCUTMB is below the smallest r_ij — no MB neighbours."};
+    return HealthOk{};
+  };
+  dm.params.push_back(std::move(p_rcut));
+
+  // CGRIDMB — vector of GTO centres (r_s in the EAD formula).
+  ParamMeta p_cgrid;
+  p_cgrid.key      = "CGRIDMB";
+  p_cgrid.arg_pos  = 0;
+  p_cgrid.scale    = Scale::Distance;
+  p_cgrid.units    = "Å";
+  p_cgrid.role     = "GTO centre r_s. Must lie within the dataset r_ij range or ρ collapses.";
+  p_cgrid.hard.lo  = 0.0;
+  p_cgrid.crit     = Criticality::Critical;
+  p_cgrid.scope    = PairScope::PerElementPair;
+  p_cgrid.suggest  = [](const DataStats& d, const SeedView&, int) {
+    if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
+    const auto& pp = d.per_pair[0];
+    if (!pp.r_peaks.empty()) {
+      const double mu = pp.r_peaks[0].position;
+      const double w  = pp.r_peaks[0].fwhm > 0
+                          ? pp.r_peaks[0].fwhm
+                          : 0.2 * mu;
+      return std::make_pair(std::max(0.0, mu - w), mu + w);
+    }
+    return std::make_pair(pp.r_percentiles[I_P10],
+                          pp.r_percentiles[I_P90]);
+  };
+  p_cgrid.check    = [](const DataStats& d, const SeedView& s) -> HealthVerdict {
+    if (!s.contains("CGRIDMB")) return HealthOk{};
+    if (d.per_pair.empty()) return HealthOk{};
+    // Per-arg-pos check: any vector entry outside the data's r_ij range collapses ρ.
+    const std::size_t n = s.size("CGRIDMB");
+    for (std::size_t i = 0; i < n; ++i) {
+      double mu;
+      try { mu = s.get<double>("CGRIDMB", i); } catch (...) { continue; }
+      const auto& pp = d.per_pair[0];
+      if (mu < pp.r_min || mu > pp.r_max)
+        return HealthFail{"CGRIDMB[" + std::to_string(i) +
+                          "]=" + std::to_string(mu) +
+                          " is outside the dataset's r_ij range — ρ will be ~0."};
+    }
+    return HealthOk{};
+  };
+  dm.params.push_back(std::move(p_cgrid));
+
+  // SGRIDMB — vector of GTO inverse widths (η).
+  ParamMeta p_sgrid;
+  p_sgrid.key      = "SGRIDMB";
+  p_sgrid.arg_pos  = 0;
+  p_sgrid.scale    = Scale::InverseDistanceSq;
+  p_sgrid.units    = "Å^-2";
+  p_sgrid.role     = "Inverse Gaussian width η. Narrow GTOs combined with off-shell centres collapse ρ to 0.";
+  p_sgrid.hard.lo  = 1.0e-6;
+  p_sgrid.crit     = Criticality::Critical;
+  p_sgrid.scope    = PairScope::Global;
+  p_sgrid.suggest  = [](const DataStats& d, const SeedView&, int) {
+    if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
+    const auto& pp = d.per_pair[0];
+    const double w = pp.r_peaks.empty()
+                       ? (pp.r_percentiles[I_P90] - pp.r_percentiles[I_P10])
+                       : (pp.r_peaks[0].fwhm > 0 ? pp.r_peaks[0].fwhm
+                                                 : 0.5);
+    return std::make_pair(0.25 / (w * w), 9.0 / (w * w));
+  };
+  dm.params.push_back(std::move(p_sgrid));
+
+  // Cross-param: CGRIDMB and SGRIDMB sizes must agree.
+  dm.cross_param_checks.push_back(
+    [](const DataStats&, const SeedView& s) -> HealthVerdict {
+      if (!s.contains("CGRIDMB") || !s.contains("SGRIDMB")) return HealthOk{};
+      if (s.size("CGRIDMB") != s.size("SGRIDMB"))
+        return HealthFail{"CGRIDMB and SGRIDMB sizes differ."};
+      return HealthOk{};
+    });
+
+  // expected_columns: |CGRIDMB| × (Lmax + 1).
+  dm.expected_columns = [](const SeedView& s) -> std::size_t {
+    if (!s.contains("CGRIDMB")) return 0;
+    const std::size_t n = s.size("CGRIDMB");
+    int Lmax = 0;
+    if (s.contains("TYPEMB")) {
+      try { Lmax = s.context().get<int>("TYPEMB", 1); } catch (...) {}
+    }
+    return n * static_cast<std::size_t>(Lmax + 1);
+  };
+
+  return dm;
 }
 
 } // namespace models

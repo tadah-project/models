@@ -79,6 +79,8 @@ public:
   suggested_value(const std::string& /*key*/, int /*arg_pos*/) const override {
     return std::nullopt;
   }
+
+  std::optional<DescriptorMeta> meta() const override;
 };
 } // namespace models
 } // namespace tadah

@@ -9,6 +9,7 @@
 #include <tadah/core/logger.h>
 #include <tadah/core/registry.h>
 #include <tadah/models/cut_all.h>
+#include <tadah/models/descriptors/param_meta.h>
 #include <vector>
 #include <bitset>
 
@@ -136,6 +137,21 @@ public:
    */
   virtual std::optional<double>
   suggested_value(const std::string& /*key*/, int /*arg_pos*/) const {
+    return std::nullopt;
+  }
+
+  /** \brief Per-descriptor parameter metadata for the HPO bound-validation
+   *  pipeline (audit, suggester, per-iter health monitor).
+   *
+   *  Default `std::nullopt` means "no metadata supplied" — the audit
+   *  treats the descriptor as opaque (skips block-level health checks
+   *  that depend on metadata) and `suggested_value` (above) remains the
+   *  only optional hint mechanism. Concrete descriptors override this
+   *  method to declare their parameter physics. See the merry-peacock
+   *  plan §"Examples — what `meta()` actually looks like" for canonical
+   *  shapes (D2_LJ scalar, D2_Blip vector, DM_mBlipEnv full).
+   */
+  virtual std::optional<DescriptorMeta> meta() const {
     return std::nullopt;
   }
 

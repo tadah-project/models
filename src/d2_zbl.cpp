@@ -1,4 +1,5 @@
 #include <tadah/models/descriptors/d2/d2_zbl.h>
+#include <tadah/models/descriptors/closed_form_meta.h>
 namespace tadah {
 namespace models {
 
@@ -151,6 +152,10 @@ double D2_ZBL::dphi(double x) const {
 }
 double D2_ZBL::screening_length(int Zi, int Zj) const {
   return (s0 * a0) / (std::pow(Zi, p0) + std::pow(Zj, p1));
+}
+
+std::optional<DescriptorMeta> D2_ZBL::meta() const {
+  return make_closed_form_meta("D2_ZBL", "RCUT2B");
 }
 
 } // namespace models
