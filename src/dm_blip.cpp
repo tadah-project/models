@@ -285,6 +285,196 @@ void DM_Blip::calc_rho(int Zi,int Zj,double rij,double,
   }
 }
 
+/* ------------------------------------------------------------------ *
+ *  drho_i/dtheta — per-pair accumulator (analog of calc_rho)         *
+ * ------------------------------------------------------------------ */
+bool DM_Blip::calc_drhoi_dtheta(
+    const std::string& theta_name,
+    int                arg_pos,
+    const int          Zi,
+    const int          Zj,
+    const double       rij,
+    const double       /*rij_sq*/,
+    const core::Vec3d& v,
+    core::rho_type&    drhoi,
+    const double       scale) const
+{
+  /* Cheap theta-name short-circuit before any pair-level math. */
+  const bool owned = (theta_name == "CGRIDMB" ||
+                      theta_name == "SGRIDMB" ||
+                      theta_name == "RCUTMB"  ||
+                      theta_name == "WATOM");
+  if (!owned) return false;
+
+  if(!is_init_for_atoms(Zi,Zj) || rij>get_rcut()) return false;
+
+  if (theta_name == "WATOM") {
+    /* d(rho)/d WATOM[Z_target] = δ(Zj, Z_target) * poly * B(x_c) * fc(r),
+     * the per-pair calc_rho contribution with weights[Zj] removed. */
+    const int Z_target = get_atom_Z_for_arg_pos(arg_pos);
+    if (Z_target < 1) return false;
+    if (Zj != Z_target) return true;
+
+    const double fc_ij = fcut->calc(rij);
+    const std::size_t ng = cgrid.size();
+    StackOrHeapBuffer<MAX_GRID> buf(ng);
+    precompute_radials(rij, fc_ij, sgrid, cgrid, buf.g(), ng);
+
+    double px[7], py[7], pz[7];
+    precompute_powers(v[0], Lmax, px);
+    precompute_powers(v[1], Lmax, py);
+    precompute_powers(v[2], Lmax, pz);
+
+    std::size_t ii = rfidx;
+    for (int L = 0; L <= Lmax; ++L) {
+      for (std::size_t o = 0; o < orbitals[L].size(); ++o) {
+        const int lx = orbitals[L][o][0],
+                  ly = orbitals[L][o][1],
+                  lz = orbitals[L][o][2];
+        const double poly = px[lx] * py[ly] * pz[lz];
+        for (std::size_t c = 0; c < ng; ++c)
+          drhoi(ii + c) += scale * poly * buf.g()[c];
+        ii += ng;
+      }
+    }
+    return true;
+  }
+
+  const double wj = weights[Zj] * scale;
+  const double fc = fcut->calc(rij);
+
+  const std::size_t ng = cgrid.size();
+  double px[7],py[7],pz[7];
+  precompute_powers(v[0],Lmax,px);
+  precompute_powers(v[1],Lmax,py);
+  precompute_powers(v[2],Lmax,pz);
+
+  if (theta_name == "CGRIDMB") {
+    if (arg_pos < 1 || static_cast<std::size_t>(arg_pos) > ng) return false;
+    const std::size_t k   = static_cast<std::size_t>(arg_pos - 1);
+    const double      mu  = cgrid[k];
+    const double      eta = sgrid[k];
+    const double      xc  = eta * (rij - mu);
+    /* dB/dr_s = -eta dB/dx_c; fc factor multiplies. Use dB(x, 1.0) to
+     * obtain the bare dB/dx_c (eta is the r-chain factor in the existing
+     * dB(x_c, eta) helper, see d_basis_functions.h). */
+    const double      dB_dx = dB(xc, 1.0);
+    const double      dB_dmu_fc = -eta * dB_dx * fc;
+    std::size_t ii = rfidx;
+    for(int L = 0; L <= Lmax; ++L){
+      for(std::size_t o = 0; o < orbitals[L].size(); ++o){
+        const int lx = orbitals[L][o][0],
+                  ly = orbitals[L][o][1],
+                  lz = orbitals[L][o][2];
+        const double poly = px[lx] * py[ly] * pz[lz];
+        drhoi(ii + k) += wj * poly * dB_dmu_fc;
+        ii += ng;
+      }
+    }
+    return true;
+  }
+
+  if (theta_name == "SGRIDMB") {
+    if (arg_pos < 1 || static_cast<std::size_t>(arg_pos) > ng) return false;
+    const std::size_t k   = static_cast<std::size_t>(arg_pos - 1);
+    const double      mu  = cgrid[k];
+    const double      eta = sgrid[k];
+    const double      xc  = eta * (rij - mu);
+    /* dB/deta = (r - mu) dB/dx_c; fc factor multiplies. */
+    const double      dB_dx = dB(xc, 1.0);
+    const double      dB_deta_fc = (rij - mu) * dB_dx * fc;
+    std::size_t ii = rfidx;
+    for(int L = 0; L <= Lmax; ++L){
+      for(std::size_t o = 0; o < orbitals[L].size(); ++o){
+        const int lx = orbitals[L][o][0],
+                  ly = orbitals[L][o][1],
+                  lz = orbitals[L][o][2];
+        const double poly = px[lx] * py[ly] * pz[lz];
+        drhoi(ii + k) += wj * poly * dB_deta_fc;
+        ii += ng;
+      }
+    }
+    return true;
+  }
+
+  if (theta_name == "RCUTMB") {
+    /* RCUTMB enters fc only; B has no direct rcut dependency. */
+    const double dfc = fcut->calc_drcut(rij);
+    if (dfc == 0.0) return false;
+    StackOrHeapBuffer<MAX_GRID> buf(ng);
+    /* B(x_c) * dfc — re-use precompute_radials with dfc playing fc's role. */
+    precompute_radials(rij, dfc, sgrid, cgrid, buf.g(), ng);
+    std::size_t ii = rfidx;
+    for(int L = 0; L <= Lmax; ++L){
+      for(std::size_t o = 0; o < orbitals[L].size(); ++o){
+        const int lx = orbitals[L][o][0],
+                  ly = orbitals[L][o][1],
+                  lz = orbitals[L][o][2];
+        const double poly = px[lx] * py[ly] * pz[lz];
+        for(std::size_t c = 0; c < ng; ++c)
+          drhoi(ii + c) += wj * poly * buf.g()[c];
+        ii += ng;
+      }
+    }
+    return true;
+  }
+
+  return false;
+}
+
+/* ------------------------------------------------------------------ *
+ *  daed/dtheta — per-atom reducer (identical math to DM_EAD)         *
+ * ------------------------------------------------------------------ */
+bool DM_Blip::calc_daed_dtheta(
+    const std::string& theta_name,
+    int                arg_pos,
+    const core::rho_type& rhoi,
+    const core::rho_type& drhoi,
+    core::aed_type&    daed_out,
+    const double       scale) const
+{
+  if (theta_name != "CGRIDMB" && theta_name != "SGRIDMB" &&
+      theta_name != "RCUTMB"  && theta_name != "WATOM")
+    return false;
+
+  const std::size_t ng = cgrid.size();
+  if (ng == 0) return false;
+
+  const bool is_rcut  = (theta_name == "RCUTMB");
+  const bool is_watom = (theta_name == "WATOM");
+  if (!is_rcut && !is_watom) {
+    if (arg_pos < 1 || static_cast<std::size_t>(arg_pos) > ng) return false;
+  }
+
+  const std::size_t k = (is_rcut || is_watom)
+                        ? 0
+                        : static_cast<std::size_t>(arg_pos - 1);
+
+  std::size_t Lshift = 0;
+  std::size_t ii     = rfidx;
+  std::size_t dii    = drfidx;
+
+  for(int L = 0; L <= Lmax; ++L){
+    const double dfac_over_f = is_rcut ? (-static_cast<double>(L) / rc) : 0.0;
+    for(std::size_t o = 0; o < orbitals[L].size(); ++o){
+      const double f = fac[L][o];
+      for(std::size_t c = 0; c < ng; ++c, ++ii, ++dii){
+        const double rho    = rhoi(ii);
+        const double Fprime = rhoi(dii);
+        const double drho   = drhoi(ii);
+        double contrib      = Fprime * drho;
+        if (is_rcut)
+          contrib += (dfac_over_f * f) * rho * rho;
+        if (!is_rcut && !is_watom && c != k)
+          continue;
+        daed_out(c + Lshift + fidx) += scale * contrib;
+      }
+    }
+    Lshift += ng;
+  }
+  return true;
+}
+
 /* ----------------------- rho_i memory ----------------------------- */
 void DM_Blip::init_rhoi(core::rho_type& rhoi)
 {

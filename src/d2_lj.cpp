@@ -73,6 +73,95 @@ void D2_LJ::calc_all(
   fd_ij(fidx,0) = scale*weights[Zj]*(6.0*r6_inv*r2_inv*rij*fc_ij - fcp_ij*r6_inv);
   fd_ij(fidx+1,0) = scale*weights[Zj]*(-12.0*r6_inv*r6_inv*r2_inv*rij*fc_ij + fcp_ij*r6_inv*r6_inv);
 }
+bool D2_LJ::calc_dDdtheta(
+  const std::string& theta_name,
+  int                arg_pos,
+  const int          Zi,
+  const int          Zj,
+  const double       rij,
+  const double       rij_sq,
+  tadah::core::aed_type& dD_buf,
+  const double       scale) const
+{
+  if (!is_init_for_atoms(Zi, Zj) || rij > get_rcut()) return false;
+
+  if (theta_name == "RCUT2B") {
+    const double dfc = fcut->calc_drcut(rij);
+    if (dfc == 0.0) return false;  // discontinuous cutoff; caller FD-falls-back
+    const double r2_inv = 1.0 / rij_sq;
+    const double r6_inv = r2_inv * r2_inv * r2_inv;
+    dD_buf(fidx)     -= scale * weights[Zj] * r6_inv          * dfc;
+    dD_buf(fidx + 1) += scale * weights[Zj] * r6_inv * r6_inv * dfc;
+    return true;
+  }
+
+  if (theta_name == "WATOM") {
+    // d(aed(fidx))   /d WATOM[Z_target] = δ(Zj, Z_target) * (-r^-6  * fc)
+    // d(aed(fidx+1)) /d WATOM[Z_target] = δ(Zj, Z_target) * ( r^-12 * fc)
+    // Unweighted calc_aed contribution.
+    const int Z_target = get_atom_Z_for_arg_pos(arg_pos);
+    if (Z_target < 1) return false;
+    if (Zj == Z_target) {
+      const double r2_inv = 1.0 / rij_sq;
+      const double r6_inv = r2_inv * r2_inv * r2_inv;
+      const double fc_ij  = fcut->calc(rij);
+      dD_buf(fidx)     -= scale * r6_inv          * fc_ij;
+      dD_buf(fidx + 1) += scale * r6_inv * r6_inv * fc_ij;
+    }
+    return true;
+  }
+
+  return false;  // not owned by this descriptor
+}
+
+bool D2_LJ::calc_dXijdri_dtheta(
+  const std::string& theta_name,
+  int                arg_pos,
+  const int          Zi,
+  const int          Zj,
+  const double       rij,
+  const double       rij_sq,
+  tadah::core::fd_type& dfd_ij,
+  const double       scale) const
+{
+  if (!is_init_for_atoms(Zi, Zj) || rij > get_rcut()) return false;
+
+  if (theta_name == "RCUT2B") {
+    const double dfc  = fcut->calc_drcut(rij);
+    const double dfcp = fcut->calc_prime_drcut(rij);
+    if (dfc == 0.0 && dfcp == 0.0) return false;   // Cut_Dummy fallback
+    const double r2_inv = 1.0 / rij_sq;
+    const double r6_inv = r2_inv * r2_inv * r2_inv;
+    // d/d rcut of fd(fidx,0)   = w(Zj) * ( 6 r^-7 * dfc - r^-6  * dfcp)
+    // d/d rcut of fd(fidx+1,0) = w(Zj) * (-12 r^-13 * dfc + r^-12 * dfcp)
+    const double val6  =  6.0 * r6_inv * r2_inv * rij * dfc - dfcp * r6_inv;
+    const double val12 = -12.0 * r6_inv * r6_inv * r2_inv * rij * dfc + dfcp * r6_inv * r6_inv;
+    dfd_ij(fidx,     0) += scale * weights[Zj] * val6;
+    dfd_ij(fidx + 1, 0) += scale * weights[Zj] * val12;
+    return true;
+  }
+
+  if (theta_name == "WATOM") {
+    // Force-side WATOM[Z_target] derivative — unweighted force-radial
+    // contribution (calc_dXijdri output with weights[Zj] removed).
+    const int Z_target = get_atom_Z_for_arg_pos(arg_pos);
+    if (Z_target < 1) return false;
+    if (Zj == Z_target) {
+      const double r2_inv = 1.0 / rij_sq;
+      const double r6_inv = r2_inv * r2_inv * r2_inv;
+      const double fc_ij  = fcut->calc(rij);
+      const double fcp_ij = fcut->calc_prime(rij);
+      dfd_ij(fidx,     0) +=
+        scale * ( 6.0 * r6_inv * r2_inv * rij * fc_ij - fcp_ij * r6_inv);
+      dfd_ij(fidx + 1, 0) +=
+        scale * (-12.0 * r6_inv * r6_inv * r2_inv * rij * fc_ij + fcp_ij * r6_inv * r6_inv);
+    }
+    return true;
+  }
+
+  return false;
+}
+
 std::string D2_LJ::label() const {
   return lab;
 }

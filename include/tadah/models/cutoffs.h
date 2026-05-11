@@ -19,6 +19,25 @@ class Cut_Base {
         virtual void set_rcut(const double r)=0;
         virtual double get_rcut_sq()=0;
         virtual double calc_prime(double r)=0;
+        /** Closed-form derivative of f_c(r) with respect to r_cut.
+         *
+         * Used by HPO analytical / hybrid gradients to chain RCUT2B /
+         * RCUT_MB through descriptors that consume the cutoff. Default
+         * is 0 (Cut_Dummy is piecewise-constant in rcut almost
+         * everywhere). Smooth cutoffs override.
+         */
+        virtual double calc_drcut(double /*r*/) { return 0.0; }
+        /** Closed-form mixed derivative d(df_c/dr)/d r_cut, at fixed r.
+         *
+         * Required by force-row chain rule in HPO analytical / hybrid
+         * gradients: d2_base::calc_dXijdri (the radial force-descriptor
+         * coefficient) is a product G * f_c'(r) + ... so chaining RCUT
+         * through the force chain needs d(f_c'(r))/d rcut on top of
+         * df_c/d rcut already exposed via calc_drcut. Default is 0
+         * (Cut_Dummy's calc_prime is identically zero). Smooth cutoffs
+         * override.
+         */
+        virtual double calc_prime_drcut(double /*r*/) { return 0.0; }
         void test_rcut(const double r);
         /** Behavioural kind; drives test dispatch without string comparisons. */
         virtual Kind kind() const { return Kind::Standard; }
@@ -103,6 +122,8 @@ class Cut_Cos : public Cut_Base {
         double get_rcut_sq();
         double calc(double r);
         double calc_prime(double r);
+        double calc_drcut(double r) override;
+        double calc_prime_drcut(double r) override;
 };
 
 /**
@@ -137,6 +158,8 @@ class Cut_Tanh : public Cut_Base {
         double get_rcut_sq();
         double calc(double r);
         double calc_prime(double r);
+        double calc_drcut(double r) override;
+        double calc_prime_drcut(double r) override;
 };
 
 /**
@@ -179,6 +202,8 @@ class Cut_PolyS : public Cut_Base {
         double get_rcut_sq();
         double calc(double r);
         double calc_prime(double r);
+        double calc_drcut(double r) override;
+        double calc_prime_drcut(double r) override;
 };
 /**
  * @class Cut_Poly
@@ -220,6 +245,8 @@ class Cut_Poly : public Cut_Base {
         double get_rcut_sq();
         double calc(double r);
         double calc_prime(double r);
+        double calc_drcut(double r) override;
+        double calc_prime_drcut(double r) override;
 };
 /**
  * @class Cut_CosS
@@ -274,6 +301,8 @@ class Cut_CosS : public Cut_Base {
         double get_rcut_sq();
         double calc(double r);
         double calc_prime(double r);
+        double calc_drcut(double r) override;
+        double calc_prime_drcut(double r) override;
 };
 /**
  * @class Cut_PT
@@ -313,6 +342,8 @@ class Cut_PT : public Cut_Base {
         double calc(double r);
 
         double calc_prime(double r);
+        double calc_drcut(double r) override;
+        double calc_prime_drcut(double r) override;
 };
 
 /* @class Cut_SinInv
@@ -342,11 +373,18 @@ class Cut_SinInv : public Cut_Base {
         double get_rcut_sq();
         double calc(double r);
         double calc_prime(double r);
+        double calc_drcut(double r) override;
+        double calc_prime_drcut(double r) override;
         // Const overloads — F_mEnv::calc_F/calc_dF call calc/calc_prime
         // through a const member, so the underlying envelope must be
-        // callable on a const Cut_SinInv as well.
+        // callable on a const Cut_SinInv as well. F_mEnv::calc_dF_dtheta
+        // adds calc_drcut to the same const-callable surface for the
+        // RCUTENV chain; calc_prime_drcut is added for the analogous
+        // F_mEnv::calc_dFp_dtheta force-side chain.
         double calc(double r) const;
         double calc_prime(double r) const;
+        double calc_drcut(double r) const;
+        double calc_prime_drcut(double r) const;
         Kind kind() const override { return Kind::Inverse; }
         double val_at_rcut() const override { return 1.0; }
 };

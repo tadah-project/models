@@ -70,6 +70,15 @@ public:
    *  between iters but the descriptor object is reused. */
   void refresh_atom_weights(const tadah::core::Context &c);
 
+  /** Resolve a 1-based WATOM arg_pos (matching `OPTIM WATOM (n)`) to the
+   *  atomic number Z of the n-th ATOM entry in the context that last
+   *  populated `weights[]`. Returns 0 when arg_pos is out of range or
+   *  the ATOM list was never populated (no context constructor / no
+   *  refresh_atom_weights call). Used by calc_dDdtheta /
+   *  calc_dXijdri_dtheta / calc_drhoi_dtheta WATOM branches to test
+   *  whether a per-pair contribution belongs to the optimised species. */
+  int get_atom_Z_for_arg_pos(int arg_pos) const;
+
   /** \brief Print grid to the log.
    *
    * @param v Vector to print.
@@ -159,6 +168,11 @@ private:
 
   bool manage_memory=false; // who owns fcut
   Bitset2D init_for_atoms_map;  // 0th is unused
+
+  /* Z values in ATOM-list order, populated by refresh_atom_weights.
+   * Empty when the descriptor was default-constructed (no Context).
+   * `OPTIM WATOM (n)` resolves to `watom_Z_by_arg_pos[n-1]`. */
+  std::vector<int> watom_Z_by_arg_pos;
 };
 } // namespace models
 } // namespace tadah

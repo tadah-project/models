@@ -1,4 +1,4 @@
-file(GLOB tests_src "*.cpp")
+file(GLOB tests_src CONFIGURE_DEPENDS "*.cpp")
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/tests_data DESTINATION .)
 
 add_executable(test_models ${tests_src})

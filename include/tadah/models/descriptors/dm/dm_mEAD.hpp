@@ -500,6 +500,632 @@ template <typename F>
   }
 
 /* ================================================================== *
+ *  calc_drhoi_dtheta — closed-form drho_i/dtheta for the radial side
+ *  (CGRIDMB[k], SGRIDMB[k], RCUTMB). Mirrors DM_EAD::calc_drhoi_dtheta
+ *  byte-for-byte: the density rho is a radial-GTO sum that does NOT
+ *  depend on the embedding function F, so the same chain rule covers
+ *  every DM_mEAD<F> instantiation.
+ * ================================================================== */
+template <typename F>
+bool DM_mEAD<F>::calc_drhoi_dtheta(
+    const std::string& theta_name,
+    int                arg_pos,
+    const int          Zi,
+    const int          Zj,
+    const double       rij,
+    const double       /*rij_sq*/,
+    const tadah::core::Vec3d& v,
+    tadah::core::rho_type&    drhoi,
+    const double       scale) const
+{
+  const bool owned = (theta_name == "CGRIDMB" ||
+                      theta_name == "SGRIDMB" ||
+                      theta_name == "RCUTMB"  ||
+                      theta_name == "WATOM");
+  if (!owned) return false;
+
+  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return false;
+
+  if (theta_name == "WATOM") {
+    /* d(rho)/d WATOM[Z_target] = δ(Zj, Z_target) * poly * G(r;eta,mu) * fc(r),
+     * the per-pair calc_rho contribution with weights[Zj] removed.
+     * Claim ownership on every valid pair so structures without
+     * Z_target atoms still report analytical (zero) rather than FD. */
+    const int Z_target = get_atom_Z_for_arg_pos(arg_pos);
+    if (Z_target < 1) return false;
+    if (Zj != Z_target) return true;
+
+    const double fc_ij = fcut->calc(rij);
+    const std::size_t ng_w = cgrid.size();
+    detail::StackOrHeapBuffer<MAX_GRID> buf_w(ng_w);
+    precompute_radials(rij, fc_ij, sgrid, cgrid, buf_w.g(), ng_w);
+
+    double pxw[7], pyw[7], pzw[7];
+    precompute_powers(v[0], Lmax, pxw);
+    precompute_powers(v[1], Lmax, pyw);
+    precompute_powers(v[2], Lmax, pzw);
+
+    std::size_t ii_w = rfidx;
+    for (int L = 0; L <= Lmax; ++L) {
+      for (std::size_t o = 0; o < orbitals[L].size(); ++o) {
+        const int lx = orbitals[L][o][0],
+                  ly = orbitals[L][o][1],
+                  lz = orbitals[L][o][2];
+        const double poly = pxw[lx] * pyw[ly] * pzw[lz];
+        for (std::size_t c = 0; c < ng_w; ++c)
+          drhoi(ii_w + c) += scale * poly * buf_w.g()[c];
+        ii_w += ng_w;
+      }
+    }
+    return true;
+  }
+
+  const double wj = weights[Zj] * scale;
+  const double fc = fcut->calc(rij);
+  const std::size_t ng = cgrid.size();
+
+  double px[7], py[7], pz[7];
+  precompute_powers(v[0], Lmax, px);
+  precompute_powers(v[1], Lmax, py);
+  precompute_powers(v[2], Lmax, pz);
+
+  if (theta_name == "CGRIDMB") {
+    if (arg_pos < 1 || static_cast<std::size_t>(arg_pos) > ng) return false;
+    const std::size_t k   = static_cast<std::size_t>(arg_pos - 1);
+    const double      mu  = cgrid[k];
+    const double      eta = sgrid[k];
+    const double      g       = std::exp(-eta * (rij - mu) * (rij - mu)) * fc;
+    const double      dG_dmu  = 2.0 * eta * (rij - mu) * g;
+    std::size_t ii = rfidx;
+    for (int L = 0; L <= Lmax; ++L) {
+      for (std::size_t o = 0; o < orbitals[L].size(); ++o) {
+        const int lx = orbitals[L][o][0],
+                  ly = orbitals[L][o][1],
+                  lz = orbitals[L][o][2];
+        const double poly = px[lx] * py[ly] * pz[lz];
+        drhoi(ii + k) += wj * poly * dG_dmu;
+        ii += ng;
+      }
+    }
+    return true;
+  }
+
+  if (theta_name == "SGRIDMB") {
+    if (arg_pos < 1 || static_cast<std::size_t>(arg_pos) > ng) return false;
+    const std::size_t k   = static_cast<std::size_t>(arg_pos - 1);
+    const double      mu  = cgrid[k];
+    const double      eta = sgrid[k];
+    const double      g        = std::exp(-eta * (rij - mu) * (rij - mu)) * fc;
+    const double      dG_deta  = -(rij - mu) * (rij - mu) * g;
+    std::size_t ii = rfidx;
+    for (int L = 0; L <= Lmax; ++L) {
+      for (std::size_t o = 0; o < orbitals[L].size(); ++o) {
+        const int lx = orbitals[L][o][0],
+                  ly = orbitals[L][o][1],
+                  lz = orbitals[L][o][2];
+        const double poly = px[lx] * py[ly] * pz[lz];
+        drhoi(ii + k) += wj * poly * dG_deta;
+        ii += ng;
+      }
+    }
+    return true;
+  }
+
+  if (theta_name == "RCUTMB") {
+    const double dfc = fcut->calc_drcut(rij);
+    if (dfc == 0.0) return false;
+    StackOrHeapBuffer<MAX_GRID> buf(ng);
+    /* Reuse the bare radial precomputer with dfc playing fc's role. */
+    precompute_radials(rij, dfc, sgrid, cgrid, buf.g(), ng);
+    std::size_t ii = rfidx;
+    for (int L = 0; L <= Lmax; ++L) {
+      for (std::size_t o = 0; o < orbitals[L].size(); ++o) {
+        const int lx = orbitals[L][o][0],
+                  ly = orbitals[L][o][1],
+                  lz = orbitals[L][o][2];
+        const double poly = px[lx] * py[ly] * pz[lz];
+        for (std::size_t c = 0; c < ng; ++c)
+          drhoi(ii + c) += wj * poly * buf.g()[c];
+        ii += ng;
+      }
+    }
+    return true;
+  }
+
+  return false;
+}
+
+/* ================================================================== *
+ *  calc_daed_dtheta — closed-form daed/dtheta. Handles both the
+ *  expands_dimensions path (F_Blip / F_mEnv: single radial, odim
+ *  outputs per orbital from the embedding-function grid) and the
+ *  standard path (ng outputs per orbital, one F invocation per cgrid
+ *  index). Chain rule:
+ *
+ *    daed_p/dtheta = f[L,o] * (dF/drho)(rho, p) * drho/dtheta
+ *                  + (df[L,o]/dtheta) * F(rho, p)
+ *
+ *  with df[L,o]/dRCUTMB = -L/rc * f[L,o] (and zero for CGRIDMB/SGRIDMB).
+ * ================================================================== */
+template <typename F>
+bool DM_mEAD<F>::calc_daed_dtheta(
+    const std::string& theta_name,
+    int                arg_pos,
+    const tadah::core::rho_type& rhoi,
+    const tadah::core::rho_type& drhoi,
+    tadah::core::aed_type&       daed_out,
+    const double       scale) const
+{
+  const bool radial = (theta_name == "CGRIDMB" ||
+                       theta_name == "SGRIDMB" ||
+                       theta_name == "RCUTMB");
+  const bool is_watom = (theta_name == "WATOM");
+
+  const std::size_t ng = cgrid.size();
+  if (ng == 0) return false;
+
+  if (!radial && !is_watom) {
+    /* Embedding-side theta — try delegating to F. rho doesn't depend
+     * on these (drhoi side comes through as zero from the walker's
+     * skipped calc_drhoi_dtheta path), so the chain rule simplifies
+     * to daed_p = scale * f[L,o] * dF/dtheta. F decides ownership;
+     * component-local theta (CEMBFUNC[i] / SEMBFUNC[i] for F_Blip /
+     * F_mEnv) return false on p != i-1. */
+    bool any_contrib = false;
+    if constexpr (F::expands_dimensions) {
+      std::size_t Lshift = 0;
+      std::size_t ii_rho = rfidx;
+      for (int L = 0; L <= Lmax; ++L) {
+        for (std::size_t o = 0; o < orbitals[L].size(); ++o) {
+          const double f   = fac[L][o];
+          const double rho = rhoi(ii_rho);
+          ++ii_rho;
+          for (std::size_t p = 0; p < odim; ++p) {
+            double dFdtheta = 0.0;
+            if (!emb.calc_dF_dtheta(rho, p, theta_name, arg_pos, dFdtheta))
+              continue;
+            daed_out(p + Lshift + fidx) += scale * f * dFdtheta;
+            any_contrib = true;
+          }
+        }
+        Lshift += odim;
+      }
+    } else {
+      /* Standard path — ng == odim, one rho per output channel. */
+      std::size_t Lshift = 0;
+      std::size_t ii     = rfidx;
+      for (int L = 0; L <= Lmax; ++L) {
+        for (std::size_t o = 0; o < orbitals[L].size(); ++o) {
+          const double f = fac[L][o];
+          for (std::size_t c = 0; c < ng; ++c, ++ii) {
+            const double rho = rhoi(ii);
+            double dFdtheta = 0.0;
+            if (!emb.calc_dF_dtheta(rho, c, theta_name, arg_pos, dFdtheta))
+              continue;
+            daed_out(c + Lshift + fidx) += scale * f * dFdtheta;
+            any_contrib = true;
+          }
+        }
+        Lshift += ng;
+      }
+    }
+    return any_contrib;
+  }
+
+  /* CGRIDMB[k]/SGRIDMB[k] are component-local and validate arg_pos
+   * here. RCUTMB fans out across every c (no arg_pos to validate).
+   * WATOM also fans out — its arg_pos validation against the ATOM list
+   * already happened in calc_drhoi_dtheta. */
+  if (radial && theta_name != "RCUTMB") {
+    if (arg_pos < 1 || static_cast<std::size_t>(arg_pos) > ng) return false;
+  }
+
+  const bool        is_rcut = (theta_name == "RCUTMB");
+  const std::size_t k       = (is_rcut || is_watom)
+                              ? 0
+                              : static_cast<std::size_t>(arg_pos - 1);
+
+  if constexpr (F::expands_dimensions) {
+    /* expanding path (F_Blip / F_mEnv): ng == 1 enforced by F's ctor,
+     * so the orbital ρ-stride is 1; the aed has odim outputs per orbital. */
+    std::size_t Lshift = 0;
+    std::size_t ii_rho = rfidx;
+    for (int L = 0; L <= Lmax; ++L) {
+      /* WATOM does not enter f[L,o], so dfac=0 for it. */
+      const double dfac_over_f = is_rcut ? (-static_cast<double>(L) / rc) : 0.0;
+      for (std::size_t o = 0; o < orbitals[L].size(); ++o) {
+        const double f    = fac[L][o];
+        const double rho  = rhoi(ii_rho);
+        const double drho = drhoi(ii_rho);
+        ++ii_rho;
+        for (std::size_t p = 0; p < odim; ++p) {
+          const double FF  = emb.calc_F (rho, p);
+          const double dFF = emb.calc_dF(rho, p);
+          double contrib = f * dFF * drho;
+          if (is_rcut) contrib += (dfac_over_f * f) * FF;
+          daed_out(p + Lshift + fidx) += scale * contrib;
+        }
+      }
+      Lshift += odim;
+    }
+  } else {
+    /* standard path: ng outputs per orbital, one F invocation per cgrid
+     * index. CGRIDMB[k]/SGRIDMB[k] are component-local (only c==k
+     * contributes); RCUTMB and WATOM both fan out across every c. */
+    std::size_t Lshift = 0;
+    std::size_t ii     = rfidx;
+    for (int L = 0; L <= Lmax; ++L) {
+      const double dfac_over_f = is_rcut ? (-static_cast<double>(L) / rc) : 0.0;
+      for (std::size_t o = 0; o < orbitals[L].size(); ++o) {
+        const double f = fac[L][o];
+        for (std::size_t c = 0; c < ng; ++c, ++ii) {
+          if (!is_rcut && !is_watom && c != k) continue;
+          const double rho  = rhoi(ii);
+          const double drho = drhoi(ii);
+          const double FF   = emb.calc_F (rho, c);
+          const double dFF  = emb.calc_dF(rho, c);
+          double contrib = f * dFF * drho;
+          if (is_rcut) contrib += (dfac_over_f * f) * FF;
+          daed_out(c + Lshift + fidx) += scale * contrib;
+        }
+      }
+      Lshift += ng;
+    }
+  }
+  return true;
+}
+
+/* ================================================================== *
+ *  calc_dXijdri_dtheta — closed-form d(fd_ij)/dtheta for the
+ *  many-body force descriptor. Mirrors calc_dXijdri's loop shape with
+ *  the chain rule applied at every layer: radial (g, dg), embedding
+ *  (F', F''), and the per-L multinomial prefactor f[L,o]. See the
+ *  class-level doc-comment in dm_mEAD.h for the math.
+ *
+ *  Implementation notes:
+ *   - Mirrors calc_dXijdri's scaling convention: fc, fcp are pre-scaled
+ *     by (scale * weights[Zj]) before entering the orbital loop. The
+ *     resulting dg/dθ, ddg/dθ inherit that scaling, so the closed-form
+ *     output drops into the walker without extra multipliers.
+ *   - Radial θ: needs F'' via F::calc_d2F (false ⇒ unowned for the
+ *     radial branch). Embedding θ: F::calc_dFp_dtheta with rho fixed.
+ *   - The walker pre-pass populates rhoi[drfidx..] = f[L,o] * F'(rho_i)
+ *     (via calc_aed) and drhoi_dtheta[rfidx..] = drho_i/dθ (via
+ *     calc_drhoi_dtheta). For embedding θ, drhoi_dtheta is zero and
+ *     the F''*drho/dθ branch contributes 0.
+ * ================================================================== */
+template <typename F>
+bool DM_mEAD<F>::calc_dXijdri_dtheta(
+    const std::string& theta_name,
+    int                arg_pos,
+    const int          Zi,
+    const int          Zj,
+    const double       rij,
+    const double       /*rij_sq*/,
+    const tadah::core::Vec3d& v,
+    const tadah::core::rho_type& rhoi,
+    const tadah::core::rho_type& drhoi_dtheta,
+    tadah::core::fd_type& fd_ij,
+    const double       scale) const
+{
+  const bool radial = (theta_name == "CGRIDMB" ||
+                       theta_name == "SGRIDMB" ||
+                       theta_name == "RCUTMB");
+  const bool is_rcut  = (theta_name == "RCUTMB");
+  const bool is_watom = (theta_name == "WATOM");
+  /* CEMBFUNC / SEMBFUNC / RCUTENV are F-side. Any other key is
+   * unowned. */
+  const bool embedding = (theta_name == "CEMBFUNC" ||
+                          theta_name == "SEMBFUNC" ||
+                          theta_name == "RCUTENV");
+  if (!radial && !embedding && !is_watom) return false;
+
+  if (!is_init_for_atoms(Zi, Zj) || rij > get_rcut()) return false;
+
+  const std::size_t ng = cgrid.size();
+  if (ng == 0) return false;
+
+  if (radial && !is_rcut) {
+    if (arg_pos < 1 || static_cast<std::size_t>(arg_pos) > ng) return false;
+  }
+
+  /* WATOM resolution: arg_pos -> Z_target via the ATOM list captured by
+   * refresh_atom_weights. Out-of-range arg_pos is a configuration error
+   * — route to FD. */
+  int Z_target_w = 0;
+  if (is_watom) {
+    Z_target_w = get_atom_Z_for_arg_pos(arg_pos);
+    if (Z_target_w < 1) return false;
+  }
+
+  const double x  = v[0], y = v[1], z = v[2];
+  const double wj = weights[Zj];
+  const double sc_wj = scale * wj;
+
+  const double fc_unscaled  = fcut->calc       (rij);
+  const double fcp_unscaled = fcut->calc_prime (rij);
+  const double fc  = sc_wj * fc_unscaled;   /* matches calc_dXijdri */
+  const double fcp = sc_wj * fcp_unscaled;
+  const double rinv = 1.0 / rij;
+
+  /* Radial pre-pass: g, dg at every c, plus dg/dθ, ddg/dθ for the
+   * radial branch (zero for embedding-θ; we still allocate the buffers
+   * to keep the loop body uniform). */
+  detail::StackOrHeapBuffer<MAX_GRID> buf(ng);
+  /* Hand-rolled per-c θ-derivative scratch (small, lives on stack via
+   * std::array — bounded by MAX_GRID = 64). */
+  std::array<double, 64> dg_dtheta_arr{};
+  std::array<double, 64> ddg_dtheta_arr{};
+  for (std::size_t c = 0; c < ng; ++c) {
+    dg_dtheta_arr[c]  = 0.0;
+    ddg_dtheta_arr[c] = 0.0;
+  }
+
+  precompute_radials(rij, fc, fcp, sgrid, cgrid, buf.g(), buf.dg(), ng);
+
+  if (is_watom && Zj == Z_target_w) {
+    /* d(g_full)/dW[Z_target] when Zj == Z_target = scale * E * fc_unscaled
+     *    (the scale*wj factor in buf.g differentiates to scale*1)
+     * d(dg_full)/dW[Z_target] = scale * E * (-2*eta*rm*fc_unscaled + fcp_unscaled)
+     * Fans out across all c. For Zj != Z_target_w the arrays stay zero. */
+    for (std::size_t c = 0; c < ng; ++c) {
+      const double eta = sgrid[c];
+      const double mu  = cgrid[c];
+      const double rm  = rij - mu;
+      const double E   = std::exp(-eta * rm * rm);
+      dg_dtheta_arr[c]  = scale * E * fc_unscaled;
+      ddg_dtheta_arr[c] = scale * E * (-2.0 * eta * rm * fc_unscaled + fcp_unscaled);
+    }
+  }
+
+  if (radial) {
+    const std::size_t k = is_rcut ? 0
+                                  : static_cast<std::size_t>(arg_pos - 1);
+
+    if (theta_name == "CGRIDMB") {
+      const double eta = sgrid[k];
+      const double mu  = cgrid[k];
+      const double rm  = rij - mu;
+      const double g_k  = buf.g ()[k];
+      const double dg_k = buf.dg()[k];
+      /* d/dmu of E*fc = (2*eta*rm) * E*fc = 2*eta*rm * g_k.
+       * d/dmu of E*(-2*eta*rm*fc + fcp) =
+       *   dE/dmu * X + E * dX/dmu
+       *   = 2*eta*rm * dg_k + 2*eta * g_k     (E*fc = g_k, E*X = dg_k) */
+      dg_dtheta_arr[k]  = 2.0 * eta * rm * g_k;
+      ddg_dtheta_arr[k] = 2.0 * eta * (rm * dg_k + g_k);
+    } else if (theta_name == "SGRIDMB") {
+      const double mu  = cgrid[k];
+      const double rm  = rij - mu;
+      const double g_k  = buf.g ()[k];
+      const double dg_k = buf.dg()[k];
+      /* d/deta of E*fc = -rm^2 * g_k.
+       * d/deta of E*X (X = -2 eta rm fc + fcp) =
+       *   -rm^2 * dg_k + E * (-2 rm fc)
+       *   = -rm^2 * dg_k - 2 rm * g_k          (E*fc = g_k) */
+      dg_dtheta_arr[k]  = -rm * rm * g_k;
+      ddg_dtheta_arr[k] = -rm * rm * dg_k - 2.0 * rm * g_k;
+    } else { /* RCUTMB */
+      const double dfc  = sc_wj * fcut->calc_drcut(rij);
+      const double dfcp = sc_wj * fcut->calc_prime_drcut(rij);
+      if (dfc == 0.0 && dfcp == 0.0) {
+        /* Discontinuous cutoff (Cut_Dummy) — analytical RCUTMB chain
+         * collapses to zero everywhere except r=rcut. Return false so
+         * the orchestrator routes to FD. */
+        return false;
+      }
+      for (std::size_t c = 0; c < ng; ++c) {
+        const double eta = sgrid[c];
+        const double mu  = cgrid[c];
+        const double rm  = rij - mu;
+        const double E   = std::exp(-eta * rm * rm);
+        dg_dtheta_arr[c]  = E * dfc;
+        ddg_dtheta_arr[c] = E * (-2.0 * eta * rm * dfc + dfcp);
+      }
+    }
+  }
+
+  /* Cartesian powers and gradients (parallel to calc_dXijdri). */
+  double px[7], py[7], pz[7], dpx[7], dpy[7], dpz[7];
+  detail::precompute_powers(x, Lmax, px, dpx);
+  detail::precompute_powers(y, Lmax, py, dpy);
+  detail::precompute_powers(z, Lmax, pz, dpz);
+
+  bool any_contrib = false;
+
+  if constexpr (F::expands_dimensions) {
+    /* Expanding path (F_Blip / F_mEnv, ng==1, odim outputs per orbital). */
+    std::size_t Lshift   = 0;
+    std::size_t ii_rho   = rfidx;       /* index into rho (one per orbital) */
+    std::size_t ii_drho  = drfidx;      /* index into rhoi[F'(rho)] storage */
+
+    for (int L = 0; L <= Lmax; ++L) {
+      const double dfac_over_f = (radial && is_rcut)
+                                 ? (-static_cast<double>(L) / rc)
+                                 : 0.0;
+
+      for (std::size_t o = 0; o < orbitals[L].size(); ++o) {
+        const int lx = orbitals[L][o][0],
+                  ly = orbitals[L][o][1],
+                  lz = orbitals[L][o][2];
+
+        const double pxij = px[lx], pyij = py[ly], pzij = pz[lz];
+        const double pqrij = pxij * pyij * pzij;
+        const double txij  = dpx[lx] * pyij * pzij;
+        const double tyij  = dpy[ly] * pxij * pzij;
+        const double tzij  = dpz[lz] * pyij * pxij;
+
+        const double f   = fac[L][o];
+        const double rho = rhoi(ii_rho);
+        const double drho = (radial || is_watom) ? drhoi_dtheta(ii_rho) : 0.0;
+        ++ii_rho;
+
+        /* Single radial (ng==1). */
+        const double g_0  = buf.g ()[0];
+        const double dg_0 = buf.dg()[0];
+        const double Bx_0 = g_0 * txij + dg_0 * pqrij * rinv * x;
+        const double By_0 = g_0 * tyij + dg_0 * pqrij * rinv * y;
+        const double Bz_0 = g_0 * tzij + dg_0 * pqrij * rinv * z;
+
+        double dg_t_0 = 0.0, ddg_t_0 = 0.0;
+        if (radial || is_watom) {
+          dg_t_0  = dg_dtheta_arr [0];
+          ddg_t_0 = ddg_dtheta_arr[0];
+        }
+        const double dBx_0 = dg_t_0 * txij + ddg_t_0 * pqrij * rinv * x;
+        const double dBy_0 = dg_t_0 * tyij + ddg_t_0 * pqrij * rinv * y;
+        const double dBz_0 = dg_t_0 * tzij + ddg_t_0 * pqrij * rinv * z;
+
+        for (std::size_t p = 0; p < odim; ++p, ++ii_drho) {
+          /* rhoi(ii_drho) = f * F'(rho, p)  (populated by calc_aed). */
+          const double f_Fp = rhoi(ii_drho);
+          /* d(f_Fp)/dθ = (df/dθ) * F' + f * F''(rho) * drho/dθ  (radial/WATOM)
+           *            = f * (∂F'/∂θ|rho fixed)                  (embedding) */
+          double d_f_Fp_dtheta = 0.0;
+
+          if (radial || is_watom) {
+            /* F' chain term: f * F''(rho) * drho/dθ. Always attempt the
+             * F'' lookup so the function fails fast when F has no
+             * analytical F'' (e.g. F_mEnv, F_RLR). */
+            double d2F = 0.0;
+            if (!emb.calc_d2F(rho, p, d2F)) return false;
+            if (drho != 0.0) {
+              d_f_Fp_dtheta += f * d2F * drho;
+            }
+            /* RCUTMB-only fac-term: (df/dRCUTMB) * F'. WATOM doesn't
+             * enter f[L,o], so this fires only for RCUTMB. */
+            if (is_rcut) {
+              const double Fp = emb.calc_dF(rho, p);
+              d_f_Fp_dtheta += (dfac_over_f * f) * Fp;
+            }
+          } else { /* embedding */
+            double dFp_dtheta = 0.0;
+            if (!emb.calc_dFp_dtheta(rho, p, theta_name, arg_pos, dFp_dtheta))
+              continue;
+            d_f_Fp_dtheta = f * dFp_dtheta;
+          }
+
+          any_contrib = true;
+
+          const std::size_t row = p + Lshift + fidx;
+          if (radial || is_watom) {
+            /* d(fd_ij)/dθ =
+             *      (d(f_Fp)/dθ) * term_k          (F'/fac chain)
+             *    + f_Fp * d(term_k)/dθ            (radial g/dg chain or
+             *                                      WATOM direct-factor)
+             *
+             * Always include both branches — the f_Fp * d(term_k)/dθ
+             * piece contributes even when drho == 0 (e.g. orbital with
+             * vanishing polynomial at this cluster geometry, or WATOM
+             * with Zj == Z_target on a pair where drho_i happens to be
+             * zero for this orbital). */
+            fd_ij(row, 0) += d_f_Fp_dtheta * Bx_0 + f_Fp * dBx_0;
+            fd_ij(row, 1) += d_f_Fp_dtheta * By_0 + f_Fp * dBy_0;
+            fd_ij(row, 2) += d_f_Fp_dtheta * Bz_0 + f_Fp * dBz_0;
+          } else {
+            /* d(term_k)/dθ_emb = 0; only the F' chain contributes. */
+            fd_ij(row, 0) += d_f_Fp_dtheta * Bx_0;
+            fd_ij(row, 1) += d_f_Fp_dtheta * By_0;
+            fd_ij(row, 2) += d_f_Fp_dtheta * Bz_0;
+          }
+        }
+      }
+      Lshift += odim;
+    }
+  } else {
+    /* Standard path (ng == odim, one rho per output channel). For
+     * radial θ != RCUTMB, the chain is component-local on c == k;
+     * RCUTMB fans out. */
+    std::size_t Lshift = 0;
+    std::size_t ii     = rfidx;
+    std::size_t dii    = drfidx;
+
+    /* For radial theta, k is the component index (0-based). */
+    const std::size_t kc = (radial && !is_rcut)
+                           ? static_cast<std::size_t>(arg_pos - 1)
+                           : 0;
+
+    for (int L = 0; L <= Lmax; ++L) {
+      const double dfac_over_f = (radial && is_rcut)
+                                 ? (-static_cast<double>(L) / rc)
+                                 : 0.0;
+
+      for (std::size_t o = 0; o < orbitals[L].size(); ++o) {
+        const int lx = orbitals[L][o][0],
+                  ly = orbitals[L][o][1],
+                  lz = orbitals[L][o][2];
+
+        const double pxij = px[lx], pyij = py[ly], pzij = pz[lz];
+        const double pqrij = pxij * pyij * pzij;
+        const double txij  = dpx[lx] * pyij * pzij;
+        const double tyij  = dpy[ly] * pxij * pzij;
+        const double tzij  = dpz[lz] * pyij * pxij;
+
+        const double f = fac[L][o];
+
+        for (std::size_t c = 0; c < ng; ++c, ++ii, ++dii) {
+          const double rho  = rhoi(ii);
+          const double drho = (radial || is_watom) ? drhoi_dtheta(ii) : 0.0;
+
+          const double g_c  = buf.g ()[c];
+          const double dg_c = buf.dg()[c];
+          const double Bx_c = g_c * txij + dg_c * pqrij * rinv * x;
+          const double By_c = g_c * tyij + dg_c * pqrij * rinv * y;
+          const double Bz_c = g_c * tzij + dg_c * pqrij * rinv * z;
+
+          const double f_Fp = rhoi(dii);
+          double d_f_Fp_dtheta = 0.0;
+
+          double dg_t_c = 0.0, ddg_t_c = 0.0;
+          if (radial || is_watom) {
+            /* Component-local for CGRIDMB[k]/SGRIDMB[k] — only c==kc
+             * touches dg/dθ. RCUTMB and WATOM fan out across all c. */
+            if (is_rcut || is_watom || c == kc) {
+              dg_t_c  = dg_dtheta_arr [c];
+              ddg_t_c = ddg_dtheta_arr[c];
+            }
+            double d2F = 0.0;
+            if (!emb.calc_d2F(rho, c, d2F)) return false;
+            if (drho != 0.0) {
+              d_f_Fp_dtheta += f * d2F * drho;
+            }
+            if (is_rcut) {
+              const double Fp = emb.calc_dF(rho, c);
+              d_f_Fp_dtheta += (dfac_over_f * f) * Fp;
+            }
+          } else {
+            double dFp_dtheta = 0.0;
+            if (!emb.calc_dFp_dtheta(rho, c, theta_name, arg_pos, dFp_dtheta))
+              continue;
+            d_f_Fp_dtheta = f * dFp_dtheta;
+          }
+
+          const double dBx_c = dg_t_c * txij + ddg_t_c * pqrij * rinv * x;
+          const double dBy_c = dg_t_c * tyij + ddg_t_c * pqrij * rinv * y;
+          const double dBz_c = dg_t_c * tzij + ddg_t_c * pqrij * rinv * z;
+
+          /* For radial CGRIDMB[k]/SGRIDMB[k] with c != kc, neither dg/dθ
+           * nor df/dθ contributes; if drho is also zero, this c
+           * contributes nothing — skip. Does not apply to WATOM (all c
+           * receive dg_t_c contributions when Zj == Z_target). */
+          if (radial && !is_rcut && c != kc
+              && d_f_Fp_dtheta == 0.0) continue;
+          any_contrib = true;
+
+          const std::size_t row = c + Lshift + fidx;
+          fd_ij(row, 0) += d_f_Fp_dtheta * Bx_c + f_Fp * dBx_c;
+          fd_ij(row, 1) += d_f_Fp_dtheta * By_c + f_Fp * dBy_c;
+          fd_ij(row, 2) += d_f_Fp_dtheta * Bz_c + f_Fp * dBz_c;
+        }
+      }
+      Lshift += ng;
+    }
+  }
+
+  return any_contrib;
+}
+
+/* ================================================================== *
  *  meta() — default templated body: covers the parameter shape every
  *  DM_mEAD<F> instantiation shares (RCUTMB + CGRIDMB + SGRIDMB), plus
  *  the per-param ρ-collapse check on CGRIDMB. F-specific extras

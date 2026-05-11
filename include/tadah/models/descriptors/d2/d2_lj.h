@@ -62,6 +62,51 @@ public:
     tadah::core::fd_type &fd_ij,
     const double scale=1) const override;
 
+  /** Closed-form analytical derivatives of D2_LJ w.r.t. its
+   *  hyperparameters. Only RCUT2B is exposed (sigma / epsilon are
+   *  recovered post-fit from the C_6 / C_12 linear regression
+   *  coefficients — they are not descriptor params, see d2_lj.h docs).
+   *
+   *  D2_LJ contributes two components per pair:
+   *    aed(fidx)   = -w(Zj) r^-6  fc(r)
+   *    aed(fidx+1) = +w(Zj) r^-12 fc(r)
+   *
+   *  Only fc depends on rcut. So:
+   *    dD/d rcut (fidx)   = -w(Zj) r^-6  * dfc/d rcut
+   *    dD/d rcut (fidx+1) = +w(Zj) r^-12 * dfc/d rcut
+   */
+  bool calc_dDdtheta(
+      const std::string& theta_name,
+      int                arg_pos,
+      const int          Zi,
+      const int          Zj,
+      const double       rij,
+      const double       rij_sq,
+      tadah::core::aed_type& dD_buf,
+      const double       scale = 1) const override;
+
+  /** Closed-form ∂(fd_radial)/∂ rcut for D2_LJ.
+   *
+   *  Per-pair force descriptor radial component (column 0):
+   *    fd(fidx,  0) = w(Zj) * ( 6 r^-7 fc - r^-6  fcp)
+   *    fd(fidx+1,0) = w(Zj) * (-12 r^-13 fc + r^-12 fcp)
+   *
+   *  Only fc and fcp depend on rcut, so:
+   *    d/d rcut (fidx,0)   = w(Zj) * ( 6 r^-7 * dfc/d rcut - r^-6  * dfcp/d rcut)
+   *    d/d rcut (fidx+1,0) = w(Zj) * (-12 r^-13 * dfc/d rcut + r^-12 * dfcp/d rcut)
+   *
+   *  Non-RCUT2B theta returns false (sigma/epsilon are post-fit, not
+   *  HPO params). */
+  bool calc_dXijdri_dtheta(
+      const std::string& theta_name,
+      int                arg_pos,
+      const int          Zi,
+      const int          Zj,
+      const double       rij,
+      const double       rij_sq,
+      tadah::core::fd_type& dfd_ij,
+      const double       scale = 1) const override;
+
   std::string label() const override;
   void init() override;
   std::optional<DescriptorMeta> meta() const override;

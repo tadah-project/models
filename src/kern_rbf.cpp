@@ -29,6 +29,24 @@ double Kern_RBF::prime(const tadah::core::aed_type& b, const tadah::core::aed_ty
   // std::cout << "f:     " << ff << std::endl;
     return derivative(b, af)*ff;
 }
+// Closed-form derivative of K w.r.t. sigma. Note: gamma = 1 / sigma^2
+// is a derived member computed in the constructor; HPO never sees gamma
+// directly. dK/d sigma = K * ||b - af||^2 / sigma^3.
+bool Kern_RBF::calc_dKdtheta(
+    const std::string& theta_name,
+    int                arg_pos,
+    const tadah::core::aed_type& b,
+    const tadah::core::aed_type& af,
+    double& dK_out) const
+{
+    if (theta_name != "MPARAMS" || arg_pos != 1) return false;
+    const tadah::core::aed_type v = af - b;
+    const double v_sq = v * v;
+    const double k    = std::exp(-0.5 * gamma * v_sq);
+    dK_out = k * v_sq / (sigma * sigma * sigma);
+    return true;
+}
+
 std::string Kern_RBF::get_label() const
 {
     return label;

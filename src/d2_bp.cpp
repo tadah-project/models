@@ -85,6 +85,166 @@ void D2_BP::calc_all(
     ++i;
   }
 }
+// Closed-form gradient of D2_BP w.r.t. its hyperparameters.
+// See class doc-comment for the math. Mirrors calc_aed's loop-shape so
+// a parity test against central-difference of calc_aed works component-
+// wise without re-deriving the cutoff or grid bookkeeping.
+bool D2_BP::calc_dDdtheta(
+  const std::string& theta_name,
+  int                arg_pos,
+  const int          Zi,
+  const int          Zj,
+  const double       rij,
+  const double       /*rij_sq*/,
+  tadah::core::aed_type& dD_buf,
+  const double       scale) const
+{
+  if (!is_init_for_atoms(Zi, Zj) || rij > get_rcut()) return false;
+
+  if (theta_name == "CGRID2B") {
+    // arg_pos is 1-based index into the cgrid vector. Only the matching
+    // component receives a non-zero entry.
+    if (arg_pos < 1 || static_cast<std::size_t>(arg_pos) > cgrid.size()) return false;
+    const std::size_t k  = static_cast<std::size_t>(arg_pos - 1);
+    const double      mu = cgrid[k];
+    const double      eta = sgrid[k];
+    const double      fc = fcut->calc(rij);
+    const double      g  = std::exp(-eta * (rij - mu) * (rij - mu)) * fc;
+    // dG/d mu = 2 eta (r - mu) G
+    const double      dG_dmu = 2.0 * eta * (rij - mu) * g;
+    dD_buf(fidx + k) += scale * weights[Zj] * dG_dmu;
+    return true;
+  }
+
+  if (theta_name == "SGRID2B") {
+    if (arg_pos < 1 || static_cast<std::size_t>(arg_pos) > sgrid.size()) return false;
+    const std::size_t k  = static_cast<std::size_t>(arg_pos - 1);
+    const double      mu = cgrid[k];
+    const double      eta = sgrid[k];
+    const double      fc = fcut->calc(rij);
+    const double      g  = std::exp(-eta * (rij - mu) * (rij - mu)) * fc;
+    // dG/d eta = -(r - mu)^2 G
+    const double      dG_deta = -(rij - mu) * (rij - mu) * g;
+    dD_buf(fidx + k) += scale * weights[Zj] * dG_deta;
+    return true;
+  }
+
+  if (theta_name == "RCUT2B") {
+    // RCUT2B is shared across grid components: every basis Gaussian is
+    // multiplied by the same fc(r), so dG/d rcut = exp(...) * df_c/d rcut(r)
+    // for every component k.
+    const double dfc = fcut->calc_drcut(rij);
+    if (dfc == 0.0) return false;  // discontinuous cutoff (Cut_Dummy);
+                                   // caller will fall back to FD under HYBRID.
+    for (std::size_t c = 0; c < cgrid.size(); ++c) {
+      const double mu  = cgrid[c];
+      const double eta = sgrid[c];
+      const double gauss = std::exp(-eta * (rij - mu) * (rij - mu));
+      dD_buf(fidx + c) += scale * weights[Zj] * gauss * dfc;
+    }
+    return true;
+  }
+
+  if (theta_name == "WATOM") {
+    // d(aed(fidx+c))/d WATOM[Z_target] = δ(Zj, Z_target) * G(...)
+    // (unweighted calc_aed contribution). Claim ownership on every
+    // valid pair so the orchestrator does not route to FD when no
+    // pair matches Z_target in a particular structure.
+    const int Z_target = get_atom_Z_for_arg_pos(arg_pos);
+    if (Z_target < 1) return false;
+    if (Zj == Z_target) {
+      const double fc_ij = fcut->calc(rij);
+      for (std::size_t c = 0; c < cgrid.size(); ++c) {
+        dD_buf(fidx + c) += scale * G(rij, sgrid[c], cgrid[c], fc_ij);
+      }
+    }
+    return true;
+  }
+
+  return false;  // theta_name not owned by this descriptor.
+}
+
+// Closed-form mixed derivative of fd_ij(radial) w.r.t. (CGRID2B[k],
+// SGRID2B[k], RCUT2B). See d2_bp.h doc-comment for the math; the
+// implementation mirrors calc_dDdtheta's branch structure and reuses
+// the same fc / fc' values calc_all reads from fcut->calc / calc_prime.
+bool D2_BP::calc_dXijdri_dtheta(
+  const std::string& theta_name,
+  int                arg_pos,
+  const int          Zi,
+  const int          Zj,
+  const double       rij,
+  const double       /*rij_sq*/,
+  tadah::core::fd_type& dfd_ij,
+  const double       scale) const
+{
+  if (!is_init_for_atoms(Zi, Zj) || rij > get_rcut()) return false;
+
+  const double fc  = fcut->calc(rij);
+  const double fcp = fcut->calc_prime(rij);
+
+  if (theta_name == "CGRID2B") {
+    if (arg_pos < 1 || static_cast<std::size_t>(arg_pos) > cgrid.size()) return false;
+    const std::size_t k    = static_cast<std::size_t>(arg_pos - 1);
+    const double      mu   = cgrid[k];
+    const double      eta  = sgrid[k];
+    const double      rm   = rij - mu;
+    const double      gexp = std::exp(-eta * rm * rm);
+    // dG/dr = gexp * (-2 eta rm fc + fcp); d/d mu of this is
+    //   2 eta rm * dG/dr + 2 eta fc * gexp
+    const double      dGdr = gexp * (-2.0 * eta * rm * fc + fcp);
+    const double      val  = 2.0 * eta * rm * dGdr + 2.0 * eta * fc * gexp;
+    dfd_ij(fidx + k, 0) += scale * weights[Zj] * val;
+    return true;
+  }
+
+  if (theta_name == "SGRID2B") {
+    if (arg_pos < 1 || static_cast<std::size_t>(arg_pos) > sgrid.size()) return false;
+    const std::size_t k    = static_cast<std::size_t>(arg_pos - 1);
+    const double      mu   = cgrid[k];
+    const double      eta  = sgrid[k];
+    const double      rm   = rij - mu;
+    const double      gexp = std::exp(-eta * rm * rm);
+    // d/d eta of dG/dr is -rm^2 * dG/dr - 2 rm fc * gexp.
+    const double      dGdr = gexp * (-2.0 * eta * rm * fc + fcp);
+    const double      val  = -rm * rm * dGdr - 2.0 * rm * fc * gexp;
+    dfd_ij(fidx + k, 0) += scale * weights[Zj] * val;
+    return true;
+  }
+
+  if (theta_name == "RCUT2B") {
+    const double dfc  = fcut->calc_drcut(rij);
+    const double dfcp = fcut->calc_prime_drcut(rij);
+    if (dfc == 0.0 && dfcp == 0.0) return false;   // Cut_Dummy: HYBRID FD fallback.
+    for (std::size_t c = 0; c < cgrid.size(); ++c) {
+      const double mu   = cgrid[c];
+      const double eta  = sgrid[c];
+      const double rm   = rij - mu;
+      const double gexp = std::exp(-eta * rm * rm);
+      // G doesn't depend on rcut; only fc and fc' do.
+      const double val  = gexp * (-2.0 * eta * rm * dfc + dfcp);
+      dfd_ij(fidx + c, 0) += scale * weights[Zj] * val;
+    }
+    return true;
+  }
+
+  if (theta_name == "WATOM") {
+    // d(fd_ij(fidx+c, 0))/d WATOM[Z_target] = δ(Zj, Z_target) * dG/dr
+    // (unweighted force-radial contribution).
+    const int Z_target = get_atom_Z_for_arg_pos(arg_pos);
+    if (Z_target < 1) return false;
+    if (Zj == Z_target) {
+      for (std::size_t c = 0; c < cgrid.size(); ++c) {
+        dfd_ij(fidx + c, 0) +=
+          scale * dG(rij, sgrid[c], cgrid[c], fc, fcp);
+      }
+    }
+    return true;
+  }
+
+  return false;
+}
+
 std::string D2_BP::label() const {
   return lab;
 }

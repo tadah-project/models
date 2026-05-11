@@ -83,6 +83,56 @@ public:
     const tadah::core::Vec3d &vec_ij,
     tadah::core::rho_type& rho,
     const double scale=1) const override;
+
+  /** \brief Closed-form per-pair contribution to drho_i/dtheta for DM_EAD.
+   *
+   *  Math (cgrid component c, angular orbital (L, o = (lx,ly,lz))):
+   *
+   *    rho_i[c,L,o] = sum_j w(Zj) * px py pz * G(r_ij; eta[c], r_s[c]) * fc(r_ij)
+   *
+   *  with G(r; eta, r_s) = exp(-eta * (r - r_s)^2).
+   *
+   *  Closed forms:
+   *
+   *    drho/dCGRIDMB[k] = 2 eta[k] (r - r_s[k]) G fc * px py pz  (only c==k)
+   *    drho/dSGRIDMB[k] = -(r - r_s[k])^2     G fc * px py pz  (only c==k)
+   *    drho/dRCUTMB     = G(r; eta[c], r_s[c]) * dfc/drcut * px py pz   (all c)
+   *
+   *  CGRIDMB[k] / SGRIDMB[k] are component-local: they only touch
+   *  drhoi entries for c == k. RCUTMB fans out across every component.
+   */
+  bool calc_drhoi_dtheta(
+      const std::string& theta_name,
+      int                arg_pos,
+      const int          Zi,
+      const int          Zj,
+      const double       rij,
+      const double       rij_sq,
+      const tadah::core::Vec3d& vec_ij,
+      tadah::core::rho_type& drhoi,
+      const double       scale=1) const override;
+
+  /** \brief Closed-form per-atom contribution to daed/dtheta for DM_EAD.
+   *
+   *  Given rhoi already filled with both rho_i (at rfidx..) and F'(rho_i)
+   *  = 2 f[L,o] rho_i (at drfidx..), plus drhoi filled with drho_i/dtheta:
+   *
+   *    daed[c+Lshift+fidx]/dtheta = F'(rho)[c,L,o] * drho/dtheta[c,L,o]
+   *                                 + (df[L,o]/dtheta) * rho_i[c,L,o]^2
+   *
+   *  For RCUTMB, f[L,o] = L!/(lx!ly!lz!) / (4 rc)^L gives:
+   *    df[L,o]/dRCUTMB = -L/rc * f[L,o]
+   *  For CGRIDMB/SGRIDMB, f does not depend on theta so the second term
+   *  vanishes.
+   */
+  bool calc_daed_dtheta(
+      const std::string& theta_name,
+      int                arg_pos,
+      const tadah::core::rho_type& rhoi,
+      const tadah::core::rho_type& drhoi,
+      tadah::core::aed_type& daed_out,
+      const double       scale=1) const override;
+
   void init() override;
   bool reinit(const tadah::core::Context& ctx) override;
   std::optional<DescriptorMeta> meta() const override;

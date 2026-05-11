@@ -101,6 +101,51 @@ public:
     const tadah::core::Vec3d &vec_ij,
     tadah::core::rho_type& rho,
     const double scale=1) const override;
+
+  /** \brief Closed-form per-pair contribution to drho_i/dtheta for DM_Blip.
+   *
+   *  Math (cgrid component c, angular orbital (L, o = (lx,ly,lz))):
+   *
+   *    rho_i[c,L,o] = sum_j w(Zj) * px py pz * B(x_c) * fc(r_ij)
+   *
+   *  with x_c = eta[c] (r_ij - r_s[c]) and B(.) the cubic blip basis
+   *  (compact support |x_c| < 2; C^1 globally; C^2 except |x_c|=1).
+   *
+   *  Closed forms (using bare dB/dx = dB(x_c, 1.0); the eta factor in
+   *  the existing dB(x,eta) wrapper is the r-derivative chain factor):
+   *
+   *    drho/dCGRIDMB[k] = -eta[k] * dB/dx_c * fc * px py pz   (only c==k)
+   *    drho/dSGRIDMB[k] = (r - r_s[k]) * dB/dx_c * fc * px py pz (only c==k)
+   *    drho/dRCUTMB     = B(x_c) * dfc/drcut * px py pz       (all c)
+   */
+  bool calc_drhoi_dtheta(
+      const std::string& theta_name,
+      int                arg_pos,
+      const int          Zi,
+      const int          Zj,
+      const double       rij,
+      const double       rij_sq,
+      const tadah::core::Vec3d& vec_ij,
+      tadah::core::rho_type& drhoi,
+      const double       scale=1) const override;
+
+  /** \brief Closed-form per-atom contribution to daed/dtheta for DM_Blip.
+   *
+   *  Identical chain rule to DM_EAD::calc_daed_dtheta — the only
+   *  difference between the two many-body descriptors is the radial
+   *  basis function, which enters only the per-pair drho/dtheta. The
+   *  per-atom reduction `daed = (dF/drho)(drho/dtheta) + (df/dtheta)rho^2`
+   *  uses the same multinomial prefactor f[L,o]=L!/(lx!ly!lz!)/(4 rc)^L
+   *  in both descriptors, and the same indexing through rhoi/drhoi.
+   */
+  bool calc_daed_dtheta(
+      const std::string& theta_name,
+      int                arg_pos,
+      const tadah::core::rho_type& rhoi,
+      const tadah::core::rho_type& drhoi,
+      tadah::core::aed_type& daed_out,
+      const double       scale=1) const override;
+
   void init() override;
   bool reinit(const tadah::core::Context& ctx) override;
   std::optional<DescriptorMeta> meta() const override;

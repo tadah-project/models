@@ -136,6 +136,103 @@ public:
   void init() override;
   bool reinit(const tadah::core::Context& ctx) override;
   std::optional<DescriptorMeta> meta() const override;
+
+  /** Closed-form per-pair contribution to drho_i/dtheta — radial-side
+   *  theta only (CGRIDMB[k], SGRIDMB[k], RCUTMB). Mirrors DM_EAD's
+   *  override byte-for-byte (the density is a radial GTO sum that does
+   *  NOT depend on the embedding function F).
+   *
+   *  Closed forms (per pair, fanned out across orbitals via the
+   *  Cartesian-power polynomial poly = px[lx]*py[ly]*pz[lz]):
+   *
+   *    drho/dCGRIDMB[k] = 2 eta[k] (r - mu[k]) G(r; eta[k], mu[k]) * fc * poly
+   *                                                       (only c==k)
+   *    drho/dSGRIDMB[k] = -(r - mu[k])^2 G(r; eta[k], mu[k]) * fc * poly
+   *                                                       (only c==k)
+   *    drho/dRCUTMB     = exp(-eta[c] (r-mu[c])^2) * (dfc/drcut) * poly
+   *                                                       (all c)
+   *
+   *  F-specific theta (CEMBFUNC / SEMBFUNC for F_Blip, RCUTENV for
+   *  F_mEnv) are NOT owned here — they affect the aed via F.calc_F
+   *  alone, with no drho/dtheta contribution. They are left for a
+   *  follow-up F::calc_dF_dtheta hook (currently fall through to FD). */
+  bool calc_drhoi_dtheta(
+      const std::string& theta_name,
+      int                arg_pos,
+      const int          Zi,
+      const int          Zj,
+      const double       rij,
+      const double       rij_sq,
+      const tadah::core::Vec3d& vec_ij,
+      tadah::core::rho_type& drhoi,
+      const double       scale=1) const override;
+
+  /** Closed-form per-atom contribution to daed/dtheta — handles both
+   *  the expands_dimensions path (F_Blip / F_mEnv, single radial,
+   *  embedding output dim = sfuncgrid.size()) and the standard path
+   *  (ng outputs, one F per cgrid index).
+   *
+   *  Chain rule:
+   *
+   *    daed_p/dtheta = f[L,o] * (dF/drho)(rho, p) * drho/dtheta
+   *                  + (df[L,o]/dtheta) * F(rho, p)
+   *
+   *  where f[L,o] = L!/(lx!ly!lz!) / (4 rc)^L gives
+   *  df[L,o]/dRCUTMB = -L/rc * f[L,o]; df[L,o]/dCGRIDMB = df[L,o]/dSGRIDMB = 0.
+   *  For CGRIDMB[k]/SGRIDMB[k], only c==k touches the aed
+   *  (component-local in the standard path; in the expanding path
+   *  ng==1 forces k==0). */
+  bool calc_daed_dtheta(
+      const std::string& theta_name,
+      int                arg_pos,
+      const tadah::core::rho_type& rhoi,
+      const tadah::core::rho_type& drhoi,
+      tadah::core::aed_type& daed_out,
+      const double       scale=1) const override;
+
+  /** Closed-form per-pair contribution to d(fd_ij)/dtheta — many-body
+   *  sibling of D2_Base::calc_dXijdri_dtheta. Mirrors the loop structure
+   *  of calc_dXijdri (full axis-expanded output) with the closed-form
+   *  derivative wrt the theta parameter applied at every stage:
+   *
+   *  Radial theta (CGRIDMB[k], SGRIDMB[k], RCUTMB) for the
+   *  F::expands_dimensions path (DM_mBlip / DM_mBlipEnv, ng==1):
+   *
+   *     term_k_g    = dpoly/dr_k                  (polynomial gradient)
+   *     term_k_dg   = poly * (v_k / r)            (radial unit-direction)
+   *     d(fd_ij_p, k)/dθ = scale * w_j * [
+   *          f * (d(F'(rho, p))/dθ_radial) * (g * term_k_g + dg * term_k_dg)
+   *        + f * F'(rho, p) * (dg/dθ * term_k_g + d(dg)/dθ * term_k_dg)
+   *        + (df/dθ) * F'(rho, p) * (g * term_k_g + dg * term_k_dg)
+   *     ]
+   *
+   *  where d(F'(rho))/dθ_radial = F''(rho, p) * drho/dθ (via F::calc_d2F)
+   *  and df/dRCUTMB = -L/rc * f (df/dCGRIDMB = df/dSGRIDMB = 0).
+   *
+   *  Embedding theta (CEMBFUNC[i], SEMBFUNC[i], RCUTENV) — rho fixed:
+   *
+   *     d(fd_ij_p, k)/dθ_emb = scale * w_j * f *
+   *                            (∂F'/∂θ at fixed rho) *
+   *                            (g * term_k_g + dg * term_k_dg)
+   *
+   *  via F::calc_dFp_dtheta. Component-local theta only contribute when
+   *  p == arg_pos - 1; RCUTENV fans out across all p.
+   *
+   *  Returns false on unowned theta or when the underlying F lacks the
+   *  required calc_d2F / calc_dFp_dtheta closure (e.g. F_RLR has neither
+   *  yet — those θ fall through to FD under HYBRID). */
+  bool calc_dXijdri_dtheta(
+      const std::string& theta_name,
+      int                arg_pos,
+      const int          Zi,
+      const int          Zj,
+      const double       rij,
+      const double       rij_sq,
+      const tadah::core::Vec3d& vec_ij,
+      const tadah::core::rho_type& rhoi,
+      const tadah::core::rho_type& drhoi_dtheta,
+      tadah::core::fd_type& fd_ij_out,
+      const double       scale=1) const override;
 };
 } // namespace models
 } // namespace tadah

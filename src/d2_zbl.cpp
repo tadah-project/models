@@ -1,5 +1,6 @@
 #include <tadah/models/descriptors/d2/d2_zbl.h>
-#include <tadah/models/descriptors/closed_form_meta.h>
+#include <tadah/models/descriptors/param_meta.h>
+#include <tadah/core/stats/data_stats.h>
 namespace tadah {
 namespace models {
 
@@ -114,6 +115,149 @@ void D2_ZBL::calc_all(
   double dE_ZBL_r = -(Zi * Zj * r_inv*r_inv)*p + dp*(Zi * Zj * r_inv) / a_ ;
   fd_ij(fidx,0) = scale*weights[Zj]*(E_ZBL*fcp_ij + dE_ZBL_r*fc_ij);
 }
+bool D2_ZBL::calc_dDdtheta(
+  const std::string& theta_name,
+  int                arg_pos,
+  const int          Zi,
+  const int          Zj,
+  const double       rij,
+  const double       /*rij_sq*/,
+  tadah::core::aed_type& dD_buf,
+  const double       scale) const
+{
+  if (!is_init_for_atoms(Zi, Zj) || rij > get_rcut()) return false;
+
+  if (theta_name == "RCUT2B") {
+    const double dfc = fcut->calc_drcut(rij);
+    if (dfc == 0.0) return false;
+    const double a_ = a[types[Zi]][types[Zj]];
+    const double x  = rij / a_;
+    const double p  = phi(x);
+    dD_buf(fidx) += scale * weights[Zj] * (Zi * Zj / rij) * p * dfc;
+    return true;
+  }
+
+  if (theta_name == "TYPE2B") {
+    if (arg_pos < 2 || arg_pos > 5) return false;
+
+    const double a_     = a[types[Zi]][types[Zj]];
+    const double x      = rij / a_;
+    const double dphi_x = dphi(x);
+    const double fc_ij  = fcut->calc(rij);
+
+    const double Zi_d   = static_cast<double>(Zi);
+    const double Zj_d   = static_cast<double>(Zj);
+    const double D_zz   = std::pow(Zi_d, p0) + std::pow(Zj_d, p1);
+
+    double da_dtheta = 0.0;
+    if (arg_pos == 2) {
+      da_dtheta = a_ / a0;
+    } else if (arg_pos == 3) {
+      da_dtheta = a_ / s0;
+    } else if (arg_pos == 4) {
+      da_dtheta = -a_ * std::pow(Zi_d, p0) * std::log(Zi_d) / D_zz;
+    } else {
+      da_dtheta = -a_ * std::pow(Zj_d, p1) * std::log(Zj_d) / D_zz;
+    }
+
+    if (da_dtheta == 0.0) return true;
+
+    const double dx_dtheta   = -(x / a_) * da_dtheta;
+    const double dphi_dtheta = dphi_x * dx_dtheta;
+    dD_buf(fidx) += scale * weights[Zj] * (Zi * Zj / rij) * dphi_dtheta * fc_ij;
+    return true;
+  }
+
+  if (theta_name == "WATOM") {
+    // d(aed(fidx))/d WATOM[Z_target] = δ(Zj, Z_target) * (Zi Zj / r) phi(x) fc(r)
+    // i.e. the unweighted calc_aed contribution.
+    const int Z_target = get_atom_Z_for_arg_pos(arg_pos);
+    if (Z_target < 1) return false;
+    if (Zj == Z_target) {
+      const double fc_ij = fcut->calc(rij);
+      const double a_    = a[types[Zi]][types[Zj]];
+      const double x     = rij / a_;
+      const double p     = phi(x);
+      dD_buf(fidx) += scale * (Zi * Zj / rij) * p * fc_ij;
+    }
+    return true;
+  }
+
+  return false;
+}
+
+// Closed-form mixed derivative of fd_ij(radial) w.r.t. θ ∈
+// {RCUT2B, TYPE2B[a0/s0/p0/p1]}. See d2_zbl.h doc-comment for the math.
+bool D2_ZBL::calc_dXijdri_dtheta(
+  const std::string& theta_name,
+  int                arg_pos,
+  const int          Zi,
+  const int          Zj,
+  const double       rij,
+  const double       /*rij_sq*/,
+  tadah::core::fd_type& dfd_ij,
+  const double       scale) const
+{
+  if (!is_init_for_atoms(Zi, Zj) || rij > get_rcut()) return false;
+
+  const double r_inv  = 1.0 / rij;
+  const double a_     = a[types[Zi]][types[Zj]];
+  const double x      = rij / a_;
+  const double p_x    = phi(x);
+  const double dp_x   = dphi(x);
+  const double fc_ij  = fcut->calc(rij);
+  const double fcp_ij = fcut->calc_prime(rij);
+  const double E_ZBL  = (Zi * Zj * r_inv) * p_x;
+  const double dE_ZBL_r = -(Zi * Zj * r_inv * r_inv) * p_x + dp_x * (Zi * Zj * r_inv) / a_;
+
+  if (theta_name == "RCUT2B") {
+    const double dfc  = fcut->calc_drcut(rij);
+    const double dfcp = fcut->calc_prime_drcut(rij);
+    if (dfc == 0.0 && dfcp == 0.0) return false;   // Cut_Dummy fallback
+    // fd = w(Zj) (E·fcp + dE/dr·fc); only fc/fcp depend on rcut.
+    const double val = E_ZBL * dfcp + dE_ZBL_r * dfc;
+    dfd_ij(fidx, 0) += scale * weights[Zj] * val;
+    return true;
+  }
+
+  if (theta_name == "TYPE2B") {
+    if (arg_pos < 2 || arg_pos > 5) return false;
+
+    const double Zi_d = static_cast<double>(Zi);
+    const double Zj_d = static_cast<double>(Zj);
+    const double D_zz = std::pow(Zi_d, p0) + std::pow(Zj_d, p1);
+
+    double da_dtheta = 0.0;
+    if      (arg_pos == 2) da_dtheta =  a_ / a0;
+    else if (arg_pos == 3) da_dtheta =  a_ / s0;
+    else if (arg_pos == 4) da_dtheta = -a_ * std::pow(Zi_d, p0) * std::log(Zi_d) / D_zz;
+    else                   da_dtheta = -a_ * std::pow(Zj_d, p1) * std::log(Zj_d) / D_zz;
+
+    if (da_dtheta == 0.0) return true;   // Z=1 vanishing case for p0/p1
+
+    // d/d theta (fd_radial) = -w(Zj) (Zi Zj / a²) * da/d theta
+    //                         * [dphi(x) fcp + d²phi(x) fc / a]
+    const double d2phi_x = d2phi(x);
+    const double bracket = dp_x * fcp_ij + d2phi_x * fc_ij / a_;
+    const double pref    = -(Zi * Zj / (a_ * a_)) * da_dtheta;
+    dfd_ij(fidx, 0) += scale * weights[Zj] * pref * bracket;
+    return true;
+  }
+
+  if (theta_name == "WATOM") {
+    // Force-side WATOM[Z_target] derivative — unweighted calc_dXijdri
+    // radial contribution.
+    const int Z_target = get_atom_Z_for_arg_pos(arg_pos);
+    if (Z_target < 1) return false;
+    if (Zj == Z_target) {
+      dfd_ij(fidx, 0) += scale * (E_ZBL * fcp_ij + dE_ZBL_r * fc_ij);
+    }
+    return true;
+  }
+
+  return false;
+}
+
 std::string D2_ZBL::label() const {
   return lab;
 }
@@ -150,12 +294,135 @@ double D2_ZBL::dphi(double x) const {
   0.4029 * 0.2802 * std::exp(-0.4029 * x) -
   0.2016 * 0.02817 * std::exp(-0.2016 * x);
 }
+double D2_ZBL::d2phi(double x) const {
+  // d²/dx² of sum_k c_k exp(-α_k x) = sum_k α_k² c_k exp(-α_k x).
+  return  3.2     * 3.2     * 0.1818  * std::exp(-3.2    * x) +
+          0.9423  * 0.9423  * 0.5099  * std::exp(-0.9423 * x) +
+          0.4029  * 0.4029  * 0.2802  * std::exp(-0.4029 * x) +
+          0.2016  * 0.2016  * 0.02817 * std::exp(-0.2016 * x);
+}
 double D2_ZBL::screening_length(int Zi, int Zj) const {
   return (s0 * a0) / (std::pow(Zi, p0) + std::pow(Zj, p1));
 }
 
+// ----------------------------------------------------------------
+// meta() — D2_ZBL exposes RCUT2B (real-space cutoff, shared with the
+// cutoff family) plus the four TYPE2B-positional screening params
+// (a0, s0, p0, p1) sitting at config indices 1..4 of the TYPE2B value
+// list "D2_ZBL a0 s0 p0 p1 ELEM_i ELEM_j".
+//
+// arg_pos in ParamMeta matches the runtime arg_pos seen by
+// calc_dDdtheta — that's i+1 where i is the config-index set true in
+// omap.opt by HPOTargets::ui_offset (which counts numeric tokens). So
+// arg_pos = 2..5 here, NOT the user-facing OPTIM (n) of 1..4 — the
+// leading "D2_ZBL" string token shifts the count by one.
+// ----------------------------------------------------------------
 std::optional<DescriptorMeta> D2_ZBL::meta() const {
-  return make_closed_form_meta("D2_ZBL", "RCUT2B");
+  using DataStats = tadah::core::stats::DataStats;
+  static constexpr std::size_t I_P50 = tadah::core::stats::IDX_P50;
+  static constexpr std::size_t I_P99 = tadah::core::stats::IDX_P99;
+
+  DescriptorMeta dm;
+  dm.label = "D2_ZBL";
+
+  ParamMeta p_rcut;
+  p_rcut.key      = "RCUT2B";
+  p_rcut.arg_pos  = -1;
+  p_rcut.scale    = Scale::Distance;
+  p_rcut.units    = "Å";
+  p_rcut.role     = "Outer cutoff for the ZBL pair sum.";
+  p_rcut.hard.lo  = 0.0;
+  p_rcut.crit     = Criticality::Critical;
+  p_rcut.scope    = PairScope::Global;
+  p_rcut.suggest  = [](const DataStats& d, const SeedView&, int)
+      -> std::pair<double, double> {
+    if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
+    const auto& pp = d.per_pair[0];
+    double low = pp.r_percentiles[I_P50];
+    if (pp.r_peaks.size() >= 2) low = pp.r_peaks[1].position * 1.05;
+    return std::make_pair(low, pp.r_percentiles[I_P99]);
+  };
+  p_rcut.check = [](const DataStats& d, const SeedView& s) -> HealthVerdict {
+    if (!s.contains("RCUT2B")) return HealthOk{};
+    const double rc = s.get<double>("RCUT2B");
+    if (d.per_pair.empty() && d.n_atoms > 0)
+      return HealthFail{"RCUT2B=" + std::to_string(rc) +
+                        " is too small — no neighbours found."};
+    if (d.per_pair.empty()) return HealthOk{};
+    if (rc < d.per_pair[0].r_min)
+      return HealthFail{"RCUT2B=" + std::to_string(rc) +
+                        " is below dataset r_min=" +
+                        std::to_string(d.per_pair[0].r_min) + "."};
+    return HealthOk{};
+  };
+  dm.params.push_back(std::move(p_rcut));
+
+  // a0 — universal length scale (default Bohr radius 0.529 Å).
+  ParamMeta p_a0;
+  p_a0.key     = "TYPE2B";
+  p_a0.arg_pos = 2;
+  p_a0.scale   = Scale::Distance;
+  p_a0.units   = "Å";
+  p_a0.role    = "ZBL screening length scale (default: Bohr radius 0.5292 Å).";
+  p_a0.hard.lo = 1.0e-6;
+  p_a0.crit    = Criticality::Optional;
+  p_a0.scope   = PairScope::Global;
+  p_a0.suggest = [](const DataStats&, const SeedView&, int)
+      -> std::pair<double, double> {
+    return std::make_pair(0.265, 0.795);   // ±50 % of default 0.5292 Å
+  };
+  dm.params.push_back(std::move(p_a0));
+
+  // s0 — dimensionless screening multiplier (default 0.88534).
+  ParamMeta p_s0;
+  p_s0.key     = "TYPE2B";
+  p_s0.arg_pos = 3;
+  p_s0.scale   = Scale::Dimensionless;
+  p_s0.units   = "";
+  p_s0.role    = "ZBL screening multiplier s0 (default 0.88534).";
+  p_s0.hard.lo = 1.0e-6;
+  p_s0.crit    = Criticality::Optional;
+  p_s0.scope   = PairScope::Global;
+  p_s0.suggest = [](const DataStats&, const SeedView&, int)
+      -> std::pair<double, double> {
+    return std::make_pair(0.443, 1.328);   // ±50 % of default 0.88534
+  };
+  dm.params.push_back(std::move(p_s0));
+
+  // p0 — exponent on Z_i in the screening-length denominator (default 0.23).
+  ParamMeta p_p0;
+  p_p0.key     = "TYPE2B";
+  p_p0.arg_pos = 4;
+  p_p0.scale   = Scale::Dimensionless;
+  p_p0.units   = "";
+  p_p0.role    = "ZBL exponent on Zi in screening-length denominator (default 0.23).";
+  p_p0.hard.lo = 1.0e-6;
+  p_p0.crit    = Criticality::Optional;
+  p_p0.scope   = PairScope::Global;
+  p_p0.suggest = [](const DataStats&, const SeedView&, int)
+      -> std::pair<double, double> {
+    return std::make_pair(0.115, 0.345);
+  };
+  dm.params.push_back(std::move(p_p0));
+
+  // p1 — exponent on Z_j in the screening-length denominator (default 0.23).
+  ParamMeta p_p1;
+  p_p1.key     = "TYPE2B";
+  p_p1.arg_pos = 5;
+  p_p1.scale   = Scale::Dimensionless;
+  p_p1.units   = "";
+  p_p1.role    = "ZBL exponent on Zj in screening-length denominator (default 0.23).";
+  p_p1.hard.lo = 1.0e-6;
+  p_p1.crit    = Criticality::Optional;
+  p_p1.scope   = PairScope::Global;
+  p_p1.suggest = [](const DataStats&, const SeedView&, int)
+      -> std::pair<double, double> {
+    return std::make_pair(0.115, 0.345);
+  };
+  dm.params.push_back(std::move(p_p1));
+
+  dm.expected_columns = [](const SeedView&) -> std::size_t { return 1; };
+  return dm;
 }
 
 } // namespace models

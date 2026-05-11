@@ -54,7 +54,9 @@ private:
   double phi(const double x) const; // x = r/a
   // dphi/dx
   double dphi(const double x) const; // x = r/a
-  double screening_length(int, int) const; // a = 
+  // d^2 phi / dx^2 (needed by calc_dXijdri_dtheta force chain rule)
+  double d2phi(const double x) const;
+  double screening_length(int, int) const; // a =
   double a0=0.52917721067; // bohr radius
   double s0=0.88534; // bohr radius
   double p0=0.23; // bohr radius
@@ -88,6 +90,72 @@ public:
     tadah::core::aed_type &aed,
     tadah::core::fd_type &fd_ij,
     const double scale=1) const override;
+
+  /** Closed-form analytical derivatives of D2_ZBL w.r.t. its
+   *  hyperparameters. Exposed via meta(): RCUT2B (real-space cutoff)
+   *  plus the four TYPE2B-positional screening params (a0, s0, p0, p1).
+   *
+   *  D2_ZBL contributes one component per pair:
+   *    aed(fidx) = +w(Zj) (Zi Zj / r) phi(r / a) fc(r)
+   *  with screening length a = s0 a0 / (Zi^p0 + Zj^p1) and Moliere phi.
+   *
+   *  Closed forms:
+   *    dD/d rcut = w(Zj) (Zi Zj / r) phi(r/a) dfc/d rcut
+   *    dD/d theta = w(Zj) (Zi Zj / r) dphi(r/a) dx/d theta fc(r)
+   *      where x = r/a, dx/d theta = -(x/a) da/d theta, and:
+   *        da/da0 = a / a0
+   *        da/ds0 = a / s0
+   *        da/dp0 = -a Zi^p0 ln(Zi) / (Zi^p0 + Zj^p1)
+   *        da/dp1 = -a Zj^p1 ln(Zj) / (Zi^p0 + Zj^p1)
+   *
+   *  arg_pos convention (matches HPOTargets::ui_offset + i+1):
+   *    arg_pos == 2 -> a0  (TYPE2B numerical token #1; config index 1)
+   *    arg_pos == 3 -> s0  (config index 2)
+   *    arg_pos == 4 -> p0  (config index 3)
+   *    arg_pos == 5 -> p1  (config index 4)
+   *  Note the +1 shift versus user-facing OPTIM (n) syntax — the leading
+   *  "D2_ZBL" string token sits at config index 0.
+   */
+  bool calc_dDdtheta(
+      const std::string& theta_name,
+      int                arg_pos,
+      const int          Zi,
+      const int          Zj,
+      const double       rij,
+      const double       rij_sq,
+      tadah::core::aed_type& dD_buf,
+      const double       scale = 1) const override;
+
+  /** Closed-form derivative of the D2_ZBL force-descriptor radial
+   *  component (column 0 of fd_ij) w.r.t. its hyperparameters.
+   *
+   *    fd_radial = w(Zj) * [E_ZBL(r) * f_c'(r) + dE_ZBL/dr * f_c(r)]
+   *
+   *  with E_ZBL = Zi Zj / r * phi(r/a). Only `a(a0, s0, p0, p1)` and
+   *  fc, fcp depend on theta. For theta ∈ {a0, s0, p0, p1}:
+   *
+   *    d/d theta (fd_radial) = -w(Zj) (Zi Zj / a²) * da/d theta
+   *                            * [dphi(x) f_c'(r) + d²phi(x) f_c(r) / a]
+   *
+   *  (Derivation: ∂E/∂θ = -(Zi Zj / a²) dphi · da/dθ;
+   *               ∂(dE/dr)/∂θ = -(Zi Zj · x · d²phi / (r · a²)) · da/dθ;
+   *               x/r = 1/a → factor simplifies as shown.)
+   *
+   *  For theta = RCUT2B only fc and fcp depend on theta:
+   *    d/d rcut = w(Zj) * [E_ZBL · dfcp/d rcut + dE_ZBL/dr · dfc/d rcut].
+   *
+   *  Z=1 (H) corner case: ln(1)=0 makes da/dp0 = 0 for Zi=1 (and
+   *  da/dp1 = 0 for Zj=1). Closed form returns true and contributes 0,
+   *  matching the FD reference. */
+  bool calc_dXijdri_dtheta(
+      const std::string& theta_name,
+      int                arg_pos,
+      const int          Zi,
+      const int          Zj,
+      const double       rij,
+      const double       rij_sq,
+      tadah::core::fd_type& dfd_ij,
+      const double       scale = 1) const override;
 
   std::string label() const override;
   void init() override;
