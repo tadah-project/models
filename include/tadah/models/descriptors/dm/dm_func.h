@@ -383,13 +383,29 @@ public:
     return false;
   }
 
-  /** F''(rho, p) chain through fcut * B requires fcut''(rho), which the
-   *  Cut_Base hierarchy does not yet expose. Return false so DM_mEAD<F_mEnv>
-   *  reports the radial-theta force derivative as unowned and routes to
-   *  FD under HYBRID. (Embedding-side theta below remain analytical
-   *  because they don't pass through F''.) */
-  bool calc_d2F(double /*rho*/, size_t /*p*/, double& /*out*/) const override final {
-    return false;
+  /** F''(rho, p) via product rule on F(rho, p) = fcut(rho) * B(x_c),
+   *  x_c = eta_p * (rho - mu_p):
+   *
+   *    F''(rho) = fcut''(rho) * B(x_c)
+   *             + 2 * fcut'(rho) * eta_p * b'(x_c)
+   *             + fcut(rho)     * eta_p^2 * b''(x_c)
+   *
+   *  fcut'' is supplied by Cut_Base::calc_double_prime (default 0; smooth
+   *  cutoffs override). Closes the radial-θ force chain for
+   *  DM_mEAD<F_mEnv> configs (Phase 2D follow-up).
+   *
+   *  Note on smoothness: at |x_c| = 1 the blip B is only C^1 (b'' has
+   *  jumps). Caller fixtures that probe rho exactly on the blip break
+   *  hit the same C^1 limitation that F_Blip does (see geometry-
+   *  sensitivity note in project_hpo_analytical_gradients_phase2). */
+  bool calc_d2F(double rho, size_t p, double& out) const override final {
+    const double eta = sfuncgrid[p];
+    const double mu  = cfuncgrid[p];
+    const double x_c = eta * (rho - mu);
+    out = fcut.calc_double_prime(rho) * B(x_c)
+        + 2.0 * fcut.calc_prime(rho)  * eta * dB(x_c, 1.0)
+        + fcut.calc(rho)              * eta * eta * d2B(x_c);
+    return true;
   }
 
   /** Closed-form derivatives of F'(rho, p) wrt embedding-side theta

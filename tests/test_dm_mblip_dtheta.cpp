@@ -1236,3 +1236,212 @@ TEST_CASE_METHOD(TestFixture,
         }
     }
 }
+
+/* ------------------------------------------------------------------------
+ * DM_mBlipEnv FORCE-side closed forms — exercises the radial-θ chain
+ * through F_mEnv::calc_d2F (Phase 2D follow-up). Without this, the
+ * radial-θ branch in DM_mEAD::calc_dXijdri_dtheta returned false for
+ * any F_mEnv config because calc_d2F was a stub. With Cut_*::calc_double_prime
+ * + the product-rule wiring, the chain is fully analytical.
+ * ------------------------------------------------------------------------ */
+
+namespace {
+
+fd_type eval_mblipenv_pair_fd(double cgrid_val,
+                              double sgrid_val,
+                              const std::vector<double>& cembfunc,
+                              const std::vector<double>& sembfunc,
+                              double rcut,
+                              double rcutenv,
+                              const std::vector<Vec3d>& positions,
+                              std::size_t j_idx,
+                              int Lmax = 2)
+{
+    Context c = make_mblipenv_mb_context(cgrid_val, sgrid_val,
+                                         cembfunc, sembfunc, rcut, rcutenv, Lmax);
+    DM_mBlipEnv dm(c);
+    Cut_Cos fc(rcut);
+    dm.set_fcut(&fc, false);
+
+    rho_type rhoi;
+    dm.init_rhoi(rhoi);
+    rhoi.set_zero();
+
+    Vec3d delij;
+    for (std::size_t j = 1; j < positions.size(); ++j) {
+        delij = positions[0] - positions[j];
+        const double rij_sq = delij * delij;
+        if (rij_sq >= rcut * rcut) continue;
+        const double rij = std::sqrt(rij_sq);
+        dm.calc_rho(1, 1, rij, rij_sq, delij, rhoi, /*scale=*/1.0);
+    }
+    aed_type aed_scratch(dm.size());
+    aed_scratch.set_zero();
+    dm.calc_aed(rhoi, aed_scratch);
+
+    fd_type fd_ij(dm.size());
+    fd_ij.set_zero();
+    delij = positions[0] - positions[j_idx];
+    const double rij_sq = delij * delij;
+    const double rij    = std::sqrt(rij_sq);
+    dm.calc_dXijdri(1, 1, rij, rij_sq, delij, rhoi, fd_ij, /*scale=*/1.0);
+    return fd_ij;
+}
+
+fd_type analytical_pair_dfd_env(const Context& c,
+                                const std::vector<Vec3d>& positions,
+                                const std::string& theta_name,
+                                int                arg_pos,
+                                std::size_t        j_idx)
+{
+    DM_mBlipEnv dm(c);
+    Cut_Cos fc(c.get<double>("RCUTMBMAX"));
+    dm.set_fcut(&fc, false);
+
+    rho_type rhoi, drhoi;
+    dm.init_rhoi(rhoi);
+    dm.init_rhoi(drhoi);
+    rhoi.set_zero();
+    drhoi.set_zero();
+
+    const double rcut    = c.get<double>("RCUTMBMAX");
+    const double rcut_sq = rcut * rcut;
+
+    Vec3d delij;
+    for (std::size_t j = 1; j < positions.size(); ++j) {
+        delij = positions[0] - positions[j];
+        const double rij_sq = delij * delij;
+        if (rij_sq >= rcut_sq) continue;
+        const double rij = std::sqrt(rij_sq);
+        dm.calc_rho(1, 1, rij, rij_sq, delij, rhoi, /*scale=*/1.0);
+        dm.calc_drhoi_dtheta(theta_name, arg_pos,
+                             1, 1, rij, rij_sq, delij, drhoi, /*scale=*/1.0);
+    }
+    aed_type aed_scratch(dm.size());
+    aed_scratch.set_zero();
+    dm.calc_aed(rhoi, aed_scratch);
+
+    fd_type dfd_ij(dm.size());
+    dfd_ij.set_zero();
+    delij = positions[0] - positions[j_idx];
+    const double rij_sq = delij * delij;
+    const double rij    = std::sqrt(rij_sq);
+    const bool ok = dm.calc_dXijdri_dtheta(theta_name, arg_pos,
+                                           1, 1, rij, rij_sq, delij,
+                                           rhoi, drhoi, dfd_ij, /*scale=*/1.0);
+    REQUIRE(ok);
+    return dfd_ij;
+}
+
+}  // namespace
+
+TEST_CASE_METHOD(TestFixture,
+          "DM_mBlipEnv analytical d(fd_ij)/dCGRIDMB matches central difference",
+          "[MODELS][dm_mblipenv][dtheta][force][parity][radial]")
+{
+    const std::vector<double> cembfunc = {0.05, 0.15};
+    const std::vector<double> sembfunc = {20.0, 20.0};
+    const auto positions = make_mblip_cluster();
+    const std::size_t j_idx = 1;
+
+    Context c = make_mblipenv_mb_context(TEST_CGRID, TEST_SGRID,
+                                         cembfunc, sembfunc,
+                                         TEST_RCUT, TEST_RCUTENV, TEST_LMAX);
+    const fd_type dfd = analytical_pair_dfd_env(c, positions, "CGRIDMB",
+                                                 /*arg_pos=*/1, j_idx);
+
+    const double h = 1e-5;
+    fd_type fd_p = eval_mblipenv_pair_fd(TEST_CGRID + h, TEST_SGRID,
+                                          cembfunc, sembfunc,
+                                          TEST_RCUT, TEST_RCUTENV,
+                                          positions, j_idx, TEST_LMAX);
+    fd_type fd_m = eval_mblipenv_pair_fd(TEST_CGRID - h, TEST_SGRID,
+                                          cembfunc, sembfunc,
+                                          TEST_RCUT, TEST_RCUTENV,
+                                          positions, j_idx, TEST_LMAX);
+
+    for (std::size_t row = 0; row < static_cast<std::size_t>(dfd.rows()); ++row) {
+        for (std::size_t k = 0; k < 3; ++k) {
+            const double an = dfd(row, k);
+            const double fd = (fd_p(row, k) - fd_m(row, k)) / (2.0 * h);
+            INFO("DM_mBlipEnv CGRIDMB[1] row=" << row << " axis=" << k
+                 << " analytical=" << an << " FD=" << fd);
+            const double tol = 1e-4 * std::max({std::abs(an), std::abs(fd), 1e-9});
+            CHECK(std::abs(an - fd) <= tol + 1e-6);
+        }
+    }
+}
+
+TEST_CASE_METHOD(TestFixture,
+          "DM_mBlipEnv analytical d(fd_ij)/dSGRIDMB matches central difference",
+          "[MODELS][dm_mblipenv][dtheta][force][parity][radial]")
+{
+    const std::vector<double> cembfunc = {0.05, 0.15};
+    const std::vector<double> sembfunc = {20.0, 20.0};
+    const auto positions = make_mblip_cluster();
+    const std::size_t j_idx = 1;
+
+    Context c = make_mblipenv_mb_context(TEST_CGRID, TEST_SGRID,
+                                         cembfunc, sembfunc,
+                                         TEST_RCUT, TEST_RCUTENV, TEST_LMAX);
+    const fd_type dfd = analytical_pair_dfd_env(c, positions, "SGRIDMB",
+                                                 /*arg_pos=*/1, j_idx);
+
+    const double h = 1e-5;
+    fd_type fd_p = eval_mblipenv_pair_fd(TEST_CGRID, TEST_SGRID + h,
+                                          cembfunc, sembfunc,
+                                          TEST_RCUT, TEST_RCUTENV,
+                                          positions, j_idx, TEST_LMAX);
+    fd_type fd_m = eval_mblipenv_pair_fd(TEST_CGRID, TEST_SGRID - h,
+                                          cembfunc, sembfunc,
+                                          TEST_RCUT, TEST_RCUTENV,
+                                          positions, j_idx, TEST_LMAX);
+
+    for (std::size_t row = 0; row < static_cast<std::size_t>(dfd.rows()); ++row) {
+        for (std::size_t k = 0; k < 3; ++k) {
+            const double an = dfd(row, k);
+            const double fd = (fd_p(row, k) - fd_m(row, k)) / (2.0 * h);
+            INFO("DM_mBlipEnv SGRIDMB[1] row=" << row << " axis=" << k
+                 << " analytical=" << an << " FD=" << fd);
+            const double tol = 1e-4 * std::max({std::abs(an), std::abs(fd), 1e-9});
+            CHECK(std::abs(an - fd) <= tol + 1e-6);
+        }
+    }
+}
+
+TEST_CASE_METHOD(TestFixture,
+          "DM_mBlipEnv analytical d(fd_ij)/dRCUTMB matches central difference",
+          "[MODELS][dm_mblipenv][dtheta][force][parity][radial]")
+{
+    const std::vector<double> cembfunc = {0.05, 0.15};
+    const std::vector<double> sembfunc = {20.0, 20.0};
+    const auto positions = make_mblip_cluster();
+    const std::size_t j_idx = 1;
+
+    Context c = make_mblipenv_mb_context(TEST_CGRID, TEST_SGRID,
+                                         cembfunc, sembfunc,
+                                         TEST_RCUT, TEST_RCUTENV, TEST_LMAX);
+    const fd_type dfd = analytical_pair_dfd_env(c, positions, "RCUTMB",
+                                                 /*arg_pos=*/-1, j_idx);
+
+    const double h = 1e-5;
+    fd_type fd_p = eval_mblipenv_pair_fd(TEST_CGRID, TEST_SGRID,
+                                          cembfunc, sembfunc,
+                                          TEST_RCUT + h, TEST_RCUTENV,
+                                          positions, j_idx, TEST_LMAX);
+    fd_type fd_m = eval_mblipenv_pair_fd(TEST_CGRID, TEST_SGRID,
+                                          cembfunc, sembfunc,
+                                          TEST_RCUT - h, TEST_RCUTENV,
+                                          positions, j_idx, TEST_LMAX);
+
+    for (std::size_t row = 0; row < static_cast<std::size_t>(dfd.rows()); ++row) {
+        for (std::size_t k = 0; k < 3; ++k) {
+            const double an = dfd(row, k);
+            const double fd = (fd_p(row, k) - fd_m(row, k)) / (2.0 * h);
+            INFO("DM_mBlipEnv RCUTMB row=" << row << " axis=" << k
+                 << " analytical=" << an << " FD=" << fd);
+            const double tol = 1e-4 * std::max({std::abs(an), std::abs(fd), 1e-9});
+            CHECK(std::abs(an - fd) <= tol + 1e-6);
+        }
+    }
+}

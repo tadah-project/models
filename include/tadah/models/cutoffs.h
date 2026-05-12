@@ -38,6 +38,16 @@ class Cut_Base {
          * override.
          */
         virtual double calc_prime_drcut(double /*r*/) { return 0.0; }
+        /** Closed-form second derivative d^2 f_c / dr^2 at fixed rcut.
+         *
+         * Required by F_mEnv::calc_d2F to close the radial-θ force chain
+         * for DM_mEAD<F_mEnv> configs: F''(rho) = fcut''(rho)*B(rho)
+         * + 2 fcut'(rho)*B'(rho) + fcut(rho)*B''(rho), and B''(rho) is
+         * already available; only fcut''(rho) was missing. Default is 0
+         * (Cut_Dummy's f is piecewise-constant; its second derivative is
+         * identically zero away from r=rcut). Smooth cutoffs override.
+         */
+        virtual double calc_double_prime(double /*r*/) { return 0.0; }
         void test_rcut(const double r);
         /** Behavioural kind; drives test dispatch without string comparisons. */
         virtual Kind kind() const { return Kind::Standard; }
@@ -124,6 +134,7 @@ class Cut_Cos : public Cut_Base {
         double calc_prime(double r);
         double calc_drcut(double r) override;
         double calc_prime_drcut(double r) override;
+        double calc_double_prime(double r) override;
 };
 
 /**
@@ -160,6 +171,7 @@ class Cut_Tanh : public Cut_Base {
         double calc_prime(double r);
         double calc_drcut(double r) override;
         double calc_prime_drcut(double r) override;
+        double calc_double_prime(double r) override;
 };
 
 /**
@@ -204,6 +216,7 @@ class Cut_PolyS : public Cut_Base {
         double calc_prime(double r);
         double calc_drcut(double r) override;
         double calc_prime_drcut(double r) override;
+        double calc_double_prime(double r) override;
 };
 /**
  * @class Cut_Poly
@@ -247,6 +260,7 @@ class Cut_Poly : public Cut_Base {
         double calc_prime(double r);
         double calc_drcut(double r) override;
         double calc_prime_drcut(double r) override;
+        double calc_double_prime(double r) override;
 };
 /**
  * @class Cut_CosS
@@ -303,6 +317,7 @@ class Cut_CosS : public Cut_Base {
         double calc_prime(double r);
         double calc_drcut(double r) override;
         double calc_prime_drcut(double r) override;
+        double calc_double_prime(double r) override;
 };
 /**
  * @class Cut_PT
@@ -344,6 +359,7 @@ class Cut_PT : public Cut_Base {
         double calc_prime(double r);
         double calc_drcut(double r) override;
         double calc_prime_drcut(double r) override;
+        double calc_double_prime(double r) override;
 };
 
 /* @class Cut_SinInv
@@ -375,16 +391,19 @@ class Cut_SinInv : public Cut_Base {
         double calc_prime(double r);
         double calc_drcut(double r) override;
         double calc_prime_drcut(double r) override;
+        double calc_double_prime(double r) override;
         // Const overloads — F_mEnv::calc_F/calc_dF call calc/calc_prime
         // through a const member, so the underlying envelope must be
         // callable on a const Cut_SinInv as well. F_mEnv::calc_dF_dtheta
         // adds calc_drcut to the same const-callable surface for the
         // RCUTENV chain; calc_prime_drcut is added for the analogous
-        // F_mEnv::calc_dFp_dtheta force-side chain.
+        // F_mEnv::calc_dFp_dtheta force-side chain. calc_double_prime
+        // is added for F_mEnv::calc_d2F (radial-θ force chain).
         double calc(double r) const;
         double calc_prime(double r) const;
         double calc_drcut(double r) const;
         double calc_prime_drcut(double r) const;
+        double calc_double_prime(double r) const;
         Kind kind() const override { return Kind::Inverse; }
         double val_at_rcut() const override { return 1.0; }
 };

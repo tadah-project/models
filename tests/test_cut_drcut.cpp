@@ -368,3 +368,176 @@ TEST_CASE("Cut_SinInv calc_prime_drcut returns 0 above rcut",
     CHECK(fc.calc_prime_drcut(3.0) == 0.0);
     CHECK(fc.calc_prime_drcut(5.0) == 0.0);
 }
+
+/* ------------------------------------------------------------------- *
+ *  Layer-1 parity tests for calc_double_prime — d^2 f_c / dr^2 at fixed
+ *  rcut, central-FD reference on calc_prime. Required by F_mEnv::calc_d2F
+ *  to close the radial-θ force chain for DM_mEAD<F_mEnv> configs (Phase
+ *  2D follow-up). Same FD harness as fd_drcut: build a fresh cutoff so
+ *  any rcut-dependent precomputed state is reset. The reference here
+ *  perturbs r (not rcut), so a single instance is fine.
+ * ------------------------------------------------------------------- */
+
+namespace {
+
+template <class Cut>
+double fd_double_prime(double rcut, double r, double h) {
+    Cut fc(rcut);
+    return (fc.calc_prime(r + h) - fc.calc_prime(r - h)) / (2.0 * h);
+}
+
+}  // namespace
+
+TEST_CASE("Cut_Cos calc_double_prime matches central difference",
+          "[MODELS][cutoffs][double_prime][parity]")
+{
+    using tadah::models::Cut_Cos;
+    const double h = 1e-6;
+    for (double rcut : {2.5, 3.5, 5.0}) {
+        for (double r : {0.5, 1.0, 2.0, rcut * 0.9}) {
+            if (r >= rcut - h) continue;
+            Cut_Cos fc(rcut);
+            const double an = fc.calc_double_prime(r);
+            const double fd = fd_double_prime<Cut_Cos>(rcut, r, h);
+            INFO("Cut_Cos rcut=" << rcut << " r=" << r
+                 << " analytical=" << an << " FD=" << fd);
+            CHECK(std::abs(an - fd) < 1e-5);
+        }
+    }
+}
+
+TEST_CASE("Cut_Tanh calc_double_prime matches central difference",
+          "[MODELS][cutoffs][double_prime][parity]")
+{
+    using tadah::models::Cut_Tanh;
+    const double h = 1e-6;
+    for (double rcut : {2.5, 3.5, 5.0}) {
+        for (double r : {0.5, 1.0, 2.0, rcut * 0.9}) {
+            if (r >= rcut - h) continue;
+            Cut_Tanh fc(rcut);
+            const double an = fc.calc_double_prime(r);
+            const double fd = fd_double_prime<Cut_Tanh>(rcut, r, h);
+            INFO("Cut_Tanh rcut=" << rcut << " r=" << r
+                 << " analytical=" << an << " FD=" << fd);
+            CHECK(std::abs(an - fd) < 1e-5);
+        }
+    }
+}
+
+TEST_CASE("Cut_Poly calc_double_prime matches central difference",
+          "[MODELS][cutoffs][double_prime][parity]")
+{
+    using tadah::models::Cut_Poly;
+    const double h = 1e-6;
+    for (double rcut : {2.5, 3.5, 5.0}) {
+        for (double r : {0.5, 1.0, 2.0, rcut * 0.9}) {
+            if (r >= rcut - h) continue;
+            Cut_Poly fc(rcut);
+            const double an = fc.calc_double_prime(r);
+            const double fd = fd_double_prime<Cut_Poly>(rcut, r, h);
+            INFO("Cut_Poly rcut=" << rcut << " r=" << r
+                 << " analytical=" << an << " FD=" << fd);
+            CHECK(std::abs(an - fd) < 1e-5);
+        }
+    }
+}
+
+TEST_CASE("Cut_PolyS calc_double_prime matches central difference",
+          "[MODELS][cutoffs][double_prime][parity]")
+{
+    using tadah::models::Cut_PolyS;
+    const double h = 1e-6;
+    /* Smooth band is (rcut - 1, rcut). FD perturbs r ± h; pick probes
+     * well inside so the perturbation does not straddle either boundary. */
+    for (double rcut : {2.5, 3.5, 5.0}) {
+        for (double offset : {0.1, 0.3, 0.5, 0.9}) {
+            const double r = rcut - offset;
+            if (r <= rcut - 1.0 + h || r >= rcut - h) continue;
+            Cut_PolyS fc(rcut);
+            const double an = fc.calc_double_prime(r);
+            const double fd = fd_double_prime<Cut_PolyS>(rcut, r, h);
+            INFO("Cut_PolyS rcut=" << rcut << " r=" << r
+                 << " analytical=" << an << " FD=" << fd);
+            CHECK(std::abs(an - fd) < 1e-5);
+        }
+    }
+}
+
+TEST_CASE("Cut_CosS calc_double_prime matches central difference",
+          "[MODELS][cutoffs][double_prime][parity]")
+{
+    using tadah::models::Cut_CosS;
+    const double h = 1e-6;
+    for (double rcut : {2.5, 3.5, 5.0}) {
+        for (double offset : {0.1, 0.3, 0.5, 0.9}) {
+            const double r = rcut - offset;
+            if (r <= rcut - 1.0 + h || r >= rcut - h) continue;
+            Cut_CosS fc(rcut);
+            const double an = fc.calc_double_prime(r);
+            const double fd = fd_double_prime<Cut_CosS>(rcut, r, h);
+            INFO("Cut_CosS rcut=" << rcut << " r=" << r
+                 << " analytical=" << an << " FD=" << fd);
+            CHECK(std::abs(an - fd) < 1e-5);
+        }
+    }
+}
+
+TEST_CASE("Cut_PT calc_double_prime matches central difference",
+          "[MODELS][cutoffs][double_prime][parity]")
+{
+    using tadah::models::Cut_PT;
+    const double h = 1e-6;
+    /* Cut_PT has stiff tails near r=rcut where calc_prime grows fast;
+     * sample the central plateau where curvature is well-behaved. */
+    for (double rcut : {2.5, 3.5, 5.0}) {
+        for (double frac : {0.2, 0.4, 0.6, 0.8}) {
+            const double r = rcut * frac;
+            if (r >= rcut - h) continue;
+            Cut_PT fc(rcut);
+            const double an = fc.calc_double_prime(r);
+            const double fd = fd_double_prime<Cut_PT>(rcut, r, h);
+            INFO("Cut_PT rcut=" << rcut << " r=" << r
+                 << " analytical=" << an << " FD=" << fd);
+            /* PT is steeper than the polynomial cutoffs; relax tolerance
+             * slightly. */
+            CHECK(std::abs(an - fd) < std::max(1e-5, std::abs(fd) * 1e-5));
+        }
+    }
+}
+
+TEST_CASE("Cut_SinInv calc_double_prime matches central difference",
+          "[MODELS][cutoffs][double_prime][parity]")
+{
+    using tadah::models::Cut_SinInv;
+    const double h = 1e-6;
+    for (double rcut : {2.5, 3.5, 5.0}) {
+        for (double r : {0.5, 1.0, 2.0, rcut * 0.9}) {
+            if (r >= rcut - h) continue;
+            Cut_SinInv fc(rcut);
+            const double an = fc.calc_double_prime(r);
+            const double fd = fd_double_prime<Cut_SinInv>(rcut, r, h);
+            INFO("Cut_SinInv rcut=" << rcut << " r=" << r
+                 << " analytical=" << an << " FD=" << fd);
+            CHECK(std::abs(an - fd) < 1e-5);
+        }
+    }
+}
+
+TEST_CASE("Cut_SinInv calc_double_prime returns 0 above rcut",
+          "[MODELS][cutoffs][double_prime]")
+{
+    using tadah::models::Cut_SinInv;
+    Cut_SinInv fc(3.0);
+    CHECK(fc.calc_double_prime(3.0) == 0.0);
+    CHECK(fc.calc_double_prime(5.0) == 0.0);
+}
+
+TEST_CASE("Cut_Dummy calc_double_prime is 0 by inherited default",
+          "[MODELS][cutoffs][double_prime]")
+{
+    using tadah::models::Cut_Dummy;
+    Cut_Dummy fc(3.0);
+    CHECK(fc.calc_double_prime(0.5) == 0.0);
+    CHECK(fc.calc_double_prime(2.0) == 0.0);
+    CHECK(fc.calc_double_prime(5.0) == 0.0);
+}
