@@ -508,7 +508,7 @@ template <typename F>
  * ================================================================== */
 template <typename F>
 bool DM_mEAD<F>::calc_drhoi_dtheta(
-    const std::string& theta_name,
+    DMThetaKey         key,
     int                arg_pos,
     const int          Zi,
     const int          Zj,
@@ -518,15 +518,15 @@ bool DM_mEAD<F>::calc_drhoi_dtheta(
     tadah::core::rho_type&    drhoi,
     const double       scale) const
 {
-  const bool owned = (theta_name == "CGRIDMB" ||
-                      theta_name == "SGRIDMB" ||
-                      theta_name == "RCUTMB"  ||
-                      theta_name == "WATOM");
+  const bool owned = (key == DMThetaKey::CGRIDMB ||
+                      key == DMThetaKey::SGRIDMB ||
+                      key == DMThetaKey::RCUTMB  ||
+                      key == DMThetaKey::WATOM);
   if (!owned) return false;
 
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return false;
 
-  if (theta_name == "WATOM") {
+  if (key == DMThetaKey::WATOM) {
     /* d(rho)/d WATOM[Z_target] = δ(Zj, Z_target) * poly * G(r;eta,mu) * fc(r),
      * the per-pair calc_rho contribution with weights[Zj] removed.
      * Claim ownership on every valid pair so structures without
@@ -569,7 +569,7 @@ bool DM_mEAD<F>::calc_drhoi_dtheta(
   precompute_powers(v[1], Lmax, py);
   precompute_powers(v[2], Lmax, pz);
 
-  if (theta_name == "CGRIDMB") {
+  if (key == DMThetaKey::CGRIDMB) {
     if (arg_pos < 1 || static_cast<std::size_t>(arg_pos) > ng) return false;
     const std::size_t k   = static_cast<std::size_t>(arg_pos - 1);
     const double      mu  = cgrid[k];
@@ -590,7 +590,7 @@ bool DM_mEAD<F>::calc_drhoi_dtheta(
     return true;
   }
 
-  if (theta_name == "SGRIDMB") {
+  if (key == DMThetaKey::SGRIDMB) {
     if (arg_pos < 1 || static_cast<std::size_t>(arg_pos) > ng) return false;
     const std::size_t k   = static_cast<std::size_t>(arg_pos - 1);
     const double      mu  = cgrid[k];
@@ -611,7 +611,7 @@ bool DM_mEAD<F>::calc_drhoi_dtheta(
     return true;
   }
 
-  if (theta_name == "RCUTMB") {
+  if (key == DMThetaKey::RCUTMB) {
     const double dfc = fcut->calc_drcut(rij);
     if (dfc == 0.0) return false;
     StackOrHeapBuffer<MAX_GRID> buf(ng);
@@ -649,17 +649,17 @@ bool DM_mEAD<F>::calc_drhoi_dtheta(
  * ================================================================== */
 template <typename F>
 bool DM_mEAD<F>::calc_daed_dtheta(
-    const std::string& theta_name,
+    DMThetaKey         key,
     int                arg_pos,
     const tadah::core::rho_type& rhoi,
     const tadah::core::rho_type& drhoi,
     tadah::core::aed_type&       daed_out,
     const double       scale) const
 {
-  const bool radial = (theta_name == "CGRIDMB" ||
-                       theta_name == "SGRIDMB" ||
-                       theta_name == "RCUTMB");
-  const bool is_watom = (theta_name == "WATOM");
+  const bool radial = (key == DMThetaKey::CGRIDMB ||
+                       key == DMThetaKey::SGRIDMB ||
+                       key == DMThetaKey::RCUTMB);
+  const bool is_watom = (key == DMThetaKey::WATOM);
 
   const std::size_t ng = cgrid.size();
   if (ng == 0) return false;
@@ -671,6 +671,9 @@ bool DM_mEAD<F>::calc_daed_dtheta(
      * to daed_p = scale * f[L,o] * dF/dtheta. F decides ownership;
      * component-local theta (CEMBFUNC[i] / SEMBFUNC[i] for F_Blip /
      * F_mEnv) return false on p != i-1. */
+    /* F_Base::calc_dF_dtheta still takes std::string — build once
+     * here, reuse across the (L,o,p) loop. One allocation per call. */
+    const std::string theta_name_str(dm_theta_name(key));
     bool any_contrib = false;
     if constexpr (F::expands_dimensions) {
       std::size_t Lshift = 0;
@@ -682,7 +685,7 @@ bool DM_mEAD<F>::calc_daed_dtheta(
           ++ii_rho;
           for (std::size_t p = 0; p < odim; ++p) {
             double dFdtheta = 0.0;
-            if (!emb.calc_dF_dtheta(rho, p, theta_name, arg_pos, dFdtheta))
+            if (!emb.calc_dF_dtheta(rho, p, theta_name_str, arg_pos, dFdtheta))
               continue;
             daed_out(p + Lshift + fidx) += scale * f * dFdtheta;
             any_contrib = true;
@@ -700,7 +703,7 @@ bool DM_mEAD<F>::calc_daed_dtheta(
           for (std::size_t c = 0; c < ng; ++c, ++ii) {
             const double rho = rhoi(ii);
             double dFdtheta = 0.0;
-            if (!emb.calc_dF_dtheta(rho, c, theta_name, arg_pos, dFdtheta))
+            if (!emb.calc_dF_dtheta(rho, c, theta_name_str, arg_pos, dFdtheta))
               continue;
             daed_out(c + Lshift + fidx) += scale * f * dFdtheta;
             any_contrib = true;
@@ -716,11 +719,11 @@ bool DM_mEAD<F>::calc_daed_dtheta(
    * here. RCUTMB fans out across every c (no arg_pos to validate).
    * WATOM also fans out — its arg_pos validation against the ATOM list
    * already happened in calc_drhoi_dtheta. */
-  if (radial && theta_name != "RCUTMB") {
+  if (radial && key != DMThetaKey::RCUTMB) {
     if (arg_pos < 1 || static_cast<std::size_t>(arg_pos) > ng) return false;
   }
 
-  const bool        is_rcut = (theta_name == "RCUTMB");
+  const bool        is_rcut = (key == DMThetaKey::RCUTMB);
   const std::size_t k       = (is_rcut || is_watom)
                               ? 0
                               : static_cast<std::size_t>(arg_pos - 1);
@@ -796,7 +799,7 @@ bool DM_mEAD<F>::calc_daed_dtheta(
  * ================================================================== */
 template <typename F>
 bool DM_mEAD<F>::calc_dXijdri_dtheta(
-    const std::string& theta_name,
+    DMThetaKey         key,
     int                arg_pos,
     const int          Zi,
     const int          Zj,
@@ -808,16 +811,16 @@ bool DM_mEAD<F>::calc_dXijdri_dtheta(
     tadah::core::fd_type& fd_ij,
     const double       scale) const
 {
-  const bool radial = (theta_name == "CGRIDMB" ||
-                       theta_name == "SGRIDMB" ||
-                       theta_name == "RCUTMB");
-  const bool is_rcut  = (theta_name == "RCUTMB");
-  const bool is_watom = (theta_name == "WATOM");
+  const bool radial = (key == DMThetaKey::CGRIDMB ||
+                       key == DMThetaKey::SGRIDMB ||
+                       key == DMThetaKey::RCUTMB);
+  const bool is_rcut  = (key == DMThetaKey::RCUTMB);
+  const bool is_watom = (key == DMThetaKey::WATOM);
   /* CEMBFUNC / SEMBFUNC / RCUTENV are F-side. Any other key is
    * unowned. */
-  const bool embedding = (theta_name == "CEMBFUNC" ||
-                          theta_name == "SEMBFUNC" ||
-                          theta_name == "RCUTENV");
+  const bool embedding = (key == DMThetaKey::CEMBFUNC ||
+                          key == DMThetaKey::SEMBFUNC ||
+                          key == DMThetaKey::RCUTENV);
   if (!radial && !embedding && !is_watom) return false;
 
   if (!is_init_for_atoms(Zi, Zj) || rij > get_rcut()) return false;
@@ -882,7 +885,7 @@ bool DM_mEAD<F>::calc_dXijdri_dtheta(
     const std::size_t k = is_rcut ? 0
                                   : static_cast<std::size_t>(arg_pos - 1);
 
-    if (theta_name == "CGRIDMB") {
+    if (key == DMThetaKey::CGRIDMB) {
       const double eta = sgrid[k];
       const double mu  = cgrid[k];
       const double rm  = rij - mu;
@@ -894,7 +897,7 @@ bool DM_mEAD<F>::calc_dXijdri_dtheta(
        *   = 2*eta*rm * dg_k + 2*eta * g_k     (E*fc = g_k, E*X = dg_k) */
       dg_dtheta_arr[k]  = 2.0 * eta * rm * g_k;
       ddg_dtheta_arr[k] = 2.0 * eta * (rm * dg_k + g_k);
-    } else if (theta_name == "SGRIDMB") {
+    } else if (key == DMThetaKey::SGRIDMB) {
       const double mu  = cgrid[k];
       const double rm  = rij - mu;
       const double g_k  = buf.g ()[k];
@@ -930,6 +933,13 @@ bool DM_mEAD<F>::calc_dXijdri_dtheta(
   detail::precompute_powers(x, Lmax, px, dpx);
   detail::precompute_powers(y, Lmax, py, dpy);
   detail::precompute_powers(z, Lmax, pz, dpz);
+
+  /* F_Base::calc_dFp_dtheta still takes std::string; build once for
+   * the embedding branch and reuse across (L,o,p). One allocation
+   * per kernel call, hit only when this kernel handles an embedding θ. */
+  const std::string theta_name_str = embedding
+                                     ? std::string(dm_theta_name(key))
+                                     : std::string{};
 
   bool any_contrib = false;
 
@@ -1000,7 +1010,7 @@ bool DM_mEAD<F>::calc_dXijdri_dtheta(
             }
           } else { /* embedding */
             double dFp_dtheta = 0.0;
-            if (!emb.calc_dFp_dtheta(rho, p, theta_name, arg_pos, dFp_dtheta))
+            if (!emb.calc_dFp_dtheta(rho, p, theta_name_str, arg_pos, dFp_dtheta))
               continue;
             d_f_Fp_dtheta = f * dFp_dtheta;
           }
@@ -1095,7 +1105,7 @@ bool DM_mEAD<F>::calc_dXijdri_dtheta(
             }
           } else {
             double dFp_dtheta = 0.0;
-            if (!emb.calc_dFp_dtheta(rho, c, theta_name, arg_pos, dFp_dtheta))
+            if (!emb.calc_dFp_dtheta(rho, c, theta_name_str, arg_pos, dFp_dtheta))
               continue;
             d_f_Fp_dtheta = f * dFp_dtheta;
           }

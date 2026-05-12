@@ -84,6 +84,11 @@ public:
     tadah::core::rho_type& rho,
     const double scale=1) const override;
 
+  /* Bring base string-keyed shims into scope. */
+  using DM_Base::calc_drhoi_dtheta;
+  using DM_Base::calc_daed_dtheta;
+  using DM_Base::calc_dXijdri_dtheta;
+
   /** \brief Closed-form per-pair contribution to drho_i/dtheta for DM_EAD.
    *
    *  Math (cgrid component c, angular orbital (L, o = (lx,ly,lz))):
@@ -102,7 +107,7 @@ public:
    *  drhoi entries for c == k. RCUTMB fans out across every component.
    */
   bool calc_drhoi_dtheta(
-      const std::string& theta_name,
+      DMThetaKey         key,
       int                arg_pos,
       const int          Zi,
       const int          Zj,
@@ -126,7 +131,7 @@ public:
    *  vanishes.
    */
   bool calc_daed_dtheta(
-      const std::string& theta_name,
+      DMThetaKey         key,
       int                arg_pos,
       const tadah::core::rho_type& rhoi,
       const tadah::core::rho_type& drhoi,

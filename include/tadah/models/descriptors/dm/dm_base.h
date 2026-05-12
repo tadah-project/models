@@ -2,10 +2,56 @@
 #define DM_BASE_H
 
 #include <tadah/models/descriptors/d_base.h>
+#include <cstdint>
 #include <string>
 
 namespace tadah {
 namespace models {
+
+/** Compact key enum for DM-arm θ-derivative dispatch. The walker decodes
+ *  the OPTIM theta_name once per outer call, then the per-pair kernels
+ *  branch on a 1-byte enum compare instead of std::string ==. Saves the
+ *  O(220M) byte-compare ladder per gradient on BASINSv2_blip6. */
+enum class DMThetaKey : std::uint8_t {
+  None     = 0,
+  CGRIDMB  = 1,
+  SGRIDMB  = 2,
+  RCUTMB   = 3,
+  WATOM    = 4,
+  CEMBFUNC = 5,
+  SEMBFUNC = 6,
+  RCUTENV  = 7,
+};
+
+inline DMThetaKey decode_dm_theta(const std::string& s) noexcept {
+  if (s.size() < 5) return DMThetaKey::None;
+  if (s == "CGRIDMB")  return DMThetaKey::CGRIDMB;
+  if (s == "SGRIDMB")  return DMThetaKey::SGRIDMB;
+  if (s == "RCUTMB")   return DMThetaKey::RCUTMB;
+  if (s == "WATOM")    return DMThetaKey::WATOM;
+  if (s == "CEMBFUNC") return DMThetaKey::CEMBFUNC;
+  if (s == "SEMBFUNC") return DMThetaKey::SEMBFUNC;
+  if (s == "RCUTENV")  return DMThetaKey::RCUTENV;
+  return DMThetaKey::None;
+}
+
+/** Reverse mapping for the cases where a kernel needs to forward to a
+ *  string-keyed downstream API (F_Base::calc_dF_dtheta /
+ *  F_Base::calc_dFp_dtheta still take a std::string). Returns a stable
+ *  const char*, never deallocated. */
+inline const char* dm_theta_name(DMThetaKey k) noexcept {
+  switch (k) {
+    case DMThetaKey::CGRIDMB:  return "CGRIDMB";
+    case DMThetaKey::SGRIDMB:  return "SGRIDMB";
+    case DMThetaKey::RCUTMB:   return "RCUTMB";
+    case DMThetaKey::WATOM:    return "WATOM";
+    case DMThetaKey::CEMBFUNC: return "CEMBFUNC";
+    case DMThetaKey::SEMBFUNC: return "SEMBFUNC";
+    case DMThetaKey::RCUTENV:  return "RCUTENV";
+    case DMThetaKey::None:     return "";
+  }
+  return "";
+}
 
 /** \brief Base class for all many-body type descriptors.
  *
@@ -129,7 +175,7 @@ public:
    *  are numerical-only (DM_EAM, DM_mEAD) keep the default.
    */
   virtual bool calc_drhoi_dtheta(
-      const std::string& /*theta_name*/,
+      DMThetaKey         /*key*/,
       int                /*arg_pos*/,
       const int          /*Zi*/,
       const int          /*Zj*/,
@@ -139,6 +185,23 @@ public:
       tadah::core::rho_type& /*drhoi*/,
       const double       /*scale=1*/) const {
     return false;
+  }
+
+  /** Back-compat string-keyed shim. Decodes once and dispatches to the
+   *  enum-keyed virtual above. NOT virtual — derived classes override
+   *  the enum form. Layer-1 tests still call this signature. */
+  bool calc_drhoi_dtheta(
+      const std::string& theta_name,
+      int                arg_pos,
+      const int          Zi,
+      const int          Zj,
+      const double       rij,
+      const double       rij_sq,
+      const tadah::core::Vec3d& vec_ij,
+      tadah::core::rho_type& drhoi,
+      const double       scale=1) const {
+    return calc_drhoi_dtheta(decode_dm_theta(theta_name), arg_pos,
+                             Zi, Zj, rij, rij_sq, vec_ij, drhoi, scale);
   }
 
   /** \brief Closed-form per-atom contribution to daed/dtheta.
@@ -163,13 +226,25 @@ public:
    *  Default returns false.
    */
   virtual bool calc_daed_dtheta(
-      const std::string& /*theta_name*/,
+      DMThetaKey         /*key*/,
       int                /*arg_pos*/,
       const tadah::core::rho_type& /*rhoi*/,
       const tadah::core::rho_type& /*drhoi*/,
       tadah::core::aed_type& /*daed_out*/,
       const double       /*scale=1*/) const {
     return false;
+  }
+
+  /** Back-compat string-keyed shim — decodes once, calls enum virtual. */
+  bool calc_daed_dtheta(
+      const std::string& theta_name,
+      int                arg_pos,
+      const tadah::core::rho_type& rhoi,
+      const tadah::core::rho_type& drhoi,
+      tadah::core::aed_type& daed_out,
+      const double       scale=1) const {
+    return calc_daed_dtheta(decode_dm_theta(theta_name), arg_pos,
+                            rhoi, drhoi, daed_out, scale);
   }
 
   /** \brief Closed-form per-pair contribution to d(fd_ij)/dtheta — the
@@ -212,7 +287,7 @@ public:
    *  Default returns false (descriptor doesn't own this theta on the
    *  force side; orchestrator routes to needs_fd). */
   virtual bool calc_dXijdri_dtheta(
-      const std::string& /*theta_name*/,
+      DMThetaKey         /*key*/,
       int                /*arg_pos*/,
       const int          /*Zi*/,
       const int          /*Zj*/,
@@ -224,6 +299,24 @@ public:
       tadah::core::fd_type& /*fd_ij_out*/,
       const double       /*scale=1*/) const {
     return false;
+  }
+
+  /** Back-compat string-keyed shim — decodes once, calls enum virtual. */
+  bool calc_dXijdri_dtheta(
+      const std::string& theta_name,
+      int                arg_pos,
+      const int          Zi,
+      const int          Zj,
+      const double       rij,
+      const double       rij_sq,
+      const tadah::core::Vec3d& vec_ij,
+      const tadah::core::rho_type& rhoi,
+      const tadah::core::rho_type& drhoi_dtheta,
+      tadah::core::fd_type& fd_ij_out,
+      const double       scale=1) const {
+    return calc_dXijdri_dtheta(decode_dm_theta(theta_name), arg_pos,
+                               Zi, Zj, rij, rij_sq, vec_ij,
+                               rhoi, drhoi_dtheta, fd_ij_out, scale);
   }
 
 

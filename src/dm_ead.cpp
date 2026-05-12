@@ -361,7 +361,7 @@ void DM_EAD::calc_rho(int Zi,int Zj,double rij,double,
  *  drho_i/dtheta — per-pair accumulator (analog of calc_rho)         *
  * ------------------------------------------------------------------ */
 bool DM_EAD::calc_drhoi_dtheta(
-    const std::string& theta_name,
+    DMThetaKey         key,
     int                arg_pos,
     const int          Zi,
     const int          Zj,
@@ -371,16 +371,16 @@ bool DM_EAD::calc_drhoi_dtheta(
     core::rho_type&    drhoi,
     const double       scale) const
 {
-  /* Cheap theta-name short-circuit before any pair-level math. */
-  const bool owned = (theta_name == "CGRIDMB" ||
-                      theta_name == "SGRIDMB" ||
-                      theta_name == "RCUTMB"  ||
-                      theta_name == "WATOM");
+  /* Cheap key short-circuit before any pair-level math. */
+  const bool owned = (key == DMThetaKey::CGRIDMB ||
+                      key == DMThetaKey::SGRIDMB ||
+                      key == DMThetaKey::RCUTMB  ||
+                      key == DMThetaKey::WATOM);
   if (!owned) return false;
 
   if(!is_init_for_atoms(Zi,Zj) || rij>get_rcut()) return false;
 
-  if (theta_name == "WATOM") {
+  if (key == DMThetaKey::WATOM) {
     /* d(rho)/d WATOM[Z_target] = δ(Zj, Z_target) * poly * G(r; eta, mu) * fc(r),
      * the per-pair calc_rho contribution with weights[Zj] removed.
      * Claim ownership on every valid pair so structures without
@@ -423,7 +423,7 @@ bool DM_EAD::calc_drhoi_dtheta(
   precompute_powers(v[1],Lmax,py);
   precompute_powers(v[2],Lmax,pz);
 
-  if (theta_name == "CGRIDMB") {
+  if (key == DMThetaKey::CGRIDMB) {
     if (arg_pos < 1 || static_cast<std::size_t>(arg_pos) > ng) return false;
     const std::size_t k   = static_cast<std::size_t>(arg_pos - 1);
     const double      mu  = cgrid[k];
@@ -446,7 +446,7 @@ bool DM_EAD::calc_drhoi_dtheta(
     return true;
   }
 
-  if (theta_name == "SGRIDMB") {
+  if (key == DMThetaKey::SGRIDMB) {
     if (arg_pos < 1 || static_cast<std::size_t>(arg_pos) > ng) return false;
     const std::size_t k   = static_cast<std::size_t>(arg_pos - 1);
     const double      mu  = cgrid[k];
@@ -468,7 +468,7 @@ bool DM_EAD::calc_drhoi_dtheta(
     return true;
   }
 
-  if (theta_name == "RCUTMB") {
+  if (key == DMThetaKey::RCUTMB) {
     /* RCUTMB enters through fc only; G's exponent does not depend on rcut.
      * dG_bare/drcut = exp(-eta(r-mu)^2) * dfc/drcut, fans out across all c. */
     const double dfc = fcut->calc_drcut(rij);
@@ -491,29 +491,29 @@ bool DM_EAD::calc_drhoi_dtheta(
     return true;
   }
 
-  return false;  /* theta_name not owned by DM_EAD. */
+  return false;  /* key not owned by DM_EAD. */
 }
 
 /* ------------------------------------------------------------------ *
  *  daed/dtheta — per-atom reducer (analog of calc_aed)               *
  * ------------------------------------------------------------------ */
 bool DM_EAD::calc_daed_dtheta(
-    const std::string& theta_name,
+    DMThetaKey         key,
     int                arg_pos,
     const core::rho_type& rhoi,
     const core::rho_type& drhoi,
     core::aed_type&    daed_out,
     const double       scale) const
 {
-  if (theta_name != "CGRIDMB" && theta_name != "SGRIDMB" &&
-      theta_name != "RCUTMB"  && theta_name != "WATOM")
+  if (key != DMThetaKey::CGRIDMB && key != DMThetaKey::SGRIDMB &&
+      key != DMThetaKey::RCUTMB  && key != DMThetaKey::WATOM)
     return false;
 
   const std::size_t ng = cgrid.size();
   if (ng == 0) return false;
 
-  const bool is_rcut  = (theta_name == "RCUTMB");
-  const bool is_watom = (theta_name == "WATOM");
+  const bool is_rcut  = (key == DMThetaKey::RCUTMB);
+  const bool is_watom = (key == DMThetaKey::WATOM);
   /* CGRIDMB[k] / SGRIDMB[k] are component-local and need arg_pos in
    * [1, ng]. RCUTMB / WATOM fan out across all c — RCUTMB has no
    * arg_pos to validate; WATOM's arg_pos validation already happened

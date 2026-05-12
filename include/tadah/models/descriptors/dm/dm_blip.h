@@ -102,6 +102,13 @@ public:
     tadah::core::rho_type& rho,
     const double scale=1) const override;
 
+  /* Bring base string-keyed shims into scope (otherwise the enum-keyed
+   * overrides below hide them and Layer-1 tests / legacy walker sites
+   * fail to find the string-keyed overloads). */
+  using DM_Base::calc_drhoi_dtheta;
+  using DM_Base::calc_daed_dtheta;
+  using DM_Base::calc_dXijdri_dtheta;
+
   /** \brief Closed-form per-pair contribution to drho_i/dtheta for DM_Blip.
    *
    *  Math (cgrid component c, angular orbital (L, o = (lx,ly,lz))):
@@ -119,7 +126,7 @@ public:
    *    drho/dRCUTMB     = B(x_c) * dfc/drcut * px py pz       (all c)
    */
   bool calc_drhoi_dtheta(
-      const std::string& theta_name,
+      DMThetaKey         key,
       int                arg_pos,
       const int          Zi,
       const int          Zj,
@@ -139,7 +146,7 @@ public:
    *  in both descriptors, and the same indexing through rhoi/drhoi.
    */
   bool calc_daed_dtheta(
-      const std::string& theta_name,
+      DMThetaKey         key,
       int                arg_pos,
       const tadah::core::rho_type& rhoi,
       const tadah::core::rho_type& drhoi,

@@ -137,6 +137,11 @@ public:
   bool reinit(const tadah::core::Context& ctx) override;
   std::optional<DescriptorMeta> meta() const override;
 
+  /* Bring base string-keyed shims into scope. */
+  using DM_Base::calc_drhoi_dtheta;
+  using DM_Base::calc_daed_dtheta;
+  using DM_Base::calc_dXijdri_dtheta;
+
   /** Closed-form per-pair contribution to drho_i/dtheta — radial-side
    *  theta only (CGRIDMB[k], SGRIDMB[k], RCUTMB). Mirrors DM_EAD's
    *  override byte-for-byte (the density is a radial GTO sum that does
@@ -157,7 +162,7 @@ public:
    *  alone, with no drho/dtheta contribution. They are left for a
    *  follow-up F::calc_dF_dtheta hook (currently fall through to FD). */
   bool calc_drhoi_dtheta(
-      const std::string& theta_name,
+      DMThetaKey         key,
       int                arg_pos,
       const int          Zi,
       const int          Zj,
@@ -183,7 +188,7 @@ public:
    *  (component-local in the standard path; in the expanding path
    *  ng==1 forces k==0). */
   bool calc_daed_dtheta(
-      const std::string& theta_name,
+      DMThetaKey         key,
       int                arg_pos,
       const tadah::core::rho_type& rhoi,
       const tadah::core::rho_type& drhoi,
@@ -222,7 +227,7 @@ public:
    *  required calc_d2F / calc_dFp_dtheta closure (e.g. F_RLR has neither
    *  yet — those θ fall through to FD under HYBRID). */
   bool calc_dXijdri_dtheta(
-      const std::string& theta_name,
+      DMThetaKey         key,
       int                arg_pos,
       const int          Zi,
       const int          Zj,
