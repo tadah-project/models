@@ -46,6 +46,8 @@ The largest module-level surface change of this release: a new family of rotatio
 - Substantive README rewrite (Session B).
 - Community / governance pointer files added.
 - CI/CD: lint + release stages, VERSION wired from blueprint TOML.
+- Unused `suggested_value()` descriptor hook dropped from the descriptor interface (no external callers).
+- Test build routed through `cmake-tools/cmake/TadahTesting.cmake` helpers (`tadah_declare_testing` / `tadah_add_tests`).
 
 ## [1.2.0] and earlier (condensed)
 
