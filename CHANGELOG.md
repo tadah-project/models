@@ -24,7 +24,7 @@ The largest module-level surface change of this release: a new family of rotatio
 - DM_Poly test suite.
 - Doxygen / LaTeX documentation for basis functions and `DM_Blip`.
 - `TADAH_ENABLE_ASAN` CMake option.
-- **Per-descriptor `meta()` schema for the HPO bound-validation pipeline**: `param_meta.h` declares `ParamMeta` / `DescriptorMeta` / `SeedView` / `HealthVerdict`, `closed_form_meta.h` provides the shared 2-body factory, and `D_Base::meta()` is the new virtual hook (default `nullopt`; existing `suggested_value()` remains as fallback). `meta()` implementations land for D2_LJ/MIE/ZBL/Blip/BP/EAM and DM_Blip/EAD/EAM/mEAD/Poly. The `DM_mEAD<F_mEnv<Cut_SinInv>>` specialisation (registered as `DM_mBlipEnv`) carries the ρ-collapse cross-param check that would have caught the BASINS silent zero-block failure.
+- **Per-descriptor `meta()` schema for the HPO bound-validation pipeline**: `param_meta.h` declares `ParamMeta` / `DescriptorMeta` / `SeedView` / `HealthVerdict`, `closed_form_meta.h` provides the shared 2-body factory, and `D_Base::meta()` is the new virtual hook (default `nullopt`). `meta()` implementations land for D2_LJ/MIE/ZBL/Blip/BP/EAM and DM_Blip/EAD/EAM/mEAD/Poly. The `DM_mEAD<F_mEnv<Cut_SinInv>>` specialisation (registered as `DM_mBlipEnv`) carries the ρ-collapse cross-param check that would have caught the BASINS silent zero-block failure.
 
 ### Changed
 - **`Cut_PT` normalised so that f(0) = 1.** Previously the polynomial cutoff was off by a constant, which silently rescaled descriptors that used it. Energies/forces/stresses computed with `Cut_PT` against v1.1.1 will differ. See the umbrella migration guide.

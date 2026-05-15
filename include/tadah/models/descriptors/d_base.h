@@ -126,36 +126,12 @@ public:
   static std::vector<std::string> get_init_atoms(const tadah::core::Context &c, std::string type);
   virtual std::vector<std::string> get_init_atoms(const tadah::core::Context &c)=0;
 
-  /** \brief Suggested physically-motivated default for an OPTIM-able
-   * parameter belonging to this descriptor.
-   *
-   * Used by the HPO PRIOR initialisation strategy. Returns std::nullopt
-   * (the base-class default) when no prior is known for the (key,
-   * arg_pos) pair; HPO will then fall back to the geometric/arithmetic
-   * mid-point of the [low, high] bounds.
-   *
-   * Concrete descriptors are encouraged to override this whenever the
-   * literature suggests a sensible default for a given parameter (e.g.
-   * typical RCUT for a given coordination shell, typical SIGMA width
-   * for a Gaussian basis).
-   *
-   * @param key      OPTIM key (e.g. "RCUT2B", "SGRID2B", "CEMBFUNC").
-   * @param arg_pos  Numeric ordinal of the parameter within the key's
-   *                 value list (1-based, matching the OPTIM (n) syntax).
-   *                 Pass -1 when the descriptor is scalar in this key.
-   */
-  virtual std::optional<double>
-  suggested_value(const std::string& /*key*/, int /*arg_pos*/) const {
-    return std::nullopt;
-  }
-
   /** \brief Per-descriptor parameter metadata for the HPO bound-validation
    *  pipeline (audit, suggester, per-iter health monitor).
    *
    *  Default `std::nullopt` means "no metadata supplied" — the audit
    *  treats the descriptor as opaque (skips block-level health checks
-   *  that depend on metadata) and `suggested_value` (above) remains the
-   *  only optional hint mechanism. Concrete descriptors override this
+   *  that depend on metadata). Concrete descriptors override this
    *  method to declare their parameter physics. See the merry-peacock
    *  plan §"Examples — what `meta()` actually looks like" for canonical
    *  shapes (D2_LJ scalar, D2_Blip vector, DM_mBlipEnv full).
