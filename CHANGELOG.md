@@ -7,7 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 Nothing yet.
 
-## [1.3.0-beta.1] — TBD
+## [1.3.0-beta.1] — 2026-05-20
 
 The largest module-level surface change of this release: a new family of rotationally invariant power-spectrum descriptors (`DM_Poly` and friends), new `F_Blip` / `DM_mBlip` / `DM_mBlipEnv` embedding-function descriptors, in-place HPO `reinit()` plumbing, and a corrected `Cut_PT` normalisation.
 
