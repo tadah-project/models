@@ -1,5 +1,6 @@
 #include "tadah/models/descriptors/dm/dm_base.h"
 #include <tadah/models/descriptors/dm/dm_eam.h>
+#include <tadah/models/descriptors/closed_form_meta.h>
 namespace tadah {
 namespace models {
 
@@ -228,6 +229,10 @@ void DM_EAM::calc_rho(
 }
 void DM_EAM::init() {
   nparams=1;
+}
+
+std::optional<DescriptorMeta> DM_EAM::meta() const {
+  return make_closed_form_meta("DM_EAM", "RCUTMB");
 }
 
 } // namespace models

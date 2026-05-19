@@ -33,6 +33,25 @@ class Kern_Sigmoid : public virtual Kern_Base {
         tadah::core::aed_type derivative(const tadah::core::aed_type& b, const tadah::core::aed_type& af) const override;
         double prime(const tadah::core::aed_type& b, const tadah::core::aed_type& af, const tadah::core::aed_type& ff) const override;
 
+        /** Closed-form analytical derivatives of K w.r.t. gamma and c.
+         *
+         *    K(b, af) = tanh(gamma * (b . af) + c)
+         *    dK/d gamma = (1 - K^2) * (b . af)
+         *    dK/d c     = (1 - K^2)
+         *
+         *  MPARAMS layout: [gamma, c]. arg_pos counts numerical tokens
+         *  1-based (see HPOTargets::ui_offset).
+         *   - ("MPARAMS", 1) -> dK/d gamma
+         *   - ("MPARAMS", 2) -> dK/d c
+         *  Anything else returns false.
+         */
+        bool calc_dKdtheta(
+            const std::string& theta_name,
+            int                arg_pos,
+            const tadah::core::aed_type& b,
+            const tadah::core::aed_type& af,
+            double& dK_out) const override;
+
         std::string get_label() const override;
 
 };

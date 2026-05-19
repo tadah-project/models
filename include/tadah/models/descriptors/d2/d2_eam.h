@@ -82,6 +82,7 @@ public:
 
   std::string label() const override;
   void init() override;
+  std::optional<DescriptorMeta> meta() const override;
 };
 } // namespace models
 } // namespace tadah

@@ -258,6 +258,21 @@ inline double dB(double r, double eta, double miu) {
   return dB(eta*(r-miu), eta);
 }
 
+/** \brief Second derivative of the blip basis function w.r.t.\ \f$ x_c \f$.
+ *
+ * Piecewise quadratic — discontinuous at \f$ |x_c| = 1 \f$ (B is C^1
+ * globally but only C^2 outside |x_c|=1). Used by HPO analytical-gradient
+ * code paths that need the F''(rho) chain through Blip embeddings.
+ *
+ * \param x_c normalised coordinate \f$ x_c = \eta(r-r_s) \f$
+ */
+inline double d2B(double x_c) {
+  if (-2.0 < x_c && x_c <= -1.0) return 1.5 * (2.0 + x_c);
+  if (-1.0 < x_c && x_c <= 1.0)  return -3.0 + 4.5 * std::fabs(x_c);
+  if (1.0 < x_c && x_c < 2.0)    return 1.5 * (2.0 - x_c);
+  return 0.0;
+}
+
 /** @} */ // end of BasisFunctions group
 
 } // namespace models

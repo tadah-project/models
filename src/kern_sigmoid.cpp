@@ -27,6 +27,30 @@ double Kern_Sigmoid::prime(const tadah::core::aed_type& b, const tadah::core::ae
 {
     return derivative(b, af)*ff;
 }
+// Closed-form derivatives of K w.r.t. gamma and c.
+// K = tanh(u), u = gamma * (b.af) + c; (1 - K^2) is the sech^2 factor.
+bool Kern_Sigmoid::calc_dKdtheta(
+    const std::string& theta_name,
+    int                arg_pos,
+    const tadah::core::aed_type& b,
+    const tadah::core::aed_type& af,
+    double& dK_out) const
+{
+    if (theta_name != "MPARAMS") return false;
+    const double dot = b * af;
+    const double k = std::tanh(gamma * dot + c);
+    const double sech2 = 1.0 - k * k;
+    if (arg_pos == 1) {        // dK/d gamma
+        dK_out = sech2 * dot;
+        return true;
+    }
+    if (arg_pos == 2) {        // dK/d c
+        dK_out = sech2;
+        return true;
+    }
+    return false;
+}
+
 std::string Kern_Sigmoid::get_label() const
 {
     return label;

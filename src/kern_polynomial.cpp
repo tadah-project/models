@@ -27,6 +27,30 @@ double Kern_Polynomial::prime(const tadah::core::aed_type& b, const tadah::core:
 {
     return derivative(b, af)*ff;
 }
+// Closed-form derivatives of K w.r.t. gamma and c. d is integer and
+// is not HPO-tunable. Common factor: d * (gamma * b.af + c)^(d-1).
+bool Kern_Polynomial::calc_dKdtheta(
+    const std::string& theta_name,
+    int                arg_pos,
+    const tadah::core::aed_type& b,
+    const tadah::core::aed_type& af,
+    double& dK_out) const
+{
+    if (theta_name != "MPARAMS") return false;
+    const double dot = b * af;
+    const double base = gamma * dot + c;
+    const double common = static_cast<double>(d) * std::pow(base, d - 1);
+    if (arg_pos == 2) {        // dK/d gamma
+        dK_out = common * dot;
+        return true;
+    }
+    if (arg_pos == 3) {        // dK/d c
+        dK_out = common;
+        return true;
+    }
+    return false;
+}
+
 std::string Kern_Polynomial::get_label() const
 {
     return label;

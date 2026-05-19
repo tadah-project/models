@@ -2,11 +2,21 @@
 namespace tadah {
 namespace models {
 
-template<> tadah::core::Registry<D_Base>::Map tadah::core::Registry<D_Base>::registry{};
-template<> tadah::core::Registry<D_Base,tadah::core::Context&>::Map tadah::core::Registry<D_Base,tadah::core::Context&>::registry{};
-template<> tadah::core::Registry<D_Base,const tadah::core::Context&>::Map tadah::core::Registry<D_Base,const tadah::core::Context&>::registry{};
-template<> tadah::core::Registry<D2_Base,tadah::core::Context&>::Map tadah::core::Registry<D2_Base,tadah::core::Context&>::registry{};
-template<> tadah::core::Registry<D2_Base,const tadah::core::Context&>::Map tadah::core::Registry<D2_Base,const tadah::core::Context&>::registry{};
+template<>
+tadah::core::Registry<D_Base>::Map& tadah::core::Registry<D_Base>::registry =
+  tadah::core::Registry<tadah::models::D_Base>::instance();
+template<>
+tadah::core::Registry<D_Base,tadah::core::Context&>::Map& tadah::core::Registry<D_Base,tadah::core::Context&>::registry =
+  tadah::core::Registry<tadah::models::D_Base,tadah::core::Context&>::instance();
+template<>
+tadah::core::Registry<D_Base,const tadah::core::Context&>::Map& tadah::core::Registry<D_Base,const tadah::core::Context&>::registry =
+  tadah::core::Registry<tadah::models::D_Base,const tadah::core::Context&>::instance();
+template<>
+tadah::core::Registry<D2_Base,tadah::core::Context&>::Map& tadah::core::Registry<D2_Base,tadah::core::Context&>::registry =
+  tadah::core::Registry<tadah::models::D2_Base,tadah::core::Context&>::instance();
+template<>
+tadah::core::Registry<D2_Base,const tadah::core::Context&>::Map& tadah::core::Registry<D2_Base,const tadah::core::Context&>::registry =
+  tadah::core::Registry<tadah::models::D2_Base,const tadah::core::Context&>::instance();
 
 tadah::core::Registry<D_Base>::Register<D2_Blip> D2_Blip_0( "D2_Blip" );
 tadah::core::Registry<D_Base>::Register<D2_BP> D2_BP_0( "D2_BP" );
@@ -55,4 +65,3 @@ tadah::core::Registry<D2_Base,const tadah::core::Context&>::Register<D2_mJoin> c
 
 } // namespace models
 } // namespace tadah
-

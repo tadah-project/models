@@ -58,6 +58,76 @@ public:
    */
   virtual double calc_dF(double rho, size_t p) const = 0;
 
+  /**
+   * @brief Closed-form derivative of calc_F w.r.t. a Context-tunable
+   *        embedding-function parameter, with rho held fixed.
+   *
+   * Called by DM_mEAD<F>::calc_daed_dtheta on the embedding side
+   * (theta_name in {CEMBFUNC, SEMBFUNC, RCUTENV, ...} — anything F
+   * owns rather than DM_mEAD's radial layer). The radial side
+   * (CGRIDMB / SGRIDMB / RCUTMB) is handled by DM_mEAD directly.
+   *
+   * Returns `true` iff this F owns the (theta_name, arg_pos) pair AND
+   * the derivative is non-zero at output channel `p`. Component-local
+   * theta (e.g. F_Blip's CEMBFUNC[i] only touches p == i-1) must
+   * return `false` when `p` doesn't match — the orchestrator counts
+   * `true` returns to decide whether the theta is FD-fallback-able.
+   *
+   * Defaults to `false` (no ownership). F_Blip and F_mEnv override.
+   *
+   * @param rho        Electron density at this orbital.
+   * @param p          Output-channel index (0..output_dim()-1).
+   * @param theta_name OPTIM key, upper-case.
+   * @param arg_pos    1-based index for vector parameters, -1 for scalars.
+   * @param out        Filled with d calc_F / d theta on success.
+   */
+  virtual bool calc_dF_dtheta(double /*rho*/, size_t /*p*/,
+                              const std::string& /*theta_name*/,
+                              int /*arg_pos*/,
+                              double& /*out*/) const {
+    return false;
+  }
+
+  /** \brief Second derivative of F: F''(rho, p) = d^2 F / d rho^2.
+   *
+   * Used by DM_mEAD<F>::calc_dXijdri_dtheta for the radial-theta chain
+   * d(F'(rho))/d theta_radial = F''(rho) * drho/d theta_radial — i.e.
+   * how the rho-dependence of theta propagates through F'(rho) into the
+   * force descriptor.
+   *
+   * Returns `true` iff this F has an analytical second derivative AND
+   * filled `out`. Default returns false; DM_mEAD falls back by reporting
+   * the radial-theta force derivative as unowned and letting the
+   * orchestrator route to FD.
+   *
+   * F_Blip, F_mEnv override; F_RLR / F_SQRT / F_SQ leave the default
+   * (force-side radial closed forms not yet wired for those F's).
+   */
+  virtual bool calc_d2F(double /*rho*/, size_t /*p*/,
+                        double& /*out*/) const {
+    return false;
+  }
+
+  /** \brief Closed-form derivative of F'(rho) (i.e. dF/drho) wrt a
+   *  Context-tunable embedding-function parameter, with rho held fixed.
+   *
+   * Companion to calc_dF_dtheta but for F' rather than F: used by
+   * DM_mEAD<F>::calc_dXijdri_dtheta to chain
+   *    d(fd_ij)/d theta_emb = scale * w * f[L,o] * (∂F'/∂theta) * term_k
+   * for embedding-side theta (CEMBFUNC, SEMBFUNC, RCUTENV) — rho is
+   * independent of these, so the only contribution is through F'.
+   *
+   * Returns `true` iff this F owns the (theta_name, arg_pos) pair AND
+   * the derivative is non-zero at output channel `p`. Component-local
+   * theta (CEMBFUNC[i] only touches p == i-1) returns false when p
+   * doesn't match. Defaults to false; F_Blip and F_mEnv override. */
+  virtual bool calc_dFp_dtheta(double /*rho*/, size_t /*p*/,
+                               const std::string& /*theta_name*/,
+                               int /*arg_pos*/,
+                               double& /*out*/) const {
+    return false;
+  }
+
   virtual ~F_Base() = default;
 };
 
@@ -185,6 +255,33 @@ public:
   double calc_F(double rho,size_t p) const override final;
   double calc_dF(double rho,size_t p) const override final;
 
+  /** Closed-form derivatives for CEMBFUNC[i] / SEMBFUNC[i] with rho
+   *  held fixed. Component-local: returns false unless p == i-1.
+   *
+   *  With x_c = eta_p * (rho - mu_p), the underlying chain is:
+   *    dB(x_c)/dCEMBFUNC[i] = dB/dx_c * dx_c/dmu_p = -eta_p * dB/dx_c
+   *    dB(x_c)/dSEMBFUNC[i] = dB/dx_c * dx_c/deta_p = (rho - mu_p) * dB/dx_c
+   *
+   *  Both expressed in terms of the existing dB(x_c, eta) = eta * dB/dx_c
+   *  helper from d_basis_functions.h. */
+  bool calc_dF_dtheta(double rho, size_t p,
+                      const std::string& theta_name, int arg_pos,
+                      double& out) const override final;
+
+  /** F''(rho, p) = eta_p^2 * d2B/dx_c^2(x_c). Always returns true. */
+  bool calc_d2F(double rho, size_t p, double& out) const override final;
+
+  /** Closed-form derivatives of F'(rho, p) = eta_p * dB/dx_c w.r.t.
+   *  CEMBFUNC[i] / SEMBFUNC[i] with rho held fixed (component-local on p).
+   *
+   *    d F'/d CEMBFUNC[i] (i-1 == p): -eta_p^2 * d2B/dx_c^2 (x_c)
+   *    d F'/d SEMBFUNC[i] (i-1 == p): dB/dx_c(x_c) + eta_p*(rho-mu_p)*d2B/dx_c^2(x_c)
+   *
+   *  Returns false on unknown theta_name / out-of-range arg_pos /
+   *  component mismatch. */
+  bool calc_dFp_dtheta(double rho, size_t p,
+                       const std::string& theta_name, int arg_pos,
+                       double& out) const override final;
 };
 
 /**
@@ -236,6 +333,138 @@ public:
   double calc_dF(double rho, size_t p) const override final {
     return fcut.calc(rho) * dB(rho, sfuncgrid[p], cfuncgrid[p])
          + fcut.calc_prime(rho) * B(rho, sfuncgrid[p], cfuncgrid[p]);
+  }
+  /** Closed-form derivatives for F_mEnv's embedding-side theta.
+   *
+   *  Product rule on F(rho, p) = fcut(rho) * B(rho, eta_p, mu_p):
+   *
+   *    dF/dCEMBFUNC[i] (only p == i-1): fcut(rho) * dB/dmu_p
+   *    dF/dSEMBFUNC[i] (only p == i-1): fcut(rho) * dB/deta_p
+   *    dF/dRCUTENV   (every p):         dfcut/drcut(rho) * B(rho, eta_p, mu_p)
+   *
+   *  RCUTENV is the only fanned-out parameter (fcut is shared across
+   *  all output channels). CEMBFUNC / SEMBFUNC are component-local
+   *  exactly like F_Blip's overrides. */
+  bool calc_dF_dtheta(double rho, size_t p,
+                      const std::string& theta_name, int arg_pos,
+                      double& out) const override final {
+    out = 0.0;
+    if (theta_name == "CEMBFUNC") {
+      if (arg_pos < 1 ||
+          static_cast<std::size_t>(arg_pos) > cfuncgrid.size()) return false;
+      const std::size_t i = static_cast<std::size_t>(arg_pos - 1);
+      if (i != p) return false;
+      const double eta = sfuncgrid[p];
+      const double mu  = cfuncgrid[p];
+      const double x_c = eta * (rho - mu);
+      /* dB/dmu = -eta * dB/dx_c = -dB(x_c, eta). */
+      out = fcut.calc(rho) * (-dB(x_c, eta));
+      return true;
+    }
+    if (theta_name == "SEMBFUNC") {
+      if (arg_pos < 1 ||
+          static_cast<std::size_t>(arg_pos) > sfuncgrid.size()) return false;
+      const std::size_t i = static_cast<std::size_t>(arg_pos - 1);
+      if (i != p) return false;
+      const double eta = sfuncgrid[p];
+      const double mu  = cfuncgrid[p];
+      if (eta == 0.0) return true;  /* out=0, theta is owned. */
+      const double x_c = eta * (rho - mu);
+      /* dB/deta = (rho - mu) * dB/dx_c = ((rho-mu)/eta) * dB(x_c, eta). */
+      out = fcut.calc(rho) * (rho - mu) / eta * dB(x_c, eta);
+      return true;
+    }
+    if (theta_name == "RCUTENV") {
+      /* Fanned out — every p contributes. dfcut/drcut comes from the
+       * cutoff's calc_drcut method (Phase 2A.3 family). */
+      out = fcut.calc_drcut(rho) * B(rho, sfuncgrid[p], cfuncgrid[p]);
+      return true;
+    }
+    return false;
+  }
+
+  /** F''(rho, p) via product rule on F(rho, p) = fcut(rho) * B(x_c),
+   *  x_c = eta_p * (rho - mu_p):
+   *
+   *    F''(rho) = fcut''(rho) * B(x_c)
+   *             + 2 * fcut'(rho) * eta_p * b'(x_c)
+   *             + fcut(rho)     * eta_p^2 * b''(x_c)
+   *
+   *  fcut'' is supplied by Cut_Base::calc_double_prime (default 0; smooth
+   *  cutoffs override). Closes the radial-θ force chain for
+   *  DM_mEAD<F_mEnv> configs (Phase 2D follow-up).
+   *
+   *  Note on smoothness: at |x_c| = 1 the blip B is only C^1 (b'' has
+   *  jumps). Caller fixtures that probe rho exactly on the blip break
+   *  hit the same C^1 limitation that F_Blip does (see geometry-
+   *  sensitivity note in project_hpo_analytical_gradients_phase2). */
+  bool calc_d2F(double rho, size_t p, double& out) const override final {
+    const double eta = sfuncgrid[p];
+    const double mu  = cfuncgrid[p];
+    const double x_c = eta * (rho - mu);
+    out = fcut.calc_double_prime(rho) * B(x_c)
+        + 2.0 * fcut.calc_prime(rho)  * eta * dB(x_c, 1.0)
+        + fcut.calc(rho)              * eta * eta * d2B(x_c);
+    return true;
+  }
+
+  /** Closed-form derivatives of F'(rho, p) wrt embedding-side theta
+   *  with rho held fixed.
+   *
+   *    F'(rho, p) = fcut'(rho) * B(x_c) + fcut(rho) * eta_p * b'(x_c),
+   *    x_c = eta_p * (rho - mu_p)
+   *
+   *    d F'/d CEMBFUNC[i] (p == i-1):
+   *      -eta_p * [fcut'(rho) * b'(x_c) + fcut(rho) * eta_p * b''(x_c)]
+   *    d F'/d SEMBFUNC[i] (p == i-1):
+   *      fcut'(rho) * (rho-mu_p) * b'(x_c)
+   *      + fcut(rho) * [b'(x_c) + eta_p*(rho-mu_p)*b''(x_c)]
+   *    d F'/d RCUTENV (every p):
+   *      fcut'_rcut(rho) * B(x_c) + fcut_rcut(rho) * eta_p * b'(x_c)
+   *      (fcut_rcut and fcut'_rcut come from Cut_Base::calc_drcut /
+   *       calc_prime_drcut, treating rho as the cutoff input.) */
+  bool calc_dFp_dtheta(double rho, size_t p,
+                       const std::string& theta_name, int arg_pos,
+                       double& out) const override final {
+    out = 0.0;
+    if (theta_name == "CEMBFUNC") {
+      if (arg_pos < 1 ||
+          static_cast<std::size_t>(arg_pos) > cfuncgrid.size()) return false;
+      const std::size_t i = static_cast<std::size_t>(arg_pos - 1);
+      if (i != p) return false;
+      const double eta = sfuncgrid[p];
+      const double mu  = cfuncgrid[p];
+      const double x_c = eta * (rho - mu);
+      const double b1  = dB(x_c, 1.0);
+      const double b2  = d2B(x_c);
+      out = -eta * (fcut.calc_prime(rho) * b1 + fcut.calc(rho) * eta * b2);
+      return true;
+    }
+    if (theta_name == "SEMBFUNC") {
+      if (arg_pos < 1 ||
+          static_cast<std::size_t>(arg_pos) > sfuncgrid.size()) return false;
+      const std::size_t i = static_cast<std::size_t>(arg_pos - 1);
+      if (i != p) return false;
+      const double eta = sfuncgrid[p];
+      const double mu  = cfuncgrid[p];
+      const double x_c = eta * (rho - mu);
+      const double b1  = dB(x_c, 1.0);
+      const double b2  = d2B(x_c);
+      out = fcut.calc_prime(rho) * (rho - mu) * b1
+          + fcut.calc(rho)       * (b1 + eta * (rho - mu) * b2);
+      return true;
+    }
+    if (theta_name == "RCUTENV") {
+      const double eta = sfuncgrid[p];
+      const double mu  = cfuncgrid[p];
+      const double x_c = eta * (rho - mu);
+      const double b   = B(x_c);
+      const double b1  = dB(x_c, 1.0);
+      out = fcut.calc_prime_drcut(rho) * b
+          + fcut.calc_drcut(rho)       * eta * b1;
+      return true;
+    }
+    return false;
   }
 };
 

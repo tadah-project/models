@@ -43,7 +43,7 @@ public:
    *
    * Calculate Force Descriptor for the atom local environment.
    *
-   * For two body this is essentiall df/dr where f is a descriptor function.
+   * For two body this is essentially df/dr where f is a descriptor function.
    * Do not include negative sign (as you mifht think E=-df/dr). The negative sign 
    * is included elsewhere in the code.
    *
@@ -70,11 +70,91 @@ public:
     tadah::core::fd_type &fd_ij,
     const double scale=1) const=0;
 
-  /** Central difference approximation to \ref FD 
+  /** \brief Closed-form derivative of \ref AED with respect to a named
+   *  hyperparameter.
+   *
+   * Used by HPO analytical / hybrid gradients (Phase 2) to assemble
+   * dPhi/dtheta one pair at a time, mirroring how calc_aed assembles
+   * Phi. The default returns false: "this descriptor does not own
+   * `theta_name`". Concrete descriptors override for the (theta_name,
+   * arg_pos) pairs they implement.
+   *
+   * Calling convention:
+   *  - `theta_name` is the OPTIM key (e.g. "CGRID2B", "SGRID2B",
+   *    "RCUT2B"); always upper-case.
+   *  - `arg_pos` is the 1-based index into the vector parameter (k for
+   *    "CGRID2B[k]"), or -1 for scalar parameters.
+   *  - `dD_buf` is the pre-zeroed aed-shaped accumulator. Concrete
+   *    implementations `+=` their contribution at `fidx + c` where c
+   *    is the descriptor-component index.
+   *  - Return `true` iff this call wrote something into `dD_buf`. The
+   *    aggregator uses the return value to detect "no descriptor owned
+   *    this theta" and route the gradient via FD fallback (HYBRID) or
+   *    raise (ANALYTICAL).
+   *  - Cross-cutting parameters (RCUT2B / RCUTMB) flow through the
+   *    cutoff (`fcut->calc_drcut`); each D2 descriptor that uses a
+   *    non-Cut_Dummy cutoff contributes additively.
+   *
+   * Default impl returns false (no-op). New descriptors can be added
+   * without implementing this method; HYBRID will FD-fallback on
+   * their parameters until an analytical version lands.
+   */
+  virtual bool calc_dDdtheta(
+      const std::string& /*theta_name*/,
+      int                /*arg_pos*/,
+      const int          /*Zi*/,
+      const int          /*Zj*/,
+      const double       /*rij*/,
+      const double       /*rij_sq*/,
+      tadah::core::aed_type& /*dD_buf*/,
+      const double       /*scale=1*/) const {
+    return false;
+  }
+
+  /** \brief Closed-form derivative of \ref FD with respect to a named
+   *  hyperparameter.
+   *
+   * Used by HPO analytical / hybrid gradients (Phase 2) to assemble
+   * dPhi/dtheta force rows one pair at a time, mirroring how
+   * calc_dXijdri assembles fd_ij. The default returns false: "this
+   * descriptor does not own `theta_name` for the force chain".
+   * Concrete descriptors override for the (theta_name, arg_pos) pairs
+   * they implement.
+   *
+   * Computes the radial-direction (column 0) component only; the
+   * caller scales by the unit directional vector delij/rij to produce
+   * the 3-axis derivative, matching the descriptors_calc.hpp axis
+   * expansion pattern.
+   *
+   * Calling convention parallels calc_dDdtheta:
+   *  - `theta_name` is the OPTIM key.
+   *  - `arg_pos` is the 1-based vector index, or -1 for scalar params.
+   *  - `dfd_ij` is the pre-zeroed fd-shaped accumulator; this method
+   *    `+=` into column 0 (radial). Columns 1, 2 are left untouched
+   *    so the caller's axis-expansion step (mirroring
+   *    descriptors_calc.hpp:233-238) can run unchanged on the result.
+   *  - Returns `true` iff something was written into `dfd_ij`.
+   *
+   * Default impl returns false; concrete descriptors override for the
+   * theta keys they support.
+   */
+  virtual bool calc_dXijdri_dtheta(
+      const std::string& /*theta_name*/,
+      int                /*arg_pos*/,
+      const int          /*Zi*/,
+      const int          /*Zj*/,
+      const double       /*rij*/,
+      const double       /*rij_sq*/,
+      tadah::core::fd_type& /*dfd_ij*/,
+      const double       /*scale=1*/) const {
+    return false;
+  }
+
+  /** Central difference approximation to \ref FD
    *
    * Calculate Force Descriptor for the atom local environment
    * using central difference approximation.
-   * 
+   *
    * fc: a pointer to initialised cutoff object.
    * r: a separation between two particles
    * fd: appropriate size container to store computation

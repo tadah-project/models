@@ -108,5 +108,83 @@ double F_Blip::calc_dF(double rho,size_t p) const {
   return dB(rho, sfuncgrid[p], cfuncgrid[p]);
 }
 
+bool F_Blip::calc_dF_dtheta(double rho, size_t p,
+                            const std::string& theta_name, int arg_pos,
+                            double& out) const
+{
+  out = 0.0;
+  if (theta_name == "CEMBFUNC") {
+    if (arg_pos < 1 ||
+        static_cast<std::size_t>(arg_pos) > cfuncgrid.size()) return false;
+    const std::size_t i = static_cast<std::size_t>(arg_pos - 1);
+    if (i != p) return false;
+    const double eta = sfuncgrid[p];
+    const double mu  = cfuncgrid[p];
+    const double x_c = eta * (rho - mu);
+    /* dB(eta*(rho-mu))/dmu = dB/dx_c * (-eta) = -dB(x_c, eta). */
+    out = -dB(x_c, eta);
+    return true;
+  }
+  if (theta_name == "SEMBFUNC") {
+    if (arg_pos < 1 ||
+        static_cast<std::size_t>(arg_pos) > sfuncgrid.size()) return false;
+    const std::size_t i = static_cast<std::size_t>(arg_pos - 1);
+    if (i != p) return false;
+    const double eta = sfuncgrid[p];
+    const double mu  = cfuncgrid[p];
+    if (eta == 0.0) return true;  /* out=0, theta is owned. */
+    const double x_c = eta * (rho - mu);
+    /* dB/deta = (rho-mu) * dB/dx_c = ((rho-mu)/eta) * dB(x_c, eta). */
+    out = (rho - mu) / eta * dB(x_c, eta);
+    return true;
+  }
+  return false;
+}
+
+bool F_Blip::calc_d2F(double rho, size_t p, double& out) const
+{
+  const double eta = sfuncgrid[p];
+  const double mu  = cfuncgrid[p];
+  const double x_c = eta * (rho - mu);
+  /* F'(rho, p) = eta_p * b'(x_c).
+   * F''(rho, p) = d/d(rho) [eta * b'(x_c)] = eta^2 * b''(x_c).
+   * b''(x_c) is piecewise quadratic; see d_basis_functions.h::d2B. */
+  out = eta * eta * d2B(x_c);
+  return true;
+}
+
+bool F_Blip::calc_dFp_dtheta(double rho, size_t p,
+                             const std::string& theta_name, int arg_pos,
+                             double& out) const
+{
+  out = 0.0;
+  if (theta_name == "CEMBFUNC") {
+    if (arg_pos < 1 ||
+        static_cast<std::size_t>(arg_pos) > cfuncgrid.size()) return false;
+    const std::size_t i = static_cast<std::size_t>(arg_pos - 1);
+    if (i != p) return false;
+    const double eta = sfuncgrid[p];
+    const double mu  = cfuncgrid[p];
+    const double x_c = eta * (rho - mu);
+    /* F'(rho, p) = eta * b'(x_c).
+     * d/dmu [eta * b'(x_c)] = eta * b''(x_c) * (-eta) = -eta^2 * b''(x_c). */
+    out = -eta * eta * d2B(x_c);
+    return true;
+  }
+  if (theta_name == "SEMBFUNC") {
+    if (arg_pos < 1 ||
+        static_cast<std::size_t>(arg_pos) > sfuncgrid.size()) return false;
+    const std::size_t i = static_cast<std::size_t>(arg_pos - 1);
+    if (i != p) return false;
+    const double eta = sfuncgrid[p];
+    const double mu  = cfuncgrid[p];
+    const double x_c = eta * (rho - mu);
+    /* d/deta [eta * b'(x_c)] = b'(x_c) + eta * b''(x_c) * (rho - mu). */
+    out = dB(x_c, 1.0) + eta * (rho - mu) * d2B(x_c);
+    return true;
+  }
+  return false;
+}
+
 } // namespace models
 } // namespace tadah

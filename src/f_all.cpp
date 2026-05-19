@@ -4,8 +4,12 @@ namespace tadah {
 namespace models {
 
 
-template<> tadah::core::Registry<Function_Base>::Map tadah::core::Registry<Function_Base>::registry{};
-template<> tadah::core::Registry<Function_Base,tadah::core::Context&>::Map tadah::core::Registry<Function_Base,tadah::core::Context&>::registry{};
+template<>
+tadah::core::Registry<Function_Base>::Map& tadah::core::Registry<Function_Base>::registry =
+  tadah::core::Registry<tadah::models::Function_Base>::instance();
+template<>
+tadah::core::Registry<Function_Base,tadah::core::Context&>::Map& tadah::core::Registry<Function_Base,tadah::core::Context&>::registry =
+  tadah::core::Registry<tadah::models::Function_Base,tadah::core::Context&>::instance();
 
 tadah::core::Registry<Function_Base>::Register<BF_Linear> BF_Linear_1( "BF_Linear" );
 tadah::core::Registry<Function_Base,tadah::core::Context&>::Register<BF_Linear> BF_Linear_2( "BF_Linear" );
@@ -27,4 +31,3 @@ tadah::core::Registry<Function_Base,tadah::core::Context&>::Register<Kern_Sigmoi
 
 } // namespace models
 } // namespace tadah
-

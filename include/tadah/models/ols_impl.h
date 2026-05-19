@@ -251,6 +251,90 @@ for (int i = m; i < maxmn; ++i) {
     // No need to resize B back, since we didn't modify the user's B
 }
 
+// NormalEquations solve that additionally caches the Cholesky factor
+// for IFT back-substitution. Mirrors the OALGO=4 branch of solveImpl
+// byte-for-byte plus a final memcpy of the factor into the handle.
+template <typename M, typename V>
+void OLS::solveAndCacheFactor(M& A, V& B, V& weights,
+                              FactorHandle& out_factor,
+                              std::size_t n_bias) {
+    int m = A.rows();
+    int n = A.cols();
+
+    if (m < n) {
+        throw std::invalid_argument(
+            "OLS::solveAndCacheFactor requires m >= n (overdetermined or "
+            "square system) for the NormalEquations path. Got m=" +
+            std::to_string(m) + ", n=" + std::to_string(n) + ".");
+    }
+    if (B.size() < static_cast<std::size_t>(m)) {
+        throw std::invalid_argument(
+            "OLS::solveAndCacheFactor: B size is insufficient (must be >= m).");
+    }
+    if (weights.size() != static_cast<std::size_t>(n)) {
+        throw std::invalid_argument(
+            "OLS::solveAndCacheFactor: weights size must equal n.");
+    }
+
+    memory::OLSWorkspace* ws =
+        workspaceManager_->getOLSWorkspace(m, n, Algorithm::NormalEquations);
+
+    char uplo = 'U';
+    char trans = 'T';
+    double alpha = 1.0;
+    double beta = 0.0;
+    int lda = m;
+    int ldc = n;
+
+    // AtA = Aᵀ A (upper triangle written by dsyrk_).
+    tadah::core::dsyrk_(&uplo, &trans, &n, &m, &alpha,
+                        A.ptr(), &lda, &beta, ws->AtA, &ldc);
+
+    // Atb = Aᵀ B.
+    int incx = 1;
+    int incy = 1;
+    tadah::core::dgemv_(&trans, &m, &n, &alpha, A.ptr(), &lda,
+                        B.ptr(), &incx, &beta, ws->Atb, &incy);
+
+    // Cholesky-factorise AtA in place. After this, the upper triangle
+    // of ws->AtA holds U with U^T U = AᵀA.
+    int info = 0;
+    tadah::core::dpotrf_(&uplo, &n, ws->AtA, &ldc, &info);
+    if (info != 0) {
+        throw std::runtime_error(
+            "OLS::solveAndCacheFactor: DPOTRF failed (matrix is not "
+            "positive definite); info = " + std::to_string(info) +
+            ". This typically means a rank-deficient design matrix or "
+            "LAMBDA=0 with insufficient data; raise LAMBDA or switch "
+            "to NUMERICAL.");
+    }
+
+    // Solve U^T U x = Atb in place; ws->Atb now contains the solution.
+    int nrhs = 1;
+    tadah::core::dpotrs_(&uplo, &n, &nrhs, ws->AtA, &ldc, ws->Atb, &n, &info);
+    if (info != 0) {
+        throw std::runtime_error(
+            "OLS::solveAndCacheFactor: DPOTRS failed; info = " +
+            std::to_string(info));
+    }
+
+    // Copy solution to weights.
+    for (int i = 0; i < n; ++i) {
+        weights[i] = ws->Atb[i];
+    }
+
+    // Snapshot the factor into the handle. Owning the buffer means the
+    // workspace can be reused for the next train() without invalidating
+    // any cached factor in flight.
+    const std::size_t nn = static_cast<std::size_t>(n) *
+                           static_cast<std::size_t>(n);
+    out_factor.AtA.assign(ws->AtA, ws->AtA + nn);
+    out_factor.n      = n;
+    out_factor.n_bias = n_bias;
+    out_factor.algo   = Algorithm::NormalEquations;
+    out_factor.valid  = true;
+}
+
 // Solve with SVD workspace (if needed)
 template <typename V1, typename V2>
 void OLS::solveWithPseudoinverse(int m, int n, V1& B, V2& weights, memory::SVDWorkspace& svdWorkspace) {

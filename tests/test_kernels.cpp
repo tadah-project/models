@@ -100,7 +100,7 @@ TEST_CASE( "Testing Kern_Linear 1", "[kernels]" ) {
   REQUIRE_THAT(fz, Catch::Matchers::WithinRel(f(2)));
 }
 TEST_CASE( "Testing Kern_Linear 2", "[kernels]" ) {
-  // Kern_Linear and BF_Linear should give the same anwer
+  // Kern_Linear and BF_Linear should give the same answer
   Kern_Linear kern;
   BF_Linear bf;
   aed_type w(2);

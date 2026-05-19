@@ -2,6 +2,7 @@
 #define TADAH_MODELS_OLS_H
 
 #include <tadah/models/algorithm.h> // Include the Algorithm enum
+#include <tadah/models/factor_handle.h>
 #include <tadah/models/memory/imodels_workspace_manager.h>
 #include <cmath>
 #include <stdexcept>
@@ -100,6 +101,32 @@ void solveWithPseudoinverse(int m, int n, V1& B, V2& weights, memory::SVDWorkspa
 template <typename V1, typename V2>
 void solveWithPseudoinverse(int m, int n, V1& B, V2& weights, memory::SVDWorkspace& svdWorkspace);
 
+    /**
+     * @brief Solve the OLS problem via NormalEquations and cache the
+     *        Cholesky factor for IFT back-substitution.
+     *
+     * Runs the same `dsyrk_ + dgemv_ + dpotrf_ + dpotrs_` sequence as
+     * the OALGO=4 path of @ref solve, additionally copying the
+     * factorised (uplo='U') AtA into @p out_factor.AtA so the caller
+     * can run any number of subsequent back-substitutions via
+     * @ref LinearRegressor::backsolve without re-factorising.
+     *
+     * Only NormalEquations is supported. Pseudoinverse / GELS / GELSD
+     * paths require an SVD-based IFT not implemented in Phase 2A.
+     *
+     * @tparam M Type of the matrix A.
+     * @tparam V Type of the vectors B and weights.
+     * @param A The (possibly ridge-augmented) design matrix.
+     * @param B The (possibly ridge-augmented) target vector.
+     * @param weights Vector to receive the OLS solution.
+     * @param out_factor Handle to be populated with the cached factor.
+     * @param n_bias Number of unregularised intercept columns
+     *               (recorded into the handle).
+     */
+    template <typename M, typename V>
+    void solveAndCacheFactor(M& A, V& B, V& weights,
+                             FactorHandle& out_factor,
+                             std::size_t n_bias = 0);
 
 private:
     memory::IModelsWorkspaceManager* workspaceManager_; ///< Pointer to the workspace manager.

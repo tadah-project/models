@@ -2,12 +2,14 @@
 #define D_BASE_H
 
 #include <string>
+#include <optional>
 #include <tadah/core/context.h>
 #include <tadah/core/core_types.h>
 #include <tadah/core/periodic_table.h>
 #include <tadah/core/logger.h>
 #include <tadah/core/registry.h>
 #include <tadah/models/cut_all.h>
+#include <tadah/models/descriptors/param_meta.h>
 #include <vector>
 #include <bitset>
 
@@ -63,6 +65,20 @@ public:
   D_Base();
   D_Base(const tadah::core::Context &c);
 
+  /** Refresh per-element weights[] from WATOM in the (possibly updated)
+   *  context. Intended for HPO reinit paths where WATOM may change
+   *  between iters but the descriptor object is reused. */
+  void refresh_atom_weights(const tadah::core::Context &c);
+
+  /** Resolve a 1-based WATOM arg_pos (matching `OPTIM WATOM (n)`) to the
+   *  atomic number Z of the n-th ATOM entry in the context that last
+   *  populated `weights[]`. Returns 0 when arg_pos is out of range or
+   *  the ATOM list was never populated (no context constructor / no
+   *  refresh_atom_weights call). Used by calc_dDdtheta /
+   *  calc_dXijdri_dtheta / calc_drhoi_dtheta WATOM branches to test
+   *  whether a per-pair contribution belongs to the optimised species. */
+  int get_atom_Z_for_arg_pos(int arg_pos) const;
+
   /** \brief Print grid to the log.
    *
    * @param v Vector to print.
@@ -110,10 +126,29 @@ public:
   static std::vector<std::string> get_init_atoms(const tadah::core::Context &c, std::string type);
   virtual std::vector<std::string> get_init_atoms(const tadah::core::Context &c)=0;
 
+  /** \brief Per-descriptor parameter metadata for the HPO bound-validation
+   *  pipeline (audit, suggester, per-iter health monitor).
+   *
+   *  Default `std::nullopt` means "no metadata supplied" — the audit
+   *  treats the descriptor as opaque (skips block-level health checks
+   *  that depend on metadata). Concrete descriptors override this
+   *  method to declare their parameter physics. See the merry-peacock
+   *  plan §"Examples — what `meta()` actually looks like" for canonical
+   *  shapes (D2_LJ scalar, D2_Blip vector, DM_mBlipEnv full).
+   */
+  virtual std::optional<DescriptorMeta> meta() const {
+    return std::nullopt;
+  }
+
 private:
 
   bool manage_memory=false; // who owns fcut
   Bitset2D init_for_atoms_map;  // 0th is unused
+
+  /* Z values in ATOM-list order, populated by refresh_atom_weights.
+   * Empty when the descriptor was default-constructed (no Context).
+   * `OPTIM WATOM (n)` resolves to `watom_Z_by_arg_pos[n-1]`. */
+  std::vector<int> watom_Z_by_arg_pos;
 };
 } // namespace models
 } // namespace tadah

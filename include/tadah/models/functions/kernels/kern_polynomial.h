@@ -36,6 +36,28 @@ class Kern_Polynomial : public virtual Kern_Base {
 
         double prime(const tadah::core::aed_type& b, const tadah::core::aed_type& af, const tadah::core::aed_type& ff) const override;
 
+        /** Closed-form analytical derivatives of K w.r.t. its continuous
+         *  hyperparameters:
+         *
+         *    K(b, af) = (gamma * (b . af) + c)^d,  d integer.
+         *    dK/d gamma = d * (b . af) * (gamma * (b . af) + c)^(d-1)
+         *    dK/d c     = d              * (gamma * (b . af) + c)^(d-1)
+         *
+         *  d is an integer and is not tunable.
+         *
+         *  MPARAMS layout: [d, gamma, c]. arg_pos counts numerical
+         *  tokens 1-based (see HPOTargets::ui_offset).
+         *   - ("MPARAMS", 2) -> dK/d gamma
+         *   - ("MPARAMS", 3) -> dK/d c
+         *  Anything else returns false.
+         */
+        bool calc_dKdtheta(
+            const std::string& theta_name,
+            int                arg_pos,
+            const tadah::core::aed_type& b,
+            const tadah::core::aed_type& af,
+            double& dK_out) const override;
+
 };
 } // namespace models
 } // namespace tadah

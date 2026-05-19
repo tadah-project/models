@@ -146,6 +146,7 @@ public:
     const double scale = 1) const override;
   void init() override;
   bool reinit(const tadah::core::Context& ctx) override;
+  std::optional<DescriptorMeta> meta() const override;
 };
 
 } // namespace models

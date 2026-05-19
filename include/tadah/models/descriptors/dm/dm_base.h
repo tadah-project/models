@@ -2,10 +2,56 @@
 #define DM_BASE_H
 
 #include <tadah/models/descriptors/d_base.h>
+#include <cstdint>
 #include <string>
 
 namespace tadah {
 namespace models {
+
+/** Compact key enum for DM-arm θ-derivative dispatch. The walker decodes
+ *  the OPTIM theta_name once per outer call, then the per-pair kernels
+ *  branch on a 1-byte enum compare instead of std::string ==. Saves the
+ *  O(220M) byte-compare ladder per gradient on BASINSv2_blip6. */
+enum class DMThetaKey : std::uint8_t {
+  None     = 0,
+  CGRIDMB  = 1,
+  SGRIDMB  = 2,
+  RCUTMB   = 3,
+  WATOM    = 4,
+  CEMBFUNC = 5,
+  SEMBFUNC = 6,
+  RCUTENV  = 7,
+};
+
+inline DMThetaKey decode_dm_theta(const std::string& s) noexcept {
+  if (s.size() < 5) return DMThetaKey::None;
+  if (s == "CGRIDMB")  return DMThetaKey::CGRIDMB;
+  if (s == "SGRIDMB")  return DMThetaKey::SGRIDMB;
+  if (s == "RCUTMB")   return DMThetaKey::RCUTMB;
+  if (s == "WATOM")    return DMThetaKey::WATOM;
+  if (s == "CEMBFUNC") return DMThetaKey::CEMBFUNC;
+  if (s == "SEMBFUNC") return DMThetaKey::SEMBFUNC;
+  if (s == "RCUTENV")  return DMThetaKey::RCUTENV;
+  return DMThetaKey::None;
+}
+
+/** Reverse mapping for the cases where a kernel needs to forward to a
+ *  string-keyed downstream API (F_Base::calc_dF_dtheta /
+ *  F_Base::calc_dFp_dtheta still take a std::string). Returns a stable
+ *  const char*, never deallocated. */
+inline const char* dm_theta_name(DMThetaKey k) noexcept {
+  switch (k) {
+    case DMThetaKey::CGRIDMB:  return "CGRIDMB";
+    case DMThetaKey::SGRIDMB:  return "SGRIDMB";
+    case DMThetaKey::RCUTMB:   return "RCUTMB";
+    case DMThetaKey::WATOM:    return "WATOM";
+    case DMThetaKey::CEMBFUNC: return "CEMBFUNC";
+    case DMThetaKey::SEMBFUNC: return "SEMBFUNC";
+    case DMThetaKey::RCUTENV:  return "RCUTENV";
+    case DMThetaKey::None:     return "";
+  }
+  return "";
+}
 
 /** \brief Base class for all many-body type descriptors.
  *
@@ -72,7 +118,7 @@ public:
    * This method works for full NN lists
    * and all models.
    *
-   * mode=0 inidcates only x-direction is computed and 
+   * mode=0 indicates only x-direction is computed and
    * the resulting descriptor must be multiplied by delx/r.
    *
    * \f[
@@ -102,6 +148,176 @@ public:
     const tadah::core::Vec3d &vec_ij,
     tadah::core::rho_type& rho,
     const double scale=1) const =0;
+
+  /** \brief Closed-form per-pair contribution to drho_i/dtheta.
+   *
+   *  Many-body analog of D2_Base::calc_dDdtheta. The MB design-matrix
+   *  builder accumulates `rho_i` in a per-pair pre-pass (calc_rho),
+   *  then computes `aed = F(rho)` in a per-atom finalisation step
+   *  (calc_aed). The dPhi/dtheta walker mirrors that structure with
+   *  TWO methods:
+   *
+   *   1. calc_drhoi_dtheta  — per-pair drho_i/dtheta accumulator
+   *      (analog of calc_rho).
+   *   2. calc_daed_dtheta   — per-atom (rho_i, drho_i/dtheta) -> daed/dtheta
+   *      reducer (analog of calc_aed).
+   *
+   *  Calling convention mirrors D2_Base::calc_dDdtheta:
+   *   - `theta_name` is the OPTIM key, upper-case (e.g. "CGRIDMB").
+   *   - `arg_pos` is 1-based for vector parameters, -1 for scalars.
+   *   - `drhoi` is the per-atom accumulator, pre-zeroed by the caller.
+   *   - Returns `true` iff this call wrote anything into `drhoi`.
+   *   - Cross-cutting parameters (RCUTMB) flow through
+   *     `fcut->calc_drcut`; each DM descriptor that uses a non-Cut_Dummy
+   *     cutoff contributes additively.
+   *
+   *  Default returns false (no-op). DM_Dummy and DM descriptors that
+   *  are numerical-only (DM_EAM, DM_mEAD) keep the default.
+   */
+  virtual bool calc_drhoi_dtheta(
+      DMThetaKey         /*key*/,
+      int                /*arg_pos*/,
+      const int          /*Zi*/,
+      const int          /*Zj*/,
+      const double       /*rij*/,
+      const double       /*rij_sq*/,
+      const tadah::core::Vec3d& /*vec_ij*/,
+      tadah::core::rho_type& /*drhoi*/,
+      const double       /*scale=1*/) const {
+    return false;
+  }
+
+  /** Back-compat string-keyed shim. Decodes once and dispatches to the
+   *  enum-keyed virtual above. NOT virtual — derived classes override
+   *  the enum form. Layer-1 tests still call this signature. */
+  bool calc_drhoi_dtheta(
+      const std::string& theta_name,
+      int                arg_pos,
+      const int          Zi,
+      const int          Zj,
+      const double       rij,
+      const double       rij_sq,
+      const tadah::core::Vec3d& vec_ij,
+      tadah::core::rho_type& drhoi,
+      const double       scale=1) const {
+    return calc_drhoi_dtheta(decode_dm_theta(theta_name), arg_pos,
+                             Zi, Zj, rij, rij_sq, vec_ij, drhoi, scale);
+  }
+
+  /** \brief Closed-form per-atom contribution to daed/dtheta.
+   *
+   *  Companion to calc_drhoi_dtheta. Called by the dPhi/dtheta walker
+   *  once per atom AFTER:
+   *   - calc_rho        has filled `rhoi[rfidx..]   = rho_i`,
+   *   - calc_aed        has filled `rhoi[drfidx..]  = F'(rho_i)`,
+   *   - calc_drhoi_dtheta has filled `drhoi[rfidx..] = drho_i/dtheta`.
+   *
+   *  Chain rule for F(rho_i, theta):
+   *
+   *    daed/dtheta = (dF/drho) (drho/dtheta) + (dF/dtheta)|_{rho fixed}
+   *
+   *  The first term reads F'(rho) from rhoi[drfidx..] and dotproducts
+   *  with drhoi[rfidx..]. The second term is non-zero only for
+   *  cross-cutting parameters that enter the per-L multinomial
+   *  prefactor `f[L,o] = L!/(lx! ly! lz!) / (4 rc)^L` — namely RCUTMB.
+   *
+   *  Returns `true` iff this call wrote anything into `daed_out`.
+   *
+   *  Default returns false.
+   */
+  virtual bool calc_daed_dtheta(
+      DMThetaKey         /*key*/,
+      int                /*arg_pos*/,
+      const tadah::core::rho_type& /*rhoi*/,
+      const tadah::core::rho_type& /*drhoi*/,
+      tadah::core::aed_type& /*daed_out*/,
+      const double       /*scale=1*/) const {
+    return false;
+  }
+
+  /** Back-compat string-keyed shim — decodes once, calls enum virtual. */
+  bool calc_daed_dtheta(
+      const std::string& theta_name,
+      int                arg_pos,
+      const tadah::core::rho_type& rhoi,
+      const tadah::core::rho_type& drhoi,
+      tadah::core::aed_type& daed_out,
+      const double       scale=1) const {
+    return calc_daed_dtheta(decode_dm_theta(theta_name), arg_pos,
+                            rhoi, drhoi, daed_out, scale);
+  }
+
+  /** \brief Closed-form per-pair contribution to d(fd_ij)/dtheta — the
+   *  many-body sibling of D2_Base::calc_dXijdri_dtheta. Walker calls
+   *  this once per (atom i, neighbour j) pair AFTER:
+   *   - calc_rho            has filled `rhoi[rfidx..]   = rho_i`,
+   *   - calc_aed            has filled `rhoi[drfidx..]  = f[L,o] F'(rho_i)`,
+   *   - calc_drhoi_dtheta   has filled `drhoi_dtheta[rfidx..]
+   *                                       = drho_i/dtheta`.
+   *
+   *  Unlike the D2 sibling (which returns a single radial column to be
+   *  axis-expanded by the walker), the MB descriptor's calc_dXijdri
+   *  writes all three axis components directly because the per-orbital
+   *  polynomial poly = x^lx * y^ly * z^lz couples to direction. This
+   *  override mirrors that signature — it writes the full axis-expanded
+   *  d(fd_ij)/dtheta into `fd_ij_out(row, 0..2)`.
+   *
+   *  Chain rule sketch (for DM_mEAD<F>, expanding path):
+   *
+   *     fd_ij(p, k) = scale * w_j * f[L,o] * F'(rho_i, p) * term_k,
+   *       term_k = g * (dpoly/dr_k) + dg * poly * (v_k / r)
+   *
+   *  with g, dg the radial Gaussian and its r-derivative (both
+   *  cutoff-weighted). Differentiating w.r.t. theta sees three groups:
+   *
+   *    1. Radial theta (CGRIDMB[k], SGRIDMB[k], RCUTMB) — touch (g, dg)
+   *       directly AND rho via calc_drhoi_dtheta. The F'(rho) chain
+   *       needs F''(rho) via F_Base::calc_d2F.
+   *    2. Embedding theta (CEMBFUNC[i], SEMBFUNC[i]) — touch F'
+   *       directly via F_Base::calc_dFp_dtheta; rho is fixed.
+   *    3. Cross-cutting RCUTENV (F_mEnv only) — same direct F' branch.
+   *
+   *  Calling convention mirrors calc_drhoi_dtheta / calc_daed_dtheta:
+   *   - `theta_name` is the OPTIM key, upper-case.
+   *   - `arg_pos` is 1-based for vector parameters, -1 for scalars.
+   *   - `fd_ij_out` is the per-pair, axis-expanded buffer, pre-zeroed by
+   *     the caller.
+   *   - Returns `true` iff this call wrote anything into `fd_ij_out`.
+   *
+   *  Default returns false (descriptor doesn't own this theta on the
+   *  force side; orchestrator routes to needs_fd). */
+  virtual bool calc_dXijdri_dtheta(
+      DMThetaKey         /*key*/,
+      int                /*arg_pos*/,
+      const int          /*Zi*/,
+      const int          /*Zj*/,
+      const double       /*rij*/,
+      const double       /*rij_sq*/,
+      const tadah::core::Vec3d& /*vec_ij*/,
+      const tadah::core::rho_type& /*rhoi*/,
+      const tadah::core::rho_type& /*drhoi_dtheta*/,
+      tadah::core::fd_type& /*fd_ij_out*/,
+      const double       /*scale=1*/) const {
+    return false;
+  }
+
+  /** Back-compat string-keyed shim — decodes once, calls enum virtual. */
+  bool calc_dXijdri_dtheta(
+      const std::string& theta_name,
+      int                arg_pos,
+      const int          Zi,
+      const int          Zj,
+      const double       rij,
+      const double       rij_sq,
+      const tadah::core::Vec3d& vec_ij,
+      const tadah::core::rho_type& rhoi,
+      const tadah::core::rho_type& drhoi_dtheta,
+      tadah::core::fd_type& fd_ij_out,
+      const double       scale=1) const {
+    return calc_dXijdri_dtheta(decode_dm_theta(theta_name), arg_pos,
+                               Zi, Zj, rij, rij_sq, vec_ij,
+                               rhoi, drhoi_dtheta, fd_ij_out, scale);
+  }
 
 
   /** \brief This is just a convenient wrapper.

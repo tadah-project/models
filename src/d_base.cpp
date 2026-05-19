@@ -51,15 +51,28 @@ D_Base::D_Base() {}
 D_Base::D_Base(const tadah::core::Context &c):
   verbose(c.get<int>("VERBOSE"))
 {
+  refresh_atom_weights(c);
+}
+void D_Base::refresh_atom_weights(const tadah::core::Context &c) {
   std::fill_n(weights, 119, 1.0);
+  watom_Z_by_arg_pos.clear();
   if (c.contains("ATOM")) {
-    for (size_t i=0; i<c.size("ATOM"); ++i) {
+    const size_t n = c.size("ATOM");
+    watom_Z_by_arg_pos.reserve(n);
+    for (size_t i=0; i<n; ++i) {
       std::string symbol = c.get<std::string>("ATOM",i);
       double wi = c.get<double>("WATOM",i);
       int Z = tadah::core::PeriodicTable::find_by_symbol(symbol).Z;
       weights[Z]=wi;
+      watom_Z_by_arg_pos.push_back(Z);
     }
   }
+}
+int D_Base::get_atom_Z_for_arg_pos(int arg_pos) const {
+  if (arg_pos < 1) return 0;
+  const size_t idx = static_cast<size_t>(arg_pos - 1);
+  if (idx >= watom_Z_by_arg_pos.size()) return 0;
+  return watom_Z_by_arg_pos[idx];
 }
 void D_Base::printGrid(core::v_type &v, const std::string &key, core::LogLevel logLevel) {
   core::Logger::instance().log(logLevel, label()," ",key,":\n  ", v);

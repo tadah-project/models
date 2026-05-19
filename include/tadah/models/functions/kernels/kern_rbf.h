@@ -31,6 +31,22 @@ class Kern_RBF : public virtual Kern_Base {
         double operator() (const tadah::core::aed_type& b, const tadah::core::aed_type& af) const override;
         tadah::core::aed_type derivative(const tadah::core::aed_type& b, const tadah::core::aed_type& af) const override;
         double prime(const tadah::core::aed_type& b, const tadah::core::aed_type& af, const tadah::core::aed_type& ff) const override;
+
+        /** Closed-form analytical derivative of K w.r.t. sigma:
+         *
+         *    K(b, af) = exp(-||b - af||^2 / (2 sigma^2))
+         *    dK / d sigma = K * ||b - af||^2 / sigma^3
+         *
+         *  Supported (theta_name, arg_pos): ("MPARAMS", 1) -> dK/d sigma.
+         *  Anything else returns false.
+         */
+        bool calc_dKdtheta(
+            const std::string& theta_name,
+            int                arg_pos,
+            const tadah::core::aed_type& b,
+            const tadah::core::aed_type& af,
+            double& dK_out) const override;
+
         std::string get_label() const override;
 
     private:

@@ -98,7 +98,7 @@ public:
       tadah::core::t_type T_r;
       auto move_map = prep_train_with_residuals(Phi, T, indices, w_f, T_r);
 
-      // Resize Phi for training, the rightmost columns correspon to FIXINDEX
+      // Resize Phi for training, the rightmost columns correspond to FIXINDEX
       Phi.resize(Phi.rows(), Phi.cols() - indices.size());
 
 

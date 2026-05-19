@@ -1,6 +1,8 @@
 #include <tadah/models/descriptors/dm/dm_func.h>
 #include <tadah/models/descriptors/dm/dm_ead.h>
 #include <tadah/models/descriptors/d_basis_functions.h>
+#include <tadah/models/descriptors/param_meta.h>
+#include <tadah/core/stats/data_stats.h>
 
 #include <array>
 #include <memory>
@@ -356,6 +358,202 @@ void DM_EAD::calc_rho(int Zi,int Zj,double rij,double,
 }
 
 /* ------------------------------------------------------------------ *
+ *  drho_i/dtheta — per-pair accumulator (analog of calc_rho)         *
+ * ------------------------------------------------------------------ */
+bool DM_EAD::calc_drhoi_dtheta(
+    DMThetaKey         key,
+    int                arg_pos,
+    const int          Zi,
+    const int          Zj,
+    const double       rij,
+    const double       /*rij_sq*/,
+    const core::Vec3d& v,
+    core::rho_type&    drhoi,
+    const double       scale) const
+{
+  /* Cheap key short-circuit before any pair-level math. */
+  const bool owned = (key == DMThetaKey::CGRIDMB ||
+                      key == DMThetaKey::SGRIDMB ||
+                      key == DMThetaKey::RCUTMB  ||
+                      key == DMThetaKey::WATOM);
+  if (!owned) return false;
+
+  if(!is_init_for_atoms(Zi,Zj) || rij>get_rcut()) return false;
+
+  if (key == DMThetaKey::WATOM) {
+    /* d(rho)/d WATOM[Z_target] = δ(Zj, Z_target) * poly * G(r; eta, mu) * fc(r),
+     * the per-pair calc_rho contribution with weights[Zj] removed.
+     * Claim ownership on every valid pair so structures without
+     * Z_target atoms still report analytical (zero) rather than FD. */
+    const int Z_target = get_atom_Z_for_arg_pos(arg_pos);
+    if (Z_target < 1) return false;
+    if (Zj != Z_target) return true;
+
+    const double fc_ij = fcut->calc(rij);
+    const std::size_t ng = cgrid.size();
+    StackOrHeapBuffer<MAX_GRID> buf(ng);
+    precompute_radials(rij, fc_ij, sgrid, cgrid, buf.g(), ng);
+
+    double px[7], py[7], pz[7];
+    precompute_powers(v[0], Lmax, px);
+    precompute_powers(v[1], Lmax, py);
+    precompute_powers(v[2], Lmax, pz);
+
+    std::size_t ii = rfidx;
+    for (int L = 0; L <= Lmax; ++L) {
+      for (std::size_t o = 0; o < orbitals[L].size(); ++o) {
+        const int lx = orbitals[L][o][0],
+                  ly = orbitals[L][o][1],
+                  lz = orbitals[L][o][2];
+        const double poly = px[lx] * py[ly] * pz[lz];
+        for (std::size_t c = 0; c < ng; ++c)
+          drhoi(ii + c) += scale * poly * buf.g()[c];
+        ii += ng;
+      }
+    }
+    return true;
+  }
+
+  const double wj = weights[Zj] * scale;
+  const double fc = fcut->calc(rij);
+
+  const std::size_t ng = cgrid.size();
+  double px[7],py[7],pz[7];
+  precompute_powers(v[0],Lmax,px);
+  precompute_powers(v[1],Lmax,py);
+  precompute_powers(v[2],Lmax,pz);
+
+  if (key == DMThetaKey::CGRIDMB) {
+    if (arg_pos < 1 || static_cast<std::size_t>(arg_pos) > ng) return false;
+    const std::size_t k   = static_cast<std::size_t>(arg_pos - 1);
+    const double      mu  = cgrid[k];
+    const double      eta = sgrid[k];
+    /* dG/dmu = 2 eta (r - mu) G(r; eta, mu) — fc already factored. */
+    const double      g       = std::exp(-eta * (rij - mu) * (rij - mu)) * fc;
+    const double      dG_dmu  = 2.0 * eta * (rij - mu) * g;
+    /* Walk (L, o), only the c==k column is non-zero. */
+    std::size_t ii = rfidx;
+    for(int L = 0; L <= Lmax; ++L){
+      for(std::size_t o = 0; o < orbitals[L].size(); ++o){
+        const int lx = orbitals[L][o][0],
+                  ly = orbitals[L][o][1],
+                  lz = orbitals[L][o][2];
+        const double poly = px[lx] * py[ly] * pz[lz];
+        drhoi(ii + k) += wj * poly * dG_dmu;
+        ii += ng;
+      }
+    }
+    return true;
+  }
+
+  if (key == DMThetaKey::SGRIDMB) {
+    if (arg_pos < 1 || static_cast<std::size_t>(arg_pos) > ng) return false;
+    const std::size_t k   = static_cast<std::size_t>(arg_pos - 1);
+    const double      mu  = cgrid[k];
+    const double      eta = sgrid[k];
+    /* dG/deta = -(r - mu)^2 G. */
+    const double      g        = std::exp(-eta * (rij - mu) * (rij - mu)) * fc;
+    const double      dG_deta  = -(rij - mu) * (rij - mu) * g;
+    std::size_t ii = rfidx;
+    for(int L = 0; L <= Lmax; ++L){
+      for(std::size_t o = 0; o < orbitals[L].size(); ++o){
+        const int lx = orbitals[L][o][0],
+                  ly = orbitals[L][o][1],
+                  lz = orbitals[L][o][2];
+        const double poly = px[lx] * py[ly] * pz[lz];
+        drhoi(ii + k) += wj * poly * dG_deta;
+        ii += ng;
+      }
+    }
+    return true;
+  }
+
+  if (key == DMThetaKey::RCUTMB) {
+    /* RCUTMB enters through fc only; G's exponent does not depend on rcut.
+     * dG_bare/drcut = exp(-eta(r-mu)^2) * dfc/drcut, fans out across all c. */
+    const double dfc = fcut->calc_drcut(rij);
+    if (dfc == 0.0) return false;
+    StackOrHeapBuffer<MAX_GRID> buf(ng);
+    /* Re-use the radial precomputer but with dfc playing the role of fc. */
+    precompute_radials(rij, dfc, sgrid, cgrid, buf.g(), ng);
+    std::size_t ii = rfidx;
+    for(int L = 0; L <= Lmax; ++L){
+      for(std::size_t o = 0; o < orbitals[L].size(); ++o){
+        const int lx = orbitals[L][o][0],
+                  ly = orbitals[L][o][1],
+                  lz = orbitals[L][o][2];
+        const double poly = px[lx] * py[ly] * pz[lz];
+        for(std::size_t c = 0; c < ng; ++c)
+          drhoi(ii + c) += wj * poly * buf.g()[c];
+        ii += ng;
+      }
+    }
+    return true;
+  }
+
+  return false;  /* key not owned by DM_EAD. */
+}
+
+/* ------------------------------------------------------------------ *
+ *  daed/dtheta — per-atom reducer (analog of calc_aed)               *
+ * ------------------------------------------------------------------ */
+bool DM_EAD::calc_daed_dtheta(
+    DMThetaKey         key,
+    int                arg_pos,
+    const core::rho_type& rhoi,
+    const core::rho_type& drhoi,
+    core::aed_type&    daed_out,
+    const double       scale) const
+{
+  if (key != DMThetaKey::CGRIDMB && key != DMThetaKey::SGRIDMB &&
+      key != DMThetaKey::RCUTMB  && key != DMThetaKey::WATOM)
+    return false;
+
+  const std::size_t ng = cgrid.size();
+  if (ng == 0) return false;
+
+  const bool is_rcut  = (key == DMThetaKey::RCUTMB);
+  const bool is_watom = (key == DMThetaKey::WATOM);
+  /* CGRIDMB[k] / SGRIDMB[k] are component-local and need arg_pos in
+   * [1, ng]. RCUTMB / WATOM fan out across all c — RCUTMB has no
+   * arg_pos to validate; WATOM's arg_pos validation already happened
+   * in calc_drhoi_dtheta. */
+  if (!is_rcut && !is_watom) {
+    if (arg_pos < 1 || static_cast<std::size_t>(arg_pos) > ng) return false;
+  }
+
+  const std::size_t k = (is_rcut || is_watom)
+                        ? 0
+                        : static_cast<std::size_t>(arg_pos - 1);
+
+  /* Walk (L, o, c) mirroring calc_aed's index pattern. */
+  std::size_t Lshift = 0;
+  std::size_t ii     = rfidx;          /* ρ part of rhoi */
+  std::size_t dii    = drfidx;         /* F'(ρ) part of rhoi (= 2 f ρ) */
+
+  for(int L = 0; L <= Lmax; ++L){
+    /* WATOM doesn't enter the multinomial prefactor f, so dfac=0. */
+    const double dfac_over_f = is_rcut ? (-static_cast<double>(L) / rc) : 0.0;
+    for(std::size_t o = 0; o < orbitals[L].size(); ++o){
+      const double f = fac[L][o];
+      for(std::size_t c = 0; c < ng; ++c, ++ii, ++dii){
+        const double rho      = rhoi(ii);
+        const double Fprime   = rhoi(dii);          /* = 2 f rho */
+        const double drho     = drhoi(ii);          /* dρ/dθ at (L,o,c) */
+        double contrib        = Fprime * drho;
+        if (is_rcut)
+          contrib += (dfac_over_f * f) * rho * rho;
+        if (!is_rcut && !is_watom && c != k)
+          continue;                                  /* component-local */
+        daed_out(c + Lshift + fidx) += scale * contrib;
+      }
+    }
+    Lshift += ng;
+  }
+  return true;
+}
+
+/* ------------------------------------------------------------------ *
  *  allocate & zero rho_i                                             *
  * ------------------------------------------------------------------ */
 void DM_EAD::init_rhoi(core::rho_type& rhoi)
@@ -412,6 +610,135 @@ bool DM_EAD::reinit(const tadah::core::Context& ctx) {
   s        = cgrid.size() * static_cast<size_t>(Lmax + 1);
   rhoisize = gen_atomic_orbitals(Lmax) * cgrid.size();
   return s != old_s;
+}
+
+// ----------------------------------------------------------------
+// meta() — DM_EAD shares the (RCUTMB, CGRIDMB, SGRIDMB) parameter
+// shape with the BASINS-fix DM_mBlipEnv: per-pair radial GTO with
+// centre/width vectors. The ρ-collapse cross-param check applies to
+// the same per-descriptor key (`DM_EAD`) — the suggester anchors all
+// numbers to the dataset's r_ij percentiles.
+// ----------------------------------------------------------------
+std::optional<DescriptorMeta> DM_EAD::meta() const {
+  using DataStats = tadah::core::stats::DataStats;
+  static constexpr std::size_t I_P10 = tadah::core::stats::IDX_P10;
+  static constexpr std::size_t I_P50 = tadah::core::stats::IDX_P50;
+  static constexpr std::size_t I_P90 = tadah::core::stats::IDX_P90;
+  static constexpr std::size_t I_P99 = tadah::core::stats::IDX_P99;
+
+  DescriptorMeta dm;
+  dm.label = "DM_EAD";
+
+  // RCUTMB — real-space cutoff for the MB neighbour sum.
+  ParamMeta p_rcut;
+  p_rcut.key      = "RCUTMB";
+  p_rcut.arg_pos  = -1;
+  p_rcut.scale    = Scale::Distance;
+  p_rcut.units    = "Å";
+  p_rcut.role     = "Real-space cutoff for the MB neighbour sum.";
+  p_rcut.hard.lo  = 0.0;
+  p_rcut.crit     = Criticality::Critical;
+  p_rcut.scope    = PairScope::Global;
+  p_rcut.suggest  = [](const DataStats& d, const SeedView&, int) {
+    if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
+    const auto& pp = d.per_pair[0];
+    double low = pp.r_percentiles[I_P50];
+    if (pp.r_peaks.size() >= 2) low = pp.r_peaks[1].position * 1.05;
+    return std::make_pair(low, pp.r_percentiles[I_P99]);
+  };
+  p_rcut.check    = [](const DataStats& d, const SeedView& s) -> HealthVerdict {
+    if (!s.contains("RCUTMB")) return HealthOk{};
+    if (d.per_pair.empty()) return HealthOk{};
+    const double rc = s.get<double>("RCUTMB");
+    if (rc < d.per_pair[0].r_min)
+      return HealthFail{"RCUTMB is below the smallest r_ij — no MB neighbours."};
+    return HealthOk{};
+  };
+  dm.params.push_back(std::move(p_rcut));
+
+  // CGRIDMB — vector of GTO centres (r_s in the EAD formula).
+  ParamMeta p_cgrid;
+  p_cgrid.key      = "CGRIDMB";
+  p_cgrid.arg_pos  = 0;
+  p_cgrid.scale    = Scale::Distance;
+  p_cgrid.units    = "Å";
+  p_cgrid.role     = "GTO centre r_s. Must lie within the dataset r_ij range or ρ collapses.";
+  p_cgrid.hard.lo  = 0.0;
+  p_cgrid.crit     = Criticality::Critical;
+  p_cgrid.scope    = PairScope::PerElementPair;
+  p_cgrid.suggest  = [](const DataStats& d, const SeedView&, int) {
+    if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
+    const auto& pp = d.per_pair[0];
+    if (!pp.r_peaks.empty()) {
+      const double mu = pp.r_peaks[0].position;
+      const double w  = pp.r_peaks[0].fwhm > 0
+                          ? pp.r_peaks[0].fwhm
+                          : 0.2 * mu;
+      return std::make_pair(std::max(0.0, mu - w), mu + w);
+    }
+    return std::make_pair(pp.r_percentiles[I_P10],
+                          pp.r_percentiles[I_P90]);
+  };
+  p_cgrid.check    = [](const DataStats& d, const SeedView& s) -> HealthVerdict {
+    if (!s.contains("CGRIDMB")) return HealthOk{};
+    if (d.per_pair.empty()) return HealthOk{};
+    // Per-arg-pos check: any vector entry outside the data's r_ij range collapses ρ.
+    const std::size_t n = s.size("CGRIDMB");
+    for (std::size_t i = 0; i < n; ++i) {
+      double mu;
+      try { mu = s.get<double>("CGRIDMB", i); } catch (...) { continue; }
+      const auto& pp = d.per_pair[0];
+      if (mu < pp.r_min || mu > pp.r_max)
+        return HealthFail{"CGRIDMB[" + std::to_string(i) +
+                          "]=" + std::to_string(mu) +
+                          " is outside the dataset's r_ij range — ρ will be ~0."};
+    }
+    return HealthOk{};
+  };
+  dm.params.push_back(std::move(p_cgrid));
+
+  // SGRIDMB — vector of GTO inverse widths (η).
+  ParamMeta p_sgrid;
+  p_sgrid.key      = "SGRIDMB";
+  p_sgrid.arg_pos  = 0;
+  p_sgrid.scale    = Scale::InverseDistanceSq;
+  p_sgrid.units    = "Å^-2";
+  p_sgrid.role     = "Inverse Gaussian width η. Narrow GTOs combined with off-shell centres collapse ρ to 0.";
+  p_sgrid.hard.lo  = 1.0e-6;
+  p_sgrid.crit     = Criticality::Critical;
+  p_sgrid.scope    = PairScope::Global;
+  p_sgrid.suggest  = [](const DataStats& d, const SeedView&, int) {
+    if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
+    const auto& pp = d.per_pair[0];
+    const double w = pp.r_peaks.empty()
+                       ? (pp.r_percentiles[I_P90] - pp.r_percentiles[I_P10])
+                       : (pp.r_peaks[0].fwhm > 0 ? pp.r_peaks[0].fwhm
+                                                 : 0.5);
+    return std::make_pair(0.25 / (w * w), 9.0 / (w * w));
+  };
+  dm.params.push_back(std::move(p_sgrid));
+
+  // Cross-param: CGRIDMB and SGRIDMB sizes must agree.
+  dm.cross_param_checks.push_back(
+    [](const DataStats&, const SeedView& s) -> HealthVerdict {
+      if (!s.contains("CGRIDMB") || !s.contains("SGRIDMB")) return HealthOk{};
+      if (s.size("CGRIDMB") != s.size("SGRIDMB"))
+        return HealthFail{"CGRIDMB and SGRIDMB sizes differ."};
+      return HealthOk{};
+    });
+
+  // expected_columns: |CGRIDMB| × (Lmax + 1).
+  dm.expected_columns = [](const SeedView& s) -> std::size_t {
+    if (!s.contains("CGRIDMB")) return 0;
+    const std::size_t n = s.size("CGRIDMB");
+    int Lmax = 0;
+    if (s.contains("TYPEMB")) {
+      try { Lmax = s.context().get<int>("TYPEMB", 1); } catch (...) {}
+    }
+    return n * static_cast<std::size_t>(Lmax + 1);
+  };
+
+  return dm;
 }
 
 } // namespace models
