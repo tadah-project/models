@@ -118,7 +118,7 @@ public:
    * This method works for full NN lists
    * and all models.
    *
-   * mode=0 inidcates only x-direction is computed and 
+   * mode=0 indicates only x-direction is computed and
    * the resulting descriptor must be multiplied by delx/r.
    *
    * \f[

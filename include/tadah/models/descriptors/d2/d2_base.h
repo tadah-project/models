@@ -43,7 +43,7 @@ public:
    *
    * Calculate Force Descriptor for the atom local environment.
    *
-   * For two body this is essentiall df/dr where f is a descriptor function.
+   * For two body this is essentially df/dr where f is a descriptor function.
    * Do not include negative sign (as you mifht think E=-df/dr). The negative sign 
    * is included elsewhere in the code.
    *
