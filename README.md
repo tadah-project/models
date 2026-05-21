@@ -6,7 +6,7 @@
 # MODELS
 
 Physics and machine-learning components of the
-[Tadah!](https://tadah.readthedocs.io/) MLIP toolchain. MODELS
+[Tadah!](https://tadah.readthedocs.io/develop/) MLIP toolchain. MODELS
 implements:
 
 - **Regressors** — `M_KRR` (kernel ridge regression) and `M_BLR`
@@ -25,9 +25,9 @@ implements:
 
 These classes are referenced by name in user-facing configuration
 files; for the user view see
-[descriptors](https://tadah.readthedocs.io/en/latest/descriptors.html),
-[cutoffs](https://tadah.readthedocs.io/en/latest/cutoffs.html), and
-[regressors](https://tadah.readthedocs.io/en/latest/regressors.html)
+[descriptors](https://tadah.readthedocs.io/develop/descriptors.html),
+[cutoffs](https://tadah.readthedocs.io/develop/cutoffs.html), and
+[regressors](https://tadah.readthedocs.io/develop/regressors.html)
 in the umbrella documentation.
 
 ## You don't need to use this directly
@@ -35,7 +35,7 @@ in the umbrella documentation.
 MODELS is an internal module of the Tadah! MLIP toolchain. It is
 fetched automatically (via CMake `FetchContent`) by MLIP, MD, and HPO. End users install the umbrella project
 [Tadah!MLIP](https://git.ecdf.ed.ac.uk/tadah/tadah.mlip) — see the
-[installation guide](https://tadah.readthedocs.io/en/latest/installation.html).
+[installation guide](https://tadah.readthedocs.io/develop/installation.html).
 
 ## Contributing
 
