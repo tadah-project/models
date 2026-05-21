@@ -31,50 +31,19 @@ files; for the user view see
 [regressors](https://tadah.readthedocs.io/en/latest/regressors.html)
 in the umbrella documentation.
 
-## When you use this directly
+## You don't need to use this directly
 
-Tadah!MODELS is not meant to be consumed standalone — Tadah!MLIP, MD,
-and HPO all pull it in via `FetchContent`. Build it directly only if
-you are developing new descriptors, kernels, or basis functions.
+Tadah!MODELS is an internal module of the Tadah! MLIP toolchain. It is
+fetched automatically (via CMake `FetchContent`) by Tadah!MLIP,
+Tadah!MD, and Tadah!HPO. End users install the umbrella project
+[Tadah!MLIP](https://git.ecdf.ed.ac.uk/tadah/tadah.mlip) — see the
+[installation guide](https://tadah.readthedocs.io/en/latest/installation.html).
 
-## Build & test in isolation
+## Contributing
 
-```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
-cmake --build build -j
-ctest --test-dir build/tests --output-on-failure
-```
-
-In-source builds are blocked deliberately; always pick a separate
-build directory.
-
-### Dependencies
-
-- C++17 compiler.
-- [Tadah!CORE](https://git.ecdf.ed.ac.uk/tadah/core) — fetched
-  automatically.
-- OpenMP (optional; enabled with `-DTADAH_ENABLE_OPENMP=ON`).
-- LAPACK / BLAS at link time (provided by the build environment).
-
-## Layout
-
-| Path | Purpose |
-|---|---|
-| `include/tadah/models/` | Public headers; one per public class. |
-| `src/`                  | Implementation translation units. |
-| `tests/`                | Unit tests for every descriptor, kernel, and basis function. |
-
-## Adding a new descriptor
-
-The general recipe is
-
-1. Implement a class derived from `D2_Base` or `DM_Base` in
-   `include/tadah/models/` and `src/`.
-2. Register the new class in `d2_all.h` / `dm_all.h` so the factory
-   can dispatch on the configuration name.
-3. Add a test under `tests/`.
-4. Document the new class in
-   [Tadah.MLIP/docs/source/descriptors.rst](https://git.ecdf.ed.ac.uk/tadah/tadah.mlip/-/blob/develop/docs/source/descriptors.rst).
+Build instructions, dependencies, layout, and the recipe for adding a
+new descriptor live in [CONTRIBUTING.md](CONTRIBUTING.md). The full
+multi-repo contributor guide is on the umbrella project.
 
 ## License
 
@@ -84,5 +53,5 @@ GPL-3.0; see [LICENSE](LICENSE).
 
 Bugs and feature requests:
 [Tadah!MODELS issues](https://git.ecdf.ed.ac.uk/tadah/models/-/issues).
-User-facing questions belong on
+For end-user questions please use the umbrella project
 [Tadah!MLIP](https://git.ecdf.ed.ac.uk/tadah/tadah.mlip).
