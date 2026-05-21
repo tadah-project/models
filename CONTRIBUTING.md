@@ -1,10 +1,10 @@
-# Contributing to Tadah!MODELS
+# Contributing to MODELS
 
 The full multi-repo contributor guide for the Tadah! project lives on
 the umbrella repository:
 <https://git.ecdf.ed.ac.uk/tadah/tadah.mlip/-/blob/develop/CONTRIBUTING.md>
 
-This file covers what is specific to Tadah!MODELS. Bug reports and
+This file covers what is specific to MODELS. Bug reports and
 feature requests on this module use the GitLab issue tracker on this
 project; cross-cutting changes (work that touches more than one
 Tadah! module) should be discussed on the umbrella project first.
@@ -23,7 +23,7 @@ build directory.
 ### Dependencies
 
 - C++17 compiler.
-- [Tadah!CORE](https://git.ecdf.ed.ac.uk/tadah/core) — fetched
+- [CORE](https://git.ecdf.ed.ac.uk/tadah/core) — fetched
   automatically.
 - OpenMP (optional; enabled with `-DTADAH_ENABLE_OPENMP=ON`).
 - LAPACK / BLAS at link time (provided by the build environment).
