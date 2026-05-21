@@ -13,7 +13,6 @@ implements:
   (Bayesian linear regression).
 - **Kernels** — `Kern_Linear`, `Kern_LQ`, `Kern_Polynomial`,
   `Kern_Quadratic`, `Kern_RBF`, `Kern_Sigmoid`.
-- **Basis functions** — `BF_Linear`, `BF_Polynomial2`.
 - **Two-body descriptors** — Behler-Parrinello (`D2_BP`), B-spline
   (`D2_Blip`), tabulated EAM (`D2_EAM`), Mie (`D2_MIE`), ZBL screening
   (`D2_ZBL`), Lennard-Jones (`D2_LJ`), composite (`D2_mJoin`).
