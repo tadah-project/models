@@ -101,7 +101,7 @@ message(STATUS "${TADAH}.MODELS Using TADAH_GIT_BRANCH:  ${TADAH_GIT_BRANCH}.")
 FetchContent_Declare(
     Tadah.CORE
     GIT_REPOSITORY https://git.ecdf.ed.ac.uk/tadah/core.git
-    GIT_TAG origin/${TADAH_GIT_BRANCH}
+    GIT_TAG ${TADAH_GIT_BRANCH}
 )
 FetchContent_MakeAvailable(Tadah.CORE)
 
