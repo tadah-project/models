@@ -185,8 +185,7 @@ void DM_Poly<ChannelFn, RadialBasis, AggMode>::calc_dXijdri_dXjidri(
   if (!is_init_for_atoms(Zi, Zj) || rij > get_rcut()) return;
 
   const double x = v[0], y = v[1], z = v[2];
-  const double wi = weights[Zi];
-  const double wj = weights[Zj];
+  const double w_pair = weights[Zi][Zj];
 
   const double fc  = fcut->calc       (rij);
   const double fcp = fcut->calc_prime (rij);
@@ -226,8 +225,8 @@ void DM_Poly<ChannelFn, RadialBasis, AggMode>::calc_dXijdri_dXjidri(
         const double Bz = g*tzij + pqrij*dg*z*rinv;
 
         for (std::size_t p = 0; p < odim; ++p, ++ii) {
-          const double coef = scale *
-              ( rhoi(ii)*wj - s_L * rhoj(ii)*wi );
+          const double coef = scale * w_pair *
+              ( rhoi(ii) - s_L * rhoj(ii) );
           const std::size_t row = p + Lshift + fidx;
           fd_ij(row, 0) += coef * Bx;
           fd_ij(row, 1) += coef * By;
@@ -242,8 +241,8 @@ void DM_Poly<ChannelFn, RadialBasis, AggMode>::calc_dXijdri_dXjidri(
           const double By = g*tyij + pqrij*dg*y*rinv;
           const double Bz = g*tzij + pqrij*dg*z*rinv;
 
-          const double coef = scale *
-              ( rhoi(ii)*wj - s_L * rhoj(ii)*wi );
+          const double coef = scale * w_pair *
+              ( rhoi(ii) - s_L * rhoj(ii) );
 
           const std::size_t row = c + Lshift + fidx;
           fd_ij(row, 0) += coef * Bx;
@@ -270,10 +269,10 @@ void DM_Poly<ChannelFn, RadialBasis, AggMode>::calc_dXijdri(
   if (!is_init_for_atoms(Zi, Zj) || rij > get_rcut()) return;
 
   const double x = v[0], y = v[1], z = v[2];
-  const double wj = weights[Zj];
+  const double w_pair = weights[Zi][Zj];
 
-  const double fc  = scale*wj * fcut->calc       (rij);
-  const double fcp = scale*wj * fcut->calc_prime (rij);
+  const double fc  = scale*w_pair * fcut->calc       (rij);
+  const double fcp = scale*w_pair * fcut->calc_prime (rij);
 
   const double      rinv = 1.0/rij;
   const std::size_t ng   = cgrid.size();
@@ -355,7 +354,7 @@ void DM_Poly<ChannelFn, RadialBasis, AggMode>::calc_rho(
 {
   if (!is_init_for_atoms(Zi, Zj) || rij > get_rcut()) return;
 
-  const double fc = scale * weights[Zj] * fcut->calc(rij);
+  const double fc = scale * weights[Zi][Zj] * fcut->calc(rij);
 
   const std::size_t ng = cgrid.size();
   StackOrHeapBuffer<DM_POLY_MAX_GRID> buf(ng);

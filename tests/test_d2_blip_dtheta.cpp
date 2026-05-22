@@ -567,13 +567,21 @@ TEST_CASE_METHOD(TestFixture,
 }
 
 TEST_CASE_METHOD(TestFixture,
-          "D2_Blip WATOM claims ownership without contributing for Zj != Z_target",
+          "D2_Blip WATOM claims ownership with chain-rule contributions",
           "[MODELS][d2_blip][dtheta][watom]")
 {
-    // Build a multi-species context (H, Ta). arg_pos=1 → Z_target=H (Z=1);
-    // arg_pos=2 → Z_target=Ta (Z=73). Probe pair (Ta, H) with Zj=H:
-    //   - arg_pos=1: should contribute (Zj == Z_target == H).
-    //   - arg_pos=2: should claim ownership but contribute zero.
+    // Build a multi-species context (H, Ta) with per-species WATOM 1.0 1.0.
+    // Under the geometric-mean pair-weight rule, the WATOM chain factor is
+    //   chain(Zi, Zj, n) = d weights[Zi][Zj] / d w_n
+    // which equals 1 on the diagonal (Zi==Zj==Z_target), 0.5*sqrt(w_other/w_n)
+    // off-diagonal when exactly one of Zi, Zj equals Z_target, and 0 otherwise.
+    // Concretely with w_H=w_Ta=1.0:
+    //   arg_pos=1 (Z_target=H): chain(H,H)=1, chain(Ta,H)=chain(H,Ta)=0.5,
+    //                            chain(Ta,Ta)=0.
+    //   arg_pos=2 (Z_target=Ta): chain(Ta,Ta)=1, chain(Ta,H)=chain(H,Ta)=0.5,
+    //                            chain(H,H)=0.
+    // Ownership (return value) is true whenever arg_pos is in range, regardless
+    // of whether the chain factor is zero.
     Context c;
     c.add("ATOM", "H");
     c.add("ATOM", "Ta");
@@ -597,34 +605,49 @@ TEST_CASE_METHOD(TestFixture,
     d.set_fcut(&fc, false);
 
     const double rij = 1.2;
-    const int Zi_Ta = 73, Zj_H = 1;
+    const int Z_H = 1, Z_Ta = 73;
 
-    // arg_pos=2 (Z_target=Ta), Zj=H → should claim true but contribute zero.
+    // arg_pos=2 (Z_target=Ta), pair (Zi=H, Zj=H) → neither matches, chain=0.
     aed_type dD2(d.size()); dD2.set_zero();
-    const bool ok2 = d.calc_dDdtheta("WATOM", 2, Zi_Ta, Zj_H, rij, rij * rij, dD2);
+    const bool ok2 = d.calc_dDdtheta("WATOM", 2, Z_H, Z_H, rij, rij * rij, dD2);
     REQUIRE(ok2);
     for (std::size_t c_ = 0; c_ < d.size(); ++c_)
         CHECK(dD2[c_] == Approx(0.0).margin(1e-15));
 
-    // arg_pos=1 (Z_target=H), Zj=H → should contribute non-zero.
+    // arg_pos=2 (Z_target=Ta), pair (Zi=Ta, Zj=H) → off-diagonal, chain=0.5.
+    aed_type dD2_off(d.size()); dD2_off.set_zero();
+    const bool ok2_off = d.calc_dDdtheta("WATOM", 2, Z_Ta, Z_H, rij, rij * rij, dD2_off);
+    REQUIRE(ok2_off);
+    double sumsq_off = 0;
+    for (std::size_t c_ = 0; c_ < d.size(); ++c_) sumsq_off += dD2_off[c_] * dD2_off[c_];
+    CHECK(sumsq_off > 1e-12);
+
+    // arg_pos=1 (Z_target=H), pair (Zi=H, Zj=H) → diagonal, chain=1.
     aed_type dD1(d.size()); dD1.set_zero();
-    const bool ok1 = d.calc_dDdtheta("WATOM", 1, Zi_Ta, Zj_H, rij, rij * rij, dD1);
+    const bool ok1 = d.calc_dDdtheta("WATOM", 1, Z_H, Z_H, rij, rij * rij, dD1);
     REQUIRE(ok1);
     double sumsq = 0;
     for (std::size_t c_ = 0; c_ < d.size(); ++c_) sumsq += dD1[c_] * dD1[c_];
     CHECK(sumsq > 1e-12);
 
-    // Force-side mirror.
+    // Off-diagonal contribution should be exactly 0.5 * diagonal (since
+    // w_H = w_Ta = 1, chain_off / chain_diag = 0.5/1.0). Compare per-component.
+    for (std::size_t c_ = 0; c_ < d.size(); ++c_) {
+        INFO("component=" << c_ << " dD1=" << dD1[c_] << " dD2_off=" << dD2_off[c_]);
+        CHECK(dD2_off[c_] == Approx(0.5 * dD1[c_]).margin(1e-12));
+    }
+
+    // Force-side mirror: arg_pos=2, (Zi=H, Zj=H) → zero contribution.
     tadah::core::fd_type dfd2(d.size());
-    const bool okf2 = d.calc_dXijdri_dtheta("WATOM", 2, Zi_Ta, Zj_H, rij, rij * rij, dfd2);
+    const bool okf2 = d.calc_dXijdri_dtheta("WATOM", 2, Z_H, Z_H, rij, rij * rij, dfd2);
     REQUIRE(okf2);
     for (std::size_t c_ = 0; c_ < d.size(); ++c_)
         CHECK(dfd2(c_, 0) == Approx(0.0).margin(1e-15));
 
     // arg_pos out of range returns false (configuration error, route to FD).
     aed_type dD3(d.size()); dD3.set_zero();
-    CHECK_FALSE(d.calc_dDdtheta("WATOM", 99, Zi_Ta, Zj_H, rij, rij * rij, dD3));
-    CHECK_FALSE(d.calc_dDdtheta("WATOM", 0,  Zi_Ta, Zj_H, rij, rij * rij, dD3));
+    CHECK_FALSE(d.calc_dDdtheta("WATOM", 99, Z_Ta, Z_H, rij, rij * rij, dD3));
+    CHECK_FALSE(d.calc_dDdtheta("WATOM", 0,  Z_Ta, Z_H, rij, rij * rij, dD3));
 }
 
 TEST_CASE_METHOD(TestFixture,

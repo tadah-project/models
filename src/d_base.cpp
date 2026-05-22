@@ -1,7 +1,10 @@
 #include "tadah/core/core_types.h"
 #include "tadah/core/utils.h"
+#include <algorithm>
+#include <cmath>
 #include <string>
 #include <tadah/models/descriptors/d_base.h>
+#include <utility>
 #include <vector>
 namespace tadah {
 namespace models {
@@ -47,24 +50,59 @@ D_Base::~D_Base() {
   }
 }
 
-D_Base::D_Base() {}
+D_Base::D_Base() {
+  for (int i = 0; i < 119; ++i) std::fill_n(weights[i], 119, 1.0);
+}
 D_Base::D_Base(const tadah::core::Context &c):
   verbose(c.get<int>("VERBOSE"))
 {
-  refresh_atom_weights(c);
+  for (int i = 0; i < 119; ++i) std::fill_n(weights[i], 119, 1.0);
+  update_weights(c);
 }
-void D_Base::refresh_atom_weights(const tadah::core::Context &c) {
-  std::fill_n(weights, 119, 1.0);
+void D_Base::update_weights(const tadah::core::Context &c) {
   watom_Z_by_arg_pos.clear();
-  if (c.contains("ATOM")) {
-    const size_t n = c.size("ATOM");
-    watom_Z_by_arg_pos.reserve(n);
-    for (size_t i=0; i<n; ++i) {
-      std::string symbol = c.get<std::string>("ATOM",i);
-      double wi = c.get<double>("WATOM",i);
-      int Z = tadah::core::PeriodicTable::find_by_symbol(symbol).Z;
-      weights[Z]=wi;
-      watom_Z_by_arg_pos.push_back(Z);
+  watom_pair_by_arg_pos.clear();
+  watom_mode = WatomMode::Empty;
+  if (!c.contains("WATOM") || c.size("WATOM") == 0) return;
+
+  const size_t n = c.size("WATOM");
+  const bool per_species =
+    tadah::core::is_number(c.get<std::string>("WATOM", 0));
+
+  if (per_species) {
+    if (!c.contains("ATOM")) return;
+    watom_mode = WatomMode::PerSpecies;
+    std::vector<int> Zs(n);
+    for (size_t i = 0; i < n; ++i) {
+      Zs[i] = tadah::core::PeriodicTable::find_by_symbol(
+                c.get<std::string>("ATOM", i)).Z;
+    }
+    watom_Z_by_arg_pos = Zs;
+    for (size_t i = 0; i < n; ++i) {
+      const double wi = c.get<double>("WATOM", i);
+      weights[Zs[i]][Zs[i]] = wi;
+      for (size_t j = i + 1; j < n; ++j) {
+        const double w = std::sqrt(wi * c.get<double>("WATOM", j));
+        weights[Zs[i]][Zs[j]] = w;
+        weights[Zs[j]][Zs[i]] = w;
+      }
+    }
+  } else {
+    if (n % 3 != 0) {
+      throw std::runtime_error(
+        "WATOM pair format: expected sym sym value triples");
+    }
+    watom_mode = WatomMode::PairTriple;
+    watom_pair_by_arg_pos.reserve(n / 3);
+    for (size_t i = 0; i < n; i += 3) {
+      const int Zi = tadah::core::PeriodicTable::find_by_symbol(
+                       c.get<std::string>("WATOM", i)).Z;
+      const int Zj = tadah::core::PeriodicTable::find_by_symbol(
+                       c.get<std::string>("WATOM", i + 1)).Z;
+      const double w = c.get<double>("WATOM", i + 2);
+      weights[Zi][Zj] = w;
+      weights[Zj][Zi] = w;
+      watom_pair_by_arg_pos.emplace_back(Zi, Zj);
     }
   }
 }
@@ -73,6 +111,41 @@ int D_Base::get_atom_Z_for_arg_pos(int arg_pos) const {
   const size_t idx = static_cast<size_t>(arg_pos - 1);
   if (idx >= watom_Z_by_arg_pos.size()) return 0;
   return watom_Z_by_arg_pos[idx];
+}
+bool D_Base::has_watom_arg_pos(int arg_pos) const {
+  if (arg_pos < 1) return false;
+  const size_t idx = static_cast<size_t>(arg_pos - 1);
+  switch (watom_mode) {
+    case WatomMode::PerSpecies: return idx < watom_Z_by_arg_pos.size();
+    case WatomMode::PairTriple: return idx < watom_pair_by_arg_pos.size();
+    case WatomMode::Empty:      return false;
+  }
+  return false;
+}
+double D_Base::dweight_dw_n(int Zi, int Zj, int arg_pos) const {
+  if (arg_pos < 1) return 0.0;
+  const size_t idx = static_cast<size_t>(arg_pos - 1);
+  if (watom_mode == WatomMode::PerSpecies) {
+    if (idx >= watom_Z_by_arg_pos.size()) return 0.0;
+    const int Z_target = watom_Z_by_arg_pos[idx];
+    const bool zi_eq = (Zi == Z_target);
+    const bool zj_eq = (Zj == Z_target);
+    if (!zi_eq && !zj_eq) return 0.0;
+    if (zi_eq && zj_eq)   return 1.0;
+    const double w_n     = weights[Z_target][Z_target];
+    const int    other   = zi_eq ? Zj : Zi;
+    const double w_other = weights[other][other];
+    if (w_n <= 0.0) return 0.0;
+    return 0.5 * std::sqrt(w_other / w_n);
+  }
+  if (watom_mode == WatomMode::PairTriple) {
+    if (idx >= watom_pair_by_arg_pos.size()) return 0.0;
+    const auto &pair = watom_pair_by_arg_pos[idx];
+    const int Za = pair.first;
+    const int Zb = pair.second;
+    return ((Zi == Za && Zj == Zb) || (Zi == Zb && Zj == Za)) ? 1.0 : 0.0;
+  }
+  return 0.0;
 }
 void D_Base::printGrid(core::v_type &v, const std::string &key, core::LogLevel logLevel) {
   core::Logger::instance().log(logLevel, label()," ",key,":\n  ", v);

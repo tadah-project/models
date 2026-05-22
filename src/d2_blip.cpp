@@ -48,7 +48,7 @@ void D2_Blip::calc_aed(
   double fc_ij = fcut->calc(rij);
   for (size_t c=0; c<cgrid.size(); c++) {
     double t = B(sgrid[c]*(rij-cgrid[c]),fc_ij);
-    aed(i++) += scale*weights[Zj]*t;
+    aed(i++) += scale*weights[Zi][Zj]*t;
   }
 
 }
@@ -65,7 +65,7 @@ void D2_Blip::calc_dXijdri(
   double fc_ij = fcut->calc(rij);
   double fcp_ij = fcut->calc_prime(rij);
   for (size_t c=0; c<cgrid.size(); c++) {
-    fd_ij(i++,0) = scale*weights[Zj]*dB(sgrid[c]*(rij-cgrid[c]),sgrid[c],fc_ij,fcp_ij);
+    fd_ij(i++,0) = scale*weights[Zi][Zj]*dB(sgrid[c]*(rij-cgrid[c]),sgrid[c],fc_ij,fcp_ij);
   }
 }
 void D2_Blip::calc_all(
@@ -83,8 +83,8 @@ void D2_Blip::calc_all(
   double fc_ij = fcut->calc(rij);
   double fcp_ij = fcut->calc_prime(rij);
   for (size_t c=0; c<cgrid.size(); c++) {
-    aed(i) += scale*weights[Zj]*B(sgrid[c]*(rij-cgrid[c]),fc_ij);
-    fd_ij(i,0) = scale*weights[Zj]*dB(sgrid[c]*(rij-cgrid[c]),sgrid[c],fc_ij,fcp_ij);
+    aed(i) += scale*weights[Zi][Zj]*B(sgrid[c]*(rij-cgrid[c]),fc_ij);
+    fd_ij(i,0) = scale*weights[Zi][Zj]*dB(sgrid[c]*(rij-cgrid[c]),sgrid[c],fc_ij,fcp_ij);
     ++i;
   }
 }
@@ -118,7 +118,7 @@ bool D2_Blip::calc_dDdtheta(
     const double      dB_dx = dB(xc, 1.0);   // bare dB/dx_c
     // d(x_c)/d(mu) = -eta
     const double      dD_dmu = -eta * dB_dx * fc;
-    dD_buf(fidx + k) += scale * weights[Zj] * dD_dmu;
+    dD_buf(fidx + k) += scale * weights[Zi][Zj] * dD_dmu;
     return true;
   }
 
@@ -132,7 +132,7 @@ bool D2_Blip::calc_dDdtheta(
     const double      dB_dx = dB(xc, 1.0);
     // d(x_c)/d(eta) = (r - mu)
     const double      dD_deta = (rij - mu) * dB_dx * fc;
-    dD_buf(fidx + k) += scale * weights[Zj] * dD_deta;
+    dD_buf(fidx + k) += scale * weights[Zi][Zj] * dD_deta;
     return true;
   }
 
@@ -147,24 +147,22 @@ bool D2_Blip::calc_dDdtheta(
       const double eta = sgrid[c];
       const double xc  = eta * (rij - mu);
       const double b_val = B(xc);
-      dD_buf(fidx + c) += scale * weights[Zj] * b_val * dfc;
+      dD_buf(fidx + c) += scale * weights[Zi][Zj] * b_val * dfc;
     }
     return true;
   }
 
   if (theta_name == "WATOM") {
-    // d(aed(fidx+c))/d WATOM[Z_target] = δ(Zj, Z_target) * B(x_c) * fc(r),
-    // i.e. the unweighted per-pair contribution (calc_aed with the
-    // weights[Zj] factor removed). For Zj != Z_target the closed form
-    // contributes nothing but still claims ownership so the orchestrator
-    // does NOT route this theta to FD.
-    const int Z_target = get_atom_Z_for_arg_pos(arg_pos);
-    if (Z_target < 1) return false;
-    if (Zj == Z_target) {
+    // d(aed(fidx+c))/d θ_WATOM = chain × B(x_c) * fc(r), where chain
+    // applies the per-species geometric-mean rule or the direct
+    // pair-triple mapping.
+    if (!has_watom_arg_pos(arg_pos)) return false;
+    const double chain = dweight_dw_n(Zi, Zj, arg_pos);
+    if (chain != 0.0) {
       const double fc_ij = fcut->calc(rij);
       for (std::size_t c = 0; c < cgrid.size(); ++c) {
         const double xc = sgrid[c] * (rij - cgrid[c]);
-        dD_buf(fidx + c) += scale * B(xc, fc_ij);
+        dD_buf(fidx + c) += scale * chain * B(xc, fc_ij);
       }
     }
     return true;
@@ -218,7 +216,7 @@ bool D2_Blip::calc_dXijdri_dtheta(
     const double      b2  = d2B_bare(xc);  // bare b''(x_c)
     // d/d mu of (fc eta b1 + fcp b) = -eta * (fc eta b2 + fcp b1)
     const double      val = -eta * (fc * eta * b2 + fcp * b1);
-    dfd_ij(fidx + k, 0) += scale * weights[Zj] * val;
+    dfd_ij(fidx + k, 0) += scale * weights[Zi][Zj] * val;
     return true;
   }
 
@@ -232,7 +230,7 @@ bool D2_Blip::calc_dXijdri_dtheta(
     const double      b2  = d2B_bare(xc);
     // d/d eta of (fc eta b1 + fcp b) = fc b1 + (r-mu) (fc eta b2 + fcp b1)
     const double      val = fc * b1 + (rij - mu) * (fc * eta * b2 + fcp * b1);
-    dfd_ij(fidx + k, 0) += scale * weights[Zj] * val;
+    dfd_ij(fidx + k, 0) += scale * weights[Zi][Zj] * val;
     return true;
   }
 
@@ -247,21 +245,22 @@ bool D2_Blip::calc_dXijdri_dtheta(
       const double b   = B(xc);
       const double b1  = dB(xc, 1.0);
       const double val = dfc * eta * b1 + dfcp * b;
-      dfd_ij(fidx + c, 0) += scale * weights[Zj] * val;
+      dfd_ij(fidx + c, 0) += scale * weights[Zi][Zj] * val;
     }
     return true;
   }
 
   if (theta_name == "WATOM") {
-    // d(fd_ij(fidx+c, 0))/d WATOM[Z_target] = δ(Zj, Z_target) * dB-with-fc'
-    // (the per-pair force radial contribution with weights[Zj] removed).
-    const int Z_target = get_atom_Z_for_arg_pos(arg_pos);
-    if (Z_target < 1) return false;
-    if (Zj == Z_target) {
+    // d(fd_ij(fidx+c, 0))/d θ_WATOM = chain × dB-with-fc' (unweighted
+    // per-pair force-radial contribution scaled by the WATOM chain
+    // factor for the current mode).
+    if (!has_watom_arg_pos(arg_pos)) return false;
+    const double chain = dweight_dw_n(Zi, Zj, arg_pos);
+    if (chain != 0.0) {
       for (std::size_t c = 0; c < cgrid.size(); ++c) {
         const double xc = sgrid[c] * (rij - cgrid[c]);
         dfd_ij(fidx + c, 0) +=
-          scale * dB(xc, sgrid[c], fc, fcp);
+          scale * chain * dB(xc, sgrid[c], fc, fcp);
       }
     }
     return true;

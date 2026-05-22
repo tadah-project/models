@@ -61,23 +61,62 @@ public:
   /** \brief Return label of this descriptor.
    */
   virtual std::string label() const=0;
-  double weights[119] = {1};  // ignore zero index; w[1]->H
+
+  /** Symmetric per-pair WATOM weights. `weights[Zi][Zj] == weights[Zj][Zi]`.
+   *  Filled to 1.0 in every constructor; populated by update_weights() from
+   *  either per-species (geometric mean) or pair-triple WATOM input.
+   *  Index 0 is unused (no element has Z=0). */
+  double weights[119][119];
+
+  /** Convenience read-only accessor for the symmetric pair weight. */
+  inline double get_weight(int Zi, int Zj) const { return weights[Zi][Zj]; }
+
+  /** Tracks which WATOM input form populated `weights`. Drives arg_pos→Z
+   *  vs arg_pos→pair resolution in dweight_dw_n. */
+  enum class WatomMode { Empty, PerSpecies, PairTriple };
+  WatomMode watom_mode = WatomMode::Empty;
+
   D_Base();
   D_Base(const tadah::core::Context &c);
 
-  /** Refresh per-element weights[] from WATOM in the (possibly updated)
-   *  context. Intended for HPO reinit paths where WATOM may change
-   *  between iters but the descriptor object is reused. */
-  void refresh_atom_weights(const tadah::core::Context &c);
+  /** Populate `weights[][]` from the (possibly updated) WATOM key in `c`.
+   *  Accepts two input formats:
+   *    - Per-species (parallel to ATOM): pair weights computed as the
+   *      geometric mean `weights[Zi][Zj] = sqrt(w_i * w_j)`, diagonal
+   *      `weights[Zi][Zi] = w_i`. Sets watom_mode = PerSpecies and
+   *      populates watom_Z_by_arg_pos.
+   *    - Pair triples (sym sym value)+ : symmetric direct writes. Sets
+   *      watom_mode = PairTriple and populates watom_pair_by_arg_pos.
+   *  Always resets `weights` to 1.0 first when called via the
+   *  constructor; subsequent calls (HPO reinit) write only the listed
+   *  pairs so callers can rely on prior state being preserved on
+   *  unlisted slots. */
+  void update_weights(const tadah::core::Context &c);
 
-  /** Resolve a 1-based WATOM arg_pos (matching `OPTIM WATOM (n)`) to the
-   *  atomic number Z of the n-th ATOM entry in the context that last
-   *  populated `weights[]`. Returns 0 when arg_pos is out of range or
-   *  the ATOM list was never populated (no context constructor / no
-   *  refresh_atom_weights call). Used by calc_dDdtheta /
-   *  calc_dXijdri_dtheta / calc_drhoi_dtheta WATOM branches to test
-   *  whether a per-pair contribution belongs to the optimised species. */
+  /** Resolve a 1-based per-species WATOM arg_pos (matching
+   *  `OPTIM WATOM (n)`) to the atomic number Z of the n-th ATOM entry
+   *  populated by the last update_weights call. Returns 0 when arg_pos
+   *  is out of range, the ATOM list was never populated, or the
+   *  descriptor is in PairTriple mode. */
   int get_atom_Z_for_arg_pos(int arg_pos) const;
+
+  /** Chain factor `d weights[Zi][Zj] / d θ_{arg_pos}` for the current
+   *  WATOM mode.
+   *    PerSpecies : geometric-mean derivative w.r.t. per-element w_n;
+   *      returns 1.0 when Zi==Zj==Z_target (diagonal direct write),
+   *      0.5 * sqrt(w_other / w_n) when exactly one of Zi,Zj equals
+   *      Z_target, 0 otherwise.
+   *    PairTriple : 1.0 iff (Zi,Zj) matches the arg_pos-th triple's
+   *      pair (either order), 0 otherwise.
+   *    Empty / out-of-range arg_pos : 0. */
+  double dweight_dw_n(int Zi, int Zj, int arg_pos) const;
+
+  /** Returns true when `arg_pos` is in range for the current watom_mode
+   *  (i.e. the descriptor owns the WATOM derivative for that θ). Lets
+   *  descriptor calc_dDdtheta branches distinguish "I own this θ but
+   *  contribute zero for this (Zi,Zj) pair" (return true) from "this θ
+   *  is unconfigured, fall back to FD" (return false). */
+  bool has_watom_arg_pos(int arg_pos) const;
 
   /** \brief Print grid to the log.
    *
@@ -145,10 +184,18 @@ private:
   bool manage_memory=false; // who owns fcut
   Bitset2D init_for_atoms_map;  // 0th is unused
 
-  /* Z values in ATOM-list order, populated by refresh_atom_weights.
-   * Empty when the descriptor was default-constructed (no Context).
-   * `OPTIM WATOM (n)` resolves to `watom_Z_by_arg_pos[n-1]`. */
+  /* Z values in ATOM-list order, populated by update_weights when the
+   * per-species WATOM input form is detected.
+   * Empty when watom_mode != PerSpecies (default-constructed, pair-triple
+   * input, or no WATOM key). `OPTIM WATOM (n)` resolves to
+   * `watom_Z_by_arg_pos[n-1]` only in PerSpecies mode. */
   std::vector<int> watom_Z_by_arg_pos;
+
+  /* (Zi, Zj) pairs in the order they appear in WATOM, populated by
+   * update_weights when the pair-triple WATOM input form is detected.
+   * Empty when watom_mode != PairTriple. `OPTIM WATOM (k)` resolves to
+   * watom_pair_by_arg_pos[k-1] only in PairTriple mode. */
+  std::vector<std::pair<int,int>> watom_pair_by_arg_pos;
 };
 } // namespace models
 } // namespace tadah

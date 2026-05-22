@@ -37,8 +37,8 @@ void D2_MIE::calc_aed(
   double rm_inv = 1.0/pow(rij,m);
   double fc_ij = fcut->calc(rij);
 
-  aed(fidx) -= scale*weights[Zj]*rn_inv*fc_ij;
-  aed(fidx+1) += scale*weights[Zj]*rm_inv*fc_ij;
+  aed(fidx) -= scale*weights[Zi][Zj]*rn_inv*fc_ij;
+  aed(fidx+1) += scale*weights[Zi][Zj]*rm_inv*fc_ij;
 }
 void D2_MIE::calc_dXijdri(
   const int Zi,
@@ -52,8 +52,8 @@ void D2_MIE::calc_dXijdri(
   double fc_ij = fcut->calc(rij);
   double fcp_ij = fcut->calc_prime(rij);
 
-  fd_ij(fidx,0)   = scale*weights[Zj]*(n/pow(rij,n+1)*fc_ij - fcp_ij/pow(rij,n));
-  fd_ij(fidx+1,0) = scale*weights[Zj]*(-m/pow(rij,m+1)*fc_ij + fcp_ij/pow(rij,m));
+  fd_ij(fidx,0)   = scale*weights[Zi][Zj]*(n/pow(rij,n+1)*fc_ij - fcp_ij/pow(rij,n));
+  fd_ij(fidx+1,0) = scale*weights[Zi][Zj]*(-m/pow(rij,m+1)*fc_ij + fcp_ij/pow(rij,m));
 }
 void D2_MIE::calc_all(
   const int Zi,
@@ -72,11 +72,11 @@ void D2_MIE::calc_all(
   double fc_ij = fcut->calc(rij);
   double fcp_ij = fcut->calc_prime(rij);
 
-  aed(fidx) -= scale*weights[Zj]*rn_inv*fc_ij;
-  aed(fidx+1) += scale*weights[Zj]*rm_inv*fc_ij;
+  aed(fidx) -= scale*weights[Zi][Zj]*rn_inv*fc_ij;
+  aed(fidx+1) += scale*weights[Zi][Zj]*rm_inv*fc_ij;
 
-  fd_ij(fidx,0) = scale*weights[Zj]*(n*rn_inv/rij*fc_ij - fcp_ij*rn_inv);
-  fd_ij(fidx+1,0) = scale*weights[Zj]*(-m*rm_inv/rij*fc_ij + fcp_ij*rm_inv);
+  fd_ij(fidx,0) = scale*weights[Zi][Zj]*(n*rn_inv/rij*fc_ij - fcp_ij*rn_inv);
+  fd_ij(fidx+1,0) = scale*weights[Zi][Zj]*(-m*rm_inv/rij*fc_ij + fcp_ij*rm_inv);
 
 }
 std::string D2_MIE::label() const {
@@ -110,8 +110,8 @@ bool D2_MIE::calc_dDdtheta(
     if (dfc == 0.0) return false;  // discontinuous cutoff; caller FD-falls-back
     const double rn_inv = 1.0 / std::pow(rij, n);
     const double rm_inv = 1.0 / std::pow(rij, m);
-    dD_buf(fidx)     -= scale * weights[Zj] * rn_inv * dfc;
-    dD_buf(fidx + 1) += scale * weights[Zj] * rm_inv * dfc;
+    dD_buf(fidx)     -= scale * weights[Zi][Zj] * rn_inv * dfc;
+    dD_buf(fidx + 1) += scale * weights[Zi][Zj] * rm_inv * dfc;
     return true;
   }
 
@@ -124,28 +124,25 @@ bool D2_MIE::calc_dDdtheta(
     if (arg_pos == 2) {
       // d(-r^{-n})/dn = +ln(r) r^{-n}
       const double rn_inv = 1.0 / std::pow(rij, n);
-      dD_buf(fidx) += scale * weights[Zj] * ln_r * rn_inv * fc_ij;
+      dD_buf(fidx) += scale * weights[Zi][Zj] * ln_r * rn_inv * fc_ij;
     } else {
       // d(+r^{-m})/dm = -ln(r) r^{-m}
       const double rm_inv = 1.0 / std::pow(rij, m);
-      dD_buf(fidx + 1) -= scale * weights[Zj] * ln_r * rm_inv * fc_ij;
+      dD_buf(fidx + 1) -= scale * weights[Zi][Zj] * ln_r * rm_inv * fc_ij;
     }
     return true;
   }
 
   if (theta_name == "WATOM") {
-    // Energy-side WATOM[Z_target] derivative — unweighted calc_aed
-    // contribution.
-    //   d(aed(fidx))   /dW[Z] = δ(Zj,Z) * (-r^{-n} fc)
-    //   d(aed(fidx+1)) /dW[Z] = δ(Zj,Z) * (+r^{-m} fc)
-    const int Z_target = get_atom_Z_for_arg_pos(arg_pos);
-    if (Z_target < 1) return false;
-    if (Zj == Z_target) {
+    // d(aed)/d θ_WATOM = chain × (unweighted Mie energy contribution).
+    if (!has_watom_arg_pos(arg_pos)) return false;
+    const double chain = dweight_dw_n(Zi, Zj, arg_pos);
+    if (chain != 0.0) {
       const double fc_ij  = fcut->calc(rij);
       const double rn_inv = 1.0 / std::pow(rij, n);
       const double rm_inv = 1.0 / std::pow(rij, m);
-      dD_buf(fidx)     -= scale * rn_inv * fc_ij;
-      dD_buf(fidx + 1) += scale * rm_inv * fc_ij;
+      dD_buf(fidx)     -= scale * chain * rn_inv * fc_ij;
+      dD_buf(fidx + 1) += scale * chain * rm_inv * fc_ij;
     }
     return true;
   }
@@ -177,8 +174,8 @@ bool D2_MIE::calc_dXijdri_dtheta(
     const double rm_inv  = 1.0 / std::pow(rij, m);
     const double rn1_inv = rn_inv / rij;   // r^{-n-1}
     const double rm1_inv = rm_inv / rij;
-    dfd_ij(fidx,     0) += scale * weights[Zj] * ( n * rn1_inv * dfc - dfcp * rn_inv);
-    dfd_ij(fidx + 1, 0) += scale * weights[Zj] * (-m * rm1_inv * dfc + dfcp * rm_inv);
+    dfd_ij(fidx,     0) += scale * weights[Zi][Zj] * ( n * rn1_inv * dfc - dfcp * rn_inv);
+    dfd_ij(fidx + 1, 0) += scale * weights[Zi][Zj] * (-m * rm1_inv * dfc + dfcp * rm_inv);
     return true;
   }
 
@@ -192,30 +189,27 @@ bool D2_MIE::calc_dXijdri_dtheta(
       const double rn_inv  = 1.0 / std::pow(rij, n);
       const double rn1_inv = rn_inv / rij;
       const double val = rn1_inv * fc_ij * (1.0 - n * ln_r) + fcp_ij * ln_r * rn_inv;
-      dfd_ij(fidx, 0) += scale * weights[Zj] * val;
+      dfd_ij(fidx, 0) += scale * weights[Zi][Zj] * val;
     } else {
       // d/dm — touches only fidx+1 (attractive column).
       const double rm_inv  = 1.0 / std::pow(rij, m);
       const double rm1_inv = rm_inv / rij;
       const double val = rm1_inv * fc_ij * (1.0 - m * ln_r) + fcp_ij * ln_r * rm_inv;
-      dfd_ij(fidx + 1, 0) -= scale * weights[Zj] * val;
+      dfd_ij(fidx + 1, 0) -= scale * weights[Zi][Zj] * val;
     }
     return true;
   }
 
   if (theta_name == "WATOM") {
-    // Force-side WATOM[Z_target] derivative — unweighted calc_dXijdri
-    // contribution. Matches the calc_dXijdri formula with weights[Zj]
-    // stripped:
-    //   fd(fidx,   0) = w(Zj) * ( n r^{-n-1} fc - fcp r^{-n})
-    //   fd(fidx+1, 0) = w(Zj) * (-m r^{-m-1} fc + fcp r^{-m})
-    const int Z_target = get_atom_Z_for_arg_pos(arg_pos);
-    if (Z_target < 1) return false;
-    if (Zj == Z_target) {
+    // Force-side d(fd)/d θ_WATOM = chain × (unweighted Mie force-radial
+    // contribution).
+    if (!has_watom_arg_pos(arg_pos)) return false;
+    const double chain = dweight_dw_n(Zi, Zj, arg_pos);
+    if (chain != 0.0) {
       const double rn_inv  = 1.0 / std::pow(rij, n);
       const double rm_inv  = 1.0 / std::pow(rij, m);
-      dfd_ij(fidx,     0) += scale * ( n * rn_inv / rij * fc_ij - fcp_ij * rn_inv);
-      dfd_ij(fidx + 1, 0) += scale * (-m * rm_inv / rij * fc_ij + fcp_ij * rm_inv);
+      dfd_ij(fidx,     0) += scale * chain * ( n * rn_inv / rij * fc_ij - fcp_ij * rn_inv);
+      dfd_ij(fidx + 1, 0) += scale * chain * (-m * rm_inv / rij * fc_ij + fcp_ij * rm_inv);
     }
     return true;
   }

@@ -80,13 +80,13 @@ namespace tadah {
           bool changed = false;
           if (d2b) {
             changed |= d2b->reinit(ctx);
-            d2b->refresh_atom_weights(ctx);
+            d2b->update_weights(ctx);
             if (c2b && ctx.get<bool>("INIT2B"))
               c2b->set_rcut(ctx.get<double>("RCUT2BMAX"));
           }
           if (dmb) {
             changed |= dmb->reinit(ctx);
-            dmb->refresh_atom_weights(ctx);
+            dmb->update_weights(ctx);
             if (cmb && ctx.get<bool>("INITMB"))
               cmb->set_rcut(ctx.get<double>("RCUTMBMAX"));
           }

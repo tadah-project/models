@@ -108,8 +108,7 @@ void DM_Blip::calc_dXijdri_dXjidri(
   if(!is_init_for_atoms(Zi,Zj) || rij>get_rcut()) return;
 
   const double x=v[0], y=v[1], z=v[2];
-  const double wi = weights[Zi];
-  const double wj = weights[Zj];
+  const double w_pair = weights[Zi][Zj];
 
   /* --- radial part ------------------------------------------------- */
   const double fc  = fcut->calc       (rij);
@@ -158,9 +157,8 @@ void DM_Blip::calc_dXijdri_dXjidri(
         const double Bz = g*tzij + pqrij*dg*z*rinv;
 
         /* i/j prefactor --------------------------------------------- */
-        const double coef = scale *
-                            ( rhoi(ii)*wj      /* i-side  */
-                            - s_L * rhoj(ii)*wi ); /* j-side */
+        const double coef = scale * w_pair *
+                            ( rhoi(ii) - s_L * rhoj(ii) );
 
         const std::size_t row = c + Lshift + fidx;
         fd_ij(row,0) += coef * Bx;
@@ -183,10 +181,10 @@ void DM_Blip::calc_dXijdri(
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
 
   const double x = v[0],  y = v[1],  z = v[2];
-  const double wj = weights[Zj];
+  const double w_pair = weights[Zi][Zj];
 
-  const double fc  = scale*wj * fcut->calc       (rij);
-  const double fcp = scale*wj * fcut->calc_prime (rij);
+  const double fc  = scale*w_pair * fcut->calc       (rij);
+  const double fcp = scale*w_pair * fcut->calc_prime (rij);
 
   const double rinv = 1.0/rij;
   const std::size_t ng = cgrid.size();
@@ -258,7 +256,7 @@ void DM_Blip::calc_rho(int Zi,int Zj,double rij,double,
 {
   if(!is_init_for_atoms(Zi,Zj) || rij>get_rcut()) return;
 
-  const double fc = scale*weights[Zj]*fcut->calc(rij);
+  const double fc = scale*weights[Zi][Zj]*fcut->calc(rij);
 
   const std::size_t ng=cgrid.size();
   StackOrHeapBuffer<MAX_GRID> buf(ng);
@@ -310,11 +308,12 @@ bool DM_Blip::calc_drhoi_dtheta(
   if(!is_init_for_atoms(Zi,Zj) || rij>get_rcut()) return false;
 
   if (key == DMThetaKey::WATOM) {
-    /* d(rho)/d WATOM[Z_target] = δ(Zj, Z_target) * poly * B(x_c) * fc(r),
-     * the per-pair calc_rho contribution with weights[Zj] removed. */
-    const int Z_target = get_atom_Z_for_arg_pos(arg_pos);
-    if (Z_target < 1) return false;
-    if (Zj != Z_target) return true;
+    /* d(rho)/d θ_WATOM = chain × poly × B(x_c) × fc(r), the per-pair
+     * calc_rho contribution with the weights[Zi][Zj] factor replaced by
+     * the WATOM chain factor for the current mode. */
+    if (!has_watom_arg_pos(arg_pos)) return false;
+    const double chain = dweight_dw_n(Zi, Zj, arg_pos);
+    if (chain == 0.0) return true;
 
     const double fc_ij = fcut->calc(rij);
     const std::size_t ng = cgrid.size();
@@ -334,14 +333,14 @@ bool DM_Blip::calc_drhoi_dtheta(
                   lz = orbitals[L][o][2];
         const double poly = px[lx] * py[ly] * pz[lz];
         for (std::size_t c = 0; c < ng; ++c)
-          drhoi(ii + c) += scale * poly * buf.g()[c];
+          drhoi(ii + c) += scale * chain * poly * buf.g()[c];
         ii += ng;
       }
     }
     return true;
   }
 
-  const double wj = weights[Zj] * scale;
+  const double wj = weights[Zi][Zj] * scale;
   const double fc = fcut->calc(rij);
 
   const std::size_t ng = cgrid.size();

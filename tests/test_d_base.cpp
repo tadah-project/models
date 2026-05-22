@@ -1,10 +1,34 @@
 #include "catch2/catch.hpp"
 #include <tadah/models/descriptors/d_base.h>
+#include <tadah/models/descriptors/d2/d2_blip.h>
 #include <tadah/core/context.h>
 #include <tadah/core/core_types.h>
+#include <tadah/core/periodic_table.h>
+
+#include <cmath>
 
 using namespace tadah::core;
 using namespace tadah::models;
+
+namespace {
+struct WatomTestFixture {
+  WatomTestFixture() { PeriodicTable::initialize(); }
+};
+
+Context make_minimal_blip_context_watom_tests() {
+  Context c;
+  c.add("INIT2B", "true");
+  c.add("VERBOSE", 0);
+  c.add("SGRID2B", "2.0 1.0");
+  c.add("CGRID2B", "0.5 1.4");
+  c.add("RCUT2B", 3.5);
+  c.add("TYPE2B", "D2_Blip");
+  c.add("TYPE2B", 2);
+  c.add("TYPE2B", 2);
+  c.add("TYPE2B", "H"); c.add("TYPE2B", "H");
+  return c;
+}
+}  // namespace
 TEST_CASE( "Testing D_Base", "[D_Base]" ) {
 
   v_type sgrid(5);
@@ -49,4 +73,129 @@ TEST_CASE( "Testing D_Base", "[D_Base]" ) {
   Context c_err;
   c_err.add("SGRID2B", "LOG 5 0.1 12");
   REQUIRE_THROWS(D_Base::get_grid(c_err,"SGRID2B",sgrid));
+}
+
+// =====================================================================
+// Dual-format WATOM tests. Exercise D_Base::update_weights /
+// get_atom_Z_for_arg_pos / has_watom_arg_pos / dweight_dw_n through a
+// concrete D2_Blip descriptor.
+// =====================================================================
+
+TEST_CASE_METHOD(WatomTestFixture, "WATOM per-species single element: diagonal write",
+          "[D_Base][watom][dual_format]") {
+  Context c = make_minimal_blip_context_watom_tests();
+  c.add("ATOM", "H");
+  c.add("WATOM", 0.5);
+  D2_Blip d(c);
+
+  CHECK(d.weights[1][1] == Approx(0.5));
+  CHECK(d.weights[8][8] == Approx(1.0));  // unrelated element stays at default
+  CHECK(d.has_watom_arg_pos(1));
+  CHECK_FALSE(d.has_watom_arg_pos(2));
+  CHECK(d.get_atom_Z_for_arg_pos(1) == 1);
+  CHECK(d.dweight_dw_n(1, 1, 1) == Approx(1.0));
+}
+
+TEST_CASE_METHOD(WatomTestFixture, "WATOM per-species two elements: geometric-mean off-diagonal",
+          "[D_Base][watom][dual_format]") {
+  Context c = make_minimal_blip_context_watom_tests();
+  c.add("ATOM", "H");
+  c.add("ATOM", "O");
+  c.add("WATOM", 0.5);
+  c.add("WATOM", 2.0);
+  D2_Blip d(c);
+
+  CHECK(d.weights[1][1] == Approx(0.5));
+  CHECK(d.weights[8][8] == Approx(2.0));
+  const double cross = std::sqrt(0.5 * 2.0);
+  CHECK(d.weights[1][8] == Approx(cross));
+  CHECK(d.weights[8][1] == Approx(cross));
+  CHECK(d.has_watom_arg_pos(1));
+  CHECK(d.has_watom_arg_pos(2));
+  CHECK_FALSE(d.has_watom_arg_pos(3));
+  CHECK(d.get_atom_Z_for_arg_pos(1) == 1);
+  CHECK(d.get_atom_Z_for_arg_pos(2) == 8);
+
+  // Chain factors at arg_pos=1 (Z_target=H, w_H=0.5, w_O=2.0):
+  //   d w[H][H] / d w_H = 1
+  //   d w[O][O] / d w_H = 0
+  //   d w[H][O] / d w_H = 0.5 * sqrt(w_O / w_H) = 0.5 * sqrt(4) = 1.0
+  CHECK(d.dweight_dw_n(1, 1, 1) == Approx(1.0));
+  CHECK(d.dweight_dw_n(8, 8, 1) == Approx(0.0));
+  CHECK(d.dweight_dw_n(1, 8, 1) == Approx(0.5 * std::sqrt(2.0 / 0.5)));
+  CHECK(d.dweight_dw_n(8, 1, 1) == Approx(0.5 * std::sqrt(2.0 / 0.5)));
+  // arg_pos=2 (Z_target=O):
+  CHECK(d.dweight_dw_n(8, 8, 2) == Approx(1.0));
+  CHECK(d.dweight_dw_n(1, 1, 2) == Approx(0.0));
+  CHECK(d.dweight_dw_n(1, 8, 2) == Approx(0.5 * std::sqrt(0.5 / 2.0)));
+}
+
+TEST_CASE_METHOD(WatomTestFixture, "WATOM pair-triple: direct symmetric writes, no geometric mean",
+          "[D_Base][watom][dual_format]") {
+  Context c = make_minimal_blip_context_watom_tests();
+  c.add("ATOM", "H");
+  c.add("ATOM", "O");
+  // Pair triples in arbitrary order.
+  c.add("WATOM", "H"); c.add("WATOM", "H"); c.add("WATOM", 0.7);
+  c.add("WATOM", "O"); c.add("WATOM", "O"); c.add("WATOM", 1.3);
+  c.add("WATOM", "H"); c.add("WATOM", "O"); c.add("WATOM", 0.9);
+  D2_Blip d(c);
+
+  CHECK(d.weights[1][1] == Approx(0.7));
+  CHECK(d.weights[8][8] == Approx(1.3));
+  CHECK(d.weights[1][8] == Approx(0.9));  // direct, NOT sqrt(0.7*1.3)
+  CHECK(d.weights[8][1] == Approx(0.9));
+  CHECK(d.weights[6][6] == Approx(1.0));  // unrelated element default
+
+  CHECK(d.has_watom_arg_pos(1));
+  CHECK(d.has_watom_arg_pos(2));
+  CHECK(d.has_watom_arg_pos(3));
+  CHECK_FALSE(d.has_watom_arg_pos(4));
+
+  // PairTriple mode: arg_pos→Z mapping is empty.
+  CHECK(d.get_atom_Z_for_arg_pos(1) == 0);
+
+  // Chain factors in pair-triple mode:
+  //   arg_pos=1 → (H,H); 1.0 only on the (H,H) pair.
+  CHECK(d.dweight_dw_n(1, 1, 1) == Approx(1.0));
+  CHECK(d.dweight_dw_n(8, 8, 1) == Approx(0.0));
+  CHECK(d.dweight_dw_n(1, 8, 1) == Approx(0.0));
+  //   arg_pos=3 → (H,O); 1.0 on (H,O) and (O,H) only.
+  CHECK(d.dweight_dw_n(1, 8, 3) == Approx(1.0));
+  CHECK(d.dweight_dw_n(8, 1, 3) == Approx(1.0));
+  CHECK(d.dweight_dw_n(1, 1, 3) == Approx(0.0));
+}
+
+TEST_CASE_METHOD(WatomTestFixture, "WATOM pair-triple: bad token count throws",
+          "[D_Base][watom][dual_format]") {
+  Context c = make_minimal_blip_context_watom_tests();
+  c.add("ATOM", "H");
+  c.add("ATOM", "O");
+  // Two tokens — not a multiple of three.
+  c.add("WATOM", "H"); c.add("WATOM", "H");
+  REQUIRE_THROWS_AS(D2_Blip(c), std::runtime_error);
+}
+
+TEST_CASE_METHOD(WatomTestFixture, "WATOM default (no WATOM key) leaves pair weights at 1.0",
+          "[D_Base][watom][dual_format]") {
+  Context c = make_minimal_blip_context_watom_tests();
+  // No ATOM, no WATOM: update_weights returns early, default-filled.
+  D2_Blip d(c);
+  for (int i = 1; i < 119; ++i) {
+    CHECK(d.weights[i][i] == Approx(1.0));
+  }
+  CHECK_FALSE(d.has_watom_arg_pos(1));
+  CHECK(d.dweight_dw_n(1, 1, 1) == Approx(0.0));  // Empty mode
+}
+
+TEST_CASE_METHOD(WatomTestFixture, "WATOM single-species H reduces to old per-Zj semantics",
+          "[D_Base][watom][dual_format][regression]") {
+  // Phase 2C-WATOM regression: single H species → diagonal chain == 1.0,
+  // recovers the old δ(Zj, Z_target) gate.
+  Context c = make_minimal_blip_context_watom_tests();
+  c.add("ATOM", "H");
+  c.add("WATOM", 1.0);
+  D2_Blip d(c);
+  CHECK(d.dweight_dw_n(1, 1, 1) == Approx(1.0));
+  CHECK(d.weights[1][1] == Approx(1.0));
 }

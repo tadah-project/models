@@ -68,7 +68,7 @@ void D2_ZBL::calc_aed(
   double a_ = a[types[Zi]][types[Zj]];
   double x = rij / a_;
   double p = phi(x);
-  aed(fidx) += scale*weights[Zj]*(Zi * Zj / rij) * p * fc_ij;
+  aed(fidx) += scale*weights[Zi][Zj]*(Zi * Zj / rij) * p * fc_ij;
 }
 void D2_ZBL::calc_dXijdri(
   const int Zi,
@@ -89,7 +89,7 @@ void D2_ZBL::calc_dXijdri(
 
   double E_ZBL = (Zi * Zj * r_inv) * p;
   double dE_ZBL_r = -(Zi * Zj * r_inv*r_inv)*p + dp*(Zi * Zj * r_inv) / a_ ;
-  fd_ij(fidx,0) = scale*weights[Zj]*(E_ZBL*fcp_ij + dE_ZBL_r*fc_ij);
+  fd_ij(fidx,0) = scale*weights[Zi][Zj]*(E_ZBL*fcp_ij + dE_ZBL_r*fc_ij);
 }
 void D2_ZBL::calc_all(
   const int Zi,
@@ -110,10 +110,10 @@ void D2_ZBL::calc_all(
   double fc_ij = fcut->calc(rij);
   double fcp_ij = fcut->calc_prime(rij);
 
-  aed(fidx) += scale*weights[Zj]*(Zi * Zj * r_inv) * p * fc_ij;
+  aed(fidx) += scale*weights[Zi][Zj]*(Zi * Zj * r_inv) * p * fc_ij;
   double E_ZBL = (Zi * Zj * r_inv) * p;
   double dE_ZBL_r = -(Zi * Zj * r_inv*r_inv)*p + dp*(Zi * Zj * r_inv) / a_ ;
-  fd_ij(fidx,0) = scale*weights[Zj]*(E_ZBL*fcp_ij + dE_ZBL_r*fc_ij);
+  fd_ij(fidx,0) = scale*weights[Zi][Zj]*(E_ZBL*fcp_ij + dE_ZBL_r*fc_ij);
 }
 bool D2_ZBL::calc_dDdtheta(
   const std::string& theta_name,
@@ -133,7 +133,7 @@ bool D2_ZBL::calc_dDdtheta(
     const double a_ = a[types[Zi]][types[Zj]];
     const double x  = rij / a_;
     const double p  = phi(x);
-    dD_buf(fidx) += scale * weights[Zj] * (Zi * Zj / rij) * p * dfc;
+    dD_buf(fidx) += scale * weights[Zi][Zj] * (Zi * Zj / rij) * p * dfc;
     return true;
   }
 
@@ -164,21 +164,21 @@ bool D2_ZBL::calc_dDdtheta(
 
     const double dx_dtheta   = -(x / a_) * da_dtheta;
     const double dphi_dtheta = dphi_x * dx_dtheta;
-    dD_buf(fidx) += scale * weights[Zj] * (Zi * Zj / rij) * dphi_dtheta * fc_ij;
+    dD_buf(fidx) += scale * weights[Zi][Zj] * (Zi * Zj / rij) * dphi_dtheta * fc_ij;
     return true;
   }
 
   if (theta_name == "WATOM") {
-    // d(aed(fidx))/d WATOM[Z_target] = δ(Zj, Z_target) * (Zi Zj / r) phi(x) fc(r)
-    // i.e. the unweighted calc_aed contribution.
-    const int Z_target = get_atom_Z_for_arg_pos(arg_pos);
-    if (Z_target < 1) return false;
-    if (Zj == Z_target) {
+    // d(aed)/d θ_WATOM = chain × (Zi Zj / r) phi(x) fc(r) (unweighted
+    // calc_aed contribution).
+    if (!has_watom_arg_pos(arg_pos)) return false;
+    const double chain = dweight_dw_n(Zi, Zj, arg_pos);
+    if (chain != 0.0) {
       const double fc_ij = fcut->calc(rij);
       const double a_    = a[types[Zi]][types[Zj]];
       const double x     = rij / a_;
       const double p     = phi(x);
-      dD_buf(fidx) += scale * (Zi * Zj / rij) * p * fc_ij;
+      dD_buf(fidx) += scale * chain * (Zi * Zj / rij) * p * fc_ij;
     }
     return true;
   }
@@ -216,7 +216,7 @@ bool D2_ZBL::calc_dXijdri_dtheta(
     if (dfc == 0.0 && dfcp == 0.0) return false;   // Cut_Dummy fallback
     // fd = w(Zj) (E·fcp + dE/dr·fc); only fc/fcp depend on rcut.
     const double val = E_ZBL * dfcp + dE_ZBL_r * dfc;
-    dfd_ij(fidx, 0) += scale * weights[Zj] * val;
+    dfd_ij(fidx, 0) += scale * weights[Zi][Zj] * val;
     return true;
   }
 
@@ -240,17 +240,17 @@ bool D2_ZBL::calc_dXijdri_dtheta(
     const double d2phi_x = d2phi(x);
     const double bracket = dp_x * fcp_ij + d2phi_x * fc_ij / a_;
     const double pref    = -(Zi * Zj / (a_ * a_)) * da_dtheta;
-    dfd_ij(fidx, 0) += scale * weights[Zj] * pref * bracket;
+    dfd_ij(fidx, 0) += scale * weights[Zi][Zj] * pref * bracket;
     return true;
   }
 
   if (theta_name == "WATOM") {
-    // Force-side WATOM[Z_target] derivative — unweighted calc_dXijdri
-    // radial contribution.
-    const int Z_target = get_atom_Z_for_arg_pos(arg_pos);
-    if (Z_target < 1) return false;
-    if (Zj == Z_target) {
-      dfd_ij(fidx, 0) += scale * (E_ZBL * fcp_ij + dE_ZBL_r * fc_ij);
+    // Force-side d(fd)/d θ_WATOM = chain × (unweighted ZBL force-radial
+    // contribution).
+    if (!has_watom_arg_pos(arg_pos)) return false;
+    const double chain = dweight_dw_n(Zi, Zj, arg_pos);
+    if (chain != 0.0) {
+      dfd_ij(fidx, 0) += scale * chain * (E_ZBL * fcp_ij + dE_ZBL_r * fc_ij);
     }
     return true;
   }

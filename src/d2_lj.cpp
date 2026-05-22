@@ -31,8 +31,8 @@ void D2_LJ::calc_aed(
   double r6_inv = r2_inv*r2_inv*r2_inv;
   double fc_ij = fcut->calc(rij);
 
-  aed(fidx) -= scale*weights[Zj]*(r6_inv*fc_ij);
-  aed(fidx+1) += scale*weights[Zj]*(r6_inv*r6_inv*fc_ij);
+  aed(fidx) -= scale*weights[Zi][Zj]*(r6_inv*fc_ij);
+  aed(fidx+1) += scale*weights[Zi][Zj]*(r6_inv*r6_inv*fc_ij);
 }
 void D2_LJ::calc_dXijdri(
   const int Zi,
@@ -49,8 +49,8 @@ void D2_LJ::calc_dXijdri(
 
   double fc_ij = fcut->calc(rij);
   double fcp_ij = fcut->calc_prime(rij);
-  fd_ij(fidx,0) =scale*weights[Zj]*( 6.0*r6_inv*r2_inv*rij*fc_ij - fcp_ij*r6_inv);
-  fd_ij(fidx+1,0) =scale*weights[Zj]*( -12.0*r6_inv*r6_inv*r2_inv*rij*fc_ij + fcp_ij*r6_inv*r6_inv);
+  fd_ij(fidx,0) =scale*weights[Zi][Zj]*( 6.0*r6_inv*r2_inv*rij*fc_ij - fcp_ij*r6_inv);
+  fd_ij(fidx+1,0) =scale*weights[Zi][Zj]*( -12.0*r6_inv*r6_inv*r2_inv*rij*fc_ij + fcp_ij*r6_inv*r6_inv);
 }
 void D2_LJ::calc_all(
   const int Zi,
@@ -67,11 +67,11 @@ void D2_LJ::calc_all(
 
   double fc_ij = fcut->calc(rij);
   double fcp_ij = fcut->calc_prime(rij);
-  aed(fidx) -= scale*weights[Zj]*r6_inv*fc_ij;
-  aed(fidx+1) += scale*weights[Zj]*r6_inv*r6_inv*fc_ij;
+  aed(fidx) -= scale*weights[Zi][Zj]*r6_inv*fc_ij;
+  aed(fidx+1) += scale*weights[Zi][Zj]*r6_inv*r6_inv*fc_ij;
 
-  fd_ij(fidx,0) = scale*weights[Zj]*(6.0*r6_inv*r2_inv*rij*fc_ij - fcp_ij*r6_inv);
-  fd_ij(fidx+1,0) = scale*weights[Zj]*(-12.0*r6_inv*r6_inv*r2_inv*rij*fc_ij + fcp_ij*r6_inv*r6_inv);
+  fd_ij(fidx,0) = scale*weights[Zi][Zj]*(6.0*r6_inv*r2_inv*rij*fc_ij - fcp_ij*r6_inv);
+  fd_ij(fidx+1,0) = scale*weights[Zi][Zj]*(-12.0*r6_inv*r6_inv*r2_inv*rij*fc_ij + fcp_ij*r6_inv*r6_inv);
 }
 bool D2_LJ::calc_dDdtheta(
   const std::string& theta_name,
@@ -90,23 +90,22 @@ bool D2_LJ::calc_dDdtheta(
     if (dfc == 0.0) return false;  // discontinuous cutoff; caller FD-falls-back
     const double r2_inv = 1.0 / rij_sq;
     const double r6_inv = r2_inv * r2_inv * r2_inv;
-    dD_buf(fidx)     -= scale * weights[Zj] * r6_inv          * dfc;
-    dD_buf(fidx + 1) += scale * weights[Zj] * r6_inv * r6_inv * dfc;
+    dD_buf(fidx)     -= scale * weights[Zi][Zj] * r6_inv          * dfc;
+    dD_buf(fidx + 1) += scale * weights[Zi][Zj] * r6_inv * r6_inv * dfc;
     return true;
   }
 
   if (theta_name == "WATOM") {
-    // d(aed(fidx))   /d WATOM[Z_target] = δ(Zj, Z_target) * (-r^-6  * fc)
-    // d(aed(fidx+1)) /d WATOM[Z_target] = δ(Zj, Z_target) * ( r^-12 * fc)
-    // Unweighted calc_aed contribution.
-    const int Z_target = get_atom_Z_for_arg_pos(arg_pos);
-    if (Z_target < 1) return false;
-    if (Zj == Z_target) {
+    // d(aed)/d θ_WATOM = chain × (per-pair LJ contribution with the
+    // weights[Zi][Zj] factor removed).
+    if (!has_watom_arg_pos(arg_pos)) return false;
+    const double chain = dweight_dw_n(Zi, Zj, arg_pos);
+    if (chain != 0.0) {
       const double r2_inv = 1.0 / rij_sq;
       const double r6_inv = r2_inv * r2_inv * r2_inv;
       const double fc_ij  = fcut->calc(rij);
-      dD_buf(fidx)     -= scale * r6_inv          * fc_ij;
-      dD_buf(fidx + 1) += scale * r6_inv * r6_inv * fc_ij;
+      dD_buf(fidx)     -= scale * chain * r6_inv          * fc_ij;
+      dD_buf(fidx + 1) += scale * chain * r6_inv * r6_inv * fc_ij;
     }
     return true;
   }
@@ -136,25 +135,25 @@ bool D2_LJ::calc_dXijdri_dtheta(
     // d/d rcut of fd(fidx+1,0) = w(Zj) * (-12 r^-13 * dfc + r^-12 * dfcp)
     const double val6  =  6.0 * r6_inv * r2_inv * rij * dfc - dfcp * r6_inv;
     const double val12 = -12.0 * r6_inv * r6_inv * r2_inv * rij * dfc + dfcp * r6_inv * r6_inv;
-    dfd_ij(fidx,     0) += scale * weights[Zj] * val6;
-    dfd_ij(fidx + 1, 0) += scale * weights[Zj] * val12;
+    dfd_ij(fidx,     0) += scale * weights[Zi][Zj] * val6;
+    dfd_ij(fidx + 1, 0) += scale * weights[Zi][Zj] * val12;
     return true;
   }
 
   if (theta_name == "WATOM") {
-    // Force-side WATOM[Z_target] derivative — unweighted force-radial
-    // contribution (calc_dXijdri output with weights[Zj] removed).
-    const int Z_target = get_atom_Z_for_arg_pos(arg_pos);
-    if (Z_target < 1) return false;
-    if (Zj == Z_target) {
+    // Force-side d(fd)/d θ_WATOM = chain × (unweighted LJ force-radial
+    // contribution).
+    if (!has_watom_arg_pos(arg_pos)) return false;
+    const double chain = dweight_dw_n(Zi, Zj, arg_pos);
+    if (chain != 0.0) {
       const double r2_inv = 1.0 / rij_sq;
       const double r6_inv = r2_inv * r2_inv * r2_inv;
       const double fc_ij  = fcut->calc(rij);
       const double fcp_ij = fcut->calc_prime(rij);
       dfd_ij(fidx,     0) +=
-        scale * ( 6.0 * r6_inv * r2_inv * rij * fc_ij - fcp_ij * r6_inv);
+        scale * chain * ( 6.0 * r6_inv * r2_inv * rij * fc_ij - fcp_ij * r6_inv);
       dfd_ij(fidx + 1, 0) +=
-        scale * (-12.0 * r6_inv * r6_inv * r2_inv * rij * fc_ij + fcp_ij * r6_inv * r6_inv);
+        scale * chain * (-12.0 * r6_inv * r6_inv * r2_inv * rij * fc_ij + fcp_ij * r6_inv * r6_inv);
     }
     return true;
   }

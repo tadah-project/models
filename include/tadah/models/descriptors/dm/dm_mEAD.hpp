@@ -168,8 +168,7 @@ void DM_mEAD<F>::calc_dXijdri_dXjidri(
 
   /* --- geometry & constants --------------------------------------- */
   const double x=v[0],  y=v[1],  z=v[2];
-  const double wi = weights[Zi];
-  const double wj = weights[Zj];
+  const double w_pair = weights[Zi][Zj];
 
   const double fc  = fcut->calc       (rij);
   const double fcp = fcut->calc_prime (rij);
@@ -220,9 +219,8 @@ void DM_mEAD<F>::calc_dXijdri_dXjidri(
         /* loop over embedding output channels */
         for (std::size_t p = 0; p < odim; ++p, ++ii_drho)
         {
-          const double coef = scale *
-                              (  rhoi(ii_drho)*wj
-                              - s_L * rhoj(ii_drho)*wi );
+          const double coef = scale * w_pair *
+                              ( rhoi(ii_drho) - s_L * rhoj(ii_drho) );
 
           const std::size_t row = p + Lshift + fidx;
           fd_ij(row,0) += coef * Bx;
@@ -263,9 +261,8 @@ void DM_mEAD<F>::calc_dXijdri_dXjidri(
           const double By = g*tyij + pqrij*dg*y*rinv;
           const double Bz = g*tzij + pqrij*dg*z*rinv;
 
-          const double coef = scale *
-                              (  rhoi(ii)*wj
-                              - s_L * rhoj(ii)*wi );
+          const double coef = scale * w_pair *
+                              ( rhoi(ii) - s_L * rhoj(ii) );
 
           const std::size_t row = c + Lshift + fidx;
           fd_ij(row,0) += coef * Bx;
@@ -293,10 +290,10 @@ void DM_mEAD<F>::calc_dXijdri(
 
   /* ---- geometry & cut-off ---------------------------------------- */
   const double x = v[0],  y = v[1],  z = v[2];
-  const double wj = weights[Zj];
+  const double w_pair = weights[Zi][Zj];
 
-  const double fc  = scale*wj * fcut->calc       (rij);
-  const double fcp = scale*wj * fcut->calc_prime (rij);
+  const double fc  = scale*w_pair * fcut->calc       (rij);
+  const double fcp = scale*w_pair * fcut->calc_prime (rij);
 
   const double rinv = 1.0/rij;
   const std::size_t ng = cgrid.size();
@@ -424,7 +421,7 @@ template <typename F>
   {
     if(!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
 
-    const double fc = scale*weights[Zj]*fcut->calc(rij);
+    const double fc = scale*weights[Zi][Zj]*fcut->calc(rij);
 
     const std::size_t ng = cgrid.size();
     StackOrHeapBuffer<MAX_GRID> buf(ng);
@@ -527,13 +524,12 @@ bool DM_mEAD<F>::calc_drhoi_dtheta(
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return false;
 
   if (key == DMThetaKey::WATOM) {
-    /* d(rho)/d WATOM[Z_target] = δ(Zj, Z_target) * poly * G(r;eta,mu) * fc(r),
-     * the per-pair calc_rho contribution with weights[Zj] removed.
-     * Claim ownership on every valid pair so structures without
-     * Z_target atoms still report analytical (zero) rather than FD. */
-    const int Z_target = get_atom_Z_for_arg_pos(arg_pos);
-    if (Z_target < 1) return false;
-    if (Zj != Z_target) return true;
+    /* d(rho)/d θ_WATOM = chain × poly × G(r;eta,mu) × fc(r), the
+     * per-pair calc_rho contribution with the weights[Zi][Zj] factor
+     * replaced by the WATOM chain factor for the current mode. */
+    if (!has_watom_arg_pos(arg_pos)) return false;
+    const double chain = dweight_dw_n(Zi, Zj, arg_pos);
+    if (chain == 0.0) return true;
 
     const double fc_ij = fcut->calc(rij);
     const std::size_t ng_w = cgrid.size();
@@ -553,14 +549,14 @@ bool DM_mEAD<F>::calc_drhoi_dtheta(
                   lz = orbitals[L][o][2];
         const double poly = pxw[lx] * pyw[ly] * pzw[lz];
         for (std::size_t c = 0; c < ng_w; ++c)
-          drhoi(ii_w + c) += scale * poly * buf_w.g()[c];
+          drhoi(ii_w + c) += scale * chain * poly * buf_w.g()[c];
         ii_w += ng_w;
       }
     }
     return true;
   }
 
-  const double wj = weights[Zj] * scale;
+  const double wj = weights[Zi][Zj] * scale;
   const double fc = fcut->calc(rij);
   const std::size_t ng = cgrid.size();
 
@@ -832,17 +828,16 @@ bool DM_mEAD<F>::calc_dXijdri_dtheta(
     if (arg_pos < 1 || static_cast<std::size_t>(arg_pos) > ng) return false;
   }
 
-  /* WATOM resolution: arg_pos -> Z_target via the ATOM list captured by
-   * refresh_atom_weights. Out-of-range arg_pos is a configuration error
-   * — route to FD. */
-  int Z_target_w = 0;
+  /* WATOM resolution: validate arg_pos against current watom_mode.
+   * Out-of-range arg_pos is a configuration error — route to FD. */
+  double w_chain = 0.0;
   if (is_watom) {
-    Z_target_w = get_atom_Z_for_arg_pos(arg_pos);
-    if (Z_target_w < 1) return false;
+    if (!has_watom_arg_pos(arg_pos)) return false;
+    w_chain = dweight_dw_n(Zi, Zj, arg_pos);
   }
 
   const double x  = v[0], y = v[1], z = v[2];
-  const double wj = weights[Zj];
+  const double wj = weights[Zi][Zj];
   const double sc_wj = scale * wj;
 
   const double fc_unscaled  = fcut->calc       (rij);
@@ -866,18 +861,19 @@ bool DM_mEAD<F>::calc_dXijdri_dtheta(
 
   precompute_radials(rij, fc, fcp, sgrid, cgrid, buf.g(), buf.dg(), ng);
 
-  if (is_watom && Zj == Z_target_w) {
-    /* d(g_full)/dW[Z_target] when Zj == Z_target = scale * E * fc_unscaled
-     *    (the scale*wj factor in buf.g differentiates to scale*1)
-     * d(dg_full)/dW[Z_target] = scale * E * (-2*eta*rm*fc_unscaled + fcp_unscaled)
-     * Fans out across all c. For Zj != Z_target_w the arrays stay zero. */
+  if (is_watom && w_chain != 0.0) {
+    /* d(g_full)/dθ_WATOM = scale * chain * E * fc_unscaled
+     *    (the scale*weights[Zi][Zj] factor in buf.g differentiates via
+     *     the WATOM chain factor for the current mode)
+     * d(dg_full)/dθ_WATOM = scale * chain * E * (-2*eta*rm*fc_unscaled + fcp_unscaled)
+     * Fans out across all c. For chain == 0 the arrays stay zero. */
     for (std::size_t c = 0; c < ng; ++c) {
       const double eta = sgrid[c];
       const double mu  = cgrid[c];
       const double rm  = rij - mu;
       const double E   = std::exp(-eta * rm * rm);
-      dg_dtheta_arr[c]  = scale * E * fc_unscaled;
-      ddg_dtheta_arr[c] = scale * E * (-2.0 * eta * rm * fc_unscaled + fcp_unscaled);
+      dg_dtheta_arr[c]  = scale * w_chain * E * fc_unscaled;
+      ddg_dtheta_arr[c] = scale * w_chain * E * (-2.0 * eta * rm * fc_unscaled + fcp_unscaled);
     }
   }
 
