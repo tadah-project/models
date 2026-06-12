@@ -173,7 +173,8 @@ bool D2_Blip::calc_dDdtheta(
 
 namespace {
 // Bare second derivative b''(x_c) of the blip basis function. Piecewise
-// (jumps at |x_c| = 1 — B is C^2 elsewhere). Used only by
+// linear and CONTINUOUS (B is C^2 globally — it is the cubic B-spline;
+// only B''' jumps, at the knots x_c = 0, +-1, +-2). Used only by
 // D2_Blip::calc_dXijdri_dtheta; not in any public header to keep blip
 // math localised here.
 inline double d2B_bare(double x_c) {

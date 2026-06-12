@@ -86,7 +86,8 @@ public:
    *
    *  The blip basis function B and its derivative dB/dx are piecewise
    *  cubics with compact support on (-2, 2); see d_basis_functions.h.
-   *  B is C^1 globally, C^2 except at x_c = +-1.
+   *  B is C^2 globally (it is the cubic B-spline: B'' is continuous,
+   *  piecewise linear; only B''' jumps at the knots x_c = 0, +-1, +-2).
    *
    *  Supported (theta_name, arg_pos) pairs:
    *   - "CGRID2B" arg_pos = k (1-based) -> dD/d cgrid[k-1] (one component)

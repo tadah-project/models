@@ -1,6 +1,7 @@
 #ifndef DM_EAM_H
 #define DM_EAM_H
 #include <tadah/models/descriptors/dm/dm_base.h>
+#include <tadah/models/eam/eam_setfl_io.h>
 
 namespace tadah {
 namespace models {
@@ -21,39 +22,16 @@ namespace models {
  * This descriptor will enforce cutoff distance as specified in a \ref SETFL file.
  * Set \ref RCUTMB to the same value to suppress the warning message.
  *
+ * The setfl parsing, cubic splines and extrapolation are provided by the shared
+ * \ref EAMSetflIO class (also used by \ref D2_EAM and the `tadah refit` machinery).
+ *
  * Required tadah::core::Context keys:
  * \ref INITMB \ref SETFL
  */
 class DM_EAM: public DM_Base {
 private:
-  struct eam_file {
-    std::string file_path;
-    std::vector<double> frho;
-    std::vector<double> rhor;
-    std::vector<double> z2r;
-    int nrho=0;
-    double drho=0;
-    int nr;
-    double dr;
-    double rdr;
-    double rdrho;
-    double rcut;
-    int atomic_number;
-    double atomic_mass;
-    double lattice_param;
-    std::string lattice;
-    double rhomax;
-
-  };
-  eam_file ef;
-
-  std::vector<std::vector<double>> frho_spline;
-  std::vector<std::vector<double>> rhor_spline;
-  std::vector<std::vector<double>> z2r_spline;
-
+  EAMSetflIO eam_;
   std::string lab="DM_EAM";
-  void read_setfl();
-  void gen_splines(int &n, double &delta, std::vector<double> &f, std::vector<std::vector<double>> &spline);
 
 public:
   DM_EAM();
@@ -79,7 +57,7 @@ public:
     const double rij_sq,
     const tadah::core::Vec3d &vec_ij,
     tadah::core::rho_type& rhoi,
-    tadah::core::fd_type &fd_ij, 
+    tadah::core::fd_type &fd_ij,
     const double scale=1) const override;
   std::string label() const override;
   void init_rhoi(tadah::core::rho_type& rhoi) override;

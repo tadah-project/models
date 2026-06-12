@@ -1,6 +1,7 @@
 #ifndef D2_EAM_H
 #define D2_EAM_H
 #include <tadah/models/descriptors/d2/d2_base.h>
+#include <tadah/models/eam/eam_setfl_io.h>
 
 namespace tadah {
 namespace models {
@@ -21,37 +22,16 @@ namespace models {
  * This descriptor will enforce cutoff distance as specified in a \ref SETFL file.
  * Set \ref RCUT2B to the same value to suppress the warning message.
  *
+ * The setfl parsing, cubic splines and extrapolation are provided by the shared
+ * \ref EAMSetflIO class (also used by \ref DM_EAM and the `tadah refit` machinery).
+ *
  * Required tadah::core::Context keys:
  * \ref INIT2B \ref SETFL
  */
 class D2_EAM : public D2_Base {
 private:
-  struct eam_file {
-    std::string file_path;
-    std::vector<double> frho;
-    std::vector<double> rhor;
-    std::vector<double> z2r;
-    int nrho=0;
-    double drho=0;
-    int nr;
-    double dr;
-    double rdr;
-    double rdrho;
-    double rcut;
-    int atomic_number;
-    double atomic_mass;
-    double lattice_param;
-    std::string lattice;
-  };
-  eam_file ef;
-
-  std::vector<std::vector<double>> frho_spline;
-  std::vector<std::vector<double>> rhor_spline;
-  std::vector<std::vector<double>> z2r_spline;
-
+  EAMSetflIO eam_;
   std::string lab="D2_EAM";
-  void read_setfl();
-  void gen_splines(int &n, double &delta, std::vector<double> &f, std::vector<std::vector<double>> &spline);
 
 public:
   D2_EAM();

@@ -394,10 +394,11 @@ public:
    *  cutoffs override). Closes the radial-θ force chain for
    *  DM_mEAD<F_mEnv> configs (Phase 2D follow-up).
    *
-   *  Note on smoothness: at |x_c| = 1 the blip B is only C^1 (b'' has
-   *  jumps). Caller fixtures that probe rho exactly on the blip break
-   *  hit the same C^1 limitation that F_Blip does (see geometry-
-   *  sensitivity note in project_hpo_analytical_gradients_phase2). */
+   *  Note on smoothness: the blip B is C^2 globally (b'' is continuous,
+   *  piecewise linear; only b''' jumps at the knots x_c = 0, +-1, +-2).
+   *  Caller fixtures that probe rho exactly on a blip knot see the b'''
+   *  jump in FD probes of this function (same geometry-sensitivity note
+   *  as F_Blip in project_hpo_analytical_gradients_phase2). */
   bool calc_d2F(double rho, size_t p, double& out) const override final {
     const double eta = sfuncgrid[p];
     const double mu  = cfuncgrid[p];

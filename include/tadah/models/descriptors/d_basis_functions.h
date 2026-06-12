@@ -103,8 +103,11 @@ inline double dG(double r, double eta, double miu, double f, double fp) {
  *   \end{cases}
  * \f]
  *
- * The function is \f$ C^1 \f$ everywhere and \f$ C^2 \f$ everywhere except at
- * \f$ x_c = \pm 1 \f$.
+ * The function is \f$ C^2 \f$ everywhere: it is the classic cubic B-spline
+ * (rescaled to unit peak), so \f$ \mathcal{B} \f$, \f$ \mathcal{B}' \f$ and
+ * \f$ \mathcal{B}'' \f$ are all continuous at every knot
+ * \f$ x_c \in \{0,\pm1,\pm2\} \f$; only \f$ \mathcal{B}''' \f$ jumps there
+ * (by \f$ \{+9,-6,+1.5\} \f$ at \f$ \{0,\pm1,\pm2\} \f$ respectively).
  *
  * \param x_c normalised coordinate \f$ x_c = \eta(r_{ij}-r_s) \f$
  *
@@ -260,8 +263,9 @@ inline double dB(double r, double eta, double miu) {
 
 /** \brief Second derivative of the blip basis function w.r.t.\ \f$ x_c \f$.
  *
- * Piecewise quadratic — discontinuous at \f$ |x_c| = 1 \f$ (B is C^1
- * globally but only C^2 outside |x_c|=1). Used by HPO analytical-gradient
+ * Piecewise LINEAR and CONTINUOUS everywhere (the blip is the cubic
+ * B-spline, C^2 globally: both pieces give 1.5 at |x_c|=1 and 0 at
+ * |x_c|=2; only B''' jumps at the knots). Used by HPO analytical-gradient
  * code paths that need the F''(rho) chain through Blip embeddings.
  *
  * \param x_c normalised coordinate \f$ x_c = \eta(r-r_s) \f$
@@ -272,6 +276,193 @@ inline double d2B(double x_c) {
   if (1.0 < x_c && x_c < 2.0)    return 1.5 * (2.0 - x_c);
   return 0.0;
 }
+
+// =========================================================================
+// QUINTIC B-SPLINE BUMP (M6)
+// =========================================================================
+//
+// The quintic B-spline bump (Schoenberg M6, rescaled to unit peak): support
+// [-3, 3] in x_c = eta*(r - r_s), C^4 globally (only the 5th derivative
+// jumps, at the knots x_c in {0, +-1, +-2, +-3}). The C^4 twin of the cubic
+// blip B: same symmetric-bump semantics (free centre mu, free width eta),
+// one order better second-derivative fidelity (O(h^4) vs O(h^2) sawtooth).
+
+/** \brief Quintic B-spline bump \f$ B_5(x_c) \f$ (peak-normalised M6). */
+inline double B5(double x_c) {
+  const double a = std::fabs(x_c);
+  if (a >= 3.0) return 0.0;
+  const double t3 = 3.0 - a;
+  double acc = t3 * t3 * t3 * t3 * t3;
+  if (a < 2.0) {
+    const double t2 = 2.0 - a;
+    acc -= 6.0 * t2 * t2 * t2 * t2 * t2;
+  }
+  if (a < 1.0) {
+    const double t1 = 1.0 - a;
+    acc += 15.0 * t1 * t1 * t1 * t1 * t1;
+  }
+  return acc / 66.0;
+}
+
+/** \brief Cutoff-weighted quintic B-spline bump. */
+inline double B5(double x_c, double f) { return B5(x_c) * f; }
+
+/** \brief Derivative of B5 w.r.t.\ \f$ r \f$ (returns \f$ \eta\,B_5'(x_c) \f$). */
+inline double dB5(double x_c, double eta) {
+  const double a = std::fabs(x_c);
+  if (a >= 3.0) return 0.0;
+  const double s = (x_c >= 0.0) ? 1.0 : -1.0;
+  const double t3 = 3.0 - a;
+  double acc = t3 * t3 * t3 * t3;
+  if (a < 2.0) {
+    const double t2 = 2.0 - a;
+    acc -= 6.0 * t2 * t2 * t2 * t2;
+  }
+  if (a < 1.0) {
+    const double t1 = 1.0 - a;
+    acc += 15.0 * t1 * t1 * t1 * t1;
+  }
+  return -5.0 * eta * s * acc / 66.0;  // == 0 at x_c = 0 (bracket vanishes)
+}
+
+/** \brief Cutoff-weighted derivative of B5 w.r.t.\ \f$ r \f$ (product rule). */
+inline double dB5(double x_c, double eta, double f, double fp) {
+  return f * dB5(x_c, eta) + fp * B5(x_c);
+}
+
+/** \brief Bare second derivative \f$ d^2 B_5 / dx_c^2 \f$ (continuous,
+ *  piecewise cubic — the C^4 family). */
+inline double d2B5(double x_c) {
+  const double a = std::fabs(x_c);
+  if (a >= 3.0) return 0.0;
+  const double t3 = 3.0 - a;
+  double acc = t3 * t3 * t3;
+  if (a < 2.0) {
+    const double t2 = 2.0 - a;
+    acc -= 6.0 * t2 * t2 * t2;
+  }
+  if (a < 1.0) {
+    const double t1 = 1.0 - a;
+    acc += 15.0 * t1 * t1 * t1;
+  }
+  return 20.0 * acc / 66.0;
+}
+
+// =========================================================================
+// ONE-SIDED QUINTIC KNOT FUNCTIONS (truncated powers)
+// =========================================================================
+//
+// K5L(x_c) = max(0, -x_c)^5  with x_c = eta*(r - mu) is the LEFT-active
+// quintic knot function: c*K5L = c*eta^5*(mu - r)_+^5, i.e. the classic
+// Mendelev/Ackland knotted-polynomial EAM form (active for r < mu, vanishes
+// C^4-smoothly at the knot r = mu). With all knots mu <= rcut the pair /
+// density functions vanish C^4-smoothly at the cutoff BY CONSTRUCTION.
+// K5R is the mirrored RIGHT-active twin (active for x > mu), used for the
+// embedding F(rho) where the function must be free at high density instead.
+// Both are C^4 globally; only the 5th derivative jumps at the knot.
+// NOTE eta is a pure gauge for this family ((c,eta)->(c s^5, eta/s) leaves
+// the function invariant); fitters pin eta = 1 and the knot position mu is
+// the only shape parameter.
+
+/** \brief Left-active quintic knot function \f$ \max(0,-x_c)^5 \f$. */
+inline double K5L(double x_c) {
+  const double t = -x_c;
+  if (t <= 0.0) return 0.0;
+  const double t2 = t * t;
+  return t2 * t2 * t;
+}
+
+/** \brief Cutoff-weighted left-active quintic knot function. */
+inline double K5L(double x_c, double f) { return K5L(x_c) * f; }
+
+/** \brief Derivative of K5L w.r.t.\ \f$ r \f$ (returns \f$ \eta\,K5L'(x_c) \f$). */
+inline double dK5L(double x_c, double eta) {
+  const double t = -x_c;
+  if (t <= 0.0) return 0.0;
+  const double t2 = t * t;
+  return -5.0 * eta * t2 * t2;
+}
+
+/** \brief Cutoff-weighted derivative of K5L w.r.t.\ \f$ r \f$ (product rule). */
+inline double dK5L(double x_c, double eta, double f, double fp) {
+  return f * dK5L(x_c, eta) + fp * K5L(x_c);
+}
+
+/** \brief Bare second derivative \f$ d^2 K5L / dx_c^2 \f$ (continuous: C^4 family). */
+inline double d2K5L(double x_c) {
+  const double t = -x_c;
+  if (t <= 0.0) return 0.0;
+  return 20.0 * t * t * t;
+}
+
+// Cubic knot functions (t - r)_+^3 — the EXACT atoms of the published
+// Mendelev/Ackland knotted-cubic EAM class. C^2 globally (only the 3rd
+// derivative jumps at the knot): a cubic atom IS an f''' corner, which the
+// C^4 quintic family cannot represent. Used by the KnotMix auto-mode (and
+// REFIT_BASIS Knot3) via the per-atom degree arrays DGRID2B / DGRIDRHOMB /
+// DGRIDFMB; same eta-gauge convention as K5*.
+
+/** \brief Left-active cubic knot function \f$ \max(0,-x_c)^3 \f$. */
+inline double K3L(double x_c) {
+  const double t = -x_c;
+  if (t <= 0.0) return 0.0;
+  return t * t * t;
+}
+
+/** \brief Cutoff-weighted left-active cubic knot function. */
+inline double K3L(double x_c, double f) { return K3L(x_c) * f; }
+
+/** \brief Derivative of K3L w.r.t.\ \f$ r \f$ (returns \f$ \eta\,K3L'(x_c) \f$). */
+inline double dK3L(double x_c, double eta) {
+  const double t = -x_c;
+  if (t <= 0.0) return 0.0;
+  return -3.0 * eta * t * t;
+}
+
+/** \brief Cutoff-weighted derivative of K3L w.r.t.\ \f$ r \f$ (product rule). */
+inline double dK3L(double x_c, double eta, double f, double fp) {
+  return f * dK3L(x_c, eta) + fp * K3L(x_c);
+}
+
+/** \brief Bare second derivative \f$ d^2 K3L / dx_c^2 \f$ (continuous: C^2 family). */
+inline double d2K3L(double x_c) {
+  const double t = -x_c;
+  return (t > 0.0) ? 6.0 * t : 0.0;
+}
+
+/** \brief Right-active cubic knot function \f$ \max(0,x_c)^3 \f$. */
+inline double K3R(double x_c) { return K3L(-x_c); }
+
+/** \brief Cutoff-weighted right-active cubic knot function. */
+inline double K3R(double x_c, double f) { return K3L(-x_c) * f; }
+
+/** \brief Derivative of K3R w.r.t.\ \f$ r \f$ (returns \f$ \eta\,K3R'(x_c) \f$). */
+inline double dK3R(double x_c, double eta) { return -dK3L(-x_c, eta); }
+
+/** \brief Cutoff-weighted derivative of K3R w.r.t.\ \f$ r \f$ (product rule). */
+inline double dK3R(double x_c, double eta, double f, double fp) {
+  return f * dK3R(x_c, eta) + fp * K3R(x_c);
+}
+
+/** \brief Bare second derivative \f$ d^2 K3R / dx_c^2 \f$ (continuous: C^2 family). */
+inline double d2K3R(double x_c) { return d2K3L(-x_c); }
+
+/** \brief Right-active quintic knot function \f$ \max(0,x_c)^5 \f$. */
+inline double K5R(double x_c) { return K5L(-x_c); }
+
+/** \brief Cutoff-weighted right-active quintic knot function. */
+inline double K5R(double x_c, double f) { return K5L(-x_c) * f; }
+
+/** \brief Derivative of K5R w.r.t.\ \f$ r \f$ (returns \f$ \eta\,K5R'(x_c) \f$). */
+inline double dK5R(double x_c, double eta) { return -dK5L(-x_c, eta); }
+
+/** \brief Cutoff-weighted derivative of K5R w.r.t.\ \f$ r \f$ (product rule). */
+inline double dK5R(double x_c, double eta, double f, double fp) {
+  return f * dK5R(x_c, eta) + fp * K5R(x_c);
+}
+
+/** \brief Bare second derivative \f$ d^2 K5R / dx_c^2 \f$ (continuous: C^4 family). */
+inline double d2K5R(double x_c) { return d2K5L(-x_c); }
 
 /** @} */ // end of BasisFunctions group
 

@@ -102,7 +102,17 @@ public:
       Phi.resize(Phi.rows(), Phi.cols() - indices.size());
 
 
-      LinearRegressor::train(context, Phi, T_r, weights, Sigma,*workspaceManager_);
+      if (Phi.cols() > 0) {
+        LinearRegressor::train(context, Phi, T_r, weights, Sigma,*workspaceManager_);
+      } else {
+        // Every column is fixed (FIXINDEX covers all weights): there is nothing
+        // left to solve, so skip the regressor entirely and let the fixed
+        // values below become the model weights. This is the path exercised by
+        // `tadah refit`'s coefficient-search HPO target (OPTIM FIXWEIGHT over
+        // all weights). Calling LinearRegressor::train with 0 columns would
+        // dereference a zero-size workspace.
+        weights = tadah::core::t_type();
+      }
 
       tadah::core::t_type w_temp(weights.size() + indices.size());
 

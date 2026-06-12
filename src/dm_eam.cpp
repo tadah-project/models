@@ -15,29 +15,21 @@ DM_EAM::DM_EAM(core::Context &c): DM_Base(c)
   init();
   if (!c.get<bool>("INITMB")) return;
   s=1;
-  ef.file_path = c.get<std::string>("TYPEMB",1);
-  read_setfl();
+  eam_.read_setfl(c.get<std::string>("TYPEMB",1));
+  eam_.build_splines();
 
-  if (std::abs(ef.rcut - c.get<double>("RCUTMB")) > std::numeric_limits<double>::min()) {
+  if (std::abs(eam_.rcut() - c.get<double>("RCUTMB")) > std::numeric_limits<double>::min()) {
     core::Logger::instance().log(
         core::LogLevel::WARNING,
         "tadah::core::Context file cutoff and setfl file cutoff differ: " +
             std::to_string(c.get<double>("RCUTMB")) + " " +
-            std::to_string(ef.rcut));
+            std::to_string(eam_.rcut()));
     core::Logger::instance().log(
         core::LogLevel::WARNING,
-        "Enforcing SETFL file cutoff: " + std::to_string(ef.rcut));
+        "Enforcing SETFL file cutoff: " + std::to_string(eam_.rcut()));
     c.remove("RCUTMB");
-    c.add("RCUTMB", ef.rcut);
+    c.add("RCUTMB", eam_.rcut());
   }
-
-  frho_spline.resize(ef.nrho+1, std::vector<double>(7));
-  rhor_spline.resize(ef.nr+1, std::vector<double>(7));
-  z2r_spline.resize(ef.nr+1, std::vector<double>(7));
-
-  gen_splines(ef.nrho, ef.drho, ef.frho, frho_spline);
-  gen_splines(ef.nr, ef.dr, ef.rhor, rhor_spline);
-  gen_splines(ef.nr, ef.dr, ef.z2r, z2r_spline);
 
   rhoisize = 1;
 
@@ -52,24 +44,19 @@ void DM_EAM::calc_aed(
   tadah::core::rho_type& rho,
   tadah::core::aed_type &aed) const
 {
-  //std::cout << "rho[i]:   " << rho(0) << std::endl;
-  double p = rho(rfidx)*ef.rdrho + 1.0;
+  const auto &frho_spline = eam_.frho_spline();
+  double p = rho(rfidx)*eam_.rdrho() + 1.0;
   int m = static_cast<int> (p);
-  m = std::max(1,std::min(m,ef.nrho-1));
+  m = std::max(1,std::min(m,eam_.nrho()-1));
   p -= m;
   p = std::min(p,1.0);
-  //std::vector<double> coeff = frho_spline[m];
   double phi = ((frho_spline[m][3]*p + frho_spline[m][4])*p + frho_spline[m][5])*p + frho_spline[m][6];
 
   rho(drfidx) = (frho_spline[m][0]*p + frho_spline[m][1])*p + frho_spline[m][2];    // lammps fp[i]
-  //std::cout << "fp[i]:   " << rho(1) << std::endl;
 
-  if (rho(rfidx) > ef.rhomax) phi += rho(drfidx) * (rho(rfidx)-ef.rhomax);
-  //phi *= scale[type[i]][type[i]];
+  if (rho(rfidx) > eam_.rhomax()) phi += rho(drfidx) * (rho(rfidx)-eam_.rhomax());
 
   aed(fidx) += phi;
-
-
 }
 void DM_EAM::calc_dXijdri_dXjidri(
   const int Zi,
@@ -83,24 +70,23 @@ void DM_EAM::calc_dXijdri_dXjidri(
   const double scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
+  const auto &rhor_spline = eam_.rhor_spline();
   double r = rij;
   double rinv = 1/r;
-  double p = r*ef.rdr + 1.0;
+  double p = r*eam_.rdr() + 1.0;
   int m = static_cast<int> (p);
-  m = std::min(m,ef.nr-1);
+  m = std::min(m,eam_.nr()-1);
   p -= m;
   p = std::min(p,1.0);
   double rhoip = (rhor_spline[m][0]*p + rhor_spline[m][1])*p + rhor_spline[m][2];
   double rhojp = (rhor_spline[m][0]*p + rhor_spline[m][1])*p + rhor_spline[m][2];
 
-  // here rho_i[1] is a derivative of rho_i at local atom, similarly for rho_j
-  //double psip = rho_i[1]*rhojp + rho_j[1]*rhoip;
   double psip = rhoi(drfidx)*rhojp + rhoj(drfidx)*rhoip;
 
   double f = scale*psip*rinv;
-  fd_ij(fidx,0) = f*vec_ij[0]; 
-  fd_ij(fidx,1) = f*vec_ij[1]; 
-  fd_ij(fidx,2) = f*vec_ij[2]; 
+  fd_ij(fidx,0) = f*vec_ij[0];
+  fd_ij(fidx,1) = f*vec_ij[1];
+  fd_ij(fidx,2) = f*vec_ij[2];
 }
 void DM_EAM::calc_dXijdri(
   const int Zi,
@@ -113,16 +99,16 @@ void DM_EAM::calc_dXijdri(
   const double scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
+  const auto &rhor_spline = eam_.rhor_spline();
   double r = rij;
   double rinv = 1/r;
-  double p = r*ef.rdr + 1.0;
+  double p = r*eam_.rdr() + 1.0;
   int m = static_cast<int> (p);
-  m = std::min(m,ef.nr-1);
+  m = std::min(m,eam_.nr()-1);
   p -= m;
   p = std::min(p,1.0);
   double rhojp = (rhor_spline[m][0]*p + rhor_spline[m][1])*p + rhor_spline[m][2];
 
-  // here rho_i[1] is a derivative of rho_i at local atom
   double psip = rhoi(drfidx)*rhojp;
 
   double f = scale*psip*rinv;
@@ -134,74 +120,6 @@ std::string DM_EAM::label() const {
   return lab;
 }
 
-void DM_EAM::read_setfl()
-{
-  std::string line;
-  std::ifstream in_file(ef.file_path);
-  if (!in_file.good())
-    throw std::runtime_error("SETFL file does not exists.\n");
-
-  if (in_file.is_open()) {
-    if (verbose)
-      std::cout << "<DM_EAM> Reading setfl: " << ef.file_path << std::endl;
-    // skip ficgridt 3 comment lines
-    getline (in_file,line);
-    getline (in_file,line);
-    getline (in_file,line);
-    // skip number of types and types
-    getline (in_file,line);
-    // read 5th line
-    in_file >> ef.nrho >> ef.drho >> ef.nr >> ef.dr >> ef.rcut;
-    in_file >> ef.atomic_number >> ef.atomic_mass >> ef.lattice_param >> ef.lattice;
-    ef.rdr = 1.0/ef.dr;
-    ef.rdrho = 1.0/ef.drho;
-    // prepare arrays
-    ef.frho.resize(ef.nrho);
-    ef.rhor.resize(ef.nr);
-    ef.z2r.resize(ef.nr);
-    // read all data
-    for (int i=0; i<ef.nrho; ++i) in_file >> ef.frho[i];
-    for (int i=0; i<ef.nr; ++i) in_file >> ef.rhor[i];
-    for (int i=0; i<ef.nr; ++i) in_file >> ef.z2r[i];
-    in_file.close();
-  }
-  else {
-    std::cout << "<DM_EAM> Unable to open file: " << ef.file_path << std::endl;;
-  }
-  // get max value of rho
-  //ef.rhomax = *std::max_element(ef.rhor.begin(), ef.rhor.end());
-  ef.rhomax = (ef.nrho-1) * ef.drho;
-
-}
-void DM_EAM::gen_splines(int &n, double &delta, std::vector<double> &f,
-                         std::vector<std::vector<double>> &spline)
-{
-  // in lammps f is n+1, here is size n
-  for (int m=1; m<=n; m++) spline[m][6] = f[m-1];
-
-  spline[1][5] = spline[2][6] - spline[1][6];
-  spline[2][5] = 0.5 * (spline[3][6]-spline[1][6]);
-  spline[n-1][5] = 0.5 * (spline[n][6]-spline[n-2][6]);
-  spline[n][5] = spline[n][6] - spline[n-1][6];
-
-  for (int m = 3; m <= n-2; m++)
-    spline[m][5] = ((spline[m-2][6]-spline[m+2][6]) +
-      8.0*(spline[m+1][6]-spline[m-1][6])) / 12.0;
-
-  for (int m = 1; m <= n-1; m++) {
-    spline[m][4] = 3.0*(spline[m+1][6]-spline[m][6]) - 2.0*spline[m][5] - spline[m+1][5];
-    spline[m][3] = spline[m][5] + spline[m+1][5] - 2.0*(spline[m+1][6]-spline[m][6]);
-  }
-
-  spline[n][4] = 0.0;
-  spline[n][3] = 0.0;
-
-  for (int m = 1; m <= n; m++) {
-    spline[m][2] = spline[m][5]/delta;
-    spline[m][1] = 2.0*spline[m][4]/delta;
-    spline[m][0] = 3.0*spline[m][3]/delta;
-  }
-}
 void DM_EAM::init_rhoi(tadah::core::rho_type& rhoi)
 {
   rhoi.resize(2);
@@ -217,15 +135,15 @@ void DM_EAM::calc_rho(
   const double scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
+  const auto &rhor_spline = eam_.rhor_spline();
   double r = rij;
-  double p = r*ef.rdr + 1.0;
+  double p = r*eam_.rdr() + 1.0;
   int m = static_cast<int> (p);
-  m = std::min(m,ef.nr-1);
+  m = std::min(m,eam_.nr()-1);
   p -= m;
   p = std::min(p,1.0);
-  std::vector<double> coeff = rhor_spline[m];
+  const std::vector<double> &coeff = rhor_spline[m];
   rho(rfidx) += scale*( ((coeff[3]*p + coeff[4])*p + coeff[5])*p + coeff[6]);
-
 }
 void DM_EAM::init() {
   nparams=1;
@@ -237,4 +155,3 @@ std::optional<DescriptorMeta> DM_EAM::meta() const {
 
 } // namespace models
 } // namespace tadah
-

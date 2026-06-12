@@ -1,0 +1,133 @@
+#ifndef DM_REAM_H
+#define DM_REAM_H
+#include <tadah/models/descriptors/dm/dm_base.h>
+
+namespace tadah {
+namespace models {
+
+/** \brief Refittable EAM many-body descriptor (flexible density + embedding).
+ *
+ * The native-Tadah counterpart of \ref DM_EAM, used by `tadah refit`. Where
+ * DM_EAM reproduces the *tabulated* density and embedding via fixed cubic
+ * splines, DM_REAM represents BOTH as flexible basis-function expansions so an
+ * EAM model can be reshaped and re-optimised with the standard linear model and
+ * HPO machinery.
+ *
+ * The EAM many-body energy is
+ * \f[
+ *   V_i = F\!\Big(\rho_i\Big), \qquad \rho_i = \sum_{j\neq i} \rho(r_{ij}).
+ * \f]
+ *
+ * Because \f$F(\rho)\f$ with \f$\rho=\sum_j\rho(r)\f$ is *bilinear*, only one of
+ * the two functions can carry the linear weights. DM_REAM therefore:
+ *
+ *  - represents the **density** as a fixed (baked) expansion
+ *    \f$\rho(r)=\sum_{n} a_n\,\psi_n(r)\,f_c(r)\f$ with coefficients
+ *    \f$a_n\f$ supplied in \ref AGRIDMB (these are NOT linear weights — they are
+ *    found by a 1-D least-squares pre-fit and stored in the descriptor), and
+ *  - represents the **embedding** as
+ *    \f$F(\rho)=\sum_{m} c_m\,g_m(\rho)\f$ where the \f$g_m\f$ are the descriptor
+ *    output components (one per \ref CGRIDFMB entry) and the \f$c_m\f$ are the
+ *    M_BLR **linear weights**.
+ *
+ * Keys (single element, \f$L=0\f$ scalar density):
+ *  - \ref CGRIDRHOMB / \ref SGRIDRHOMB : density basis centres / widths (size Nρ)
+ *  - \ref AGRIDMB                       : baked density coefficients \f$a_n\f$ (size Nρ)
+ *  - \ref CGRIDFMB / \ref SGRIDFMB      : embedding basis centres / widths (size M)
+ *
+ * `TYPEMB` layout: `DM_REAM <basis> <El> <El>` where `<basis>` is `0` (Blip,
+ * default), `1` (Gaussian), `2` (Knot5: one-sided quintic knot functions)
+ * or `3` (Blip5: symmetric quintic B-spline bumps, C^4)
+ * and selects the family used for BOTH the density and the embedding
+ * expansions. For Knot5 the per-channel orientation is part of the family
+ * definition: the radial density basis is LEFT-active, \f$\psi_n(r) =
+ * (\mu_n - r)_+^5\f$ (vanishes C^4-smoothly at its knot, so with all knots
+ * \f$\le r_{cut}\f$ the density vanishes smoothly at the cutoff), while the
+ * embedding basis is RIGHT-active, \f$g_m(\rho) = (\rho - \mu_m)_+^5\f$
+ * (F free at high density, F(0) anchored by the fit). SGRID* entries are a
+ * pure gauge for this family and are conventionally 1.0.
+ *
+ * \note Like \ref D2_Blip / \ref DM_Blip, the per-pair density carries the
+ *       symmetric WATOM weight `weights[Zi][Zj]` (1.0 for a single-element
+ *       potential), so multi-element generalisation and HPO WATOM search work.
+ */
+class DM_REAM: public DM_Base {
+public:
+  enum class Basis { Blip = 0, Gaussian = 1, Knot5 = 2, Blip5 = 3 };
+
+private:
+  std::string lab="DM_REAM";
+  Basis basis = Basis::Blip;
+  // density expansion (baked)
+  tadah::core::v_type crho;   // CGRIDRHOMB
+  tadah::core::v_type srho;   // SGRIDRHOMB
+  tadah::core::v_type arho;   // AGRIDMB  (fixed coefficients)
+  // embedding expansion (linear weights live in the model)
+  tadah::core::v_type cemb;   // CGRIDFMB
+  tadah::core::v_type semb;   // SGRIDFMB
+  // optional per-atom degrees for the knot family (bcode 2): 3|5, empty = 5
+  tadah::core::v_type drho_deg;  // DGRIDRHOMB
+  tadah::core::v_type demb_deg;  // DGRIDFMB
+  int rho_deg(std::size_t n) const {
+    return n < drho_deg.size() ? static_cast<int>(drho_deg[n]) : 5;
+  }
+  int emb_deg(std::size_t m) const {
+    return m < demb_deg.size() ? static_cast<int>(demb_deg[m]) : 5;
+  }
+
+  // ---- inline basis helpers (family selected by `basis`) ----
+  /** Density radial value (cutoff-weighted) for centre n at distance r. */
+  double psi(std::size_t n, double r, double fc) const;
+  /** Density radial r-derivative (cutoff product rule) for centre n. */
+  double dpsi(std::size_t n, double r, double fc, double fcp) const;
+  /** Sum_n a_n psi_n(r) f_c(r). */
+  double rho_raw(double r, double fc) const;
+  /** d/dr [ Sum_n a_n psi_n(r) f_c(r) ]. */
+  double rho_raw_deriv(double r, double fc, double fcp) const;
+  /** Embedding value g_m(rho) (no cutoff). */
+  double gemb(std::size_t m, double rho) const;
+  /** Embedding derivative g'_m(rho) w.r.t. rho. */
+  double dgemb(std::size_t m, double rho) const;
+
+public:
+  DM_REAM();
+  DM_REAM(const tadah::core::Context&);
+  void calc_aed(
+    tadah::core::rho_type& rho,
+    tadah::core::aed_type &aed) const override;
+  void calc_dXijdri_dXjidri(
+    const int Zi,
+    const int Zj,
+    const double rij,
+    const double rij_sq,
+    const tadah::core::Vec3d &vec_ij,
+    tadah::core::rho_type& rhoi,
+    tadah::core::rho_type& rhoj,
+    tadah::core::fd_type &fd_ij,
+    const double scale=1) const override;
+  void calc_dXijdri(
+    const int Zi,
+    const int Zj,
+    const double rij,
+    const double rij_sq,
+    const tadah::core::Vec3d &vec_ij,
+    tadah::core::rho_type& rhoi,
+    tadah::core::fd_type &fd_ij,
+    const double scale=1) const override;
+  std::string label() const override;
+  void init_rhoi(tadah::core::rho_type& rhoi) override;
+  void calc_rho(
+    const int Zi,
+    const int Zj,
+    const double rij,
+    const double rij_sq,
+    const tadah::core::Vec3d &vec_ij,
+    tadah::core::rho_type& rho,
+    const double scale=1) const override;
+  void init() override;
+  bool reinit(const tadah::core::Context& ctx) override;
+  std::optional<DescriptorMeta> meta() const override;
+};
+} // namespace models
+} // namespace tadah
+#endif

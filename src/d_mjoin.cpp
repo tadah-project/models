@@ -1,12 +1,36 @@
 #include "tadah/core/registry.h"
 #include <cstddef>
 #include <iostream>
+#include <memory>
+#include <set>
 #include <string>
 #include <tadah/models/descriptors/d_mjoin.h>
 #include <tadah/models/descriptors/d_base.h>
 #include <vector>
 namespace tadah {
 namespace models {
+
+namespace {
+// parse_context() only knows how to split the standard grid keys. A single
+// descriptor whose keys fall outside this set — e.g. DM_REAM (CGRIDRHOMB,
+// AGRIDMB, CGRIDFMB, ...) — is left untouched by expand_grids; it reads its
+// own grids straight from the context. mJoin meta-descriptors are always
+// handled (their sub-descriptors are standard). Keyless descriptors (D2_EAM,
+// DM_EAM) are trivially handled.
+bool mjoin_can_handle(const tadah::core::Context &c, const std::string &type_str) {
+  if (!c.contains(type_str) || c.size(type_str) == 0) return false;
+  const std::string label = c.get<std::string>(type_str, 0);
+  if (label.find("mJoin") != std::string::npos) return true;
+  static const std::set<std::string> sup2b = {"CGRID2B", "SGRID2B"};
+  static const std::set<std::string> supmb = {"CGRIDMB", "SGRIDMB",
+                                              "CEMBFUNC", "SEMBFUNC"};
+  const std::set<std::string> &sup = (type_str == "TYPE2B") ? sup2b : supmb;
+  std::unique_ptr<D_Base> d(tadah::core::factory<D_Base>(label));
+  for (const auto &k : d->keys)
+    if (!sup.count(k)) return false;
+  return true;
+}
+} // namespace
 
 
 D_mJoin::D_mJoin() {}
@@ -27,11 +51,11 @@ std::vector<std::string> convert_to_strings(const tadah::core::v_type& vec, int 
 }
 
 void D_mJoin::expand_grids(tadah::core::Context &c) {
-  if (c.contains("TYPE2B")) {
+  if (mjoin_can_handle(c, "TYPE2B")) {
     std::vector<tadah::core::Context> contexts1 = parse_context(c, "TYPE2B");
     expand_grids(c,contexts1,"TYPE2B");
   }
-  if (c.contains("TYPEMB")) {
+  if (mjoin_can_handle(c, "TYPEMB")) {
     std::vector<tadah::core::Context> contexts2 = parse_context(c, "TYPEMB");
     expand_grids(c,contexts2,"TYPEMB");
   }
