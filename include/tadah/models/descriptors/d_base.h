@@ -45,7 +45,23 @@ protected:
   Cut_Base *fcut=nullptr;
 
 public:
-  std::vector<std::string> keys;    // keys required by this descriptor
+  // ---- the descriptor key contract (mJoin + HPO addressing) ----
+  // `keys`: the descriptor's OPTIMIZABLE per-instance list parameters.
+  //   Every entry is (a) splittable by the *_mJoin meta-descriptors and
+  //   (b) addressable by HPO via get_arg_pos/OPTIM.
+  // `data_keys`: per-instance list DATA that mJoin must split but that is
+  //   NOT a continuous optimisation dimension (e.g. the knot-degree lists
+  //   KDEG*: a discrete 3|5 structure choice). Never exposed to OPTIM.
+  // TYPE2B/TYPEMB token layout (consumed by D_mJoin::expand_grids and
+  // get_init_atoms):
+  //   <Label> <fparam family params> <one SIZE token per `keys` entry>
+  //           <one SIZE token per `data_keys` entry> <El El ...>
+  // with nparams = fparam + keys.size() + data_keys.size() and
+  // get_arg_pos(key) = index-in-keys + fparam. A size token of 0 means the
+  // pot carries no entries (and no key) for that channel — e.g. the knot
+  // families' width channels, where eta is a pure gauge.
+  std::vector<std::string> keys;       // optimizable list parameters
+  std::vector<std::string> data_keys;  // split-only list data (no OPTIM)
   size_t nparams;  // number of params which follow TYPExB
   std::vector<bool> is_optimizable;
   static void get_grid(const tadah::core::Context &c, const std::string &key, tadah::core::v_type &v);

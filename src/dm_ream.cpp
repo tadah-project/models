@@ -27,6 +27,43 @@ DM_REAM::Basis basis_from_bcode(int bcode) {
 }
 }  // namespace
 
+void DM_REAM::validate_grids() const {
+  if (crho.size() != arho.size())
+    throw std::runtime_error("DM_REAM: CGRIDMB / AMPGRIDMB sizes differ.");
+  if (cemb.empty())
+    throw std::runtime_error("DM_REAM: embedding basis (CEMBFUNC) is empty.");
+  if (basis == Basis::Knot5) {
+    // eta is a pure gauge for the knot family: the width channels must be
+    // ABSENT (size-0 segments in TYPEMB) — no silent constant-1 lists.
+    if (!srho.empty() || !semb.empty())
+      throw std::runtime_error(
+          "DM_REAM (knot family): SGRIDMB/SEMBFUNC must be empty — eta is a "
+          "pure gauge ((c,eta)->(c s^k, eta/s)); the knot position grids "
+          "CGRIDMB/CEMBFUNC define the basis alone.");
+  } else {
+    if (crho.size() != srho.size())
+      throw std::runtime_error("DM_REAM: CGRIDMB / SGRIDMB sizes differ.");
+    if (cemb.size() != semb.size())
+      throw std::runtime_error("DM_REAM: CEMBFUNC / SEMBFUNC sizes differ.");
+    for (const auto &e : srho)
+      if (std::abs(e) < std::numeric_limits<double>::min())
+        throw std::runtime_error("DM_REAM: zero entry in SGRIDMB.");
+    for (const auto &e : semb)
+      if (std::abs(e) < std::numeric_limits<double>::min())
+        throw std::runtime_error("DM_REAM: zero entry in SEMBFUNC.");
+  }
+  if (!drho_deg.empty() && drho_deg.size() != crho.size())
+    throw std::runtime_error("DM_REAM: KDEGMB / CGRIDMB sizes differ.");
+  if (!demb_deg.empty() && demb_deg.size() != cemb.size())
+    throw std::runtime_error("DM_REAM: KDEGEMB / CEMBFUNC sizes differ.");
+  for (const auto *arr : {&drho_deg, &demb_deg})
+    for (const auto &d : *arr)
+      if (d != 3.0 && d != 5.0)
+        throw std::runtime_error(
+            "DM_REAM: KDEG* entries must be 3 or 5 (the knot-degree lists "
+            "are structure data, not optimisable parameters).");
+}
+
 DM_REAM::DM_REAM(const tadah::core::Context& ctx) : DM_Base(ctx) {
   init();
   if (!ctx.get<bool>("INITMB")) return;
@@ -35,35 +72,23 @@ DM_REAM::DM_REAM(const tadah::core::Context& ctx) : DM_Base(ctx) {
   try { bcode = ctx.get<int>("TYPEMB", 1); } catch (...) { bcode = 0; }
   basis = basis_from_bcode(bcode);
 
-  get_grid(ctx, "CGRIDRHOMB", crho);
-  get_grid(ctx, "SGRIDRHOMB", srho);
-  get_grid(ctx, "AGRIDMB",    arho);
-  get_grid(ctx, "CGRIDFMB",   cemb);
-  get_grid(ctx, "SGRIDFMB",   semb);
-  if (ctx.contains("DGRIDRHOMB") && ctx.size("DGRIDRHOMB") > 0)
-    get_grid(ctx, "DGRIDRHOMB", drho_deg);  // optional knot degrees (3|5)
-  if (ctx.contains("DGRIDFMB") && ctx.size("DGRIDFMB") > 0)
-    get_grid(ctx, "DGRIDFMB", demb_deg);
-  D_Base::printGrid(crho, "CGRIDRHOMB");
-  D_Base::printGrid(cemb, "CGRIDFMB");
+  get_grid(ctx, "CGRIDMB", crho);
+  srho.clear();
+  if (ctx.contains("SGRIDMB") && ctx.size("SGRIDMB") > 0)
+    get_grid(ctx, "SGRIDMB", srho);     // absent for the knot family
+  get_grid(ctx, "AMPGRIDMB", arho);
+  get_grid(ctx, "CEMBFUNC", cemb);
+  semb.clear();
+  if (ctx.contains("SEMBFUNC") && ctx.size("SEMBFUNC") > 0)
+    get_grid(ctx, "SEMBFUNC", semb);    // absent for the knot family
+  if (ctx.contains("KDEGMB") && ctx.size("KDEGMB") > 0)
+    get_grid(ctx, "KDEGMB", drho_deg);  // optional knot degrees (3|5)
+  if (ctx.contains("KDEGEMB") && ctx.size("KDEGEMB") > 0)
+    get_grid(ctx, "KDEGEMB", demb_deg);
+  D_Base::printGrid(crho, "CGRIDMB");
+  D_Base::printGrid(cemb, "CEMBFUNC");
 
-  if (crho.size() != srho.size() || crho.size() != arho.size())
-    throw std::runtime_error(
-        "DM_REAM: CGRIDRHOMB / SGRIDRHOMB / AGRIDMB sizes differ.");
-  if (cemb.size() != semb.size())
-    throw std::runtime_error("DM_REAM: CGRIDFMB / SGRIDFMB sizes differ.");
-  if (cemb.empty())
-    throw std::runtime_error("DM_REAM: embedding basis (CGRIDFMB) is empty.");
-  if (!drho_deg.empty() && drho_deg.size() != crho.size())
-    throw std::runtime_error("DM_REAM: DGRIDRHOMB / CGRIDRHOMB sizes differ.");
-  if (!demb_deg.empty() && demb_deg.size() != cemb.size())
-    throw std::runtime_error("DM_REAM: DGRIDFMB / CGRIDFMB sizes differ.");
-  for (const auto &e : srho)
-    if (std::abs(e) < std::numeric_limits<double>::min())
-      throw std::runtime_error("DM_REAM: zero entry in SGRIDRHOMB.");
-  for (const auto &e : semb)
-    if (std::abs(e) < std::numeric_limits<double>::min())
-      throw std::runtime_error("DM_REAM: zero entry in SGRIDFMB.");
+  validate_grids();
 
   s         = cemb.size();   // M embedding outputs (linear weights live in M_BLR)
   rhoisize  = 1;             // scalar density rho_i
@@ -79,9 +104,8 @@ DM_REAM::DM_REAM(const tadah::core::Context& ctx) : DM_Base(ctx) {
 double DM_REAM::psi(std::size_t n, double r, double fc) const {
   if (basis == Basis::Blip)
     return B(srho[n] * (r - crho[n]), fc);
-  if (basis == Basis::Knot5)   // LEFT-active: vanishes smoothly at the knot
-    return rho_deg(n) == 3 ? K3L(srho[n] * (r - crho[n]), fc)
-                           : K5L(srho[n] * (r - crho[n]), fc);
+  if (basis == Basis::Knot5)   // LEFT-active; eta == 1 (gauge, no SGRIDMB)
+    return rho_deg(n) == 3 ? K3L(r - crho[n], fc) : K5L(r - crho[n], fc);
   if (basis == Basis::Blip5)
     return B5(srho[n] * (r - crho[n]), fc);
   return G(r, srho[n], crho[n], fc);
@@ -91,8 +115,8 @@ double DM_REAM::dpsi(std::size_t n, double r, double fc, double fcp) const {
   if (basis == Basis::Blip)
     return dB(srho[n] * (r - crho[n]), srho[n], fc, fcp);
   if (basis == Basis::Knot5)
-    return rho_deg(n) == 3 ? dK3L(srho[n] * (r - crho[n]), srho[n], fc, fcp)
-                           : dK5L(srho[n] * (r - crho[n]), srho[n], fc, fcp);
+    return rho_deg(n) == 3 ? dK3L(r - crho[n], 1.0, fc, fcp)
+                           : dK5L(r - crho[n], 1.0, fc, fcp);
   if (basis == Basis::Blip5)
     return dB5(srho[n] * (r - crho[n]), srho[n], fc, fcp);
   return dG(r, srho[n], crho[n], fc, fcp);
@@ -113,9 +137,8 @@ double DM_REAM::rho_raw_deriv(double r, double fc, double fcp) const {
 double DM_REAM::gemb(std::size_t m, double rho) const {
   if (basis == Basis::Blip)
     return B(semb[m] * (rho - cemb[m]));
-  if (basis == Basis::Knot5)   // RIGHT-active: F free at high density
-    return emb_deg(m) == 3 ? K3R(semb[m] * (rho - cemb[m]))
-                           : K5R(semb[m] * (rho - cemb[m]));
+  if (basis == Basis::Knot5)   // RIGHT-active; eta == 1 (gauge, no SEMBFUNC)
+    return emb_deg(m) == 3 ? K3R(rho - cemb[m]) : K5R(rho - cemb[m]);
   if (basis == Basis::Blip5)
     return B5(semb[m] * (rho - cemb[m]));
   return G(rho, semb[m], cemb[m]);
@@ -125,8 +148,8 @@ double DM_REAM::dgemb(std::size_t m, double rho) const {
   if (basis == Basis::Blip)
     return dB(semb[m] * (rho - cemb[m]), semb[m]);
   if (basis == Basis::Knot5)
-    return emb_deg(m) == 3 ? dK3R(semb[m] * (rho - cemb[m]), semb[m])
-                           : dK5R(semb[m] * (rho - cemb[m]), semb[m]);
+    return emb_deg(m) == 3 ? dK3R(rho - cemb[m], 1.0)
+                           : dK5R(rho - cemb[m], 1.0);
   if (basis == Basis::Blip5)
     return dB5(semb[m] * (rho - cemb[m]), semb[m]);
   return dG(rho, semb[m], cemb[m]);
@@ -225,8 +248,14 @@ void DM_REAM::init_rhoi(tadah::core::rho_type& rhoi) {
 }
 
 void DM_REAM::init() {
-  keys = {"CGRIDRHOMB", "SGRIDRHOMB", "AGRIDMB", "CGRIDFMB", "SGRIDFMB"};
-  nparams = 1;   // TYPEMB: DM_REAM <basis> <El> <El>
+  // contract (see d_base.h): TYPEMB carries 1 family param (the basis code)
+  // followed by one SIZE token per keys entry, then per data_keys entry:
+  //   DM_REAM <bcode> <nC> <nS> <nAmp> <nEc> <nEs> <nKd> <nKe> El El
+  // Knot pots carry 0 for the width channels (eta is a pure gauge) and bump
+  // pots carry 0 for the KDEG channels.
+  keys = {"CGRIDMB", "SGRIDMB", "AMPGRIDMB", "CEMBFUNC", "SEMBFUNC"};
+  data_keys = {"KDEGMB", "KDEGEMB"};
+  nparams = 1 + 5 + 2;
 }
 
 std::optional<DescriptorMeta> DM_REAM::meta() const {
@@ -272,25 +301,39 @@ std::optional<DescriptorMeta> DM_REAM::meta() const {
         -> std::pair<double, double> { return std::make_pair(0.0, 0.0); };
     dm.params.push_back(std::move(p));
   };
-  add_vec("CGRIDRHOMB", Scale::Distance, "Å",
-          "Centre of the i-th density radial basis function.", 0.0,
+  add_vec("CGRIDMB", Scale::Distance, "Å",
+          "Centre (knot families: knot position) of the i-th density radial "
+          "basis function. Optimizable (OPTIM CGRIDMB).", 0.0,
           Criticality::Recommended);
-  add_vec("SGRIDRHOMB", Scale::InverseDistanceSq, "Å^-2",
-          "Inverse width of the i-th density radial basis function.", 1.0e-6,
+  add_vec("SGRIDMB", Scale::InverseDistanceSq, "Å^-2",
+          "Inverse width of the i-th density radial basis function — bump "
+          "families only; ABSENT for knot families (eta is a pure gauge). "
+          "Optimizable where present.", 1.0e-6, Criticality::Recommended);
+  add_vec("AMPGRIDMB", Scale::Dimensionless, "",
+          "Density-expansion amplitude a_n: rho(r) = sum_n a_n psi_n(r). "
+          "Excluded from the LINEAR solve by bilinearity, but a first-class "
+          "NONLINEAR HPO parameter (OPTIM AMPGRIDMB).", -1.0e30,
           Criticality::Recommended);
-  add_vec("AGRIDMB", Scale::Dimensionless, "",
-          "Baked density-expansion coefficient a_n (fitted, not a weight).",
-          -1.0e30, Criticality::Optional);
-  add_vec("CGRIDFMB", Scale::Density, "rho",
-          "Centre (in rho-space) of the i-th embedding basis function.",
-          -1.0e30, Criticality::Recommended);
-  add_vec("SGRIDFMB", Scale::InverseDensity, "rho^-1",
-          "Inverse width (in rho-space) of the i-th embedding basis function.",
-          1.0e-6, Criticality::Recommended);
+  add_vec("CEMBFUNC", Scale::Density, "rho",
+          "Centre (in rho-space) of the i-th embedding basis function. "
+          "Optimizable (OPTIM CEMBFUNC).", -1.0e30,
+          Criticality::Recommended);
+  add_vec("SEMBFUNC", Scale::InverseDensity, "rho^-1",
+          "Inverse width (in rho-space) of the i-th embedding basis "
+          "function — bump families only; ABSENT for knot families. "
+          "Optimizable where present.", 1.0e-6, Criticality::Recommended);
+  add_vec("KDEGMB", Scale::Dimensionless, "",
+          "Knot-degree DATA (3|5) per density atom: a discrete structure "
+          "choice, NOT optimizable (data_keys; values outside {3,5} are "
+          "rejected at construction — the de-facto OPTIM guard).", 3.0,
+          Criticality::Optional);
+  add_vec("KDEGEMB", Scale::Dimensionless, "",
+          "Knot-degree DATA (3|5) per embedding atom: NOT optimizable "
+          "(data_keys).", 3.0, Criticality::Optional);
 
   dm.expected_columns = [](const SeedView& s) -> std::size_t {
-    if (!s.contains("CGRIDFMB")) return 0;
-    return s.size("CGRIDFMB");
+    if (!s.contains("CEMBFUNC")) return 0;
+    return s.size("CEMBFUNC");
   };
 
   return dm;
@@ -301,17 +344,22 @@ bool DM_REAM::reinit(const tadah::core::Context& ctx) {
   int bcode = 0;
   try { bcode = ctx.get<int>("TYPEMB", 1); } catch (...) { bcode = 0; }
   basis = basis_from_bcode(bcode);
-  get_grid(ctx, "CGRIDRHOMB", crho);
-  get_grid(ctx, "SGRIDRHOMB", srho);
-  get_grid(ctx, "AGRIDMB",    arho);
-  get_grid(ctx, "CGRIDFMB",   cemb);
-  get_grid(ctx, "SGRIDFMB",   semb);
+  get_grid(ctx, "CGRIDMB", crho);
+  srho.clear();
+  if (ctx.contains("SGRIDMB") && ctx.size("SGRIDMB") > 0)
+    get_grid(ctx, "SGRIDMB", srho);     // absent for the knot family
+  get_grid(ctx, "AMPGRIDMB", arho);
+  get_grid(ctx, "CEMBFUNC", cemb);
+  semb.clear();
+  if (ctx.contains("SEMBFUNC") && ctx.size("SEMBFUNC") > 0)
+    get_grid(ctx, "SEMBFUNC", semb);    // absent for the knot family
   drho_deg.clear();
   demb_deg.clear();
-  if (ctx.contains("DGRIDRHOMB") && ctx.size("DGRIDRHOMB") > 0)
-    get_grid(ctx, "DGRIDRHOMB", drho_deg);
-  if (ctx.contains("DGRIDFMB") && ctx.size("DGRIDFMB") > 0)
-    get_grid(ctx, "DGRIDFMB", demb_deg);
+  if (ctx.contains("KDEGMB") && ctx.size("KDEGMB") > 0)
+    get_grid(ctx, "KDEGMB", drho_deg);
+  if (ctx.contains("KDEGEMB") && ctx.size("KDEGEMB") > 0)
+    get_grid(ctx, "KDEGEMB", demb_deg);
+  validate_grids();
   s         = cemb.size();
   rhoisize  = 1;
   rhoipsize = s;

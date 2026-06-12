@@ -146,13 +146,16 @@ TEST_CASE_METHOD(Blip5Fixture, "DM_REAM Blip5 (bcode 3): symmetric channels",
   c.add("RCTYPEMB", "Cut_Cos");
   c.add("TYPEMB", "DM_REAM");
   c.add("TYPEMB", 3);          // Blip5
+  c.add("TYPEMB", 3); c.add("TYPEMB", 3); c.add("TYPEMB", 3);
+  c.add("TYPEMB", 3); c.add("TYPEMB", 3);
+  c.add("TYPEMB", 0); c.add("TYPEMB", 0);
   c.add("TYPEMB", "H");
   c.add("TYPEMB", "H");
-  c.add("CGRIDRHOMB", "2.0 3.5 5.0");
-  c.add("SGRIDRHOMB", "1.0 1.0 1.0");
-  c.add("AGRIDMB",    "0.40 0.25 0.12");
-  c.add("CGRIDFMB", "0.0 0.5 1.0");
-  c.add("SGRIDFMB", "1.5 1.5 1.5");
+  c.add("CGRIDMB", "2.0 3.5 5.0");
+  c.add("SGRIDMB", "1.0 1.0 1.0");
+  c.add("AMPGRIDMB",    "0.40 0.25 0.12");
+  c.add("CEMBFUNC", "0.0 0.5 1.0");
+  c.add("SEMBFUNC", "1.5 1.5 1.5");
   DM_REAM dm(c);
   Cut_Cos fc(6.0);
   dm.set_fcut(&fc, false);

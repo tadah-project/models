@@ -136,8 +136,8 @@ TEST_CASE_METHOD(RefitFixture,
   // pot context carries the injected grids and WEIGHTS = [c2b | cmb]
   tadah::core::Context c = refit.build_pot_context();
   REQUIRE(c.size("CGRID2B") == 5);
-  REQUIRE(c.size("AGRIDMB") == 4);
-  REQUIRE(c.size("CGRIDFMB") == 6);
+  REQUIRE(c.size("AMPGRIDMB") == 4);
+  REQUIRE(c.size("CEMBFUNC") == 6);
   REQUIRE(c.size("WEIGHTS") == 11);
   REQUIRE(c.get<double>("WEIGHTS", 0) == Approx(1.0));
   REQUIRE(c.get<double>("WEIGHTS", 5) == Approx(0.0));
@@ -198,8 +198,8 @@ TEST_CASE_METHOD(RefitFixture, "EAMRefit assembles a structurally valid pot cont
   REQUIRE(c.get<std::string>("TYPE2B", 0) == "D2_Blip");
   REQUIRE(c.get<std::string>("TYPEMB", 0) == "DM_REAM");
   REQUIRE(c.size("CGRID2B") == static_cast<std::size_t>(cfg.n2b));
-  REQUIRE(c.size("AGRIDMB") == static_cast<std::size_t>(cfg.nrho));
-  REQUIRE(c.size("CGRIDFMB") == static_cast<std::size_t>(cfg.nF));
+  REQUIRE(c.size("AMPGRIDMB") == static_cast<std::size_t>(cfg.nrho));
+  REQUIRE(c.size("CEMBFUNC") == static_cast<std::size_t>(cfg.nF));
   // WEIGHTS = [c2b | cmb] = n2b + nF
   REQUIRE(c.size("WEIGHTS") ==
           static_cast<std::size_t>(cfg.n2b + cfg.nF));
@@ -244,14 +244,21 @@ TEST_CASE_METHOD(RefitFixture,
   tadah::core::Context pot = refit.build_pot_context();
   REQUIRE(pot.get<std::string>("TYPE2B") == "D2_Knot5");
   REQUIRE(pot.get<int>("TYPEMB", 1) == 2);
-  REQUIRE(pot.size("DGRID2B") == 3);
-  tadah::core::v_type d2b(pot.size("DGRID2B"));
-  pot.get("DGRID2B", d2b);
+  REQUIRE(pot.size("KDEG2B") == 3);
+  tadah::core::v_type d2b(pot.size("KDEG2B"));
+  pot.get("KDEG2B", d2b);
   REQUIRE(d2b[0] == 5.0);
   REQUIRE(d2b[1] == 3.0);
   REQUIRE(d2b[2] == 5.0);
-  REQUIRE(!pot.contains("DGRIDRHOMB"));    // all-quintic: no key (back-compat)
-  REQUIRE(pot.size("DGRIDFMB") == 2);
+  REQUIRE(!pot.contains("KDEGMB"));    // all-quintic: no key (back-compat)
+  REQUIRE(pot.size("KDEGEMB") == 2);
+  // knot family: NO width keys anywhere (eta is a pure gauge)
+  REQUIRE(!pot.contains("SGRID2B"));
+  REQUIRE(!pot.contains("SGRIDMB"));
+  REQUIRE(!pot.contains("SEMBFUNC"));
+  // TYPE2B contract: D2_Knot5 <nC> <nKdeg> El El
+  REQUIRE(pot.get<int>("TYPE2B", 1) == 3);
+  REQUIRE(pot.get<int>("TYPE2B", 2) == 3);
 }
 
 TEST_CASE_METHOD(RefitFixture, "EAMRefit emits per-family TYPE2B names",
@@ -280,5 +287,12 @@ TEST_CASE_METHOD(RefitFixture, "EAMRefit emits per-family TYPE2B names",
     INFO("basis=" << basis);
     REQUIRE(pot.get<std::string>("TYPE2B") == t2b);
     REQUIRE(pot.get<int>("TYPEMB", 1) == bcode);
+    if (basis == "Knot5") {
+      REQUIRE(!pot.contains("SGRID2B"));
+      REQUIRE(!pot.contains("SGRIDMB"));
+    } else {
+      REQUIRE(pot.size("SGRID2B") == 2);
+      REQUIRE(pot.size("SGRIDMB") == 2);
+    }
   }
 }

@@ -45,28 +45,23 @@ Context make_knot5_context(const std::vector<double>& cgrid, double rcut) {
   c.add("VERBOSE", 0);
   {
     std::ostringstream ss;
-    for (std::size_t i = 0; i < cgrid.size(); ++i) ss << (i ? " " : "") << "1.0";
-    c.add("SGRID2B", ss.str());
-  }
-  {
-    std::ostringstream ss;
     for (std::size_t i = 0; i < cgrid.size(); ++i)
       ss << (i ? " " : "") << cgrid[i];
     c.add("CGRID2B", ss.str());
   }
   c.add("RCUT2B", rcut);
+  // contract: TYPE2B D2_Knot5 <nC> <nKdeg> El El — no width key
   c.add("TYPE2B", "D2_Knot5");
-  c.add("TYPE2B", 2);
-  c.add("TYPE2B", 2);
+  c.add("TYPE2B", static_cast<int>(cgrid.size()));
+  c.add("TYPE2B", 0);
   c.add("TYPE2B", "H");
   c.add("TYPE2B", "H");
   return c;
 }
 
 aed_type eval_aed(const std::vector<double>& cgrid, double rcut, double rij,
-                  double sgrid_k = 1.0, int pert_idx = -1,
-                  bool pert_cgrid = true, double h = 0.0) {
-  // optionally perturb cgrid[pert_idx] (or sgrid) by h for FD references
+                  int pert_idx = -1, double h = 0.0) {
+  // optionally perturb cgrid[pert_idx] by h for FD references
   Context c;
   c.add("ATOM", "H");
   c.add("WATOM", 1);
@@ -74,28 +69,18 @@ aed_type eval_aed(const std::vector<double>& cgrid, double rcut, double rij,
   c.add("VERBOSE", 0);
   {
     std::ostringstream ss;
-    ss.precision(17);  // keep the 1e-6 FD perturbation (default 6 digits drops it)
-    for (std::size_t i = 0; i < cgrid.size(); ++i) {
-      double v = sgrid_k;
-      if (!pert_cgrid && static_cast<int>(i) == pert_idx) v += h;
-      ss << (i ? " " : "") << v;
-    }
-    c.add("SGRID2B", ss.str());
-  }
-  {
-    std::ostringstream ss;
     ss.precision(17);
     for (std::size_t i = 0; i < cgrid.size(); ++i) {
       double v = cgrid[i];
-      if (pert_cgrid && static_cast<int>(i) == pert_idx) v += h;
+      if (static_cast<int>(i) == pert_idx) v += h;
       ss << (i ? " " : "") << v;
     }
     c.add("CGRID2B", ss.str());
   }
   c.add("RCUT2B", rcut);
   c.add("TYPE2B", "D2_Knot5");
-  c.add("TYPE2B", 2);
-  c.add("TYPE2B", 2);
+  c.add("TYPE2B", static_cast<int>(cgrid.size()));
+  c.add("TYPE2B", 0);
   c.add("TYPE2B", "H");
   c.add("TYPE2B", "H");
   D2_Knot5 d(c);
@@ -208,22 +193,29 @@ TEST_CASE_METHOD(Knot5Fixture, "D2_Knot5: dtheta parity vs FD contexts",
 
   const double h = 1e-6;
   for (int k = 1; k <= static_cast<int>(cgrid.size()); ++k) {
-    // CGRID2B
     aed_type dD(d.size());
     dD.set_zero();
     REQUIRE(d.calc_dDdtheta("CGRID2B", k, 1, 1, rij, rij * rij, dD));
-    aed_type p = eval_aed(cgrid, rcut, rij, 1.0, k - 1, true, h);
-    aed_type m = eval_aed(cgrid, rcut, rij, 1.0, k - 1, true, -h);
+    aed_type p = eval_aed(cgrid, rcut, rij, k - 1, h);
+    aed_type m = eval_aed(cgrid, rcut, rij, k - 1, -h);
     REQUIRE(dD(k - 1) ==
             Approx((p(k - 1) - m(k - 1)) / (2 * h)).margin(1e-6));
-    // SGRID2B
-    dD.set_zero();
-    REQUIRE(d.calc_dDdtheta("SGRID2B", k, 1, 1, rij, rij * rij, dD));
-    p = eval_aed(cgrid, rcut, rij, 1.0, k - 1, false, h);
-    m = eval_aed(cgrid, rcut, rij, 1.0, k - 1, false, -h);
-    REQUIRE(dD(k - 1) ==
-            Approx((p(k - 1) - m(k - 1)) / (2 * h)).margin(1e-6));
+    // no SGRID2B walker: the knot family has no width parameter
+    aed_type dS(d.size());
+    dS.set_zero();
+    REQUIRE_FALSE(d.calc_dDdtheta("SGRID2B", k, 1, 1, rij, rij * rij, dS));
   }
+  // keys contract: CGRID2B addressable; KDEG2B (data) and SGRID2B are not
+  REQUIRE(d.get_arg_pos("CGRID2B") == 0);   // fparam = 2 - 1 - 1 = 0
+  REQUIRE(d.get_arg_pos("KDEG2B") == -1);
+  REQUIRE(d.get_arg_pos("SGRID2B") == -1);
+}
+
+TEST_CASE_METHOD(Knot5Fixture, "D2_Knot5 rejects SGRID2B", "[knot5]") {
+  Context c = make_knot5_context({2.5, 3.5}, 6.0);
+  c.add("SGRID2B", "1.0 1.0");
+  REQUIRE_THROWS_WITH(D2_Knot5(c),
+                      Catch::Matchers::Contains("pure gauge"));
 }
 
 TEST_CASE_METHOD(Knot5Fixture, "DM_REAM Knot5 (bcode 2): basis orientation",
@@ -234,14 +226,15 @@ TEST_CASE_METHOD(Knot5Fixture, "DM_REAM Knot5 (bcode 2): basis orientation",
   c.add("RCUTMB", 6.0);
   c.add("RCTYPEMB", "Cut_Cos");
   c.add("TYPEMB", "DM_REAM");
-  c.add("TYPEMB", 2);          // Knot5
+  c.add("TYPEMB", 2);          // Knot5 (no width channels: eta is a gauge)
+  c.add("TYPEMB", 3); c.add("TYPEMB", 0); c.add("TYPEMB", 3);
+  c.add("TYPEMB", 3); c.add("TYPEMB", 0);
+  c.add("TYPEMB", 0); c.add("TYPEMB", 0);
   c.add("TYPEMB", "H");
   c.add("TYPEMB", "H");
-  c.add("CGRIDRHOMB", "3.0 4.5 6.0");
-  c.add("SGRIDRHOMB", "1.0 1.0 1.0");
-  c.add("AGRIDMB",    "0.40 0.25 0.12");
-  c.add("CGRIDFMB", "0.0 0.5 1.0");
-  c.add("SGRIDFMB", "1.0 1.0 1.0");
+  c.add("CGRIDMB", "3.0 4.5 6.0");
+  c.add("AMPGRIDMB",    "0.40 0.25 0.12");
+  c.add("CEMBFUNC", "0.0 0.5 1.0");
   DM_REAM dm(c);
   Cut_Cos fc(6.0);
   dm.set_fcut(&fc, false);
@@ -270,7 +263,7 @@ TEST_CASE_METHOD(Knot5Fixture, "DM_REAM Knot5 (bcode 2): basis orientation",
 }
 
 
-TEST_CASE_METHOD(Knot5Fixture, "D2_Knot5 mixed degrees (DGRID2B)", "[knot5][knotmix]") {
+TEST_CASE_METHOD(Knot5Fixture, "D2_Knot5 mixed degrees (KDEG2B)", "[knot5][knotmix]") {
   const double rcut = 6.0;
   Context c;
   c.add("ATOM", "H");
@@ -278,12 +271,11 @@ TEST_CASE_METHOD(Knot5Fixture, "D2_Knot5 mixed degrees (DGRID2B)", "[knot5][knot
   c.add("INIT2B", "true");
   c.add("VERBOSE", 0);
   c.add("CGRID2B", "2.5 3.5 4.5");
-  c.add("SGRID2B", "1.0 1.0 1.0");
-  c.add("DGRID2B", "5 3 5");          // middle atom CUBIC
+  c.add("KDEG2B", "5 3 5");          // middle atom CUBIC
   c.add("RCUT2B", rcut);
   c.add("TYPE2B", "D2_Knot5");
-  c.add("TYPE2B", 2);
-  c.add("TYPE2B", 2);
+  c.add("TYPE2B", 3);
+  c.add("TYPE2B", 3);
   c.add("TYPE2B", "H");
   c.add("TYPE2B", "H");
   D2_Knot5 d(c);
@@ -317,8 +309,7 @@ TEST_CASE_METHOD(Knot5Fixture, "D2_Knot5 mixed degrees (DGRID2B)", "[knot5][knot
   bad.add("INIT2B", "true");
   bad.add("VERBOSE", 0);
   bad.add("CGRID2B", "2.5 3.5");
-  bad.add("SGRID2B", "1.0 1.0");
-  bad.add("DGRID2B", "5 4");          // 4 is not a knot degree
+  bad.add("KDEG2B", "5 4");          // 4 is not a knot degree
   bad.add("RCUT2B", rcut);
   bad.add("TYPE2B", "D2_Knot5");
   bad.add("TYPE2B", 2);
@@ -337,15 +328,16 @@ TEST_CASE_METHOD(Knot5Fixture, "DM_REAM mixed degrees (DGRID*)", "[knot5][knotmi
   c.add("RCTYPEMB", "Cut_Cos");
   c.add("TYPEMB", "DM_REAM");
   c.add("TYPEMB", 2);
+  c.add("TYPEMB", 3); c.add("TYPEMB", 0); c.add("TYPEMB", 3);
+  c.add("TYPEMB", 3); c.add("TYPEMB", 0);
+  c.add("TYPEMB", 3); c.add("TYPEMB", 3);
   c.add("TYPEMB", "H");
   c.add("TYPEMB", "H");
-  c.add("CGRIDRHOMB", "3.0 4.5 6.0");
-  c.add("SGRIDRHOMB", "1.0 1.0 1.0");
-  c.add("AGRIDMB",    "0.40 0.25 0.12");
-  c.add("DGRIDRHOMB", "5 3 5");
-  c.add("CGRIDFMB", "0.0 0.5 1.0");
-  c.add("SGRIDFMB", "1.0 1.0 1.0");
-  c.add("DGRIDFMB", "3 5 5");
+  c.add("CGRIDMB", "3.0 4.5 6.0");
+  c.add("AMPGRIDMB",    "0.40 0.25 0.12");
+  c.add("KDEGMB", "5 3 5");
+  c.add("CEMBFUNC", "0.0 0.5 1.0");
+  c.add("KDEGEMB", "3 5 5");
   DM_REAM dm(c);
   Cut_Cos fc(6.0);
   dm.set_fcut(&fc, false);

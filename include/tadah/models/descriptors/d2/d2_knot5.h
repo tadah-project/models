@@ -21,12 +21,16 @@ namespace models {
  * \f$C^4\f$-smoothly at the cutoff BY CONSTRUCTION (the hard Cut_Dummy
  * truncation becomes a mathematical no-op).
  *
- * \ref CGRID2B parameters are the knot positions \f$ r_s \f$.
+ * \ref CGRID2B parameters are the knot positions \f$ r_s \f$ — the ONLY
+ * shape parameters of this family. There is NO width key: \f$\eta\f$ is a
+ * pure gauge (\f$(c,\eta)\to(c s^5, \eta/s)\f$ leaves the function
+ * invariant), so the descriptor evaluates with \f$\eta \equiv 1\f$ and
+ * REJECTS an SGRID2B key if present. Optional \ref KDEG2B (a data_keys
+ * entry: mJoin-splittable, never OPTIM) carries per-atom degrees 3|5.
  *
- * \ref SGRID2B parameters are a pure GAUGE for this family
- * (\f$(c,\eta)\to(c s^5, \eta/s)\f$ leaves the function invariant) and
- * are conventionally all 1.0; they are kept so the (centre, width,
- * coefficient) plumbing is shared with D2_Blip / D2_BP.
+ * TYPE2B layout (d_base.h keys contract):
+ * `D2_Knot5 <nC> <nK> <El> <El>` — one SIZE token per keys entry
+ * ({CGRID2B}) then per data_keys entry ({KDEG2B}; 0 = all quintic).
  *
  * The family is \f$C^4\f$ globally — only the 5th derivative jumps at the
  * knots, so second-derivative observables (elastic constants) see no
@@ -39,10 +43,9 @@ class D2_Knot5 : public D2_Base {
 private:
   std::string lab="D2_Knot5";
   tadah::core::v_type cgrid;
-  tadah::core::v_type sgrid;
   tadah::core::v_type dgrid;  ///< optional per-atom degree 3|5 (empty = all 5)
 
-  /** degree of atom c (DGRID2B absent => quintic) */
+  /** degree of atom c (KDEG2B absent => quintic) */
   int deg(std::size_t c) const {
     return c < dgrid.size() ? static_cast<int>(dgrid[c]) : 5;
   }
@@ -88,7 +91,7 @@ public:
    *
    *  Supported (theta_name, arg_pos) pairs:
    *   - "CGRID2B" arg_pos = k (1-based) -> dD/d cgrid[k-1]
-   *   - "SGRID2B" arg_pos = k (1-based) -> dD/d sgrid[k-1]
+   *   (no SGRID2B: the knot family has no width parameter)
    *   - "RCUT2B"  arg_pos = -1          -> dD/d rcut (all components)
    *  Anything else returns false (HYBRID FD-fallback, ANALYTICAL throw). */
   bool calc_dDdtheta(

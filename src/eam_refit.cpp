@@ -536,37 +536,59 @@ tadah::core::Context EAMRefit::build_pot_context() const {
   // ---- two-body descriptor: must match the family the coefficients were
   //      FIT with (basisval), else the pot evaluates a different basis than
   //      was trained — D2_BP is the Gaussian twin of D2_Blip (same
-  //      CGRID2B/SGRID2B keys, same exp(-width*(x-center)^2) convention);
-  //      D2_Knot5 is the one-sided quintic twin ((mu-r)_+^5, SGRID = 1).
+  //      CGRID2B/SGRID2B keys); D2_Knot5 is the one-sided knot descriptor
+  //      (knot positions only — NO width key, eta is a pure gauge; optional
+  //      KDEG2B data list carries per-atom degrees 3|5).
   c.add("INIT2B", "true");
+  const bool knot2b = (family_ == Family::Knot5);
   c.add("TYPE2B", family_ == Family::Gaussian ? "D2_BP"
-                : family_ == Family::Knot5    ? "D2_Knot5"
+                : knot2b                      ? "D2_Knot5"
                 : family_ == Family::Blip5    ? "D2_Blip5"
                                               : "D2_Blip");
-  c.add("TYPE2B", static_cast<int>(cgrid2b_.size()));
-  c.add("TYPE2B", static_cast<int>(cgrid2b_.size()));
+  if (knot2b) {
+    // contract: D2_Knot5 <nC> <nKdeg> El El
+    c.add("TYPE2B", static_cast<int>(cgrid2b_.size()));
+    c.add("TYPE2B", static_cast<int>(deg2b_.size()));
+  } else {
+    // contract: <name> <nC> <nS> El El
+    c.add("TYPE2B", static_cast<int>(cgrid2b_.size()));
+    c.add("TYPE2B", static_cast<int>(sgrid2b_.size()));
+  }
   c.add("TYPE2B", el);
   c.add("TYPE2B", el);
   for (double v : cgrid2b_) c.add("CGRID2B", v);
-  for (double v : sgrid2b_) c.add("SGRID2B", v);
+  if (!knot2b)
+    for (double v : sgrid2b_) c.add("SGRID2B", v);
   // optional per-atom degrees (KnotMix/Knot3; absent = all quintic)
-  for (int d : deg2b_) c.add("DGRID2B", static_cast<double>(d));
+  for (int d : deg2b_) c.add("KDEG2B", static_cast<double>(d));
   c.add("RCUT2B", rcut_);
   c.add("RCTYPE2B", cfg_.rctype);
 
   // ---- many-body: DM_REAM ----
+  // contract: DM_REAM <bcode> <nC> <nS> <nAmp> <nEc> <nEs> <nKd> <nKe> El El
+  // (knot family: width sizes are 0 — eta is a pure gauge, no SGRID data)
+  const bool knotmb = (family_ == Family::Knot5);
   c.add("INITMB", "true");
   c.add("TYPEMB", "DM_REAM");
   c.add("TYPEMB", bcode);
+  c.add("TYPEMB", static_cast<int>(crho_.size()));
+  c.add("TYPEMB", knotmb ? 0 : static_cast<int>(srho_.size()));
+  c.add("TYPEMB", static_cast<int>(arho_.size()));
+  c.add("TYPEMB", static_cast<int>(cF_.size()));
+  c.add("TYPEMB", knotmb ? 0 : static_cast<int>(sF_.size()));
+  c.add("TYPEMB", static_cast<int>(degrho_.size()));
+  c.add("TYPEMB", static_cast<int>(degF_.size()));
   c.add("TYPEMB", el);
   c.add("TYPEMB", el);
-  for (double v : crho_) c.add("CGRIDRHOMB", v);
-  for (double v : srho_) c.add("SGRIDRHOMB", v);
-  for (double v : arho_) c.add("AGRIDMB", v);
-  for (int d : degrho_) c.add("DGRIDRHOMB", static_cast<double>(d));
-  for (double v : cF_) c.add("CGRIDFMB", v);
-  for (double v : sF_) c.add("SGRIDFMB", v);
-  for (int d : degF_) c.add("DGRIDFMB", static_cast<double>(d));
+  for (double v : crho_) c.add("CGRIDMB", v);
+  if (!knotmb)
+    for (double v : srho_) c.add("SGRIDMB", v);
+  for (double v : arho_) c.add("AMPGRIDMB", v);
+  for (int d : degrho_) c.add("KDEGMB", static_cast<double>(d));
+  for (double v : cF_) c.add("CEMBFUNC", v);
+  if (!knotmb)
+    for (double v : sF_) c.add("SEMBFUNC", v);
+  for (int d : degF_) c.add("KDEGEMB", static_cast<double>(d));
   c.add("RCUTMB", rcut_);
   c.add("RCTYPEMB", cfg_.rctype);
 

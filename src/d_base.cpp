@@ -163,9 +163,13 @@ void D_Base::set_fcut(Cut_Base* cut, bool manage_memory) {
 int D_Base::get_arg_pos(const std::string &key) const {
   auto it = std::find(keys.begin(), keys.end(), key);
 
-  if (it == keys.end()) return -1;
+  if (it == keys.end()) return -1;  // incl. data_keys: not OPTIM-addressable
 
-  return std::distance(keys.begin(), it)+(nparams-keys.size());
+  // fparam = leading family params before the per-key size tokens
+  const long fparam = static_cast<long>(nparams) -
+                      static_cast<long>(keys.size()) -
+                      static_cast<long>(data_keys.size());
+  return static_cast<int>(std::distance(keys.begin(), it) + fparam);
 }
 size_t D_Base::size() const { return s; }
 double D_Base::get_rcut() const { 

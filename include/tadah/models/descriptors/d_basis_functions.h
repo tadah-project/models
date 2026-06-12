@@ -399,8 +399,8 @@ inline double d2K5L(double x_c) {
 // Mendelev/Ackland knotted-cubic EAM class. C^2 globally (only the 3rd
 // derivative jumps at the knot): a cubic atom IS an f''' corner, which the
 // C^4 quintic family cannot represent. Used by the KnotMix auto-mode (and
-// REFIT_BASIS Knot3) via the per-atom degree arrays DGRID2B / DGRIDRHOMB /
-// DGRIDFMB; same eta-gauge convention as K5*.
+// REFIT_BASIS Knot3) via the per-atom degree arrays KDEG2B / KDEGMB /
+// KDEGEMB; same eta-gauge convention as K5*.
 
 /** \brief Left-active cubic knot function \f$ \max(0,-x_c)^3 \f$. */
 inline double K3L(double x_c) {

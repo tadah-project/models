@@ -23,23 +23,33 @@ namespace models {
  *
  *  - represents the **density** as a fixed (baked) expansion
  *    \f$\rho(r)=\sum_{n} a_n\,\psi_n(r)\,f_c(r)\f$ with coefficients
- *    \f$a_n\f$ supplied in \ref AGRIDMB (these are NOT linear weights — they are
+ *    \f$a_n\f$ supplied in \ref AMPGRIDMB (these are NOT linear weights — they are
  *    found by a 1-D least-squares pre-fit and stored in the descriptor), and
  *  - represents the **embedding** as
  *    \f$F(\rho)=\sum_{m} c_m\,g_m(\rho)\f$ where the \f$g_m\f$ are the descriptor
- *    output components (one per \ref CGRIDFMB entry) and the \f$c_m\f$ are the
+ *    output components (one per \ref CEMBFUNC entry) and the \f$c_m\f$ are the
  *    M_BLR **linear weights**.
  *
  * Keys (single element, \f$L=0\f$ scalar density):
- *  - \ref CGRIDRHOMB / \ref SGRIDRHOMB : density basis centres / widths (size Nρ)
- *  - \ref AGRIDMB                       : baked density coefficients \f$a_n\f$ (size Nρ)
- *  - \ref CGRIDFMB / \ref SGRIDFMB      : embedding basis centres / widths (size M)
+ *  - \ref CGRIDMB / \ref SGRIDMB : density basis centres / widths (size Nρ)
+ *  - \ref AMPGRIDMB                       : baked density coefficients \f$a_n\f$ (size Nρ)
+ *  - \ref CEMBFUNC / \ref SEMBFUNC      : embedding basis centres / widths (size M)
  *
- * `TYPEMB` layout: `DM_REAM <basis> <El> <El>` where `<basis>` is `0` (Blip,
- * default), `1` (Gaussian), `2` (Knot5: one-sided quintic knot functions)
- * or `3` (Blip5: symmetric quintic B-spline bumps, C^4)
- * and selects the family used for BOTH the density and the embedding
- * expansions. For Knot5 the per-channel orientation is part of the family
+ * `TYPEMB` layout (the d_base.h keys contract):
+ * `DM_REAM <basis> <nC> <nS> <nAmp> <nEc> <nEs> <nKd> <nKe> <El> <El>`
+ * — one family param (the basis code) followed by one SIZE token per keys
+ * entry ({CGRIDMB, SGRIDMB, AMPGRIDMB, CEMBFUNC, SEMBFUNC}) and per
+ * data_keys entry ({KDEGMB, KDEGEMB}), which makes DM_REAM splittable by
+ * DM_mJoin and HPO-addressable via get_arg_pos. `<basis>` is `0` (Blip,
+ * default), `1` (Gaussian), `2` (Knot5: one-sided quintic/cubic knot
+ * functions) or `3` (Blip5: symmetric quintic B-spline bumps, C^4) and
+ * selects the family used for BOTH the density and the embedding
+ * expansions. Knot pots carry SIZE 0 for the width channels (SGRIDMB /
+ * SEMBFUNC ABSENT — eta is a pure gauge) and use the KDEG* data lists for
+ * per-atom degrees (3|5); bump pots carry SIZE 0 for the KDEG* channels.
+ * The amplitudes AMPGRIDMB are excluded from the LINEAR solve by
+ * bilinearity but are first-class NONLINEAR HPO parameters
+ * (`OPTIM AMPGRIDMB`). For Knot5 the per-channel orientation is part of the family
  * definition: the radial density basis is LEFT-active, \f$\psi_n(r) =
  * (\mu_n - r)_+^5\f$ (vanishes C^4-smoothly at its knot, so with all knots
  * \f$\le r_{cut}\f$ the density vanishes smoothly at the cutoff), while the
@@ -59,15 +69,15 @@ private:
   std::string lab="DM_REAM";
   Basis basis = Basis::Blip;
   // density expansion (baked)
-  tadah::core::v_type crho;   // CGRIDRHOMB
-  tadah::core::v_type srho;   // SGRIDRHOMB
-  tadah::core::v_type arho;   // AGRIDMB  (fixed coefficients)
+  tadah::core::v_type crho;   // CGRIDMB
+  tadah::core::v_type srho;   // SGRIDMB
+  tadah::core::v_type arho;   // AMPGRIDMB  (fixed coefficients)
   // embedding expansion (linear weights live in the model)
-  tadah::core::v_type cemb;   // CGRIDFMB
-  tadah::core::v_type semb;   // SGRIDFMB
+  tadah::core::v_type cemb;   // CEMBFUNC
+  tadah::core::v_type semb;   // SEMBFUNC
   // optional per-atom degrees for the knot family (bcode 2): 3|5, empty = 5
-  tadah::core::v_type drho_deg;  // DGRIDRHOMB
-  tadah::core::v_type demb_deg;  // DGRIDFMB
+  tadah::core::v_type drho_deg;  // KDEGMB
+  tadah::core::v_type demb_deg;  // KDEGEMB
   int rho_deg(std::size_t n) const {
     return n < drho_deg.size() ? static_cast<int>(drho_deg[n]) : 5;
   }
@@ -88,6 +98,9 @@ private:
   double gemb(std::size_t m, double rho) const;
   /** Embedding derivative g'_m(rho) w.r.t. rho. */
   double dgemb(std::size_t m, double rho) const;
+  /** Family-aware grid validation (ctor + reinit): size consistency, the
+   *  knot family's width-channel absence, KDEG* in {3,5}. */
+  void validate_grids() const;
 
 public:
   DM_REAM();

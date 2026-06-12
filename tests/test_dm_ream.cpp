@@ -21,15 +21,19 @@ Context make_ream_context() {
   c.add("RCTYPEMB", "Cut_Cos");
   c.add("TYPEMB", "DM_REAM");
   c.add("TYPEMB", 0);          // basis = Blip
+  // size tokens per keys {C,S,AMP,Ec,Es} then data_keys {Kd,Ke}
+  c.add("TYPEMB", 4); c.add("TYPEMB", 4); c.add("TYPEMB", 4);
+  c.add("TYPEMB", 5); c.add("TYPEMB", 5);
+  c.add("TYPEMB", 0); c.add("TYPEMB", 0);
   c.add("TYPEMB", "H");
   c.add("TYPEMB", "H");
   // density expansion (4 baked terms)
-  c.add("CGRIDRHOMB", "1.0 2.0 3.0 4.0");
-  c.add("SGRIDRHOMB", "1.0 1.0 1.0 1.0");
-  c.add("AGRIDMB",    "0.40 0.25 0.12 0.05");
+  c.add("CGRIDMB", "1.0 2.0 3.0 4.0");
+  c.add("SGRIDMB", "1.0 1.0 1.0 1.0");
+  c.add("AMPGRIDMB",    "0.40 0.25 0.12 0.05");
   // embedding expansion (5 terms; M output components)
-  c.add("CGRIDFMB", "0.0 0.4 0.8 1.2 1.6");
-  c.add("SGRIDFMB", "1.5 1.5 1.5 1.5 1.5");
+  c.add("CEMBFUNC", "0.0 0.4 0.8 1.2 1.6");
+  c.add("SEMBFUNC", "1.5 1.5 1.5 1.5 1.5");
   return c;
 }
 
@@ -58,7 +62,7 @@ TEST_CASE_METHOD(ReamFixture, "DM_REAM constructs and sizes", "[ream]") {
   Context c = make_ream_context();
   DM_REAM dm(c);
   REQUIRE(dm.label() == "DM_REAM");
-  REQUIRE(dm.size() == 5);          // M = CGRIDFMB.size()
+  REQUIRE(dm.size() == 5);          // M = CEMBFUNC.size()
   REQUIRE(dm.rhoi_size() == 1);     // scalar density
   REQUIRE(dm.rhoip_size() == 5);    // one g'_m per output
 }
@@ -169,13 +173,16 @@ TEST_CASE_METHOD(ReamFixture, "DM_REAM rejects unknown basis code", "[ream]") {
   c.add("RCTYPEMB", "Cut_Cos");
   c.add("TYPEMB", "DM_REAM");
   c.add("TYPEMB", 7);          // unknown basis code: must ERROR, not -> Blip
+  c.add("TYPEMB", 2); c.add("TYPEMB", 2); c.add("TYPEMB", 2);
+  c.add("TYPEMB", 2); c.add("TYPEMB", 2);
+  c.add("TYPEMB", 0); c.add("TYPEMB", 0);
   c.add("TYPEMB", "H");
   c.add("TYPEMB", "H");
-  c.add("CGRIDRHOMB", "1.0 2.0");
-  c.add("SGRIDRHOMB", "1.0 1.0");
-  c.add("AGRIDMB",    "0.4 0.2");
-  c.add("CGRIDFMB", "0.0 0.4");
-  c.add("SGRIDFMB", "1.5 1.5");
+  c.add("CGRIDMB", "1.0 2.0");
+  c.add("SGRIDMB", "1.0 1.0");
+  c.add("AMPGRIDMB",    "0.4 0.2");
+  c.add("CEMBFUNC", "0.0 0.4");
+  c.add("SEMBFUNC", "1.5 1.5");
   REQUIRE_THROWS_WITH(DM_REAM(c),
                       Catch::Matchers::Contains("unknown basis code"));
 }
@@ -183,6 +190,9 @@ TEST_CASE_METHOD(ReamFixture, "DM_REAM rejects unknown basis code", "[ream]") {
 
 namespace {
 Context make_ream_context_bcode(int bcode, bool mixed_deg) {
+  // knot family (bcode 2): width channels ABSENT (eta is a pure gauge);
+  // bump families carry matching SGRID/SEMBFUNC lists
+  const bool knot = (bcode == 2);
   Context c;
   c.add("VERBOSE", 0);
   c.add("INITMB", "true");
@@ -190,16 +200,19 @@ Context make_ream_context_bcode(int bcode, bool mixed_deg) {
   c.add("RCTYPEMB", "Cut_Cos");
   c.add("TYPEMB", "DM_REAM");
   c.add("TYPEMB", bcode);
+  c.add("TYPEMB", 3); c.add("TYPEMB", knot ? 0 : 3); c.add("TYPEMB", 3);
+  c.add("TYPEMB", 3); c.add("TYPEMB", knot ? 0 : 3);
+  c.add("TYPEMB", mixed_deg ? 3 : 0); c.add("TYPEMB", mixed_deg ? 3 : 0);
   c.add("TYPEMB", "H");
   c.add("TYPEMB", "H");
-  c.add("CGRIDRHOMB", "2.0 3.5 5.0");
-  c.add("SGRIDRHOMB", "1.0 1.0 1.0");
-  c.add("AGRIDMB",    "0.40 0.25 0.12");
-  c.add("CGRIDFMB", "0.0 0.4 0.8");
-  c.add("SGRIDFMB", "1.0 1.0 1.0");
+  c.add("CGRIDMB", "2.0 3.5 5.0");
+  if (!knot) c.add("SGRIDMB", "1.0 1.0 1.0");
+  c.add("AMPGRIDMB", "0.40 0.25 0.12");
+  c.add("CEMBFUNC", "0.0 0.4 0.8");
+  if (!knot) c.add("SEMBFUNC", "1.0 1.0 1.0");
   if (mixed_deg) {
-    c.add("DGRIDRHOMB", "5 3 5");
-    c.add("DGRIDFMB", "3 5 5");
+    c.add("KDEGMB", "5 3 5");
+    c.add("KDEGEMB", "3 5 5");
   }
   return c;
 }
@@ -261,4 +274,21 @@ TEST_CASE_METHOD(ReamFixture,
       REQUIRE(grad_analytic[k] == Approx(num).margin(1e-6));
     }
   }
+}
+
+
+TEST_CASE_METHOD(ReamFixture, "DM_REAM keys contract: arg positions",
+                 "[ream]") {
+  // contract (d_base.h): get_arg_pos = index-in-keys + fparam, with
+  // fparam = nparams - keys.size() - data_keys.size() = 8 - 5 - 2 = 1
+  // (the leading basis-code token). The amplitudes are HPO-addressable;
+  // the KDEG* data lists are NOT.
+  DM_REAM dm;
+  REQUIRE(dm.get_arg_pos("CGRIDMB") == 1);
+  REQUIRE(dm.get_arg_pos("SGRIDMB") == 2);
+  REQUIRE(dm.get_arg_pos("AMPGRIDMB") == 3);
+  REQUIRE(dm.get_arg_pos("CEMBFUNC") == 4);
+  REQUIRE(dm.get_arg_pos("SEMBFUNC") == 5);
+  REQUIRE(dm.get_arg_pos("KDEGMB") == -1);
+  REQUIRE(dm.get_arg_pos("KDEGEMB") == -1);
 }
