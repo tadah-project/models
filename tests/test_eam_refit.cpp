@@ -2,14 +2,31 @@
 #include <tadah/core/periodic_table.h>
 #include <tadah/models/eam/eam_setfl_io.h>
 #include <tadah/models/eam/eam_refit.h>
+#include <tadah/models/eam/eam_lattice.h>
 #include <tadah/models/descriptors/d_basis_functions.h>
 #include <cmath>
+#include <cstdio>
+#include <fstream>
 #include <iostream>
+#include <string>
 
 using namespace tadah::models;
 
 namespace {
 struct RefitFixture { RefitFixture() { tadah::core::PeriodicTable::initialize(); } };
+
+// Minimal single-element setfl (header + tiny tabulated block) with a chosen
+// lattice token and lattice constant. Enough for read_setfl(); do NOT call
+// build_splines() on it (nr=nrho=2 is below the spline stencil).
+void write_min_setfl(const std::string &path, const std::string &lat,
+                     double a0) {
+  std::ofstream os(path);
+  os << "# minimal setfl for tests\n# comment 2\n# comment 3\n"
+     << "1 Cu\n"
+     << "2 0.5 2 0.5 1.0\n"
+     << "29 63.55 " << a0 << " " << lat << "\n"
+     << "0.0 0.1\n0.2 0.3\n0.4 0.5\n";
+}
 
 // Relative RMS error of f_fit vs f_tab sampled over [a,b], normalised by the
 // peak-to-peak amplitude of f_tab over the same range.
@@ -295,4 +312,69 @@ TEST_CASE_METHOD(RefitFixture, "EAMRefit emits per-family TYPE2B names",
       REQUIRE(pot.size("SGRIDMB") == 2);
     }
   }
+}
+
+TEST_CASE("EAMSetflIO normalises the lattice label to lower case",
+          "[refit][setfl]") {
+  const std::string p = "tmp_min_upper.eam.alloy";
+  write_min_setfl(p, "FCC", 3.615);
+  EAMSetflIO eam;
+  eam.read_setfl(p);
+  std::remove(p.c_str());
+  REQUIRE(eam.lattice() == "fcc");        // canonical, used by the crystal code
+  REQUIRE(eam.lattice_raw() == "FCC");    // original case preserved
+  REQUIRE(eam_lattice::supported(eam.lattice()));
+  REQUIRE(eam.lattice_param() == Approx(3.615));
+  REQUIRE_NOTHROW(
+      eam_lattice::require_crystal(eam.lattice_raw(), eam.lattice_param()));
+}
+
+TEST_CASE("EAMSetflIO: an unspecified lattice (NONE / a0=0) fails the crystal "
+          "gate", "[refit][setfl]") {
+  const std::string p = "tmp_min_none.eam.fs";
+  write_min_setfl(p, "NONE", 0.0);
+  EAMSetflIO eam;
+  eam.read_setfl(p);                       // parsing the file itself is fine
+  std::remove(p.c_str());
+  REQUIRE(eam.lattice() == "none");
+  REQUIRE(eam.lattice_raw() == "NONE");
+  REQUIRE_FALSE(eam_lattice::supported(eam.lattice()));
+  REQUIRE(eam.lattice_param() == Approx(0.0));
+  // the gate the refit engine applies must reject it
+  REQUIRE_THROWS(
+      eam_lattice::require_crystal(eam.lattice_raw(), eam.lattice_param()));
+}
+
+TEST_CASE_METHOD(RefitFixture,
+                 "crystal_epa: fitted EAM reproduces the cohesive energy",
+                 "[refit]") {
+  // The self-test's cohesive point: crystal_epa with the original tabulated
+  // functions vs the fitted native functions, on the header lattice at a0.
+  EAMSetflIO eam;
+  eam.read_setfl("tests_data/eam.alloy");  // Ta, bcc, a0=3.304
+  eam.build_splines();
+  EAMRefitConfig cfg;                      // dense Blip defaults
+  EAMRefit refit(eam, cfg);
+  refit.fit();
+
+  const std::string lat = eam.lattice();
+  const double a0 = eam.lattice_param(), rc = eam.rcut();
+  REQUIRE(eam_lattice::supported(lat));
+
+  const double e_orig = eam_lattice::crystal_epa(
+      lat, a0, rc, [&](double r) { return eam.phi_tab(r); },
+      [&](double r) { return eam.rho_tab(r); },
+      [&](double x) { return eam.F_tab(x); });
+  const double e_fit = eam_lattice::crystal_epa(
+      lat, a0, rc, [&](double r) { return refit.phi_fit(r); },
+      [&](double r) { return refit.rho_fit(r); },
+      [&](double x) { return refit.F_fit(x); });
+
+  REQUIRE(std::isfinite(e_orig));
+  REQUIRE(std::isfinite(e_fit));
+  const double delta_mev = 1000.0 * std::fabs(e_fit - e_orig);
+  std::cout << "[refit] cohesive original=" << e_orig << " fit=" << e_fit
+            << " delta=" << delta_mev << " meV/atom" << std::endl;
+  REQUIRE(delta_mev < 1.0);    // measured ~0.01 meV/atom (dense Blip on Ta);
+                               // a broken self-test/fit lands orders larger
 }

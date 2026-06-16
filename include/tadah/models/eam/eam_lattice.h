@@ -3,8 +3,10 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cmath>
 #include <functional>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -23,9 +25,27 @@ namespace eam_lattice {
  * adequate probe geometry.
  */
 
-/// true if \p lattice is one of the supported monatomic lattices
+/// true if \p lattice is one of the supported monatomic lattices. Expects the
+/// canonical lower-case form (EAMSetflIO normalises the header label on read).
 inline bool supported(const std::string &lattice) {
   return lattice == "bcc" || lattice == "fcc" || lattice == "hcp";
+}
+
+/** Require a crystal the refit self-test can build: one of fcc/bcc/hcp and a
+ *  positive lattice constant. Throws std::runtime_error with a fix hint
+ *  otherwise. Case-insensitive (normalises \p lattice internally); \p
+ *  lattice_for_msg is shown verbatim so the message names the user's own token. */
+inline void require_crystal(const std::string &lattice, double a0) {
+  std::string l = lattice;
+  for (auto &ch : l) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+  if (supported(l) && a0 > 0.0) return;
+  throw std::runtime_error(
+      "tadah refit: the EAM header does not specify a crystal usable for the "
+      "faithfulness self-test (lattice='" + (lattice.empty() ? "<missing>" : lattice) +
+      "', a0=" + std::to_string(a0) + "). The self-test needs one of fcc/bcc/hcp "
+      "and a positive lattice constant. Edit the element line of the setfl file "
+      "(`<Z> <mass> <a0> <lattice>`): set the ground-state lattice (e.g. change "
+      "'NONE' to 'fcc', 'bcc' or 'hcp') and the equilibrium lattice constant.");
 }
 
 /// nearest-neighbour distance for lattice constant \p a

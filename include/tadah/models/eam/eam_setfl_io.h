@@ -58,7 +58,12 @@ public:
   int    atomic_number() const { return atomic_number_; }
   double atomic_mass()   const { return atomic_mass_; }
   double lattice_param() const { return lattice_param_; }
+  /** Ground-state lattice label, normalised to lower case (e.g. "fcc"); the
+   *  setfl field has no fixed case convention. Empty if the header omitted it. */
   const std::string &lattice() const { return lattice_; }
+  /** The lattice label exactly as written in the file (original case), for
+   *  faithful messages and round-trip output. */
+  const std::string &lattice_raw() const { return lattice_raw_; }
   const std::string &element() const { return element_; }
   const std::string &path()    const { return file_path_; }
 
@@ -81,6 +86,18 @@ public:
   double rho_tab(double r) const;
   /** Embedding function \f$F(\rho)\f$. */
   double F_tab(double rho) const;
+
+  // -------- ANALYTIC derivatives of the tabulated functions --------
+  // The LAMMPS cubic-spline rows carry the derivative-polynomial coefficients
+  // (spline[m][0..2]), so the 1st and 2nd derivatives are exact for the spline
+  // — no finite differencing needed. phi = z2r/r, so its derivatives apply the
+  // quotient rule to z2r; rho(r) and F(rho) are direct splines.
+  double dphi_tab(double r) const;    ///< d phi / dr
+  double d2phi_tab(double r) const;   ///< d^2 phi / dr^2
+  double drho_tab(double r) const;    ///< d rho / dr
+  double d2rho_tab(double r) const;   ///< d^2 rho / dr^2
+  double dF_tab(double rho) const;    ///< dF / drho
+  double d2F_tab(double rho) const;   ///< d^2 F / drho^2
 
   /** Convenience: the input grid as an EAMGrid (the writer's default). */
   EAMGrid input_grid() const { return EAMGrid{nrho_, drho_, nr_, dr_, rcut_}; }
@@ -114,6 +131,12 @@ private:
    *  `rdx` over `n` points (1-based index, clamped to [1, n-1]). */
   static double eval_value(const std::vector<std::vector<double>> &spline,
                            double x, double rdx, int n);
+  /** Analytic 1st derivative d(value)/dx of the same spline (LAMMPS deriv
+   *  coefficients spline[m][0..2]); 2nd derivative d^2(value)/dx^2. */
+  static double eval_deriv(const std::vector<std::vector<double>> &spline,
+                           double x, double rdx, int n);
+  static double eval_deriv2(const std::vector<std::vector<double>> &spline,
+                            double x, double rdx, int n);
 
   std::string file_path_;
   std::string element_;
@@ -125,7 +148,8 @@ private:
   int    atomic_number_ = 0;
   double atomic_mass_   = 0;
   double lattice_param_ = 0;
-  std::string lattice_;
+  std::string lattice_;       // normalised to lower case
+  std::string lattice_raw_;   // original case, as written in the file
   std::vector<std::vector<double>> frho_spline_, rhor_spline_, z2r_spline_;
 };
 

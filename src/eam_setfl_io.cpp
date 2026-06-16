@@ -1,6 +1,7 @@
 #include <tadah/models/eam/eam_setfl_io.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <fstream>
 #include <iomanip>
@@ -53,6 +54,14 @@ void EAMSetflIO::read_setfl(const std::string &path) {
   in >> atomic_number_ >> atomic_mass_ >> lattice_param_ >> lattice_;
   if (!in.good())
     throw std::runtime_error("EAMSetflIO: malformed setfl header in: " + path);
+
+  // The setfl lattice label is an informational field with no fixed case
+  // convention — real files use both "fcc" and "FCC". Keep the raw token for
+  // faithful messages / round-trip output, and normalise to lower case so the
+  // crystal routines (eam_lattice::supported / crystal_epa) recognise it.
+  lattice_raw_ = lattice_;
+  for (auto &ch : lattice_)
+    ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
 
   rdr_   = 1.0 / dr_;
   rdrho_ = 1.0 / drho_;
@@ -122,6 +131,34 @@ double EAMSetflIO::eval_value(const std::vector<std::vector<double>> &spline,
   return ((c[3] * p + c[4]) * p + c[5]) * p + c[6];
 }
 
+// Analytic d(value)/dx: value = c3 p^3 + c4 p^2 + c5 p + c6 with p = x*rdx - m,
+// so d/dx = rdx*(3 c3 p^2 + 2 c4 p + c5) = (c[0] p + c[1]) p + c[2] using the
+// stored deriv coeffs (c[0]=3c3/dx, c[1]=2c4/dx, c[2]=c5/dx). d^2/dx^2 =
+// rdx*(2 c[0] p + c[1]).
+double EAMSetflIO::eval_deriv(const std::vector<std::vector<double>> &spline,
+                             double x, double rdx, int n) {
+  double p = x * rdx + 1.0;
+  int m = static_cast<int>(p);
+  if (m < 1) m = 1;
+  if (m > n - 1) m = n - 1;
+  p -= m;
+  if (p > 1.0) p = 1.0;
+  const std::vector<double> &c = spline[m];
+  return (c[0] * p + c[1]) * p + c[2];
+}
+
+double EAMSetflIO::eval_deriv2(const std::vector<std::vector<double>> &spline,
+                              double x, double rdx, int n) {
+  double p = x * rdx + 1.0;
+  int m = static_cast<int>(p);
+  if (m < 1) m = 1;
+  if (m > n - 1) m = n - 1;
+  p -= m;
+  if (p > 1.0) p = 1.0;
+  const std::vector<double> &c = spline[m];
+  return (2.0 * c[0] * p + c[1]) * rdx;
+}
+
 double EAMSetflIO::phi_tab(double r) const {
   return eval_value(z2r_spline_, r, rdr_, nr_) / r;
 }
@@ -136,6 +173,38 @@ double EAMSetflIO::rho_tab(double r) const {
 
 double EAMSetflIO::F_tab(double rho) const {
   return eval_value(frho_spline_, rho, rdrho_, nrho_);
+}
+
+// phi(r) = z2r(r)/r. Quotient rule with z = z2r, z' , z'':
+//   phi'  = z'/r - z/r^2
+//   phi'' = z''/r - 2 z'/r^2 + 2 z/r^3
+double EAMSetflIO::dphi_tab(double r) const {
+  const double z = eval_value(z2r_spline_, r, rdr_, nr_);
+  const double z1 = eval_deriv(z2r_spline_, r, rdr_, nr_);
+  return z1 / r - z / (r * r);
+}
+
+double EAMSetflIO::d2phi_tab(double r) const {
+  const double z = eval_value(z2r_spline_, r, rdr_, nr_);
+  const double z1 = eval_deriv(z2r_spline_, r, rdr_, nr_);
+  const double z2 = eval_deriv2(z2r_spline_, r, rdr_, nr_);
+  return z2 / r - 2.0 * z1 / (r * r) + 2.0 * z / (r * r * r);
+}
+
+double EAMSetflIO::drho_tab(double r) const {
+  return eval_deriv(rhor_spline_, r, rdr_, nr_);
+}
+
+double EAMSetflIO::d2rho_tab(double r) const {
+  return eval_deriv2(rhor_spline_, r, rdr_, nr_);
+}
+
+double EAMSetflIO::dF_tab(double rho) const {
+  return eval_deriv(frho_spline_, rho, rdrho_, nrho_);
+}
+
+double EAMSetflIO::d2F_tab(double rho) const {
+  return eval_deriv2(frho_spline_, rho, rdrho_, nrho_);
 }
 
 EAMGrid EAMSetflIO::scaled_grid(double scale) const {
@@ -169,7 +238,7 @@ void EAMSetflIO::write_setfl(const std::string &path,
   out << grid.nrho << "  " << grid.drho << "  " << grid.nr << "  " << grid.dr
       << "  " << grid.rcut << "\n";
   out << atomic_number_ << "  " << atomic_mass_ << "  " << lattice_param_ << "  "
-      << (lattice_.empty() ? "unknown" : lattice_) << "\n";
+      << (lattice_raw_.empty() ? "unknown" : lattice_raw_) << "\n";
 
   auto dump = [&out](int N, double spacing,
                      const std::function<double(double)> &fn) {
