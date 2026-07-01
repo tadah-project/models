@@ -538,6 +538,9 @@ std::optional<DescriptorMeta> DM_Blip::meta() const {
 
   DescriptorMeta dm;
   dm.label = "DM_Blip";
+  // Single source for the DataStats rho-percentile key (captured by the
+  // cross-param check below instead of hardcoding the label literal there).
+  const std::string self = dm.label;
 
   // RCUTMB — real-space cutoff for the MB neighbour sum.
   ParamMeta p_rcut;
@@ -629,8 +632,8 @@ std::optional<DescriptorMeta> DM_Blip::meta() const {
 
   // Cross-param: ρ-collapse warning (uses descriptor stats if available)
   dm.cross_param_checks.push_back(
-    [](const DataStats& d, const SeedView&) -> HealthVerdict {
-      auto it = d.rho_percentiles_per_descriptor.find("DM_Blip");
+    [self](const DataStats& d, const SeedView&) -> HealthVerdict {
+      auto it = d.rho_percentiles_per_descriptor.find(self);
       if (it == d.rho_percentiles_per_descriptor.end()) return HealthOk{};
       const auto& rho = it->second;
       if (rho[I_P99] < 1.0e-6)

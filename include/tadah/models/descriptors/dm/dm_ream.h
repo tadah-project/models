@@ -62,12 +62,13 @@ namespace models {
  *       potential), so multi-element generalisation and HPO WATOM search work.
  */
 class DM_REAM: public DM_Base {
-public:
-  enum class Basis { Blip = 0, Gaussian = 1, Knot5 = 2, Blip5 = 3 };
-
 private:
   std::string lab="DM_REAM";
-  Basis basis = Basis::Blip;
+  // Runtime-selected radial/embedding basis family (from the TYPEMB <basis>
+  // wire code). BasisKind is the shared enum; the per-basis math is reached
+  // through the single dispatcher in basis_dispatch.h — no scattered
+  // if(basis==...) ladders live in this class any more.
+  BasisKind basis = BasisKind::Blip;
   // density expansion (baked)
   tadah::core::v_type crho;   // CGRIDMB
   tadah::core::v_type srho;   // SGRIDMB
@@ -140,6 +141,7 @@ public:
   void init() override;
   bool reinit(const tadah::core::Context& ctx) override;
   std::optional<DescriptorMeta> meta() const override;
+  std::optional<BasisKind> basis_kind() const override { return basis; }
 };
 } // namespace models
 } // namespace tadah

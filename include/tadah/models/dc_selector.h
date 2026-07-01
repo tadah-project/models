@@ -49,6 +49,7 @@ namespace tadah {
             c2b = tadah::core::factory<Cut_Base,double&>( context.get<std::string>("RCTYPE2B"), rcut2b );
             d2b = tadah::core::factory<D2_Base,const tadah::core::Context&>( context.get<std::string>("TYPE2B"), context );
             d2b->set_fidx(bias);
+            d2b->warn_if_discontinuous_noncompact();
           }
           else {
             c2b = tadah::core::factory<Cut_Base,double&>( "Cut_Dummy", rcutzero );
@@ -60,6 +61,7 @@ namespace tadah {
             cmb = tadah::core::factory<Cut_Base,double&>( context.get<std::string>("RCTYPEMB"), rcutmb );
             dmb = tadah::core::factory<DM_Base,const tadah::core::Context&>( context.get<std::string>("TYPEMB"), context );
             dmb->set_fidx(bias + d2b->size());
+            dmb->warn_if_discontinuous_noncompact();
           }
           else {
             cmb = tadah::core::factory<Cut_Base,double&>( "Cut_Dummy", rcutzero );

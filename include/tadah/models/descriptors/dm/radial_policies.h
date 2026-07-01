@@ -19,6 +19,7 @@
  * - \ref tadah::models::GaussianRadial — Gaussian \f$ e^{-\eta(r-r_s)^2} \f$ basis
  */
 
+#include <tadah/models/descriptors/basis_kind.h>
 #include <tadah/models/descriptors/d_basis_functions.h>
 #include <cstddef>
 #include <vector>
@@ -44,6 +45,8 @@ namespace models {
  * \f$ c \f$ is \f$ 4/\eta_c \f$.
  */
 struct BlipRadial {
+  /** Shared basis-family tag (lets DM_Poly report its radial family). */
+  static constexpr BasisKind kind = BasisKind::Blip;
   /** \brief Evaluate \f$ g_c = \mathcal{B}(\eta_c(r-r_{s,c}))\,f_c \f$. */
   static void eval(
       double r, double fc,
@@ -93,6 +96,8 @@ struct BlipRadial {
  * This is the same radial basis used by DM_EAD and DM_mEAD.
  */
 struct GaussianRadial {
+  /** Shared basis-family tag (lets DM_Poly report its radial family). */
+  static constexpr BasisKind kind = BasisKind::Gaussian;
   /** \brief Evaluate \f$ g_c = e^{-\eta_c(r-r_{s,c})^2}\,f_c \f$. */
   static void eval(
       double r, double fc,

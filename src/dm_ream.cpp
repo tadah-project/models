@@ -1,5 +1,5 @@
 #include <tadah/models/descriptors/dm/dm_ream.h>
-#include <tadah/models/descriptors/d_basis_functions.h>
+#include <tadah/models/descriptors/basis_dispatch.h>
 #include <tadah/core/stats/data_stats.h>
 
 #include <stdexcept>
@@ -9,32 +9,15 @@ namespace models {
 
 DM_REAM::DM_REAM() { init(); }
 
-namespace {
-// Map the TYPEMB basis index to the family enum. Unknown codes ERROR rather
-// than silently degrading to Blip (a pot written by a newer Tadah would
-// otherwise be evaluated with the wrong basis without any warning).
-DM_REAM::Basis basis_from_bcode(int bcode) {
-  switch (bcode) {
-    case 0: return DM_REAM::Basis::Blip;
-    case 1: return DM_REAM::Basis::Gaussian;
-    case 2: return DM_REAM::Basis::Knot5;
-    case 3: return DM_REAM::Basis::Blip5;
-    default:
-      throw std::runtime_error(
-          "DM_REAM: unknown basis code " + std::to_string(bcode) +
-          " in TYPEMB (known: 0=Blip, 1=Gaussian, 2=Knot5, 3=Blip5).");
-  }
-}
-}  // namespace
-
 void DM_REAM::validate_grids() const {
   if (crho.size() != arho.size())
     throw std::runtime_error("DM_REAM: CGRIDMB / AMPGRIDMB sizes differ.");
   if (cemb.empty())
     throw std::runtime_error("DM_REAM: embedding basis (CEMBFUNC) is empty.");
-  if (basis == Basis::Knot5) {
-    // eta is a pure gauge for the knot family: the width channels must be
-    // ABSENT (size-0 segments in TYPEMB) — no silent constant-1 lists.
+  if (basis_traits(basis).eta_is_gauge) {
+    // eta is a pure gauge for this family (knots): the width channels must be
+    // ABSENT (size-0 segments in TYPEMB) — no silent constant-1 lists. Asking
+    // the trait (not comparing to a specific basis) keeps this future-proof.
     if (!srho.empty() || !semb.empty())
       throw std::runtime_error(
           "DM_REAM (knot family): SGRIDMB/SEMBFUNC must be empty — eta is a "
@@ -70,7 +53,7 @@ DM_REAM::DM_REAM(const tadah::core::Context& ctx) : DM_Base(ctx) {
 
   int bcode = 0;
   try { bcode = ctx.get<int>("TYPEMB", 1); } catch (...) { bcode = 0; }
-  basis = basis_from_bcode(bcode);
+  basis = basis_kind_from_code(bcode);
 
   get_grid(ctx, "CGRIDMB", crho);
   srho.clear();
@@ -102,24 +85,15 @@ DM_REAM::DM_REAM(const tadah::core::Context& ctx) : DM_Base(ctx) {
 // ---------------------------- basis helpers ----------------------------
 
 double DM_REAM::psi(std::size_t n, double r, double fc) const {
-  if (basis == Basis::Blip)
-    return B(srho[n] * (r - crho[n]), fc);
-  if (basis == Basis::Knot5)   // LEFT-active; eta == 1 (gauge, no SGRIDMB)
-    return rho_deg(n) == 3 ? K3L(r - crho[n], fc) : K5L(r - crho[n], fc);
-  if (basis == Basis::Blip5)
-    return B5(srho[n] * (r - crho[n]), fc);
-  return G(r, srho[n], crho[n], fc);
+  // Knot family: SGRIDMB is absent (eta is a pure gauge) -> s = 1 (ignored by
+  // the knot arms of the dispatcher). One shared switch, no if(basis==...) ladder.
+  const double s = (n < srho.size()) ? srho[n] : 1.0;
+  return radial_value(basis, r, fc, s, crho[n], rho_deg(n));
 }
 
 double DM_REAM::dpsi(std::size_t n, double r, double fc, double fcp) const {
-  if (basis == Basis::Blip)
-    return dB(srho[n] * (r - crho[n]), srho[n], fc, fcp);
-  if (basis == Basis::Knot5)
-    return rho_deg(n) == 3 ? dK3L(r - crho[n], 1.0, fc, fcp)
-                           : dK5L(r - crho[n], 1.0, fc, fcp);
-  if (basis == Basis::Blip5)
-    return dB5(srho[n] * (r - crho[n]), srho[n], fc, fcp);
-  return dG(r, srho[n], crho[n], fc, fcp);
+  const double s = (n < srho.size()) ? srho[n] : 1.0;
+  return radial_deriv(basis, r, fc, fcp, s, crho[n], rho_deg(n));
 }
 
 double DM_REAM::rho_raw(double r, double fc) const {
@@ -135,24 +109,15 @@ double DM_REAM::rho_raw_deriv(double r, double fc, double fcp) const {
 }
 
 double DM_REAM::gemb(std::size_t m, double rho) const {
-  if (basis == Basis::Blip)
-    return B(semb[m] * (rho - cemb[m]));
-  if (basis == Basis::Knot5)   // RIGHT-active; eta == 1 (gauge, no SEMBFUNC)
-    return emb_deg(m) == 3 ? K3R(rho - cemb[m]) : K5R(rho - cemb[m]);
-  if (basis == Basis::Blip5)
-    return B5(semb[m] * (rho - cemb[m]));
-  return G(rho, semb[m], cemb[m]);
+  // Embedding: RIGHT-active knots, no cutoff. SEMBFUNC absent for the knot
+  // family (eta gauge) -> s = 1 (ignored by the knot arms).
+  const double s = (m < semb.size()) ? semb[m] : 1.0;
+  return embedding_value(basis, rho, s, cemb[m], emb_deg(m));
 }
 
 double DM_REAM::dgemb(std::size_t m, double rho) const {
-  if (basis == Basis::Blip)
-    return dB(semb[m] * (rho - cemb[m]), semb[m]);
-  if (basis == Basis::Knot5)
-    return emb_deg(m) == 3 ? dK3R(rho - cemb[m], 1.0)
-                           : dK5R(rho - cemb[m], 1.0);
-  if (basis == Basis::Blip5)
-    return dB5(semb[m] * (rho - cemb[m]), semb[m]);
-  return dG(rho, semb[m], cemb[m]);
+  const double s = (m < semb.size()) ? semb[m] : 1.0;
+  return embedding_deriv(basis, rho, s, cemb[m], emb_deg(m));
 }
 
 // ------------------------------ density --------------------------------
@@ -343,7 +308,7 @@ bool DM_REAM::reinit(const tadah::core::Context& ctx) {
   const std::size_t old_s = s;
   int bcode = 0;
   try { bcode = ctx.get<int>("TYPEMB", 1); } catch (...) { bcode = 0; }
-  basis = basis_from_bcode(bcode);
+  basis = basis_kind_from_code(bcode);
   get_grid(ctx, "CGRIDMB", crho);
   srho.clear();
   if (ctx.contains("SGRIDMB") && ctx.size("SGRIDMB") > 0)

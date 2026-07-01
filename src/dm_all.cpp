@@ -27,6 +27,9 @@ DM_mEAD<F_mEnv<Cut_SinInv>>::meta() const {
 
   DescriptorMeta dm;
   dm.label = "DM_mBlipEnv";
+  // Single source for this descriptor's DataStats rho-percentile key: the
+  // closures below capture `self` instead of each hardcoding the label literal.
+  const std::string self = dm.label;
 
   // RCUTMB — real-space cutoff for the MB neighbour sum.
   ParamMeta p_rcut;
@@ -119,8 +122,8 @@ DM_mEAD<F_mEnv<Cut_SinInv>>::meta() const {
   p_renv.hard.lo  = 1.0e-6;
   p_renv.crit     = Criticality::Recommended;
   p_renv.scope    = PairScope::Global;
-  p_renv.suggest  = [](const DataStats& d, const SeedView&, int) {
-    auto it = d.rho_percentiles_per_descriptor.find("DM_mBlipEnv");
+  p_renv.suggest  = [self](const DataStats& d, const SeedView&, int) {
+    auto it = d.rho_percentiles_per_descriptor.find(self);
     if (it == d.rho_percentiles_per_descriptor.end()) {
       return std::make_pair(0.5, 5.0);          // fall-back; suggester logs notice
     }
@@ -138,8 +141,8 @@ DM_mEAD<F_mEnv<Cut_SinInv>>::meta() const {
   p_cemb.role     = "i-th embedding-blip centre in ρ-space.";
   p_cemb.crit     = Criticality::Recommended;
   p_cemb.scope    = PairScope::Global;
-  p_cemb.suggest  = [](const DataStats& d, const SeedView&, int) {
-    auto it = d.rho_percentiles_per_descriptor.find("DM_mBlipEnv");
+  p_cemb.suggest  = [self](const DataStats& d, const SeedView&, int) {
+    auto it = d.rho_percentiles_per_descriptor.find(self);
     if (it == d.rho_percentiles_per_descriptor.end()) {
       return std::make_pair(1.0, 10.0);
     }
@@ -159,10 +162,10 @@ DM_mEAD<F_mEnv<Cut_SinInv>>::meta() const {
   p_semb.hard.lo  = 1.0e-6;
   p_semb.crit     = Criticality::Recommended;
   p_semb.scope    = PairScope::Global;
-  p_semb.suggest  = [](const DataStats& d, const SeedView& s, int) {
+  p_semb.suggest  = [self](const DataStats& d, const SeedView& s, int) {
     if (!s.contains("CEMBFUNC") || s.size("CEMBFUNC") < 2) {
       // Fallback: small range based on rho data if available.
-      auto it = d.rho_percentiles_per_descriptor.find("DM_mBlipEnv");
+      auto it = d.rho_percentiles_per_descriptor.find(self);
       if (it != d.rho_percentiles_per_descriptor.end()) {
         const double w = it->second[I_P90] - it->second[I_P10];
         if (w > 0) return std::make_pair(0.5 / w, 8.0 / w);
@@ -183,8 +186,8 @@ DM_mEAD<F_mEnv<Cut_SinInv>>::meta() const {
 
   // ----- Cross-parameter ρ-collapse check (the BASINS test) -----
   dm.cross_param_checks.push_back(
-    [](const DataStats& d, const SeedView&) -> HealthVerdict {
-      auto it = d.rho_percentiles_per_descriptor.find("DM_mBlipEnv");
+    [self](const DataStats& d, const SeedView&) -> HealthVerdict {
+      auto it = d.rho_percentiles_per_descriptor.find(self);
       if (it == d.rho_percentiles_per_descriptor.end()) return HealthOk{};
       const auto& rho = it->second;
       if (rho[I_P99] < 1.0e-6) {

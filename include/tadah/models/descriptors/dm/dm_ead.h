@@ -141,6 +141,8 @@ public:
   void init() override;
   bool reinit(const tadah::core::Context& ctx) override;
   std::optional<DescriptorMeta> meta() const override;
+  // Radial basis is a Gaussian GTO (the F_ embedding is a separate axis).
+  std::optional<BasisKind> basis_kind() const override { return BasisKind::Gaussian; }
 };
 } // namespace models
 } // namespace tadah

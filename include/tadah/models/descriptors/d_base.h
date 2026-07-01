@@ -10,6 +10,7 @@
 #include <tadah/core/registry.h>
 #include <tadah/models/cut_all.h>
 #include <tadah/models/descriptors/param_meta.h>
+#include <tadah/models/descriptors/basis_kind.h>
 #include <vector>
 #include <bitset>
 
@@ -193,6 +194,53 @@ public:
    */
   virtual std::optional<DescriptorMeta> meta() const {
     return std::nullopt;
+  }
+
+  /** \brief The radial/embedding basis family of this descriptor, when it has a
+   *  parametric analytic basis. Default `std::nullopt` = "no selectable
+   *  analytic basis" (tabulated / fixed / dummy descriptors — e.g. DM_EAM,
+   *  D2_LJ, DM_Dummy). Descriptors with a basis (D2_Blip/Blip5/Knot5/BP,
+   *  DM_Blip/EAD, DM_REAM, DM_Poly, ...) override it. This is the single
+   *  virtual the basis-analysis engine and capabilities() query instead of
+   *  branching on the descriptor name string. */
+  virtual std::optional<BasisKind> basis_kind() const { return std::nullopt; }
+
+  /** \brief Declarative capability summary, mirroring the meta() opt-in idiom.
+   *  Lets HPO / audits ask structural questions ("real cutoff? compact-support
+   *  basis? has metadata?") without a dynamic_cast or a descriptor-name test. */
+  struct DescriptorCapabilities {
+    bool has_real_cutoff    = false; ///< smooth, tunable cutoff (RCUT is an HPO lever)
+    bool is_compact_support = true;  ///< basis self-terminates (Cut_Dummy is sound)
+    bool has_meta           = false; ///< meta() returns a DescriptorMeta
+  };
+  virtual DescriptorCapabilities capabilities() const {
+    DescriptorCapabilities cap;
+    cap.has_real_cutoff = fcut && fcut->kind() != Cut_Base::Kind::Discontinuous;
+    if (auto bk = basis_kind())
+      cap.is_compact_support = basis_traits(*bk).compact_support;
+    cap.has_meta = meta().has_value();
+    return cap;
+  }
+
+  /** \brief Emit a one-time warning when a NON-compact basis (e.g. Gaussian) is
+   *  paired with a discontinuous (Cut_Dummy) cutoff: the descriptor's forces
+   *  are then discontinuous at the cutoff and RCUT is not an HPO lever. Makes
+   *  the previously-silent Cut_Dummy(0) install visible. No-op for a
+   *  compact-support basis or a descriptor with no analytic basis. Meant to be
+   *  called once, after construction, from the central builder (DC_Selector),
+   *  when basis_kind()/fcut are settled. */
+  void warn_if_discontinuous_noncompact() const {
+    const auto bk = basis_kind();
+    if (!bk || basis_traits(*bk).compact_support) return;
+    if (fcut && fcut->kind() == Cut_Base::Kind::Discontinuous) {
+      tadah::core::Logger::instance().log(
+          tadah::core::LogLevel::WARNING,
+          "Descriptor " + label() + " uses a non-compact " +
+          std::string(basis_name(*bk)) +
+          " basis with a discontinuous (Cut_Dummy) cutoff: forces are "
+          "discontinuous at the cutoff and RCUT cannot be optimised by HPO. "
+          "Configure a smooth cutoff (RCTYPE2B/RCTYPEMB) to make it a lever.");
+    }
   }
 
 private:

@@ -2,6 +2,7 @@
 #include <tadah/models/eam/eam_lattice.h>
 #include <tadah/models/linear_regressor.h>
 #include <tadah/models/descriptors/d_basis_functions.h>
+#include <tadah/models/descriptors/basis_dispatch.h>
 
 #include <algorithm>
 #include <cmath>
@@ -12,21 +13,10 @@ namespace models {
 
 EAMRefit::EAMRefit(const EAMSetflIO &eam, const EAMRefitConfig &cfg)
   : eam_(eam), cfg_(cfg) {
-  if (cfg.basis == "Gaussian" || cfg.basis == "gaussian" ||
-      cfg.basis == "BP" || cfg.basis == "D2_BP")
-    family_ = Family::Gaussian;
-  else if (cfg.basis == "Knot5" || cfg.basis == "KNOT5" ||
-           cfg.basis == "knot5" || cfg.basis == "Knot3" ||
-           cfg.basis == "KNOT3" || cfg.basis == "knot3" ||
-           cfg.basis == "KnotMix" || cfg.basis == "KNOTMIX" ||
-           cfg.basis == "knotmix" || cfg.basis == "Mixed" ||
-           cfg.basis == "MIXED")
-    family_ = Family::Knot5;  // per-atom degree arrays select 3 vs 5
-  else if (cfg.basis == "Blip5" || cfg.basis == "BLIP5" ||
-           cfg.basis == "blip5" || cfg.basis == "M6")
-    family_ = Family::Blip5;
-  else
-    family_ = Family::Blip;
+  // Shared, single-source-of-truth parser (Blip/Blip5/Gaussian/BP/Knot5 and the
+  // Knot3/KnotMix/Mixed/M6 aliases). The Knot5 family's per-atom degree arrays
+  // then select cubic vs quintic knot atoms.
+  family_ = basis_kind_from_string(cfg.basis);
   rcut_   = eam_.rcut();
   r_lo_   = std::max(cfg_.r_lo_frac * rcut_, eam_.dr());
   rhomax_ = eam_.rhomax();
@@ -41,22 +31,13 @@ double EAMRefit::cutoff(double r) const {
 
 double EAMRefit::basisval(double x, double center, double width,
                           bool emb, int deg) const {
-  switch (family_) {
-    case Family::Gaussian:
-      return std::exp(-width * (x - center) * (x - center));
-    case Family::Knot5:
-      // phi/rho: LEFT-active (vanishes smoothly at the knot/cutoff);
-      // embedding F: RIGHT-active (free at high density). deg == 3: cubic
-      // knot atom (KnotMix / Knot3 — exact f''' corner).
-      if (deg == 3)
-        return emb ? K3R(width * (x - center)) : K3L(width * (x - center));
-      return emb ? K5R(width * (x - center)) : K5L(width * (x - center));
-    case Family::Blip5:
-      return B5(width * (x - center));
-    case Family::Blip:
-      break;
-  }
-  return B(width * (x - center));
+  // The SAME shared dispatcher the DM_REAM / D2 descriptors use, so a refitted
+  // potential evaluates the identical basis at fit time and at run time (no
+  // parallel hand-copy of the basis math to drift). `width` is the eta gauge
+  // (1.0 for the knot family, whose knot arms ignore it); `emb` picks the
+  // RIGHT-active embedding orientation vs the LEFT-active phi/rho orientation.
+  return emb ? embedding_value(family_, x, width, center, deg)
+             : radial_value_bare(family_, x, width, center, deg);
 }
 
 void EAMRefit::make_grid(double lo, double hi, int n,
@@ -72,8 +53,8 @@ void EAMRefit::make_grid(double lo, double hi, int n,
     //   two nearest neighbours on each side (cubic-B-spline-like coverage).
     // Gaussian: eta = 0.5/dx^2 (sigma ~ dx).
     // Knot5: eta is a pure gauge — pinned to 1 (the knot mu is the shape).
-    widths[k] = (family_ == Family::Gaussian) ? 0.5 / (dx * dx)
-              : (family_ == Family::Knot5)    ? 1.0
+    widths[k] = (family_ == BasisKind::Gaussian) ? 0.5 / (dx * dx)
+              : (family_ == BasisKind::Knot5)    ? 1.0
                                               : 1.0 / dx;  // Blip + Blip5
   }
 }
@@ -122,8 +103,8 @@ void EAMRefit::make_grid_windowed(double lo, double hi, int n,
                               : std::max(b - a, 1e-12);
     for (int k = 0; k < m; ++k) {
       centers.push_back(a + dx * k);
-      widths.push_back((family_ == Family::Gaussian) ? 0.5 / (dx * dx)
-                     : (family_ == Family::Knot5)    ? 1.0
+      widths.push_back((family_ == BasisKind::Gaussian) ? 0.5 / (dx * dx)
+                     : (family_ == BasisKind::Knot5)    ? 1.0
                                                      : 1.0 / dx);
     }
   };
@@ -213,9 +194,9 @@ FitStats EAMRefit::lsq_fit_windowed(const std::vector<double> &xs,
   // compact mode, which injects externally-optimised parameters instead).
   std::vector<std::size_t> bA, bB, sA, sB;
   for (std::size_t k = 0; k < Nb; ++k) {
-    const double half = (family_ == Family::Gaussian)
+    const double half = (family_ == BasisKind::Gaussian)
                             ? 3.0 / std::sqrt(2.0 * widths[k])
-                        : (family_ == Family::Blip5)
+                        : (family_ == BasisKind::Blip5)
                             ? 3.0 / widths[k]
                             : 2.0 / widths[k];
     if (centers[k] + half >= win_lo && centers[k] - half <= win_hi)
@@ -540,10 +521,10 @@ tadah::core::Context EAMRefit::build_pot_context() const {
   //      (knot positions only — NO width key, eta is a pure gauge; optional
   //      KDEG2B data list carries per-atom degrees 3|5).
   c.add("INIT2B", "true");
-  const bool knot2b = (family_ == Family::Knot5);
-  c.add("TYPE2B", family_ == Family::Gaussian ? "D2_BP"
+  const bool knot2b = (family_ == BasisKind::Knot5);
+  c.add("TYPE2B", family_ == BasisKind::Gaussian ? "D2_BP"
                 : knot2b                      ? "D2_Knot5"
-                : family_ == Family::Blip5    ? "D2_Blip5"
+                : family_ == BasisKind::Blip5    ? "D2_Blip5"
                                               : "D2_Blip");
   if (knot2b) {
     // contract: D2_Knot5 <nC> <nKdeg> El El
@@ -567,7 +548,7 @@ tadah::core::Context EAMRefit::build_pot_context() const {
   // ---- many-body: DM_REAM ----
   // contract: DM_REAM <bcode> <nC> <nS> <nAmp> <nEc> <nEs> <nKd> <nKe> El El
   // (knot family: width sizes are 0 — eta is a pure gauge, no SGRID data)
-  const bool knotmb = (family_ == Family::Knot5);
+  const bool knotmb = (family_ == BasisKind::Knot5);
   c.add("INITMB", "true");
   c.add("TYPEMB", "DM_REAM");
   c.add("TYPEMB", bcode);

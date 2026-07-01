@@ -136,6 +136,8 @@ public:
   void init() override;
   bool reinit(const tadah::core::Context& ctx) override;
   std::optional<DescriptorMeta> meta() const override;
+  // Radial basis is a Gaussian GTO for every embedding F (F is a separate axis).
+  std::optional<BasisKind> basis_kind() const override { return BasisKind::Gaussian; }
 
   /* Bring base string-keyed shims into scope. */
   using DM_Base::calc_drhoi_dtheta;

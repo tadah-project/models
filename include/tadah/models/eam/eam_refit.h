@@ -4,6 +4,7 @@
 #include <tadah/core/context.h>
 #include <tadah/core/core_types.h>
 #include <tadah/models/eam/eam_setfl_io.h>
+#include <tadah/models/descriptors/basis_kind.h>
 
 #include <string>
 #include <vector>
@@ -65,14 +66,13 @@ struct FitStats {
  */
 class EAMRefit {
 public:
-  /** Basis family, parsed from EAMRefitConfig::basis. For Knot5 the
-   *  orientation is per channel: phi/rho LEFT-active (mu - x)_+^5 (vanish
-   *  C^4-smoothly at the cutoff), embedding F RIGHT-active (x - mu)_+^5. */
-  enum class Family { Blip = 0, Gaussian = 1, Knot5 = 2, Blip5 = 3 };
-
   EAMRefit(const EAMSetflIO &eam, const EAMRefitConfig &cfg);
 
-  Family family() const { return family_; }
+  /** Basis family, parsed from EAMRefitConfig::basis into the shared BasisKind
+   *  enum. For Knot5 the orientation is per channel: phi/rho LEFT-active
+   *  (mu - x)_+^5 (vanish C^4-smoothly at the cutoff), embedding F RIGHT-active
+   *  (x - mu)_+^5 — exactly the LEFT/RIGHT split the shared dispatcher applies. */
+  BasisKind family() const { return family_; }
 
   /** Run the three least-squares fits. */
   void fit();
@@ -176,7 +176,7 @@ private:
 
   const EAMSetflIO &eam_;
   EAMRefitConfig cfg_;
-  Family family_ = Family::Blip;
+  BasisKind family_ = BasisKind::Blip;
   double rcut_, r_lo_, rhomax_;
   double rho_join_ = 0.0;  ///< F tabulation join (ctor sets rhomax)
   double r_reach_ = 0.0, rho_reach_ = 0.0;
