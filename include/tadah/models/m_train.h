@@ -51,25 +51,24 @@ public:
   virtual void train(tadah::core::phi_type &Phi, tadah::core::t_type &T) = 0;
 
   /**
- * Swaps columns and fits a reduced matrix to obtain residuals.
+ * Computes the residual target for fixed-weight training and rearranges Phi.
  *
- * This function processes a full matrix Phi by swapping columns specified by indices,
- * creating a new pointer for the fixed matrix Phi_f, and then use w_f weights
- * to obtain prediction T_f = Phi_f w_f. The function then copmutes the residual vector
- * T_r = T - T_f. On exit, the Phi matrix is rearranged such that the indices.size()
- * rightmost columns of the original matrix are the same as Phi_f.
- * The function return a mapping between columns of original Phi matrix and rearranged.
+ * The residual vector T_r = T - sum_k Phi[:, indices[k]] * w_f[k] is computed
+ * on the ORIGINAL column layout, so that w_f[k] pairs with column indices[k]
+ * regardless of the declaration order of the indices. Phi is then rearranged
+ * such that the indices.size() rightmost columns are the fixed ones (in
+ * ascending original-column order — NOT in indices order; do not pair the
+ * tail columns with w_f positionally).
+ * The function returns move_map with move_map[new_pos] = original column
+ * index of the column now at new_pos.
  *
- * @param Phi         The full matrix to be reduced and fitted to the adjusted target
- *                    vector.
- * @param T           The full target vector to which the reduced matrix Phi will
- *                    be fitted.
- * @param indices     A vector of indices specifying which columns in the
- *                    original matrix are fixed and should be considered during
- *                    the regression.
- * @param w_f         A vector of fixed weights corresponding to the specified
- *                    indices. These weights are used to adjust the target
- *                    vector, resulting in residuals.
+ * @param Phi         The full matrix; on exit its columns are rearranged with
+ *                    the fixed columns moved to the right.
+ * @param T           The full target vector.
+ * @param indices     0-based column indices that are fixed; indices[k] pairs
+ *                    with w_f[k].
+ * @param w_f         Fixed weight values, one per entry of indices.
+ * @param T_r         Output residual target for the reduced regression.
  */
   template <typename M>
   std::vector<size_t> prep_train_with_residuals(
@@ -79,31 +78,18 @@ public:
       throw std::runtime_error("Size of w_f must be equal to size of indices.");
     }
 
-    // std::sort(indices.begin(), indices.end());
-    //
-    // if (indices.back() >= Phi.cols()) {
     if (*std::max_element(indices.begin(), indices.end()) >= Phi.cols()) {
       throw std::runtime_error("Largest index is greater than the number of columns in Phi.");
     }
 
-    std::vector<size_t> move_map = move_columns_in_place(Phi,indices);
+    T_r = T;
+    for (size_t k = 0; k < indices.size(); ++k) {
+      for (size_t i = 0; i < Phi.rows(); ++i) {
+        T_r[i] -= Phi(i, indices[k]) * w_f[k];
+      }
+    }
 
-    //   indices.size() = 1
-    //   indices[0] 1
-    //   1 4 7        1 7    4
-    //   2 5 8   ->   2 8    5
-    //   3 6 9        3 9    6
-    //    Phi        Phi_o   Phi_f
-    //    move_map = {0,2,1}
-
-    // the fixed columns are to the right
-    tadah::core::MatrixView Phi_f(Phi, Phi.cols()-indices.size());
-
-    tadah::core::t_type T_f = Phi_f * w_f;
-
-    T_r = T-T_f;
-
-    return move_map;
+    return move_columns_in_place(Phi, indices);
   }
 
   void setWorkspaceManager(tadah::models::memory::IModelsWorkspaceManager  *workspaceManager) {

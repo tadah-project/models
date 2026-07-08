@@ -12,7 +12,6 @@
 #include <tadah/models/memory/imodels_workspace_manager.h>
 
 #include <iostream>
-#include <limits>
 
 namespace tadah {
 namespace models {
@@ -74,7 +73,17 @@ public:
       throw std::runtime_error("This object is already trained!");
     }
 
-    if (context.contains("FIXWEIGHT") && context.contains("FIXINDEX")) {
+    const bool has_fixweight = context.contains("FIXWEIGHT");
+    const bool has_fixindex = context.contains("FIXINDEX");
+    if (has_fixweight != has_fixindex) {
+      throw std::runtime_error(
+          "FIXINDEX requires FIXWEIGHT (and vice versa). Provide both keys "
+          "with matching lengths; the i-th FIXWEIGHT value pins the weight "
+          "named by the i-th FIXINDEX entry. There is no auto-seeding from "
+          "WEIGHTS.");
+    }
+
+    if (has_fixweight && has_fixindex) {
       std::vector<std::string> indices_str(context.size("FIXINDEX"));
       context.get("FIXINDEX", indices_str);
 
@@ -118,7 +127,6 @@ public:
         weights = ekm.EKM_mat * weights;
       }
 
-      // reverse_vector(weights, move_map);
       for (size_t i=0; i<indices.size(); ++i) {
         weights[indices[i]]=w_f[i];
       }

@@ -11,7 +11,6 @@
 #include <tadah/core/context.h>
 #include <tadah/models/memory/imodels_workspace_manager.h>
 
-#include <iostream>
 #include <vector>
 
 namespace tadah {
@@ -70,7 +69,17 @@ public:
       throw std::runtime_error("This object is already trained!");
     }
 
-    if (context.contains("FIXWEIGHT") && context.contains("FIXINDEX")) {
+    const bool has_fixweight = context.contains("FIXWEIGHT");
+    const bool has_fixindex = context.contains("FIXINDEX");
+    if (has_fixweight != has_fixindex) {
+      throw std::runtime_error(
+          "FIXINDEX requires FIXWEIGHT (and vice versa). Provide both keys "
+          "with matching lengths; the i-th FIXWEIGHT value pins the weight "
+          "named by the i-th FIXINDEX entry. There is no auto-seeding from "
+          "WEIGHTS.");
+    }
+
+    if (has_fixweight && has_fixindex) {
       std::vector<std::string> indices_str(context.size("FIXINDEX"));
       context.get("FIXINDEX", indices_str);
 
@@ -114,23 +123,21 @@ public:
         weights = tadah::core::t_type();
       }
 
-      tadah::core::t_type w_temp(weights.size() + indices.size());
-
-      // for (size_t i = 0; i < indices.size(); ++i) {
-      //   w_temp[w_temp.size() - indices.size() + i] = w_f[i];
-      // }
-
-      // Insert fixed weights into their original positions but shifted by the size of weights
-      for (size_t i = 0; i < indices.size(); ++i) {
-        w_temp[i+weights.size()] = w_f[move_map[i+weights.size()]];
+      // Reassemble the full weight vector. {move_map[0..n_free-1]} and
+      // indices partition {0..N-1}, so every slot is written exactly once:
+      // the solved coefficients go back to the original positions of the
+      // free columns, and each fixed value lands on its own weight index
+      // (indices order == FIXWEIGHT declaration order). The all-fixed case
+      // (n_free == 0) reduces to the pure scatter.
+      const size_t n_free = weights.size();
+      tadah::core::t_type w_full(n_free + indices.size());
+      for (size_t j = 0; j < n_free; ++j) {
+        w_full[move_map[j]] = weights[j];
       }
-
-      for (size_t i = 0; i < weights.size(); ++i) {
-        w_temp[i] = weights[i];
+      for (size_t k = 0; k < indices.size(); ++k) {
+        w_full[indices[k]] = w_f[k];
       }
-
-      weights = w_temp;
-      reverse_vector(weights, move_map);
+      weights = w_full;
       trained = true;
     }
     else {
