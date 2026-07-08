@@ -581,6 +581,9 @@ tadah::core::Context EAMRefit::build_pot_context() const {
   // can *search* the coefficients via `OPTIM FIXWEIGHT` (the standard linear
   // solve would otherwise overwrite them each iteration). `tadah predict`
   // ignores both keys — it reads WEIGHTS — so this does not change predictions.
+  // `OPTIM FIXWEIGHT (i)` indices name MODEL WEIGHTS; because FIXINDEX is 1-K
+  // here, weight index == FIXWEIGHT slot and the emitted target is valid
+  // under both readings.
   const std::size_t K = weights_.size();
   if (K > 0) {
     c.add("FIXINDEX", std::string("1-") + std::to_string(K));
