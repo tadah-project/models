@@ -103,6 +103,15 @@ private:
    *  knot family's width-channel absence, KDEG* in {3,5}. */
   void validate_grids() const;
 
+  bool warned_rcut_ = false;  ///< one-shot guard for the truncation warning
+  /** Last-resort guard (ctor + reinit), knot family only: a density knot
+   *  beyond rcut is silently hard-truncated by Cut_Dummy — warn once. The
+   *  honest fixes live at the command level (refit/edit/hpo derive RCUTMB
+   *  from the largest knot); no auto-raise here because widening fcut
+   *  without resizing the caller's neighbour list would not recover the
+   *  missing pairs. */
+  void warn_if_knots_beyond_rcut();
+
 public:
   DM_REAM();
   DM_REAM(const tadah::core::Context&);

@@ -2,7 +2,9 @@
 #include <tadah/models/descriptors/d2/d2_knot5.h>
 #include <tadah/models/descriptors/d_basis_functions.h>
 #include <tadah/models/descriptors/param_meta.h>
+#include <tadah/core/logger.h>
 #include <tadah/core/stats/data_stats.h>
+#include <algorithm>
 #include <cstdlib>
 #include <stdexcept>
 namespace tadah {
@@ -39,6 +41,24 @@ D2_Knot5::D2_Knot5(const tadah::core::Context &c): D2_Base(c)
 
   auto init_atoms = get_init_atoms(c);
   init_for_atoms(init_atoms);
+  warn_if_knots_beyond_rcut();
+}
+
+void D2_Knot5::warn_if_knots_beyond_rcut() {
+  if (warned_rcut_ || cgrid.empty() || !fcut) return;
+  const double mx = *std::max_element(cgrid.begin(), cgrid.end());
+  const double rc = get_rcut();
+  if (mx > rc + 1e-12) {
+    warned_rcut_ = true;
+    tadah::core::Logger::instance().log(
+        tadah::core::LogLevel::WARNING,
+        "D2_Knot5: the largest CGRID2B knot (" + std::to_string(mx) +
+        ") lies beyond RCUT2B (" + std::to_string(rc) +
+        ") — its contribution is silently hard-truncated at the cutoff. "
+        "The effective cutoff of a knot channel is its largest knot: set "
+        "RCUT2B to the largest knot (refit/edit/hpo tooling derives it "
+        "automatically).");
+  }
 }
 
 void D2_Knot5::calc_aed(
@@ -233,6 +253,7 @@ bool D2_Knot5::reinit(const tadah::core::Context& ctx) {
     get_grid(ctx, "KDEG2B", dgrid);
   s = cgrid.size();
   if (fcut) fcut->set_rcut(ctx.get<double>("RCUT2BMAX"));
+  warn_if_knots_beyond_rcut();
   return s != old_s;
 }
 

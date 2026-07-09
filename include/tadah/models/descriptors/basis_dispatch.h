@@ -96,6 +96,21 @@ inline double embedding_deriv(BasisKind k, double rho,
   basis_detail::unknown_basis(k);
 }
 
+/** \brief g''_m(rho) w.r.t. rho for the given basis (embedding, no cutoff).
+ *  The bump primitives return bare d^2/dx_c^2, so the s^2 chain factor is
+ *  applied here; knots carry eta = 1 (pure gauge). */
+inline double embedding_deriv2(BasisKind k, double rho,
+                               double s, double c, int deg = 5) {
+  switch (k) {
+    case BasisKind::Blip:     return s * s * d2B (s * (rho - c));
+    case BasisKind::Blip5:    return s * s * d2B5(s * (rho - c));
+    case BasisKind::Knot5:    return deg == 3 ? d2K3R(rho - c)
+                                              : d2K5R(rho - c);
+    case BasisKind::Gaussian: return d2G(rho, s, c);
+  }
+  basis_detail::unknown_basis(k);
+}
+
 // --------------------------------------------------------------------------
 //  Bare radial basis  psi_c(r)  (no cutoff weight) — basis analysis / plots.
 //  Matches the legacy `double(*)(double,double,double)` shape of models::B /
@@ -123,6 +138,20 @@ inline double radial_deriv_bare(BasisKind k, double r,
     case BasisKind::Knot5:    return deg == 3 ? dK3L(r - c, 1.0)
                                               : dK5L(r - c, 1.0);
     case BasisKind::Gaussian: return dG (r, s, c);
+  }
+  basis_detail::unknown_basis(k);
+}
+
+/** \brief d^2/dr^2 psi_c(r) with no cutoff weight (LEFT-active knots).
+ *  The bump primitives return bare d^2/dx_c^2, so the s^2 chain factor is
+ *  applied here; knots carry eta = 1 (pure gauge). */
+inline double radial_deriv2_bare(BasisKind k, double r,
+                                 double s, double c, int deg = 5) {
+  switch (k) {
+    case BasisKind::Blip:     return s * s * d2B (s * (r - c));
+    case BasisKind::Blip5:    return s * s * d2B5(s * (r - c));
+    case BasisKind::Knot5:    return deg == 3 ? d2K3L(r - c) : d2K5L(r - c);
+    case BasisKind::Gaussian: return d2G(r, s, c);
   }
   basis_detail::unknown_basis(k);
 }

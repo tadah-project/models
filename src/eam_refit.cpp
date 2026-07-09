@@ -542,7 +542,14 @@ tadah::core::Context EAMRefit::build_pot_context() const {
     for (double v : sgrid2b_) c.add("SGRID2B", v);
   // optional per-atom degrees (KnotMix/Knot3; absent = all quintic)
   for (int d : deg2b_) c.add("KDEG2B", static_cast<double>(d));
-  c.add("RCUT2B", rcut_);
+  // Knot family: the basis vanishes C^4-smoothly at its largest knot, so the
+  // TRUE effective cutoff IS max(knot) — emit that instead of the source
+  // table's cutoff (prediction-exact; keeps the pot self-consistent for the
+  // RCUT-derivation checks in edit/hpo/predict). Bump families keep the
+  // table cutoff: their hard truncation at rcut is part of the fitted model.
+  c.add("RCUT2B", knot2b && !cgrid2b_.empty()
+                      ? *std::max_element(cgrid2b_.begin(), cgrid2b_.end())
+                      : rcut_);
   c.add("RCTYPE2B", cfg_.rctype);
 
   // ---- many-body: DM_REAM ----
@@ -570,7 +577,11 @@ tadah::core::Context EAMRefit::build_pot_context() const {
   if (!knotmb)
     for (double v : sF_) c.add("SEMBFUNC", v);
   for (int d : degF_) c.add("KDEGEMB", static_cast<double>(d));
-  c.add("RCUTMB", rcut_);
+  // See the RCUT2B comment: knot density channel derives its cutoff from
+  // the largest density knot.
+  c.add("RCUTMB", knotmb && !crho_.empty()
+                      ? *std::max_element(crho_.begin(), crho_.end())
+                      : rcut_);
   c.add("RCTYPEMB", cfg_.rctype);
 
   // ---- linear weights [c2b | cmb] ----

@@ -314,6 +314,43 @@ TEST_CASE_METHOD(RefitFixture, "EAMRefit emits per-family TYPE2B names",
   }
 }
 
+TEST_CASE_METHOD(RefitFixture,
+                 "EAMRefit derives knot-family RCUT from the largest knot",
+                 "[refit]") {
+  EAMSetflIO eam;
+  eam.read_setfl("tests_data/eam.alloy");
+  eam.build_splines();
+
+  // Knot family: the basis vanishes at its largest knot, so the emitted
+  // RCUT2B/RCUTMB must be the largest knot position, NOT the table cutoff.
+  {
+    EAMRefitConfig cfg;
+    cfg.basis = "Knot5";
+    EAMRefit refit(eam, cfg);
+    refit.set_blip_fit(EAMRefit::Fn::PHI, {3.0, 4.7}, {1.0, 1.0}, {0.1, 0.2});
+    refit.set_blip_fit(EAMRefit::Fn::RHO, {2.8, 4.1}, {1.0, 1.0}, {0.1, 0.2});
+    refit.set_blip_fit(EAMRefit::Fn::F, {0.2, 0.6}, {1.0, 1.0}, {0.1, 0.2});
+    refit.finalize_injected(2.0, 1.0);
+    tadah::core::Context pot = refit.build_pot_context();
+    REQUIRE(pot.get<double>("RCUT2B") == Approx(4.7));
+    REQUIRE(pot.get<double>("RCUTMB") == Approx(4.1));
+  }
+  // Bump families keep the table cutoff: the hard truncation at rcut is
+  // part of the fitted model.
+  {
+    EAMRefitConfig cfg;
+    cfg.basis = "Blip";
+    EAMRefit refit(eam, cfg);
+    refit.set_blip_fit(EAMRefit::Fn::PHI, {3.0, 4.7}, {1.0, 1.0}, {0.1, 0.2});
+    refit.set_blip_fit(EAMRefit::Fn::RHO, {2.8, 4.1}, {1.0, 1.0}, {0.1, 0.2});
+    refit.set_blip_fit(EAMRefit::Fn::F, {0.2, 0.6}, {1.0, 1.0}, {0.1, 0.2});
+    refit.finalize_injected(2.0, 1.0);
+    tadah::core::Context pot = refit.build_pot_context();
+    REQUIRE(pot.get<double>("RCUT2B") == Approx(eam.rcut()));
+    REQUIRE(pot.get<double>("RCUTMB") == Approx(eam.rcut()));
+  }
+}
+
 TEST_CASE("EAMSetflIO normalises the lattice label to lower case",
           "[refit][setfl]") {
   const std::string p = "tmp_min_upper.eam.alloy";

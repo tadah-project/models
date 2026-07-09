@@ -1,6 +1,8 @@
 #include <tadah/models/descriptors/dm/dm_ream.h>
 #include <tadah/models/descriptors/basis_dispatch.h>
+#include <tadah/core/logger.h>
 #include <tadah/core/stats/data_stats.h>
+#include <algorithm>
 
 #include <stdexcept>
 
@@ -80,6 +82,25 @@ DM_REAM::DM_REAM(const tadah::core::Context& ctx) : DM_Base(ctx) {
   set_drfidx(rhoisize);
 
   init_for_atoms(get_init_atoms(ctx));
+  warn_if_knots_beyond_rcut();
+}
+
+void DM_REAM::warn_if_knots_beyond_rcut() {
+  if (warned_rcut_ || basis != BasisKind::Knot5 || crho.empty() || !fcut)
+    return;
+  const double mx = *std::max_element(crho.begin(), crho.end());
+  const double rc = get_rcut();
+  if (mx > rc + 1e-12) {
+    warned_rcut_ = true;
+    tadah::core::Logger::instance().log(
+        tadah::core::LogLevel::WARNING,
+        "DM_REAM: the largest CGRIDMB density knot (" + std::to_string(mx) +
+        ") lies beyond RCUTMB (" + std::to_string(rc) +
+        ") — its contribution is silently hard-truncated at the cutoff. "
+        "The effective cutoff of a knot channel is its largest knot: set "
+        "RCUTMB to the largest knot (refit/edit/hpo tooling derives it "
+        "automatically).");
+  }
 }
 
 // ---------------------------- basis helpers ----------------------------
@@ -329,6 +350,7 @@ bool DM_REAM::reinit(const tadah::core::Context& ctx) {
   rhoisize  = 1;
   rhoipsize = s;
   if (fcut) fcut->set_rcut(ctx.get<double>("RCUTMBMAX"));
+  warn_if_knots_beyond_rcut();
   return s != old_s;
 }
 

@@ -84,6 +84,26 @@ inline double dG(double r, double eta, double miu, double f, double fp) {
   return exp(-eta*(r-miu)*(r-miu) )*(-2.0*f*eta*(r-miu)+fp);
 }
 
+/** \brief Second derivative of the Gaussian basis function w.r.t.\ \f$ r \f$.
+ *
+ * \f[
+ *   \frac{d^2 G}{d r^2} = \left(4\eta^2(r-\mu)^2 - 2\eta\right)
+ *                         e^{-\eta(r-\mu)^2}
+ * \f]
+ *
+ * Unlike d2B/d2B5/d2K5L (bare \f$ d^2/dx_c^2 \f$, chain factor applied by
+ * the caller), the Gaussian primitives take \f$ (r,\eta,\mu) \f$ directly,
+ * so the derivative here is already w.r.t.\ \f$ r \f$ — mirroring dG.
+ *
+ * \param r   interatomic distance
+ * \param eta width parameter \f$ \eta \f$
+ * \param miu centre \f$ \mu \f$
+ */
+inline double d2G(double r, double eta, double miu) {
+  const double d = r - miu;
+  return (4.0*eta*eta*d*d - 2.0*eta) * exp(-eta*d*d);
+}
+
 // =========================================================================
 // BLIPS
 // =========================================================================
