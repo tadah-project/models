@@ -151,6 +151,15 @@ public:
   bool reinit(const tadah::core::Context& ctx) override;
   std::optional<DescriptorMeta> meta() const override;
   std::optional<BasisKind> basis_kind() const override { return basis; }
+
+  /* EAM collapse (see DM_Base): V_i = F(rho_i) exactly, so expose the scalar
+   * density rho(r) (amp-baked, cutoff- and WATOM-weighted) and the
+   * weight-collapsed embedding F(rho) = sum_m w_m g_m(rho). */
+  bool eam_form() const override { return true; }
+  void eam_density(const int Zi, const int Zj, const double rij,
+                   double &rho, double &rhop) const override;
+  void eam_embed(const tadah::core::t_type &w_full, const double rho_bar,
+                 double &F, double &Fp) const override;
 };
 } // namespace models
 } // namespace tadah

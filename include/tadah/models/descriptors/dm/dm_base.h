@@ -139,6 +139,37 @@ public:
   /** \brief Resize arrays for a density and F' */
   virtual void init_rhoi(tadah::core::rho_type& rhoi)=0;
 
+  /** \brief EAM-collapse capability (scalar-density descriptors).
+   *
+   *  A DM descriptor is "EAM-form" when its many-body energy is exactly
+   *  \f$ V_i = F(\bar\rho_i) \f$ with \f$ \bar\rho_i = \sum_j \rho(r_{ij}) \f$
+   *  and, for a linear model, \f$ F(\rho) = \sum_m w_m g_m(\rho) \f$ where the
+   *  \f$ w_m \f$ are the model weights of this descriptor's block. For such
+   *  descriptors the whole (linear-model) potential collapses to classic EAM
+   *  scalar functions, which MD drivers can tabulate and evaluate at
+   *  native-EAM cost instead of accumulating per-pair descriptor vectors.
+   *
+   *  eam_density(): scalar pair density and its r-derivative, including the
+   *  cutoff function and the symmetric WATOM factor weights[Zi][Zj]; must
+   *  return (0,0) beyond the cutoff.
+   *
+   *  eam_embed(): embedding value and derivative collapsed against the FULL
+   *  model weight vector `w_full` (indexed with this descriptor's own block
+   *  offset internally, so callers never handle offsets).
+   *
+   *  Default: not EAM-form. */
+  virtual bool eam_form() const { return false; }
+  virtual void eam_density(const int /*Zi*/, const int /*Zj*/,
+                           const double /*rij*/,
+                           double &rho, double &rhop) const {
+    rho = 0.0; rhop = 0.0;
+  }
+  virtual void eam_embed(const tadah::core::t_type & /*w_full*/,
+                         const double /*rho_bar*/,
+                         double &F, double &Fp) const {
+    F = 0.0; Fp = 0.0;
+  }
+
   /** \brief Calculate density */
   virtual void calc_rho(
     const int Zi,

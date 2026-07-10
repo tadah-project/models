@@ -224,6 +224,30 @@ void DM_REAM::calc_dXijdri(
   }
 }
 
+// --------------------------- EAM collapse ------------------------------
+
+void DM_REAM::eam_density(const int Zi, const int Zj, const double rij,
+                          double &rho, double &rhop) const {
+  rho = 0.0; rhop = 0.0;
+  if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
+  const double fc  = fcut->calc(rij);
+  const double fcp = fcut->calc_prime(rij);
+  const double w   = weights[Zi][Zj];
+  rho  = w * rho_raw(rij, fc);
+  rhop = w * rho_raw_deriv(rij, fc, fcp);
+}
+
+void DM_REAM::eam_embed(const tadah::core::t_type &w_full, const double rho_bar,
+                        double &F, double &Fp) const {
+  F = 0.0; Fp = 0.0;
+  const std::size_t M = cemb.size();
+  for (std::size_t m = 0; m < M; ++m) {
+    const double w = w_full(fidx + m);
+    F  += w * gemb(m, rho_bar);
+    Fp += w * dgemb(m, rho_bar);
+  }
+}
+
 // ------------------------------- misc ----------------------------------
 
 std::string DM_REAM::label() const { return lab; }

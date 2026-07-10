@@ -5,7 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+- EAM-collapse capability API on `DM_Base`: `eam_form()`, `eam_density()` (scalar pair density and r-derivative, cutoff- and WATOM-weighted), `eam_embed()` (embedding value/derivative collapsed against the full model weight vector, block offsets handled internally). Implemented by `DM_REAM`, whose many-body energy is exactly `F(rho_bar)`. Lets MD drivers (pair_style tadah's `EAMFAST` fast path) collapse linear EAM-form models to classic scalar pair/density/embedding functions. Default: not EAM-form (no behavioural change for other descriptors).
 
 ## [1.3.0-beta.1] — 2026-05-20
 
