@@ -112,6 +112,58 @@ Context make_blip_pot() {
   return c;
 }
 
+// Pure two-body knot pot (the HPO_two_body_fit seed shape: TYPE2B only, no
+// TYPEMB/INITMB anywhere, WEIGHTS = one per pair basis function).
+Context make_pure2b_pot() {
+  Context c;
+  add_common(c, "Kr");
+  c.add("INIT2B", "true");
+  c.add("TYPE2B", "D2_Knot5");
+  c.add("TYPE2B", 3);
+  c.add("TYPE2B", 0);
+  c.add("TYPE2B", "Kr");
+  c.add("TYPE2B", "Kr");
+  for (double v : {5.0, 3.0, 4.2}) c.add("CGRID2B", v);
+  c.add("RCUT2B", 5.0);
+  c.add("RCTYPE2B", "Cut_Dummy");
+  for (double v : {1.5, -900.0, 12.0}) c.add("WEIGHTS", v);
+  c.add("FIXINDEX", "1-3");
+  for (double v : {1.5, -900.0, 12.0}) c.add("FIXWEIGHT", v);
+  return c;
+}
+
+// Knot pair channel + a FOREIGN (non-DM_REAM) many-body descriptor: the
+// pair block is the WEIGHTS prefix; the many-body tail must ride along
+// opaquely and every MB key must survive untouched.
+Context make_foreign_mb_pot() {
+  Context c;
+  add_common(c, "Ta");
+  c.add("INIT2B", "true");
+  c.add("TYPE2B", "D2_Knot5");
+  c.add("TYPE2B", 3);
+  c.add("TYPE2B", 0);
+  c.add("TYPE2B", "Ta");
+  c.add("TYPE2B", "Ta");
+  for (double v : {5.0, 3.0, 4.2}) c.add("CGRID2B", v);
+  c.add("RCUT2B", 5.0);
+  c.add("RCTYPE2B", "Cut_Dummy");
+  c.add("INITMB", "true");
+  c.add("TYPEMB", "DM_Blip");
+  c.add("TYPEMB", 2);
+  c.add("TYPEMB", 2);
+  c.add("TYPEMB", "Ta");
+  c.add("TYPEMB", "Ta");
+  c.add("CGRIDMB", "2.5 4.0");
+  c.add("SGRIDMB", "1.0 1.2");
+  c.add("RCUTMB", 4.6);
+  c.add("RCTYPEMB", "Cut_Cos");
+  // WEIGHTS = [3 pair | 2 many-body]
+  for (double v : {1.5, -900.0, 12.0, 7.0, -3.0}) c.add("WEIGHTS", v);
+  c.add("FIXINDEX", "1-5");
+  for (double v : {1.5, -900.0, 12.0, 7.0, -3.0}) c.add("FIXWEIGHT", v);
+  return c;
+}
+
 // Max |difference| of value/deriv/deriv2 between two curve views over a
 // dense sample of [lo, hi].
 double curve_maxdiff(const CurveView &a, const CurveView &b, double lo,
@@ -387,6 +439,107 @@ TEST_CASE_METHOD(EditFixture, "potedit: derived/normalized knot RCUT",
     REQUIRE_FALSE(normalize_knot_rcut(b, "test"));
     REQUIRE(b.get<double>("RCUT2B") == 5.0);
   }
+}
+
+TEST_CASE_METHOD(EditFixture, "potedit: pure two-body potentials",
+                 "[potedit]") {
+  SECTION("parse classifies and splits the weights") {
+    PotEAMView v = parse_pot_view(make_pure2b_pot());
+    REQUIRE(v.mb == MBKind::None);
+    REQUIRE(v.phi.n() == 3);
+    REQUIRE(v.phi.coeff == std::vector<double>{1.5, -900.0, 12.0});
+    REQUIRE(v.tail.empty());
+  }
+  SECTION("round-trip without edit is text-identical") {
+    Context pot = make_pure2b_pot();
+    Context out = rebuild_pot_context(parse_pot_view(pot));
+    for (const char *key : {"CGRID2B", "WEIGHTS", "FIXWEIGHT", "TYPE2B"}) {
+      REQUIRE(out.size(key) == pot.size(key));
+      for (std::size_t i = 0; i < pot.size(key); ++i)
+        REQUIRE(out.get<std::string>(key, i) == pot.get<std::string>(key, i));
+    }
+    // no many-body TERM appears out of nowhere. (Context::contains
+    // materialises blueprint defaults, so probing INITMB during the parse
+    // leaves an explicit `INITMB false` behind — semantically identical to
+    // its absence, and it keeps the pot pair-only for every consumer.)
+    for (const char *key : {"TYPEMB", "CGRIDMB", "AMPGRIDMB",
+                            "CEMBFUNC", "RCUTMB"}) {
+      INFO("key=" << key);
+      REQUIRE(!out.contains(key));
+    }
+    REQUIRE_FALSE(out.get<bool>("INITMB"));
+  }
+  SECTION("ADD beyond the largest knot: bit-identical + cutoff grows") {
+    PotEAMView v = parse_pot_view(make_pure2b_pot());
+    const CurveView before = v.phi;
+    add_basis(v.phi, AddSpec{6.8, {}, {}}, true);
+    REQUIRE(curve_maxdiff(before, v.phi, 0.2, 9.0) == 0.0);
+    Context out = rebuild_pot_context(v);
+    REQUIRE(out.get<double>("RCUT2B") == Approx(6.8));
+    REQUIRE(out.size("WEIGHTS") == 4);
+    REQUIRE(out.get<double>("WEIGHTS", 3) == 0.0);
+    REQUIRE(out.get<std::string>("FIXINDEX") == "1-4");
+    REQUIRE(out.get<int>("TYPE2B", 1) == 4);
+  }
+  SECTION("REMOVE compensates as usual") {
+    PotEAMView v = parse_pot_view(make_pure2b_pot());
+    RemoveReport rep = remove_basis(v.phi, 4.1, true);
+    REQUIRE(rep.removed_mu == 4.2);
+    REQUIRE(rep.compensated);
+    Context out = rebuild_pot_context(v);
+    REQUIRE(out.size("WEIGHTS") == 2);
+    REQUIRE(out.get<std::string>("FIXINDEX") == "1-2");
+  }
+  SECTION("derived/normalized RCUT works without a many-body term") {
+    Context k = make_pure2b_pot();
+    k.remove("RCUT2B");
+    k.add("RCUT2B", 6.3);  // stale headroom-style value
+    REQUIRE(derived_knot_rcut(k, "2B").value() == Approx(5.0));
+    REQUIRE(!derived_knot_rcut(k, "MB").has_value());
+    REQUIRE(normalize_knot_rcut(k, "test"));
+    REQUIRE(k.get<double>("RCUT2B") == Approx(5.0));
+  }
+}
+
+TEST_CASE_METHOD(EditFixture,
+                 "potedit: foreign many-body descriptors (pair-only editing)",
+                 "[potedit]") {
+  PotEAMView v = parse_pot_view(make_foreign_mb_pot());
+  REQUIRE(v.mb == MBKind::Foreign);
+  REQUIRE(v.mb_name == "DM_Blip");
+  REQUIRE(v.phi.coeff == std::vector<double>{1.5, -900.0, 12.0});
+  REQUIRE(v.tail == std::vector<double>{7.0, -3.0});
+
+  const CurveView before = v.phi;
+  add_basis(v.phi, AddSpec{3.6, {}, {}}, true);
+  REQUIRE(curve_maxdiff(before, v.phi, 0.2, 8.0) == 0.0);
+  Context out = rebuild_pot_context(v);
+  // pair block grew; the opaque many-body tail rides along unchanged
+  REQUIRE(out.size("WEIGHTS") == 6);
+  REQUIRE(out.get<double>("WEIGHTS", 3) == 0.0);
+  REQUIRE(out.get<double>("WEIGHTS", 4) == 7.0);
+  REQUIRE(out.get<double>("WEIGHTS", 5) == -3.0);
+  REQUIRE(out.get<std::string>("FIXINDEX") == "1-6");
+  // every many-body key survives verbatim
+  const Context ref = make_foreign_mb_pot();
+  for (const char *key : {"TYPEMB", "CGRIDMB", "SGRIDMB", "RCUTMB",
+                          "RCTYPEMB", "INITMB"}) {
+    REQUIRE(out.size(key) == ref.size(key));
+    for (std::size_t i = 0; i < ref.size(key); ++i)
+      REQUIRE(out.get<std::string>(key, i) == ref.get<std::string>(key, i));
+  }
+}
+
+TEST_CASE_METHOD(EditFixture, "potedit: BIAS/NORM potentials are rejected",
+                 "[potedit]") {
+  Context b = make_pure2b_pot();
+  b.remove("BIAS");
+  b.add("BIAS", "true");
+  REQUIRE_THROWS_WITH(parse_pot_view(b), Catch::Contains("BIAS"));
+  Context n = make_pure2b_pot();
+  n.remove("NORM");
+  n.add("NORM", "true");
+  REQUIRE_THROWS_WITH(parse_pot_view(n), Catch::Contains("NORM"));
 }
 
 TEST_CASE_METHOD(EditFixture,

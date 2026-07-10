@@ -79,16 +79,37 @@ struct CurveView {
   static double support_infinity();
 };
 
-/** \brief A refit potential parsed into its three curves + retained Context. */
+/** \brief The many-body situation of a parsed potential. */
+enum class MBKind {
+  None,     ///< pure two-body (no active many-body term): WEIGHTS = pair block
+  Ream,     ///< DM_REAM: density (baked amps) + embedding (WEIGHTS tail)
+  Foreign,  ///< some other active many-body descriptor: its WEIGHTS tail is
+            ///< preserved OPAQUELY; only the pair channel can be edited
+};
+
+/** \brief A knot/blip potential parsed into per-channel views + retained
+ *  Context. The pair channel is always present; rho/F are populated only
+ *  for MBKind::Ream. For MBKind::Foreign the non-pair WEIGHTS block is kept
+ *  verbatim in `tail` (the design matrix is [bias | pair | many-body], so
+ *  with BIAS false the pair block is the WEIGHTS prefix for ANY many-body
+ *  descriptor — see DC_Selector::init). */
 struct PotEAMView {
   core::Context ctx;  ///< the parsed original; untouched keys preserved
   CurveView phi, rho, F;
+  MBKind mb = MBKind::None;
+  std::string mb_name;        ///< TYPEMB descriptor name (Foreign diagnostics)
+  std::vector<double> tail;   ///< opaque non-pair WEIGHTS (Foreign only)
   std::string element;
 };
 
-/** \brief Parse a refit-shaped potential Context into per-channel views.
- *  Throws std::runtime_error with an actionable message on any other shape
- *  (D2_mJoin, Gaussian/D2_BP, non-DM_REAM many-body, inconsistent arrays). */
+/** \brief Parse a knot/blip potential Context into per-channel views.
+ *  Requirements: TYPE2B is a refit family (D2_Knot5 / D2_Blip / D2_Blip5),
+ *  BIAS and NORM are false (intercept / normalization columns are aligned
+ *  with WEIGHTS and cannot survive an edit). The many-body term is optional:
+ *  absent/inactive (pure two-body), DM_REAM (fully editable), or any other
+ *  descriptor (pair channel only). Throws std::runtime_error with an
+ *  actionable message otherwise (D2_mJoin, Gaussian/D2_BP, inconsistent
+ *  arrays). */
 PotEAMView parse_pot_view(const core::Context &ctx);
 
 /** \brief Rebuild a full potential Context from an (edited) view: grids,

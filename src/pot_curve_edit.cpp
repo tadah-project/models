@@ -142,10 +142,24 @@ PotEAMView parse_pot_view(const core::Context &ctx) {
   PotEAMView v;
   v.ctx = ctx;
 
-  if (!ctx.contains("TYPE2B") || !ctx.contains("TYPEMB"))
+  if (!ctx.contains("TYPE2B") || ctx.size("TYPE2B") == 0)
     throw std::runtime_error(
-        "pot edit: the potential must carry TYPE2B and TYPEMB keys "
-        "(only single-descriptor `tadah refit` potentials are supported).");
+        "pot edit: the potential must carry a TYPE2B key (a knot/blip pair "
+        "descriptor is the editable part).");
+
+  // ---- editing safety: WEIGHTS must be [pair block | many-body block] ----
+  // BIAS prepends intercept columns and NORM stores column-aligned
+  // NMEAN/NSTDEV — neither survives inserting/removing a column.
+  if (ctx.contains("BIAS") && ctx.size("BIAS") > 0 && ctx.get<bool>("BIAS"))
+    throw std::runtime_error(
+        "pot edit: BIAS true is not supported — the intercept columns "
+        "precede the pair block in WEIGHTS, so a basis edit cannot keep the "
+        "layout consistent.");
+  if (ctx.contains("NORM") && ctx.size("NORM") > 0 && ctx.get<bool>("NORM"))
+    throw std::runtime_error(
+        "pot edit: NORM true is not supported — the stored normalization "
+        "vectors are column-aligned with WEIGHTS and cannot survive a basis "
+        "edit. Set NORM false.");
 
   // ---- two-body family ----
   const std::string t2 = ctx.get<std::string>("TYPE2B", 0);
@@ -158,17 +172,30 @@ PotEAMView parse_pot_view(const core::Context &ctx) {
         "' — only refit families (D2_Knot5, D2_Blip, D2_Blip5) can be "
         "edited (Gaussian/D2_BP and D2_mJoin are not supported).");
 
-  // ---- many-body: DM_REAM only ----
-  const std::string tm = ctx.get<std::string>("TYPEMB", 0);
-  if (tm != "DM_REAM")
-    throw std::runtime_error(
-        "pot edit: unsupported many-body descriptor '" + tm +
-        "' — only DM_REAM (as written by `tadah refit`) can be edited.");
-  const BasisKind mb =
-      basis_kind_from_code(ctx.get<int>("TYPEMB", 1));
-  if (mb == BasisKind::Gaussian)
-    throw std::runtime_error(
-        "pot edit: the Gaussian DM_REAM basis is not supported.");
+  // ---- many-body situation: absent/inactive, DM_REAM, or foreign ----
+  // The many-body descriptor only contributes WEIGHTS columns when INITMB is
+  // true (DC_Selector builds DM_Dummy otherwise), so an absent/false INITMB
+  // means a pure two-body potential regardless of a stray TYPEMB key.
+  const bool mb_active = ctx.contains("INITMB") && ctx.size("INITMB") > 0 &&
+                         ctx.get<bool>("INITMB");
+  BasisKind mbk = BasisKind::Blip;
+  if (mb_active) {
+    if (!ctx.contains("TYPEMB") || ctx.size("TYPEMB") == 0)
+      throw std::runtime_error(
+          "pot edit: INITMB is true but the potential has no TYPEMB key.");
+    v.mb_name = ctx.get<std::string>("TYPEMB", 0);
+    if (v.mb_name == "DM_REAM") {
+      v.mb = MBKind::Ream;
+      mbk = basis_kind_from_code(ctx.get<int>("TYPEMB", 1));
+      if (mbk == BasisKind::Gaussian)
+        throw std::runtime_error(
+            "pot edit: the Gaussian DM_REAM basis is not supported.");
+    } else {
+      v.mb = MBKind::Foreign;  // pair channel editable; tail kept verbatim
+    }
+  } else {
+    v.mb = MBKind::None;
+  }
 
   if (!ctx.contains("ATOM") || ctx.size("ATOM") == 0)
     throw std::runtime_error("pot edit: the potential has no ATOM key.");
@@ -192,50 +219,69 @@ PotEAMView parse_pot_view(const core::Context &ctx) {
   }
   v.phi.rcut = ctx.get<double>("RCUT2B");
 
-  // ---- rho ----
-  v.rho.family = mb;
-  v.rho.right_active = false;
-  v.rho.mu = read_grid(ctx, "CGRIDMB");
-  v.rho.coeff = read_grid(ctx, "AMPGRIDMB");
-  if (v.rho.mu.empty() || v.rho.coeff.size() != v.rho.mu.size())
-    throw std::runtime_error(
-        "pot edit: CGRIDMB/AMPGRIDMB must be non-empty and equal-sized.");
-  if (mb == BasisKind::Knot5) {
-    v.rho.deg = read_degs(ctx, "KDEGMB", v.rho.mu.size());
-  } else {
-    v.rho.eta = read_grid(ctx, "SGRIDMB");
-    if (v.rho.eta.size() != v.rho.mu.size())
-      throw std::runtime_error("pot edit: SGRIDMB/CGRIDMB size mismatch.");
-  }
-  v.rho.rcut = ctx.get<double>("RCUTMB");
+  if (v.mb == MBKind::Ream) {
+    // ---- rho ----
+    v.rho.family = mbk;
+    v.rho.right_active = false;
+    v.rho.mu = read_grid(ctx, "CGRIDMB");
+    v.rho.coeff = read_grid(ctx, "AMPGRIDMB");
+    if (v.rho.mu.empty() || v.rho.coeff.size() != v.rho.mu.size())
+      throw std::runtime_error(
+          "pot edit: CGRIDMB/AMPGRIDMB must be non-empty and equal-sized.");
+    if (mbk == BasisKind::Knot5) {
+      v.rho.deg = read_degs(ctx, "KDEGMB", v.rho.mu.size());
+    } else {
+      v.rho.eta = read_grid(ctx, "SGRIDMB");
+      if (v.rho.eta.size() != v.rho.mu.size())
+        throw std::runtime_error("pot edit: SGRIDMB/CGRIDMB size mismatch.");
+    }
+    v.rho.rcut = ctx.get<double>("RCUTMB");
 
-  // ---- F (embedding) ----
-  v.F.family = mb;
-  v.F.right_active = (mb == BasisKind::Knot5);
-  v.F.mu = read_grid(ctx, "CEMBFUNC");
-  if (v.F.mu.empty())
-    throw std::runtime_error("pot edit: CEMBFUNC is empty.");
-  if (mb == BasisKind::Knot5) {
-    v.F.deg = read_degs(ctx, "KDEGEMB", v.F.mu.size());
-  } else {
-    v.F.eta = read_grid(ctx, "SEMBFUNC");
-    if (v.F.eta.size() != v.F.mu.size())
-      throw std::runtime_error("pot edit: SEMBFUNC/CEMBFUNC size mismatch.");
+    // ---- F (embedding) ----
+    v.F.family = mbk;
+    v.F.right_active = (mbk == BasisKind::Knot5);
+    v.F.mu = read_grid(ctx, "CEMBFUNC");
+    if (v.F.mu.empty())
+      throw std::runtime_error("pot edit: CEMBFUNC is empty.");
+    if (mbk == BasisKind::Knot5) {
+      v.F.deg = read_degs(ctx, "KDEGEMB", v.F.mu.size());
+    } else {
+      v.F.eta = read_grid(ctx, "SEMBFUNC");
+      if (v.F.eta.size() != v.F.mu.size())
+        throw std::runtime_error("pot edit: SEMBFUNC/CEMBFUNC size mismatch.");
+    }
+    v.F.rcut = 0.0;  // no r cutoff on the embedding
   }
-  v.F.rcut = 0.0;  // no r cutoff on the embedding
 
-  // ---- weights: [phi | F] ----
+  // ---- weights: [phi | many-body block] ----
   const std::size_t K = ctx.contains("WEIGHTS") ? ctx.size("WEIGHTS") : 0;
-  const std::size_t n2b = v.phi.mu.size(), nEc = v.F.mu.size();
-  if (K != n2b + nEc)
-    throw std::runtime_error(
-        "pot edit: WEIGHTS has " + std::to_string(K) + " entries, expected " +
-        std::to_string(n2b) + " (CGRID2B) + " + std::to_string(nEc) +
-        " (CEMBFUNC) = " + std::to_string(n2b + nEc) + ".");
+  const std::size_t n2b = v.phi.mu.size();
+  if (v.mb == MBKind::Ream) {
+    const std::size_t nEc = v.F.mu.size();
+    if (K != n2b + nEc)
+      throw std::runtime_error(
+          "pot edit: WEIGHTS has " + std::to_string(K) + " entries, expected " +
+          std::to_string(n2b) + " (CGRID2B) + " + std::to_string(nEc) +
+          " (CEMBFUNC) = " + std::to_string(n2b + nEc) + ".");
+  } else if (v.mb == MBKind::None) {
+    if (K != n2b)
+      throw std::runtime_error(
+          "pot edit: WEIGHTS has " + std::to_string(K) + " entries but the "
+          "pure two-body potential has " + std::to_string(n2b) +
+          " CGRID2B basis functions (one weight each).");
+  } else {  // Foreign: pair block first, opaque many-body tail after it
+    if (K < n2b)
+      throw std::runtime_error(
+          "pot edit: WEIGHTS has " + std::to_string(K) + " entries — fewer "
+          "than the " + std::to_string(n2b) + " CGRID2B basis functions.");
+  }
   std::vector<double> w(K);
   for (std::size_t i = 0; i < K; ++i) w[i] = ctx.get<double>("WEIGHTS", i);
   v.phi.coeff.assign(w.begin(), w.begin() + n2b);
-  v.F.coeff.assign(w.begin() + n2b, w.end());
+  if (v.mb == MBKind::Ream)
+    v.F.coeff.assign(w.begin() + n2b, w.end());
+  else if (v.mb == MBKind::Foreign)
+    v.tail.assign(w.begin() + n2b, w.end());
 
   return v;
 }
@@ -244,7 +290,8 @@ core::Context rebuild_pot_context(const PotEAMView &v) {
   core::Context c = v.ctx;
   const std::string el = v.element;
   const bool knot2b = (v.phi.family == BasisKind::Knot5);
-  const bool knotmb = (v.rho.family == BasisKind::Knot5);
+  const bool ream = (v.mb == MBKind::Ream);
+  const bool knotmb = ream && (v.rho.family == BasisKind::Knot5);
 
   // ---- two-body: <name> <nC> <nKdeg|nS> El El ----
   c.remove("TYPE2B");
@@ -259,32 +306,40 @@ core::Context rebuild_pot_context(const PotEAMView &v) {
   if (!knot2b) add_all(c, "SGRID2B", v.phi.eta);
   add_degs(c, "KDEG2B", v.phi.deg);
 
-  // ---- many-body: DM_REAM <bcode> <nC> <nS> <nAmp> <nEc> <nEs> <nKd> <nKe> ----
-  c.remove("TYPEMB");
-  c.add("TYPEMB", "DM_REAM");
-  c.add("TYPEMB", basis_code(v.rho.family));
-  c.add("TYPEMB", static_cast<int>(v.rho.mu.size()));
-  c.add("TYPEMB", static_cast<int>(knotmb ? 0 : v.rho.eta.size()));
-  c.add("TYPEMB", static_cast<int>(v.rho.coeff.size()));
-  c.add("TYPEMB", static_cast<int>(v.F.mu.size()));
-  c.add("TYPEMB", static_cast<int>(knotmb ? 0 : v.F.eta.size()));
-  c.add("TYPEMB", static_cast<int>(v.rho.deg.size()));
-  c.add("TYPEMB", static_cast<int>(v.F.deg.size()));
-  c.add("TYPEMB", el);
-  c.add("TYPEMB", el);
-  add_all(c, "CGRIDMB", v.rho.mu);
-  c.remove("SGRIDMB");
-  if (!knotmb) add_all(c, "SGRIDMB", v.rho.eta);
-  add_all(c, "AMPGRIDMB", v.rho.coeff);
-  add_degs(c, "KDEGMB", v.rho.deg);
-  add_all(c, "CEMBFUNC", v.F.mu);
-  c.remove("SEMBFUNC");
-  if (!knotmb) add_all(c, "SEMBFUNC", v.F.eta);
-  add_degs(c, "KDEGEMB", v.F.deg);
+  // ---- many-body ----
+  // DM_REAM is regenerated from the (possibly edited) rho/F views; a pure
+  // two-body potential has nothing to write; a FOREIGN many-body descriptor
+  // is left completely untouched (its keys survive in the cloned Context and
+  // its WEIGHTS block rides along in v.tail).
+  if (ream) {
+    // DM_REAM <bcode> <nC> <nS> <nAmp> <nEc> <nEs> <nKd> <nKe> El El
+    c.remove("TYPEMB");
+    c.add("TYPEMB", "DM_REAM");
+    c.add("TYPEMB", basis_code(v.rho.family));
+    c.add("TYPEMB", static_cast<int>(v.rho.mu.size()));
+    c.add("TYPEMB", static_cast<int>(knotmb ? 0 : v.rho.eta.size()));
+    c.add("TYPEMB", static_cast<int>(v.rho.coeff.size()));
+    c.add("TYPEMB", static_cast<int>(v.F.mu.size()));
+    c.add("TYPEMB", static_cast<int>(knotmb ? 0 : v.F.eta.size()));
+    c.add("TYPEMB", static_cast<int>(v.rho.deg.size()));
+    c.add("TYPEMB", static_cast<int>(v.F.deg.size()));
+    c.add("TYPEMB", el);
+    c.add("TYPEMB", el);
+    add_all(c, "CGRIDMB", v.rho.mu);
+    c.remove("SGRIDMB");
+    if (!knotmb) add_all(c, "SGRIDMB", v.rho.eta);
+    add_all(c, "AMPGRIDMB", v.rho.coeff);
+    add_degs(c, "KDEGMB", v.rho.deg);
+    add_all(c, "CEMBFUNC", v.F.mu);
+    c.remove("SEMBFUNC");
+    if (!knotmb) add_all(c, "SEMBFUNC", v.F.eta);
+    add_degs(c, "KDEGEMB", v.F.deg);
+  }
 
   // ---- weights + HPO coefficient-search seed (mirrors build_pot_context) ----
   std::vector<double> w(v.phi.coeff);
-  w.insert(w.end(), v.F.coeff.begin(), v.F.coeff.end());
+  if (ream) w.insert(w.end(), v.F.coeff.begin(), v.F.coeff.end());
+  else      w.insert(w.end(), v.tail.begin(), v.tail.end());
   add_all(c, "WEIGHTS", w);
   c.remove("FIXINDEX");
   c.remove("FIXWEIGHT");
@@ -304,10 +359,11 @@ core::Context rebuild_pot_context(const PotEAMView &v) {
   if (knotmb) {
     c.remove("RCUTMB");
     c.add("RCUTMB", *std::max_element(v.rho.mu.begin(), v.rho.mu.end()));
-  } else {
+  } else if (ream) {
     c.remove("RCUTMB");
     c.add("RCUTMB", v.rho.rcut);
   }
+  // None/Foreign: RCUTMB (if any) stays exactly as it was.
 
   // ---- self-check: the rebuilt Context must construct cleanly ----
   try {
@@ -316,7 +372,7 @@ core::Context rebuild_pot_context(const PotEAMView &v) {
     if (knot2b) { D2_Knot5 d(probe); }
     else if (v.phi.family == BasisKind::Blip5) { D2_Blip5 d(probe); }
     else { D2_Blip d(probe); }
-    DM_REAM m(probe);
+    if (ream) { DM_REAM m(probe); }
   } catch (const std::exception &e) {
     throw std::runtime_error(
         std::string("pot edit: rebuilt potential failed descriptor "
