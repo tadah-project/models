@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-07-14
+
 ### Added
 - **Bump-support invariant plumbing** (`c + w/eta <= RCUT` for the compact bump families under a hard Cut_Dummy cutoff — a truncated overhang is an energy/force step at the cutoff): `BasisTraits::bump_halfwidth` (2 Blip / 3 Blip5) + `bump_halfwidth(BasisKind)` + the shared gate tolerance `bump_rcut_tol` (1e-6 relative, so hpotarget-quantized bounds sitting exactly on the cap still pass) in `basis_kind.h`; `potedit::bump_channel_halfwidth(ctx, suffix)` (Context-level twin of `derived_knot_rcut` for bumps) and `potedit::channel_cutoff_is_discontinuous(ctx, suffix)` (RCTYPE\* absent = Cut_Dummy, matching the descriptor ctor default) in `pot_curve_edit`.
 - **Read-path warn parity for bumps**: `D_Base::warn_if_bump_support_beyond_rcut` (warn-once, discontinuous cutoffs only), called from the ctor + `reinit()` of `D2_Blip`, `D2_Blip5` and `DM_REAM` (density grids) — the bump analogue of the knot families' `warn_if_knots_beyond_rcut`. Reading a legacy spilled pot stays warn-only: its truncation is part of the fitted model.
