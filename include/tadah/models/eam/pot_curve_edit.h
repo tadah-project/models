@@ -18,9 +18,16 @@
 //   DERIVED quantities — `derived_knot_rcut` computes them and
 //   `normalize_knot_rcut` warns + rewrites a stale stated value. Moving RCUT
 //   anywhere >= max knot is prediction-exact.
-// - Blip channels: the hard Cut_Dummy truncation at RCUT was part of the fit
-//   (the basis overhangs the cutoff by design), so RCUT is AUTHORITATIVE and
-//   is never auto-changed — only warned about.
+// - Blip channels: RCUT is AUTHORITATIVE and is never auto-changed. Under a
+//   discontinuous cutoff (Cut_Dummy) a bump whose support crosses RCUT is
+//   hard-truncated mid-tail -> phi(RCUT) != 0 -> an energy/force step at the
+//   cutoff, so AUTHORING surfaces (hpo preflight, refit's optimizer stages,
+//   the hpotarget emitter, --edit add) enforce `c + w/eta <= RCUT` as a hard
+//   error (`bump_channel_halfwidth` + bump_rcut_tol). READING an existing
+//   fitted pot stays warn-only: legacy spilled pots exist and their
+//   truncation is part of the fitted model. Smooth cutoffs (Cut_Poly, ...)
+//   damp any overhang to zero smoothly, so overhang there is legitimate and
+//   is not gated (`channel_cutoff_is_discontinuous`).
 
 #include <cstddef>
 #include <optional>
@@ -134,6 +141,24 @@ std::optional<double> derived_knot_rcut(const core::Context &ctx,
  *  Returns true if anything changed. */
 bool normalize_knot_rcut(core::Context &ctx, const std::string &who);
 
+/** \brief Support half-width w of a BUMP channel, from the pot Context alone:
+ *  bump k spans [c_k - w/eta_k, c_k + w/eta_k]. suffix is "2B" (TYPE2B
+ *  D2_Blip -> 2, D2_Blip5 -> 3) or "MB" (DM_REAM density, bcode 0 -> 2,
+ *  bcode 3 -> 3). std::nullopt for knot/Gaussian channels or when the channel
+ *  keys are absent/non-refit (malformed channels are not policed here). The
+ *  Context-level twin of `derived_knot_rcut` for the bump families. */
+std::optional<double> bump_channel_halfwidth(const core::Context &ctx,
+                                             const std::string &suffix);
+
+/** \brief True when the channel's cutoff function is a hard step
+ *  (Cut_Base::Kind::Discontinuous, i.e. Cut_Dummy). RCTYPE{suffix} absent
+ *  matches the D2_Base/DM_Base constructor default (Cut_Dummy) -> true; an
+ *  unknown cutoff name is conservatively treated as discontinuous. Gates the
+ *  bump-support-vs-RCUT hard errors: smooth cutoffs damp overhang to zero at
+ *  RCUT, so overhang there is legitimate. */
+bool channel_cutoff_is_discontinuous(const core::Context &ctx,
+                                     const std::string &suffix);
+
 struct AddSpec {
   double centre = 0.0;
   std::optional<double> eta;  ///< bump families only
@@ -151,8 +176,13 @@ struct AddReport {
  *  and extrapolation bit-identical until the coefficient is varied).
  *  `radial` selects the validation rules (centre > 0, rcut interplay).
  *  Throws on invalid spec (eta on knots, deg on bumps, bad centre, bump
- *  support entirely beyond rcut). */
-AddReport add_basis(CurveView &c, const AddSpec &s, bool radial);
+ *  support entirely beyond rcut). With `hard_cutoff` (the Cut_Dummy default;
+ *  callers with a pot Context pass `channel_cutoff_is_discontinuous`), a bump
+ *  support merely CROSSING rcut is also an error — the overhang would be
+ *  hard-truncated into an energy step at the cutoff; under a smooth cutoff it
+ *  is only warned about. */
+AddReport add_basis(CurveView &c, const AddSpec &s, bool radial,
+                    bool hard_cutoff = true);
 
 struct RemoveReport {
   std::size_t removed_idx = 0;

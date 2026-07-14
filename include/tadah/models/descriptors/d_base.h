@@ -11,6 +11,7 @@
 #include <tadah/models/cut_all.h>
 #include <tadah/models/descriptors/param_meta.h>
 #include <tadah/models/descriptors/basis_kind.h>
+#include <cmath>
 #include <vector>
 #include <bitset>
 
@@ -241,6 +242,56 @@ public:
           "discontinuous at the cutoff and RCUT cannot be optimised by HPO. "
           "Configure a smooth cutoff (RCTYPE2B/RCTYPEMB) to make it a lever.");
     }
+  }
+
+protected:
+  /** One-shot latch for warn_if_bump_support_beyond_rcut. */
+  bool warned_bump_rcut_ = false;
+
+  /** \brief Read-path counterpart of the authoring-time bump-support gate
+   *  (the bump analogue of D2_Knot5/DM_REAM::warn_if_knots_beyond_rcut):
+   *  warn ONCE when a bump basis function's support [c - w/eta, c + w/eta]
+   *  reaches past rcut under a discontinuous (Cut_Dummy) cutoff — the
+   *  overhang is hard-truncated there, i.e. an energy/force step whenever a
+   *  neighbour crosses the cutoff. Reading stays warn-only: legacy fitted
+   *  pots with spill exist and their truncation is part of the fitted model
+   *  (authoring surfaces — hpo preflight, refit, --edit — hard-error
+   *  instead). Smooth cutoffs damp the overhang to zero -> no-op. Call from
+   *  the ctor and reinit() of bump descriptors. */
+  void warn_if_bump_support_beyond_rcut(const std::string &who,
+                                        const std::string &ckey,
+                                        const std::string &rkey,
+                                        const tadah::core::v_type &cgrid,
+                                        const tadah::core::v_type &sgrid,
+                                        BasisKind kind) {
+    if (warned_bump_rcut_ || !fcut || cgrid.empty() ||
+        cgrid.size() != sgrid.size())
+      return;
+    if (fcut->kind() != Cut_Base::Kind::Discontinuous) return;
+    const double w = bump_halfwidth(kind);
+    if (w <= 0.0) return;
+    double reach = -1.0;
+    std::size_t worst = 0;
+    for (std::size_t k = 0; k < cgrid.size(); ++k) {
+      const double eta = std::fabs(sgrid[k]);
+      if (eta <= 0.0) continue;
+      const double r = cgrid[k] + w / eta;
+      if (r > reach) { reach = r; worst = k; }
+    }
+    const double rc = get_rcut();
+    if (reach <= rc + bump_rcut_tol(rc)) return;
+    warned_bump_rcut_ = true;
+    tadah::core::Logger::instance().log(
+        tadah::core::LogLevel::WARNING,
+        who + ": bump " + std::to_string(worst + 1) + " of " + ckey +
+        " (centre " + std::to_string(cgrid[worst]) + ", eta " +
+        std::to_string(sgrid[worst]) + ") has support reaching " +
+        std::to_string(reach) + ", past " + rkey + " = " +
+        std::to_string(rc) +
+        " — the overhang is hard-truncated at the cutoff (for an existing "
+        "fitted pot the truncation is part of the model; predictions are "
+        "unchanged). New fits/edits enforce centre + " + std::to_string(w) +
+        "/eta <= " + rkey + ".");
   }
 
 private:

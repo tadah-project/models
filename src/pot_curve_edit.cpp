@@ -7,7 +7,11 @@
 #include <sstream>
 #include <stdexcept>
 
+#include <memory>
+
 #include <tadah/core/logger.h>
+#include <tadah/core/registry.h>
+#include <tadah/models/cut_all.h>
 #include <tadah/models/descriptors/basis_dispatch.h>
 #include <tadah/models/descriptors/d_base.h>
 #include <tadah/models/descriptors/d2/d2_blip.h>
@@ -21,11 +25,7 @@ namespace potedit {
 
 namespace {
 
-// Support half-width of the bump families in the normalised coordinate
-// (Blip: (-2,2), Blip5: (-3,3)); knots are one-sided.
-double bump_halfwidth(BasisKind k) {
-  return k == BasisKind::Blip5 ? 3.0 : 2.0;
-}
+// (Bump support half-widths live in basis_kind.h: models::bump_halfwidth.)
 
 std::string fmt(double v) {
   std::ostringstream os;
@@ -447,11 +447,54 @@ bool normalize_knot_rcut(core::Context &ctx, const std::string &who) {
   return changed;
 }
 
+std::optional<double> bump_channel_halfwidth(const core::Context &ctx,
+                                             const std::string &suffix) {
+  try {
+    if (suffix == "2B") {
+      if (!ctx.contains("TYPE2B") || ctx.size("TYPE2B") == 0)
+        return std::nullopt;
+      const std::string n = ctx.get<std::string>("TYPE2B", 0);
+      if (n == "D2_Blip") return bump_halfwidth(BasisKind::Blip);
+      if (n == "D2_Blip5") return bump_halfwidth(BasisKind::Blip5);
+      return std::nullopt;
+    }
+    if (suffix == "MB") {
+      if (!ctx.contains("TYPEMB") || ctx.size("TYPEMB") == 0)
+        return std::nullopt;
+      if (ctx.get<std::string>("TYPEMB", 0) != "DM_REAM") return std::nullopt;
+      const double w =
+          bump_halfwidth(basis_kind_from_code(ctx.get<int>("TYPEMB", 1)));
+      if (w > 0.0) return w;
+      return std::nullopt;
+    }
+  } catch (const std::exception &) {
+    return std::nullopt;  // malformed channel: not ours to police here
+  }
+  throw std::invalid_argument(
+      "bump_channel_halfwidth: suffix must be 2B or MB");
+}
+
+bool channel_cutoff_is_discontinuous(const core::Context &ctx,
+                                     const std::string &suffix) {
+  const std::string key = "RCTYPE" + suffix;
+  try {
+    if (!ctx.contains(key) || ctx.size(key) == 0)
+      return true;  // D2_Base/DM_Base ctor default: Cut_Dummy
+    double probe_rcut = 1.0;  // kind() is rcut-independent
+    std::unique_ptr<Cut_Base> fc(core::factory<Cut_Base, double &>(
+        ctx.get<std::string>(key, 0), probe_rcut));
+    return !fc || fc->kind() == Cut_Base::Kind::Discontinuous;
+  } catch (const std::exception &) {
+    return true;  // unknown cutoff name: conservatively a hard step
+  }
+}
+
 // ---------------------------------------------------------------------------
 // ADD
 // ---------------------------------------------------------------------------
 
-AddReport add_basis(CurveView &c, const AddSpec &s, bool radial) {
+AddReport add_basis(CurveView &c, const AddSpec &s, bool radial,
+                    bool hard_cutoff) {
   AddReport rep;
   const bool knot = (c.family == BasisKind::Knot5);
   if (c.n() == 0)
@@ -500,11 +543,26 @@ AddReport add_basis(CurveView &c, const AddSpec &s, bool radial) {
             "] lies entirely beyond RCUT = " + fmt(c.rcut) +
             " — it could never contribute (RCUT is fixed for blip "
             "potentials: the hard cutoff is part of the fitted model).");
-      if (s.centre + w > c.rcut)
+      if (s.centre + w > c.rcut + bump_rcut_tol(c.rcut)) {
+        if (hard_cutoff) {
+          std::string hint =
+              s.centre < c.rcut
+                  ? "raise --eta to at least " +
+                        fmt(bump_halfwidth(c.family) / (c.rcut - s.centre)) +
+                        " or move the centre inward"
+                  : "move the centre below RCUT";
+          throw std::runtime_error(
+              "pot edit: the new basis function's support [" +
+              fmt(s.centre - w) + ", " + fmt(s.centre + w) +
+              "] crosses RCUT = " + fmt(c.rcut) +
+              " — under the hard Cut_Dummy cutoff the overhang would be "
+              "truncated into an energy step at the cutoff (RCUT is never "
+              "changed for blip potentials); " + hint + ".");
+        }
         rep.warnings.push_back(
             "the new basis function's support crosses RCUT = " + fmt(c.rcut) +
-            " and is truncated there (RCUT is never changed for blip "
-            "potentials).");
+            "; the smooth cutoff damps the overhang to zero there.");
+      }
     }
   } else if (radial) {
     const double mx = *std::max_element(c.mu.begin(), c.mu.end());

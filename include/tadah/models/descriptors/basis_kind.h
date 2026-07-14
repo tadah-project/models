@@ -48,21 +48,43 @@ struct BasisTraits {
   bool eta_is_gauge;
   /** Human-readable name (matches the canonical `tadah refit` REFIT_BASIS). */
   const char *name;
+  /** Support half-width of a symmetric BUMP basis function in units of 1/eta:
+   *  the support of bump k is [c_k - w/eta_k, c_k + w/eta_k] (w = 2 for the
+   *  cubic Blip, 3 for the quintic Blip5). 0 for non-bump shapes (Gaussian is
+   *  non-compact; Knot5 is one-sided — its rightmost extent is the knot
+   *  itself, see potedit::derived_knot_rcut). */
+  double bump_halfwidth;
 };
 
 /** \brief Compile-time trait lookup (no runtime cost). */
 constexpr BasisTraits basis_traits(BasisKind k) {
   switch (k) {
-    case BasisKind::Blip:     return {true,  false, "Blip"};
-    case BasisKind::Gaussian: return {false, false, "Gaussian"};
-    case BasisKind::Knot5:    return {true,  true,  "Knot5"};
-    case BasisKind::Blip5:    return {true,  false, "Blip5"};
+    case BasisKind::Blip:     return {true,  false, "Blip",     2.0};
+    case BasisKind::Gaussian: return {false, false, "Gaussian", 0.0};
+    case BasisKind::Knot5:    return {true,  true,  "Knot5",    0.0};
+    case BasisKind::Blip5:    return {true,  false, "Blip5",    3.0};
   }
-  return {true, false, "Blip"};  // unreachable (enum is exhaustive above)
+  return {true, false, "Blip", 2.0};  // unreachable (enum is exhaustive above)
 }
 
 inline int          basis_code(BasisKind k) { return static_cast<int>(k); }
 inline const char  *basis_name(BasisKind k) { return basis_traits(k).name; }
+constexpr double    bump_halfwidth(BasisKind k) {
+  return basis_traits(k).bump_halfwidth;
+}
+
+/** \brief Tolerance for comparing a bump's support reach against a hard
+ *  cutoff: `c + w/eta <= rcut + bump_rcut_tol(rcut)` passes.
+ *
+ * A support edge EXACTLY at rcut is fine (B/B5 vanish C^2/C^4-smoothly
+ * there); the tolerance only absorbs round-off. It is deliberately ~1e-6
+ * RELATIVE — no tighter — so bounds produced by the hpotarget emitter's
+ * decimal quantization (optim_bound_quantum, ~1e-6 relative) can sit exactly
+ * on the cap and still pass the `tadah hpo` startup gate. 5e-6 A of spill
+ * contributes O((eta*5e-6)^w) — physically nil. */
+inline double bump_rcut_tol(double rcut) {
+  return 1e-6 * (rcut > 1.0 ? rcut : 1.0);
+}
 
 /** \brief Map the FROZEN TYPExB integer `<basis>` code to a BasisKind.
  *

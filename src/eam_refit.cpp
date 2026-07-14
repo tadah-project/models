@@ -42,10 +42,19 @@ double EAMRefit::basisval(double x, double center, double width,
 
 void EAMRefit::make_grid(double lo, double hi, int n,
                          tadah::core::v_type &centers,
-                         tadah::core::v_type &widths) const {
+                         tadah::core::v_type &widths, bool radial) const {
   centers.assign(n, 0.0);
   widths.assign(n, 0.0);
-  double dx = (n > 1) ? (hi - lo) / (n - 1) : (hi - lo);
+  // Radial bump grids (Blip w=2, Blip5 w=3) against the hard rcut at `hi`:
+  // dx = (hi-lo)/(n-1+w) puts the outermost centre at hi - w*dx, so with
+  // eta = 1/dx its support ends EXACTLY at hi — the curve vanishes smoothly
+  // at the cutoff instead of leaving a truncated tail (the bump-support
+  // invariant `c + w/eta <= RCUT` that hpo/refit/edit enforce).
+  const double wb = bump_halfwidth(family_);
+  const bool cap = radial && wb > 0.0;
+  double dx = cap     ? (hi - lo) / (n - 1 + wb)
+            : (n > 1) ? (hi - lo) / (n - 1)
+                      : (hi - lo);
   if (dx <= 0.0) dx = (hi > 0.0 ? hi : 1.0);
   for (int k = 0; k < n; ++k) {
     centers[k] = lo + dx * k;
@@ -72,12 +81,13 @@ void EAMRefit::make_grid(double lo, double hi, int n,
 void EAMRefit::make_grid_windowed(double lo, double hi, int n,
                                   double win_lo, double win_hi,
                                   tadah::core::v_type &centers,
-                                  tadah::core::v_type &widths) const {
+                                  tadah::core::v_type &widths,
+                                  bool radial) const {
   win_lo = std::max(win_lo, lo);
   win_hi = std::min(win_hi, hi);
   const double span = hi - lo, wspan = win_hi - win_lo;
   if (n < 8 || wspan <= 0.0 || wspan >= 0.999 * span) {
-    make_grid(lo, hi, n, centers, widths);
+    make_grid(lo, hi, n, centers, widths, radial);
     return;
   }
   // tail blip count: proportional to tail length but capped so the window
@@ -97,10 +107,17 @@ void EAMRefit::make_grid_windowed(double lo, double hi, int n,
 
   centers.clear(); widths.clear();
   centers.reserve(n); widths.reserve(n);
-  auto add_uniform = [&](double a, double b, int m, bool incl_b) {
+  // cap_b: this segment's upper edge b IS the hard rcut — for radial bump
+  // grids use dx = (b-a)/(m-1+w) so the outermost support ends exactly at b
+  // (see make_grid).
+  const double wb = bump_halfwidth(family_);
+  const bool cap_bump = radial && wb > 0.0;
+  auto add_uniform = [&](double a, double b, int m, bool incl_b, bool cap_b) {
     if (m <= 0) return;
-    const double dx = (m > 1) ? (b - a) / (incl_b ? (m - 1) : m)
-                              : std::max(b - a, 1e-12);
+    double dx = (cap_b && cap_bump) ? (b - a) / (m - 1 + wb)
+              : (m > 1)             ? (b - a) / (incl_b ? (m - 1) : m)
+                                    : std::max(b - a, 1e-12);
+    if (dx <= 0.0) dx = std::max(b - a, 1e-12);
     for (int k = 0; k < m; ++k) {
       centers.push_back(a + dx * k);
       widths.push_back((family_ == BasisKind::Gaussian) ? 0.5 / (dx * dx)
@@ -108,11 +125,10 @@ void EAMRefit::make_grid_windowed(double lo, double hi, int n,
                                                      : 1.0 / dx);
     }
   };
-  add_uniform(lo, win_lo, n_lo, false);             // lower tail (excl. win_lo)
-  add_uniform(win_lo, win_hi, n_win, n_hi == 0);    // the window
+  add_uniform(lo, win_lo, n_lo, false, false);      // lower tail (excl. win_lo)
+  add_uniform(win_lo, win_hi, n_win, n_hi == 0, n_hi == 0);  // the window
   if (n_hi > 0) {
-    const double dx = (win_hi - win_lo) / std::max(n_win - 1, 1);
-    add_uniform(win_hi + 0.0 * dx, hi, n_hi, true); // upper tail
+    add_uniform(win_hi, hi, n_hi, true, true);      // upper tail (ends at rcut)
   }
 }
 
@@ -346,15 +362,15 @@ void EAMRefit::fit() {
 
   // ---- 1. pair phi(r) -> 2-body linear weights ----
   if (adaptive) make_grid_windowed(r_lo_, rcut_, cfg_.n2b, rwin_lo, rcut_,
-                                   cgrid2b_, sgrid2b_);
-  else          make_grid(r_lo_, rcut_, cfg_.n2b, cgrid2b_, sgrid2b_);
+                                   cgrid2b_, sgrid2b_, true);
+  else          make_grid(r_lo_, rcut_, cfg_.n2b, cgrid2b_, sgrid2b_, true);
   phi_stats_ = lsq_fit_windowed(xr, yphi, rwin_lo, rcut_, cgrid2b_, sgrid2b_,
                                 true, c2b_, false, 0.0, 0.0);
 
   // ---- 2. density rho(r) -> baked coefficients ----
   if (adaptive) make_grid_windowed(r_lo_, rcut_, cfg_.nrho, rwin_lo, rcut_,
-                                   crho_, srho_);
-  else          make_grid(r_lo_, rcut_, cfg_.nrho, crho_, srho_);
+                                   crho_, srho_, true);
+  else          make_grid(r_lo_, rcut_, cfg_.nrho, crho_, srho_, true);
   rho_stats_ = lsq_fit_windowed(xr, yrho, rwin_lo, rcut_, crho_, srho_,
                                 true, arho_, false, 0.0, 0.0);
 
@@ -370,8 +386,8 @@ void EAMRefit::fit() {
   const double rho_win_hi = (adaptive && rho_reach_ > 0.0) ? rho_reach_
                                                            : rhomax_;
   if (adaptive) make_grid_windowed(0.0, rhomax_, cfg_.nF, 0.0, rho_win_hi,
-                                   cF_, sF_);
-  else          make_grid(0.0, rhomax_, cfg_.nF, cF_, sF_);
+                                   cF_, sF_, false);   // F: no r cutoff
+  else          make_grid(0.0, rhomax_, cfg_.nF, cF_, sF_, false);
   // pin = the isolated-atom reference F(0) (the table's own value)
   F_stats_ = lsq_fit_windowed(xrho, yF, 0.0, rho_win_hi, cF_, sF_, false,
                               cmb_, cfg_.constrain_F0, 0.0, eam_.F_tab(0.0));

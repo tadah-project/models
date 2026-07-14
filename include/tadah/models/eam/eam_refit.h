@@ -142,15 +142,20 @@ private:
    *  symmetric Blip/Gaussian families. */
   double basisval(double x, double center, double width,
                   bool emb = false, int deg = 5) const;
+  /** `radial`: the grid feeds a radial channel whose upper edge `hi` is the
+   *  hard rcut — for the compact bump families the spacing switches to
+   *  dx = (hi-lo)/(n-1+w) so the OUTERMOST bump's support ends exactly at
+   *  `hi` (uniform-translate structure preserved; no truncated tail at the
+   *  cutoff). false for the embedding channel (no r cutoff). */
   void make_grid(double lo, double hi, int n,
                  tadah::core::v_type &centers,
-                 tadah::core::v_type &widths) const;
+                 tadah::core::v_type &widths, bool radial) const;
   /** Uniform sub-grid on the reachable window [win_lo,win_hi] (>= 2/3 of the
    *  basis) + small uniform allocations on the unreachable tail(s). */
   void make_grid_windowed(double lo, double hi, int n,
                           double win_lo, double win_hi,
                           tadah::core::v_type &centers,
-                          tadah::core::v_type &widths) const;
+                          tadah::core::v_type &widths, bool radial) const;
   FitStats lsq_fit(const std::vector<double> &xs,
                    const std::vector<double> &ys,
                    const std::vector<double> &wts,  // empty => unweighted

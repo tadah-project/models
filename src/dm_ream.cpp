@@ -83,6 +83,8 @@ DM_REAM::DM_REAM(const tadah::core::Context& ctx) : DM_Base(ctx) {
 
   init_for_atoms(get_init_atoms(ctx));
   warn_if_knots_beyond_rcut();
+  warn_if_bump_support_beyond_rcut("DM_REAM", "CGRIDMB", "RCUTMB", crho,
+                                   srho, basis);
 }
 
 void DM_REAM::warn_if_knots_beyond_rcut() {
@@ -375,6 +377,8 @@ bool DM_REAM::reinit(const tadah::core::Context& ctx) {
   rhoipsize = s;
   if (fcut) fcut->set_rcut(ctx.get<double>("RCUTMBMAX"));
   warn_if_knots_beyond_rcut();
+  warn_if_bump_support_beyond_rcut("DM_REAM", "CGRIDMB", "RCUTMB", crho,
+                                   srho, basis);
   return s != old_s;
 }
 

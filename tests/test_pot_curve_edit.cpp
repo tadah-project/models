@@ -233,11 +233,14 @@ TEST_CASE_METHOD(EditFixture,
     Channel ch;
     double centre;
   };
+  // Blip centres sit inward enough that the default eta keeps the new
+  // support inside RCUT (support crossing RCUT is an error since the
+  // bump-support gate).
   for (const Case &cs : {Case{"knot-phi", true, Channel::Phi, 3.6},
                          Case{"knot-rho", true, Channel::Rho, 3.9},
                          Case{"knot-F", true, Channel::F, 0.4},
-                         Case{"blip-phi", false, Channel::Phi, 3.6},
-                         Case{"blip-rho", false, Channel::Rho, 3.9},
+                         Case{"blip-phi", false, Channel::Phi, 3.3},
+                         Case{"blip-rho", false, Channel::Rho, 2.6},
                          Case{"blip-F", false, Channel::F, 1.4}}) {
     INFO("case=" << cs.tag);
     Context pot = cs.knot ? make_knot_pot() : make_blip_pot();
@@ -288,7 +291,7 @@ TEST_CASE_METHOD(EditFixture, "potedit: ADD bookkeeping and validation",
   }
   SECTION("blip eta defaults to the mean of the two nearest widths") {
     PotEAMView v = parse_pot_view(make_blip_pot());
-    AddReport rep = add_basis(v.phi, AddSpec{3.55, {}, {}}, true);
+    AddReport rep = add_basis(v.phi, AddSpec{3.2, {}, {}}, true);
     REQUIRE(rep.eta_used == Approx(0.5 * (1.0 + 1.4)));  // mu 3.0 and 4.2
     REQUIRE(v.phi.eta.back() == Approx(1.2));
   }
@@ -309,12 +312,24 @@ TEST_CASE_METHOD(EditFixture, "potedit: ADD bookkeeping and validation",
     REQUIRE_THROWS_WITH(add_basis(v.phi, AddSpec{6.5, 2.0, {}}, true),
                         Catch::Contains("entirely beyond"));
   }
-  SECTION("blip support crossing RCUT warns, RCUT unchanged") {
+  SECTION("blip support crossing RCUT errors under the hard cutoff") {
     PotEAMView v = parse_pot_view(make_blip_pot());
-    AddReport rep = add_basis(v.phi, AddSpec{4.8, 2.0, {}}, true);
+    REQUIRE_THROWS_WITH(add_basis(v.phi, AddSpec{4.8, 2.0, {}}, true),
+                        Catch::Contains("crosses RCUT"));
+  }
+  SECTION("blip support crossing RCUT warns under a smooth cutoff") {
+    PotEAMView v = parse_pot_view(make_blip_pot());
+    AddReport rep = add_basis(v.phi, AddSpec{4.8, 2.0, {}}, true,
+                              /*hard_cutoff=*/false);
     REQUIRE_FALSE(rep.warnings.empty());
     Context out = rebuild_pot_context(v);
-    REQUIRE(out.get<double>("RCUT2B") == 5.0);
+    REQUIRE(out.get<double>("RCUT2B") == 5.0);  // RCUT never auto-changed
+  }
+  SECTION("blip support ending exactly at RCUT passes silently") {
+    PotEAMView v = parse_pot_view(make_blip_pot());
+    // centre + w/eta = 4.0 + 2/2.0 = 5.0 == RCUT2B: C^2-smooth at the edge.
+    AddReport rep = add_basis(v.phi, AddSpec{4.0, 2.0, {}}, true);
+    REQUIRE(rep.warnings.empty());
   }
   SECTION("invalid specs throw") {
     PotEAMView vk = parse_pot_view(make_knot_pot());
@@ -327,6 +342,53 @@ TEST_CASE_METHOD(EditFixture, "potedit: ADD bookkeeping and validation",
     PotEAMView vb = parse_pot_view(make_blip_pot());
     REQUIRE_THROWS_WITH(add_basis(vb.phi, AddSpec{3.6, {}, 3}, true),
                         Catch::Contains("knot family"));
+  }
+}
+
+TEST_CASE_METHOD(EditFixture,
+                 "potedit: bump_channel_halfwidth and the cutoff-kind probe",
+                 "[potedit][rcut]") {
+  SECTION("half-width table") {
+    Context blip = make_blip_pot();  // D2_Blip + DM_REAM bcode 0
+    REQUIRE(bump_channel_halfwidth(blip, "2B") == 2.0);
+    REQUIRE(bump_channel_halfwidth(blip, "MB") == 2.0);
+
+    Context blip5 = make_blip_pot();
+    blip5.remove("TYPE2B");
+    blip5.add("TYPE2B", "D2_Blip5");
+    blip5.add("TYPE2B", 3);
+    blip5.add("TYPE2B", 3);
+    blip5.add("TYPE2B", "Cu");
+    blip5.add("TYPE2B", "Cu");
+    REQUIRE(bump_channel_halfwidth(blip5, "2B") == 3.0);
+
+    Context mb5 = make_blip_pot();
+    mb5.remove("TYPEMB");
+    mb5.add("TYPEMB", "DM_REAM");
+    mb5.add("TYPEMB", 3);  // bcode Blip5
+    for (int v : {2, 2, 2, 3, 3, 0, 0}) mb5.add("TYPEMB", v);
+    mb5.add("TYPEMB", "Cu");
+    mb5.add("TYPEMB", "Cu");
+    REQUIRE(bump_channel_halfwidth(mb5, "MB") == 3.0);
+
+    Context knot = make_knot_pot();  // D2_Knot5 + DM_REAM bcode 2
+    REQUIRE_FALSE(bump_channel_halfwidth(knot, "2B").has_value());
+    REQUIRE_FALSE(bump_channel_halfwidth(knot, "MB").has_value());
+    Context empty;
+    REQUIRE_FALSE(bump_channel_halfwidth(empty, "2B").has_value());
+  }
+  SECTION("cutoff-kind probe") {
+    Context blip = make_blip_pot();
+    REQUIRE(channel_cutoff_is_discontinuous(blip, "2B"));  // Cut_Dummy
+    Context foreign = make_foreign_mb_pot();
+    REQUIRE_FALSE(channel_cutoff_is_discontinuous(foreign, "MB"));  // Cut_Cos
+    Context absent = make_blip_pot();
+    absent.remove("RCTYPE2B");  // descriptor ctor default is Cut_Dummy
+    REQUIRE(channel_cutoff_is_discontinuous(absent, "2B"));
+    Context smooth = make_blip_pot();
+    smooth.remove("RCTYPE2B");
+    smooth.add("RCTYPE2B", "Cut_Poly");
+    REQUIRE_FALSE(channel_cutoff_is_discontinuous(smooth, "2B"));
   }
 }
 

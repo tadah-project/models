@@ -33,6 +33,8 @@ D2_Blip5::D2_Blip5(const tadah::core::Context &c): D2_Base(c)
 
   auto init_atoms = get_init_atoms(c);
   init_for_atoms(init_atoms);
+  warn_if_bump_support_beyond_rcut("D2_Blip5", "CGRID2B", "RCUT2B", cgrid,
+                                   sgrid, BasisKind::Blip5);
 }
 
 void D2_Blip5::calc_aed(
@@ -271,6 +273,8 @@ bool D2_Blip5::reinit(const tadah::core::Context& ctx) {
   get_grid(ctx, "SGRID2B", sgrid);
   s = cgrid.size();
   if (fcut) fcut->set_rcut(ctx.get<double>("RCUT2BMAX"));
+  warn_if_bump_support_beyond_rcut("D2_Blip5", "CGRID2B", "RCUT2B", cgrid,
+                                   sgrid, BasisKind::Blip5);
   return s != old_s;
 }
 
