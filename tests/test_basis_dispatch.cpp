@@ -67,6 +67,14 @@ TEST_CASE("radial_value/deriv identical to raw primitives", "[basis_dispatch]") 
   REQUIRE(radial_deriv(BasisKind::Gaussian, r, fc, fcp, s, c) == dG (r, s, c, fc, fcp));
   REQUIRE(radial_deriv(BasisKind::Knot5,    r, fc, fcp, s, c, 5) == dK5L(r - c, 1.0, fc, fcp));
   REQUIRE(radial_deriv(BasisKind::Knot5,    r, fc, fcp, s, c, 3) == dK3L(r - c, 1.0, fc, fcp));
+
+  for (BasisKind k : {BasisKind::Blip, BasisKind::Blip5,
+                      BasisKind::Knot5, BasisKind::Gaussian}) {
+    double value = 0.0, deriv = 0.0;
+    radial_value_deriv(k, r, fc, fcp, s, c, value, deriv);
+    REQUIRE(value == radial_value(k, r, fc, s, c));
+    REQUIRE(deriv == radial_deriv(k, r, fc, fcp, s, c));
+  }
 }
 
 TEST_CASE("embedding_value/deriv identical to raw primitives (RIGHT knots, no cutoff)",
@@ -84,6 +92,14 @@ TEST_CASE("embedding_value/deriv identical to raw primitives (RIGHT knots, no cu
   REQUIRE(embedding_deriv(BasisKind::Gaussian, rho, s, c) == dG (rho, s, c));
   REQUIRE(embedding_deriv(BasisKind::Knot5,    rho, s, c, 5) == dK5R(rho - c, 1.0));
   REQUIRE(embedding_deriv(BasisKind::Knot5,    rho, s, c, 3) == dK3R(rho - c, 1.0));
+
+  for (BasisKind k : {BasisKind::Blip, BasisKind::Blip5,
+                      BasisKind::Knot5, BasisKind::Gaussian}) {
+    double value = 0.0, deriv = 0.0;
+    embedding_value_deriv(k, rho, s, c, value, deriv);
+    REQUIRE(value == embedding_value(k, rho, s, c));
+    REQUIRE(deriv == embedding_deriv(k, rho, s, c));
+  }
 }
 
 TEST_CASE("bare radial matches the legacy models::B/G function-pointer shape",

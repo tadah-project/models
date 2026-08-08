@@ -67,6 +67,23 @@ inline double radial_deriv(BasisKind k, double r, double fc, double fcp,
   basis_detail::unknown_basis(k);
 }
 
+/** Evaluate a cutoff-weighted radial basis and its derivative together.
+ * The measured Blip5 path shares support tests; the other families retain
+ * their original expressions exactly. */
+inline void radial_value_deriv(BasisKind k, double r, double fc, double fcp,
+                               double s, double c,
+                               double &value, double &deriv, int deg = 5) {
+  if (k == BasisKind::Blip5) {
+    double bare_value, bare_deriv;
+    B5_value_deriv(s * (r - c), s, bare_value, bare_deriv);
+    value = bare_value * fc;
+    deriv = fc * bare_deriv + fcp * bare_value;
+    return;
+  }
+  value = radial_value(k, r, fc, s, c, deg);
+  deriv = radial_deriv(k, r, fc, fcp, s, c, deg);
+}
+
 // --------------------------------------------------------------------------
 //  Embedding basis  g_m(rho)   (RIGHT-active knots, NO cutoff)
 // --------------------------------------------------------------------------
@@ -94,6 +111,20 @@ inline double embedding_deriv(BasisKind k, double rho,
     case BasisKind::Gaussian: return dG (rho, s, c);
   }
   basis_detail::unknown_basis(k);
+}
+
+/** Evaluate an embedding basis and its derivative together.
+ * The measured Blip5 path shares support tests; the other families retain
+ * their original expressions exactly. */
+inline void embedding_value_deriv(BasisKind k, double rho,
+                                  double s, double c,
+                                  double &value, double &deriv, int deg = 5) {
+  if (k == BasisKind::Blip5) {
+    B5_value_deriv(s * (rho - c), s, value, deriv);
+    return;
+  }
+  value = embedding_value(k, rho, s, c, deg);
+  deriv = embedding_deriv(k, rho, s, c, deg);
 }
 
 /** \brief g''_m(rho) w.r.t. rho for the given basis (embedding, no cutoff).

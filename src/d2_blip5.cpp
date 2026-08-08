@@ -85,8 +85,10 @@ void D2_Blip5::calc_all(
   double fc_ij = fcut->calc(rij);
   double fcp_ij = fcut->calc_prime(rij);
   for (size_t c=0; c<cgrid.size(); c++) {
-    aed(i) += scale*weights[Zi][Zj]*B5(sgrid[c]*(rij-cgrid[c]),fc_ij);
-    fd_ij(i,0) = scale*weights[Zi][Zj]*dB5(sgrid[c]*(rij-cgrid[c]),sgrid[c],fc_ij,fcp_ij);
+    double b, db;
+    B5_value_deriv(sgrid[c]*(rij-cgrid[c]), sgrid[c], b, db);
+    aed(i) += scale*weights[Zi][Zj]*(b*fc_ij);
+    fd_ij(i,0) = scale*weights[Zi][Zj]*(fc_ij*db + fcp_ij*b);
     ++i;
   }
 }

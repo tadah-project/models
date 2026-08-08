@@ -234,9 +234,19 @@ void DM_REAM::eam_density(const int Zi, const int Zj, const double rij,
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
   const double fc  = fcut->calc(rij);
   const double fcp = fcut->calc_prime(rij);
+  double rho_raw_both = 0.0;
+  double rhop_raw = 0.0;
+  for (std::size_t n = 0; n < crho.size(); ++n) {
+    const double s = (n < srho.size()) ? srho[n] : 1.0;
+    double psi_value, psi_deriv;
+    radial_value_deriv(basis, rij, fc, fcp, s, crho[n],
+                       psi_value, psi_deriv, rho_deg(n));
+    rho_raw_both += arho[n] * psi_value;
+    rhop_raw += arho[n] * psi_deriv;
+  }
   const double w   = weights[Zi][Zj];
-  rho  = w * rho_raw(rij, fc);
-  rhop = w * rho_raw_deriv(rij, fc, fcp);
+  rho  = w * rho_raw_both;
+  rhop = w * rhop_raw;
 }
 
 void DM_REAM::eam_embed(const tadah::core::t_type &w_full, const double rho_bar,
@@ -245,8 +255,12 @@ void DM_REAM::eam_embed(const tadah::core::t_type &w_full, const double rho_bar,
   const std::size_t M = cemb.size();
   for (std::size_t m = 0; m < M; ++m) {
     const double w = w_full(fidx + m);
-    F  += w * gemb(m, rho_bar);
-    Fp += w * dgemb(m, rho_bar);
+    const double s = (m < semb.size()) ? semb[m] : 1.0;
+    double emb_value, emb_deriv;
+    embedding_value_deriv(basis, rho_bar, s, cemb[m],
+                          emb_value, emb_deriv, emb_deg(m));
+    F  += w * emb_value;
+    Fp += w * emb_deriv;
   }
 }
 

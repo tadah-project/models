@@ -350,6 +350,37 @@ inline double dB5(double x_c, double eta, double f, double fp) {
   return f * dB5(x_c, eta) + fp * B5(x_c);
 }
 
+/** Evaluate B5 and its radial derivative together.
+ *
+ * Algebraically identical to separate B5(x_c) and dB5(x_c, eta) calls,
+ * while sharing the support tests and polynomial powers. */
+inline void B5_value_deriv(double x_c, double eta,
+                           double& value, double& deriv) {
+  const double a = std::fabs(x_c);
+  if (a >= 3.0) {
+    value = 0.0;
+    deriv = 0.0;
+    return;
+  }
+  const double s = (x_c >= 0.0) ? 1.0 : -1.0;
+
+  const double t3 = 3.0 - a;
+  double acc_v = t3 * t3 * t3 * t3 * t3;
+  double acc_d = t3 * t3 * t3 * t3;
+  if (a < 2.0) {
+    const double t2 = 2.0 - a;
+    acc_v -= 6.0 * t2 * t2 * t2 * t2 * t2;
+    acc_d -= 6.0 * t2 * t2 * t2 * t2;
+  }
+  if (a < 1.0) {
+    const double t1 = 1.0 - a;
+    acc_v += 15.0 * t1 * t1 * t1 * t1 * t1;
+    acc_d += 15.0 * t1 * t1 * t1 * t1;
+  }
+  value = acc_v / 66.0;
+  deriv = -5.0 * eta * s * acc_d / 66.0;
+}
+
 /** \brief Bare second derivative \f$ d^2 B_5 / dx_c^2 \f$ (continuous,
  *  piecewise cubic — the C^4 family). */
 inline double d2B5(double x_c) {

@@ -79,6 +79,15 @@ TEST_CASE_METHOD(Blip5Fixture, "B5 primitives: peak, FD parity, C4 knots",
   REQUIRE(B5(1.3) == Approx(B5(-1.3)));
   REQUIRE(d2B5(0.0) == Approx(-20.0 / 11.0));  // survey closed form
 
+  // Fused value/derivative helper is exactly the two original primitives.
+  for (double x : {-3.0, -2.7, -2.0, -1.5, -1.0, -0.4, 0.0,
+                    0.6, 1.0, 1.2, 2.0, 2.3, 3.0}) {
+    double value = 0.0, deriv = 0.0;
+    B5_value_deriv(x, 1.7, value, deriv);
+    REQUIRE(value == B5(x));
+    REQUIRE(deriv == dB5(x, 1.7));
+  }
+
   // derivative convention: dB5(x_c, eta) == eta * d/dx_c B5
   const double h = 1e-6;
   for (double x : {-2.7, -1.5, -0.4, 0.0, 0.6, 1.2, 2.3}) {
@@ -135,6 +144,18 @@ TEST_CASE_METHOD(Blip5Fixture, "D2_Blip5: factory + value + force FD",
   d.calc_aed(1, 1, rij - h, (rij - h) * (rij - h), am);
   for (std::size_t k = 0; k < cgrid.size(); ++k)
     REQUIRE(fd(k, 0) == Approx((ap(k) - am(k)) / (2 * h)).margin(1e-6));
+
+  // The combined path used by collapse-table construction matches the
+  // separate descriptor calls exactly, including accumulation semantics.
+  aed_type both_aed(d.size());
+  fd_type both_fd(d.size());
+  both_aed.set_zero();
+  both_fd.set_zero();
+  d.calc_all(1, 1, rij, rij * rij, both_aed, both_fd);
+  for (std::size_t k = 0; k < cgrid.size(); ++k) {
+    REQUIRE(both_aed(k) == aed(k));
+    REQUIRE(both_fd(k, 0) == fd(k, 0));
+  }
 }
 
 TEST_CASE_METHOD(Blip5Fixture, "DM_REAM Blip5 (bcode 3): symmetric channels",
