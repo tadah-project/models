@@ -1,7 +1,7 @@
 [![pipeline](https://git.ecdf.ed.ac.uk/tadah/models/badges/develop/pipeline.svg)](https://git.ecdf.ed.ac.uk/tadah/models/-/commits/develop)
 [![coverage](https://git.ecdf.ed.ac.uk/tadah/models/badges/develop/coverage.svg)](https://git.ecdf.ed.ac.uk/tadah/models/-/commits/develop)
 [![license](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
-[![version](https://img.shields.io/badge/version-1.3.0--beta.1-blue.svg)](https://git.ecdf.ed.ac.uk/tadah/models/-/tags)
+[![version](https://img.shields.io/badge/version-1.5.1-blue.svg)](https://git.ecdf.ed.ac.uk/tadah/models/-/tags)
 
 # MODELS
 

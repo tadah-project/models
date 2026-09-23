@@ -78,16 +78,6 @@ endif()
 # cmake-tools/TadahTesting.cmake.
 tadah_declare_testing()
 
-# Single-source-of-truth version (from CORE's blueprint TOML).
-# Falls back to 0.0.0 when CORE isn't reachable or cmake-tools is old.
-if(COMMAND tadah_read_version_from_blueprint)
-  tadah_read_version_from_blueprint(TADAH_VERSION)
-else()
-  set(TADAH_VERSION "0.0.0")
-endif()
-project(Tadah.MODELS VERSION ${TADAH_VERSION} LANGUAGES CXX)
-message(STATUS "Tadah.MODELS version: ${TADAH_VERSION}")
-
 option(TADAH_ENABLE_ASAN "Enable AddressSanitizer (-fsanitize=address -fno-omit-frame-pointer)" OFF)
 
 # (option) Developer builds -DTADAH_DEVELOP=ON
@@ -104,6 +94,16 @@ FetchContent_Declare(
     GIT_TAG ${TADAH_GIT_BRANCH}
 )
 FetchContent_MakeAvailable(Tadah.CORE)
+
+# Single-source-of-truth version (from CORE's blueprint TOML). Read after
+# the Tadah dependencies are available so CORE's blueprint is found in
+# every layout (sibling checkout or FetchContent); then re-state project().
+if(NOT COMMAND tadah_read_version_from_blueprint)
+  message(FATAL_ERROR "cmake-tools is too old: tadah_read_version_from_blueprint() is missing")
+endif()
+tadah_read_version_from_blueprint(TADAH_VERSION REQUIRED)
+project(Tadah.MODELS VERSION ${TADAH_VERSION} LANGUAGES CXX)
+message(STATUS "Tadah.MODELS version: ${TADAH_VERSION}")
 
 file(GLOB MODELS_SRC CONFIGURE_DEPENDS "src/*.cpp")
 add_library(tadah.models ${MODELS_SRC})
