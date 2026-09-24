@@ -16,6 +16,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Performance
 - Blip5 value and derivative are evaluated in one fused pass.
 
+### Removed
+- The static `D_Base::get_init_atoms(const Context &, std::string)`. Nothing called it, and it left one parameter among the element tokens and did not check the line's length. Descriptors use `D2_Base::get_init_atoms` and `DM_Base::get_init_atoms`.
+
+### Fixed
+- A `TYPE2B` or `TYPEMB` line without the parameters its descriptor takes is now an error that names the line. The key's format does not know how many parameters a descriptor takes, so two kinds of line reached the descriptor:
+  - a line with fewer tokens than parameters, such as `TYPE2B D2_Blip` (the form of potential files written before descriptors named their parameters), crashed the descriptor's constructor with a vector erase past its end. It now fails with `TYPE2B D2_Blip takes 2 parameters before its element pairs; the line has 0: TYPE2B D2_Blip`;
+  - a line with element pairs where the grid sizes belong, such as `TYPE2B D2_Blip * *` or `TYPEMB DM_Blip 1 N N`, was read as parameters followed by no element pair, so the descriptor applied to no pair of elements and a potential predicted wrong energies without an error. It now fails with `TYPE2B D2_Blip takes 2 parameters before its element pairs; parameter 1, the number of CGRID2B values, must be a non-negative integer, not "*": TYPE2B D2_Blip * *`.
+
+  The check is `D_Base::element_tokens`, used by `D2_Base` and `DM_Base`: the line must have every parameter, and each size parameter (one per list key of the descriptor, the tokens `D_mJoin` reads as sizes) must be a non-negative integer. The descriptors read and convert their other parameters themselves. Test: `test_descriptor_type_line.cpp`.
+
 ## [1.4.0] — 2026-07-14
 
 ### Added
