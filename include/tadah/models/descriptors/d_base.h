@@ -61,7 +61,8 @@ public:
   // with nparams = fparam + keys.size() + data_keys.size() and
   // get_arg_pos(key) = index-in-keys + fparam. A size token of 0 means the
   // pot carries no entries (and no key) for that channel — e.g. the knot
-  // families' width channels, where eta is a pure gauge.
+  // families' width channels, where eta is a pure gauge. SIZE tokens are
+  // non-negative integers; element_tokens() checks them.
   std::vector<std::string> keys;       // optimizable list parameters
   std::vector<std::string> data_keys;  // split-only list data (no OPTIM)
   size_t nparams;  // number of params which follow TYPExB
@@ -180,8 +181,31 @@ public:
   virtual void init_for_atoms(int Zi, int Zj);
   virtual void init_for_atoms(const std::vector<std::string> &Zs);
   virtual void uninit_for_atoms(int Zi, int Zj);
-  static std::vector<std::string> get_init_atoms(const tadah::core::Context &c, std::string type);
   virtual std::vector<std::string> get_init_atoms(const tadah::core::Context &c)=0;
+
+  /** \brief Element tokens of this descriptor's TYPE2B/TYPEMB line.
+   *
+   * `line` is the whole line in the layout of the key contract above: the
+   * descriptor name, its `nparams` parameters, then the element pairs,
+   * which are returned. The key's format does not know how many
+   * parameters a descriptor takes (TYPE2B accepts a bare name, and both
+   * keys accept element pairs after too few numbers), so the line is
+   * checked here: it must have `nparams` parameters, and each SIZE token
+   * (one per `keys` and `data_keys` entry) must be a non-negative integer.
+   * Otherwise an element pair standing where a SIZE token belongs would be
+   * read as parameters, and the descriptor would apply to no element pair.
+   * The family parameters before the SIZE tokens are read and converted
+   * by the descriptor itself.
+   *
+   * \throws std::runtime_error naming `key`, the descriptor and the line
+   *         if the line has fewer than `nparams` parameters, or naming the
+   *         parameter and its token if a SIZE token is not a non-negative
+   *         integer.
+   * \throws std::logic_error if the descriptor declares more `keys` and
+   *         `data_keys` than `nparams`.
+   */
+  std::vector<std::string> element_tokens(const std::string &key,
+                                          std::vector<std::string> line) const;
 
   /** \brief Per-descriptor parameter metadata for the HPO bound-validation
    *  pipeline (audit, suggester, per-iter health monitor).

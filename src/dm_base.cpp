@@ -1,4 +1,5 @@
 #include <tadah/models/descriptors/dm/dm_base.h>
+#include <utility>
 namespace tadah {
 namespace models {
 
@@ -15,8 +16,7 @@ std::vector<std::string> DM_Base::get_init_atoms(const tadah::core::Context &c) 
   }
   std::vector<std::string> init_atoms(c.size("TYPEMB"));
   c.get("TYPEMB", init_atoms);
-  init_atoms.erase(init_atoms.begin(), init_atoms.begin() + nparams + 1);
-  return init_atoms;
+  return element_tokens("TYPEMB", std::move(init_atoms));
 }
 
 } // namespace models

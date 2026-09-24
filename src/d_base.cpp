@@ -2,6 +2,8 @@
 #include "tadah/core/utils.h"
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
+#include <stdexcept>
 #include <string>
 #include <tadah/models/descriptors/d_base.h>
 #include <utility>
@@ -216,13 +218,46 @@ void D_Base::init_for_atoms(const std::vector<std::string> &Zs) {
     }
   }
 }
-std::vector<std::string> D_Base::get_init_atoms(const tadah::core::Context &c, std::string type) {
-  std::vector<std::string> init_atoms(c.size(type));
-  c.get(type, init_atoms);
-  std::unique_ptr<D_Base> d(tadah::core::factory<D_Base>(init_atoms[0]));
-  size_t nparams = d->nparams;
-  init_atoms.erase(init_atoms.begin(), init_atoms.begin() + nparams);
-  return init_atoms;
+std::vector<std::string> D_Base::element_tokens(const std::string &key,
+                                                std::vector<std::string> line) const {
+  const size_t nsizes = keys.size() + data_keys.size();
+  const std::string name =
+      line.empty() ? std::string("<no descriptor>") : line[0];
+  if (nsizes > nparams) {
+    throw std::logic_error(name + " declares " + std::to_string(nsizes) +
+                           " list keys but takes " + std::to_string(nparams) +
+                           " parameters");
+  }
+  std::string text = key;
+  for (const auto &t : line) text += " " + t;
+  const std::string takes =
+      key + " " + name + " takes " + std::to_string(nparams) +
+      (nparams == 1 ? " parameter" : " parameters") +
+      " before its element pairs; ";
+
+  const size_t have = line.empty() ? 0 : line.size() - 1;
+  if (have < nparams) {
+    throw std::runtime_error(takes + "the line has " + std::to_string(have) +
+                             ": " + text);
+  }
+
+  // SIZE tokens: line[1 + fparam + k] is the size of the k-th list key.
+  const size_t fparam = nparams - nsizes;
+  for (size_t k = 0; k < nsizes; ++k) {
+    const std::string &token = line[1 + fparam + k];
+    if (tadah::core::is_integer(token)) continue;
+    const std::string &list_key =
+        k < keys.size() ? keys[k] : data_keys[k - keys.size()];
+    throw std::runtime_error(takes + "parameter " +
+                             std::to_string(fparam + k + 1) +
+                             ", the number of " + list_key +
+                             " values, must be a non-negative integer, not \"" +
+                             token + "\": " + text);
+  }
+
+  line.erase(line.begin(),
+             line.begin() + static_cast<std::ptrdiff_t>(nparams + 1));
+  return line;
 }
 
 } // namespace models
