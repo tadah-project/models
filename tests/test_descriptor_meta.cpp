@@ -4,8 +4,9 @@
 //   * D2_Blip::meta() returns a DescriptorMeta with the expected
 //     parameter set, suggester output, and column counter
 //   * DM_Blip::meta() likewise + cross-param size check
-//   * DM_mEAD<F_mEnv<Cut_SinInv>>::meta() (i.e. DM_mBlipEnv) flags the
-//     BASINS-style ρ-collapse failure
+//   * DM_mEAD<F_mEnv<Cut_SinInv>>::meta() (i.e. DM_mBlipEnv) flags a
+//     collapsed ρ: a radial GTO centre (CGRIDMB) outside the data's
+//     neighbour distances makes every atom's density vanish
 
 #include "catch2/catch.hpp"
 
@@ -29,7 +30,7 @@ using tadah::core::stats::PerPairStats;
 
 // ----------------------------------------------------------------------
 // Helper: build a synthetic DataStats with a single Ta-Ta pair whose
-// r_ij percentiles bracket the bcc Ta values from BASINS_BETA.
+// r_ij percentiles bracket typical bcc Ta neighbour distances.
 // ----------------------------------------------------------------------
 static DataStats make_ta_like_stats() {
   DataStats d;
@@ -173,7 +174,8 @@ TEST_CASE("DM_Blip::meta returns expected_columns scaling with TYPEMB Lmax") {
   REQUIRE(m->expected_columns(sv) == 7);
 }
 
-TEST_CASE("DM_mBlipEnv::meta has the BASINS ρ-collapse cross-param check") {
+TEST_CASE("DM_mBlipEnv::meta: CGRIDMB is critical and the cross-param check "
+          "fails a collapsed ρ") {
   // The descriptor type is DM_mEAD<F_mEnv<Cut_SinInv>>. We exercise it
   // via meta() through a DM_mEAD<F_mEnv<Cut_SinInv>> instance directly.
   DM_mEAD<F_mEnv<Cut_SinInv>> d;
@@ -182,7 +184,8 @@ TEST_CASE("DM_mBlipEnv::meta has the BASINS ρ-collapse cross-param check") {
   REQUIRE(m->label == "DM_mBlipEnv");
   REQUIRE(m->params.size() == 6);     // RCUTMB, CGRIDMB, SGRIDMB, RCUTENV, CEMBFUNC, SEMBFUNC
 
-  // CGRIDMB should be Critical (drives the BASINS warning).
+  // CGRIDMB is Critical: the pre-flight audit warns when it is left out
+  // of the OPTIM search.
   auto cgridmb = std::find_if(m->params.begin(), m->params.end(),
       [](const ParamMeta& p){ return p.key == "CGRIDMB"; });
   REQUIRE(cgridmb != m->params.end());
@@ -211,7 +214,8 @@ TEST_CASE("DM_mBlipEnv per-param check rejects out-of-range CGRIDMB") {
   REQUIRE(cgridmb != m->params.end());
   REQUIRE(static_cast<bool>(cgridmb->check));
 
-  // Empty context with CGRIDMB = 0.0 (the BASINS value) — outside r_min=1.61
+  // Empty context with CGRIDMB = 0.0, a centre outside the data's r_ij
+  // support (r_min=1.61)
   Context ctx;
   ctx.add<double>("CGRIDMB", 0.0);
   SeedView sv(ctx);
