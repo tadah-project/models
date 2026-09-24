@@ -8,9 +8,9 @@ namespace models {
 // Specialisation of DM_mEAD<F>::meta() for the F_mEnv<Cut_SinInv>
 // instantiation registered as "DM_mBlipEnv".
 //
-// This is the BASINS culprit — the descriptor whose silent
-// zero-block failure motivated the entire merry-peacock plan. The
-// metadata captures every parameter that the descriptor reads from
+// This descriptor fails silently when its radial GTO centre lies outside
+// the data's neighbour distances: every density ρ collapses to zero and
+// its design-matrix block is empty. The metadata captures every parameter that the descriptor reads from
 // Context, with bound suggesters anchored to dataset percentiles and
 // KDE peaks, and a cross-parameter ρ-collapse health check.
 // ----------------------------------------------------------------------
@@ -50,7 +50,7 @@ DM_mEAD<F_mEnv<Cut_SinInv>>::meta() const {
   };
   dm.params.push_back(std::move(p_rcut));
 
-  // CGRIDMB — radial GTO centre. THE parameter that triggered BASINS.
+  // CGRIDMB — radial GTO centre; a bad fixed value collapses ρ.
   ParamMeta p_cgrid;
   p_cgrid.key      = "CGRIDMB";
   p_cgrid.arg_pos  = -1;            // DM_mBlipEnv requires cgrid size 1
@@ -184,7 +184,7 @@ DM_mEAD<F_mEnv<Cut_SinInv>>::meta() const {
   };
   dm.params.push_back(std::move(p_semb));
 
-  // ----- Cross-parameter ρ-collapse check (the BASINS test) -----
+  // ----- Cross-parameter ρ-collapse check -----
   dm.cross_param_checks.push_back(
     [self](const DataStats& d, const SeedView&) -> HealthVerdict {
       auto it = d.rho_percentiles_per_descriptor.find(self);

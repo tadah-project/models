@@ -53,8 +53,10 @@ struct HardLimit {
 };
 
 /** \brief Whether a parameter must be optimised.
- *  - Critical: BASINS-style "if this is fixed, the descriptor dies"
- *    (used by Phase 5 to warn when no OPTIM block is present).
+ *  - Critical: a fixed value that misses the data can make the
+ *    descriptor vanish (e.g. a CGRIDMB centre outside the neighbour
+ *    distances collapses ρ); used by Phase 5 to warn when no OPTIM
+ *    block is present.
  *  - Recommended: optimisation usually helps; not strictly necessary.
  *  - Optional: routine to fix.
  */

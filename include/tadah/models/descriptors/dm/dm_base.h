@@ -10,8 +10,9 @@ namespace models {
 
 /** Compact key enum for DM-arm θ-derivative dispatch. The walker decodes
  *  the OPTIM theta_name once per outer call, then the per-pair kernels
- *  branch on a 1-byte enum compare instead of std::string ==. Saves the
- *  O(220M) byte-compare ladder per gradient on BASINSv2_blip6. */
+ *  branch on a 1-byte enum compare instead of std::string ==. Saves an
+ *  O(220M) byte-compare ladder per gradient on a six-function DM_Blip
+ *  search. */
 enum class DMThetaKey : std::uint8_t {
   None     = 0,
   CGRIDMB  = 1,

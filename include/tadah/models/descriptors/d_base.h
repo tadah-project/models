@@ -189,9 +189,10 @@ public:
    *  Default `std::nullopt` means "no metadata supplied" — the audit
    *  treats the descriptor as opaque (skips block-level health checks
    *  that depend on metadata). Concrete descriptors override this
-   *  method to declare their parameter physics. See the merry-peacock
-   *  plan §"Examples — what `meta()` actually looks like" for canonical
-   *  shapes (D2_LJ scalar, D2_Blip vector, DM_mBlipEnv full).
+   *  method to declare their parameter physics. Canonical shapes:
+   *  D2_LJ::meta() (scalar parameters, d2_lj.cpp), D2_Blip::meta() (grid
+   *  vectors, d2_blip.cpp) and the DM_mBlipEnv specialisation in
+   *  dm_all.cpp (every parameter plus a cross-parameter health check).
    */
   virtual std::optional<DescriptorMeta> meta() const {
     return std::nullopt;

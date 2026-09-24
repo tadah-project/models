@@ -611,7 +611,7 @@ bool DM_EAD::reinit(const tadah::core::Context& ctx) {
 
 // ----------------------------------------------------------------
 // meta() — DM_EAD shares the (RCUTMB, CGRIDMB, SGRIDMB) parameter
-// shape with the BASINS-fix DM_mBlipEnv: per-pair radial GTO with
+// shape with DM_mBlipEnv: per-pair radial GTO with
 // centre/width vectors. The ρ-collapse cross-param check applies to
 // the same per-descriptor key (`DM_EAD`) — the suggester anchors all
 // numbers to the dataset's r_ij percentiles.
