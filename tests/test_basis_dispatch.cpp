@@ -1,5 +1,7 @@
 #include "catch2/catch.hpp"
 
+#include <cstdint>
+#include <cstring>
 #include <memory>
 #include <string>
 
@@ -100,6 +102,47 @@ TEST_CASE("embedding_value/deriv identical to raw primitives (RIGHT knots, no cu
     REQUIRE(value == embedding_value(k, rho, s, c));
     REQUIRE(deriv == embedding_deriv(k, rho, s, c));
   }
+}
+
+TEST_CASE("embedding_value == fused value at rho = 0, bitwise (EMBF0 g(0))",
+          "[basis_dispatch][embf0]") {
+  // DM_REAM's EMBF0 ZERO reference g_m(0) is evaluated with embedding_value
+  // (calc_aed) and with embedding_value_deriv (eam_embed): the two must agree
+  // bitwise at rho = 0 so both paths subtract the same reference. Covers the
+  // support edges and the RIGHT-active knots with mu < 0 (the only knots
+  // with g(0) != 0).
+  auto bits = [](double v) {
+    std::uint64_t u;
+    std::memcpy(&u, &v, sizeof u);
+    return u;
+  };
+  struct Case { BasisKind k; double s, c; int deg; };
+  const Case cases[] = {
+      {BasisKind::Blip, 0.9, 0.0, 5},     {BasisKind::Blip, 1.3, -0.7, 5},
+      {BasisKind::Blip, 1.3, 0.7, 5},     {BasisKind::Blip, 2.0, 1.0, 5},
+      {BasisKind::Blip, 2.0, -0.6, 5},    {BasisKind::Blip5, 0.9, 0.0, 5},
+      {BasisKind::Blip5, 1.5, -1.1, 5},   {BasisKind::Blip5, 1.5, 1.9, 5},
+      {BasisKind::Blip5, 2.0, 1.5, 5},    {BasisKind::Blip5, 0.5, -5.0, 5},
+      {BasisKind::Gaussian, 0.9, 0.0, 5}, {BasisKind::Gaussian, 2.5, -0.8, 5},
+      {BasisKind::Gaussian, 40.0, 0.3, 5},
+      {BasisKind::Knot5, 1.0, -0.8, 5},   {BasisKind::Knot5, 1.0, -0.8, 3},
+      {BasisKind::Knot5, 1.0, -2.3, 5},   {BasisKind::Knot5, 1.0, -2.3, 3},
+      {BasisKind::Knot5, 1.0, 0.0, 5},    {BasisKind::Knot5, 1.0, 0.0, 3},
+      {BasisKind::Knot5, 1.0, 0.4, 5},    {BasisKind::Knot5, 1.0, 0.4, 3},
+  };
+  for (const Case &cs : cases) {
+    INFO(basis_name(cs.k) << " s=" << cs.s << " c=" << cs.c << " deg=" << cs.deg);
+    double value = 0.0, deriv = 0.0;
+    embedding_value_deriv(cs.k, 0.0, cs.s, cs.c, value, deriv, cs.deg);
+    REQUIRE(bits(value) == bits(embedding_value(cs.k, 0.0, cs.s, cs.c, cs.deg)));
+    REQUIRE(bits(deriv) == bits(embedding_deriv(cs.k, 0.0, cs.s, cs.c, cs.deg)));
+  }
+  // g(0) != 0 exactly for the knots with mu < 0 and zero for mu >= 0
+  REQUIRE(embedding_value(BasisKind::Knot5, 0.0, 1.0, -0.8, 5) == K5R(0.8));
+  REQUIRE(embedding_value(BasisKind::Knot5, 0.0, 1.0, -0.8, 3) == K3R(0.8));
+  REQUIRE(embedding_value(BasisKind::Knot5, 0.0, 1.0, -0.8, 5) > 0.0);
+  REQUIRE(embedding_value(BasisKind::Knot5, 0.0, 1.0, 0.4, 5) == 0.0);
+  REQUIRE(embedding_value(BasisKind::Knot5, 0.0, 1.0, 0.0, 3) == 0.0);
 }
 
 TEST_CASE("bare radial matches the legacy models::B/G function-pointer shape",

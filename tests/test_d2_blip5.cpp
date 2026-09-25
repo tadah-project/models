@@ -195,7 +195,19 @@ TEST_CASE_METHOD(Blip5Fixture, "DM_REAM Blip5 (bcode 3): symmetric channels",
   aed.set_zero();
   dm.calc_aed(rhoi, aed);
   const double rho_i = rhoi(0);
-  REQUIRE(aed(0) == Approx(B5(1.5 * (rho_i - 0.0))).margin(1e-12));
-  REQUIRE(aed(1) == Approx(B5(1.5 * (rho_i - 0.5))).margin(1e-12));
-  REQUIRE(aed(2) == Approx(B5(1.5 * (rho_i - 1.0))).margin(1e-12));
+  // EMBF0 ZERO (default): zero-referenced embedding g(rho) - g(0).
+  REQUIRE(aed(0) == Approx(B5(1.5 * (rho_i - 0.0)) - B5(1.5 * (0.0 - 0.0))).margin(1e-12));
+  REQUIRE(aed(1) == Approx(B5(1.5 * (rho_i - 0.5)) - B5(1.5 * (0.0 - 0.5))).margin(1e-12));
+  REQUIRE(aed(2) == Approx(B5(1.5 * (rho_i - 1.0)) - B5(1.5 * (0.0 - 1.0))).margin(1e-12));
+
+  // EMBF0 FREE: the raw Blip5 basis of tadah 1.5.0.
+  c.add("EMBF0", "FREE");
+  DM_REAM dm_free(c);
+  dm_free.set_fcut(&fc, false);
+  aed_type aed_free(dm_free.size());
+  aed_free.set_zero();
+  dm_free.calc_aed(rhoi, aed_free);
+  REQUIRE(aed_free(0) == Approx(B5(1.5 * (rho_i - 0.0))).margin(1e-12));
+  REQUIRE(aed_free(1) == Approx(B5(1.5 * (rho_i - 0.5))).margin(1e-12));
+  REQUIRE(aed_free(2) == Approx(B5(1.5 * (rho_i - 1.0))).margin(1e-12));
 }

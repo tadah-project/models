@@ -94,6 +94,15 @@ public:
 
   void init() override;
   bool reinit(const tadah::core::Context& ctx) override;
+
+  /** EMBF0 of the joined DM_REAM children (one global key: the children read
+   *  copies of the same context); nullopt when no child has an embedding
+   *  reference. */
+  std::optional<EmbF0Mode> embf0_mode() const override;
+  /** Sum of the children's raw F(0) (each indexes its own block of w_full);
+   *  nullopt when no child reports one. */
+  std::optional<double>
+  raw_embedding_f0(const tadah::core::t_type &w_full) const override;
 };
 
 } // namespace models

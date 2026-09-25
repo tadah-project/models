@@ -40,6 +40,7 @@
 
 #include <tadah/core/context.h>
 #include <tadah/models/descriptors/basis_kind.h>
+#include <tadah/models/descriptors/dm/embf0.h>
 
 namespace tadah {
 namespace models {
@@ -63,6 +64,9 @@ constexpr double kCompensationRLoFrac = 0.15;
 struct CurveView {
   BasisKind family = BasisKind::Blip;
   bool right_active = false;  ///< true only for F with the knot family
+  /// true only for F of an EMBF0 ZERO potential: the zero-referenced
+  /// embedding basis g_k(x) - g_k(0) that DM_REAM evaluates (see value())
+  bool zero_ref = false;
   std::vector<double> mu;
   std::vector<double> eta;    ///< empty for the knot family
   std::vector<double> coeff;
@@ -79,12 +83,16 @@ struct CurveView {
 
   /// Curve value/derivatives at x: sum_k coeff_k g_k(x). Radial channels
   /// apply the hard Cut_Dummy semantics (0 beyond rcut), matching runtime.
+  /// With zero_ref the value is sum_k coeff_k (g_k(x) - g_k(0)), term by
+  /// term as DM_REAM::calc_aed forms it, and exactly 0 at x == 0; the
+  /// derivatives are the same in both embedding references.
   double value(double x) const;
   double deriv(double x) const;
   double deriv2(double x) const;
 
   /// Active x-interval of BF k. One-sided knots return a half-line encoded
-  /// with +-support_infinity() on the open side.
+  /// with +-support_infinity() on the open side. With zero_ref, BF k is the
+  /// constant -g_k(0) outside this interval (its derivatives vanish).
   std::pair<double, double> support(std::size_t k) const;
   static double support_infinity();
 };
@@ -110,6 +118,9 @@ struct PotEAMView {
   std::string mb_name;        ///< TYPEMB descriptor name (Foreign diagnostics)
   std::vector<double> tail;   ///< opaque non-pair WEIGHTS (Foreign only)
   std::string element;
+  /// MBKind::Ream only: the embedding reference (stored EMBF0; absent ->
+  /// the default ZERO). F.zero_ref is (embf0 == EmbF0Mode::Zero).
+  EmbF0Mode embf0 = EmbF0Mode::Zero;
 };
 
 /** \brief Parse a knot/blip potential Context into per-channel views.
@@ -117,16 +128,19 @@ struct PotEAMView {
  *  BIAS and NORM are false (intercept / normalization columns are aligned
  *  with WEIGHTS and cannot survive an edit). The many-body term is optional:
  *  absent/inactive (pure two-body), DM_REAM (fully editable), or any other
- *  descriptor (pair channel only). Throws std::runtime_error with an
- *  actionable message otherwise (D2_mJoin, Gaussian/D2_BP, inconsistent
- *  arrays). */
+ *  descriptor (pair channel only). For DM_REAM the stored EMBF0 (absent ->
+ *  ZERO) sets `embf0` and F.zero_ref, so the F view evaluates what DM_REAM
+ *  evaluates. Throws std::runtime_error with an actionable message otherwise
+ *  (D2_mJoin, Gaussian/D2_BP, inconsistent arrays, invalid EMBF0). */
 PotEAMView parse_pot_view(const core::Context &ctx);
 
 /** \brief Rebuild a full potential Context from an (edited) view: grids,
  *  KDEG / SGRID / AMPGRIDMB arrays, TYPE2B/TYPEMB count tokens, WEIGHTS =
- *  [phi|F], FIXINDEX "1-K" + FIXWEIGHT, and RCUT2B/RCUTMB (derived for knot
- *  channels, preserved for bump channels). Self-checks by constructing the
- *  D2/DM descriptors from the result before returning. */
+ *  [phi|F], FIXINDEX "1-K" + FIXWEIGHT, RCUT2B/RCUTMB (derived for knot
+ *  channels, preserved for bump channels) and, for DM_REAM, an explicit
+ *  EMBF0 line (`embf0`); any other potential goes through
+ *  normalise_embf0_key (a stray EMBF0 is dropped). Self-checks by
+ *  constructing the D2/DM descriptors from the result before returning. */
 core::Context rebuild_pot_context(const PotEAMView &v);
 
 /** \brief Effective cutoff of a knot channel, from the pot Context alone.
@@ -182,7 +196,8 @@ struct AddReport {
 };
 
 /** \brief Insert one basis function with coefficient 0 (curve, derivatives
- *  and extrapolation bit-identical until the coefficient is varied).
+ *  and extrapolation bit-identical until the coefficient is varied; with
+ *  zero_ref too, as 0 * (g(x) - g(0)) is +-0).
  *  `radial` selects the validation rules (centre > 0, rcut interplay).
  *  Throws on invalid spec (eta on knots, deg on bumps, bad centre, bump
  *  support entirely beyond rcut). With `hard_cutoff` (the Cut_Dummy default;
@@ -204,7 +219,9 @@ struct RemoveReport {
   double vresid_plain = 0.0; ///< value-only RMS over the affected region
   double vresid_comp = 0.0;
   bool compensated = false;
+  bool region_widened = false;  ///< zero_ref: region widened to the F domain
   std::vector<std::string> warnings;
+  std::vector<std::string> notes;  ///< informational (e.g. region_widened)
 };
 
 /** \brief Remove the basis function whose centre is nearest centre_request
@@ -212,8 +229,12 @@ struct RemoveReport {
  *  two remaining nearest-in-centre coefficients are least-squares adjusted
  *  against the removed contribution's value + 1st + 2nd derivative on a
  *  dense sample of the affected region (per-order rows normalised by the
- *  removed term's RMS so the orders are balanced). Throws when the channel
- *  has a single basis function. */
+ *  removed term's RMS so the orders are balanced). With zero_ref (F only)
+ *  the value rows use g(x) - g(0), and when the removed function has
+ *  g(0) != 0 its removal also shifts F by a constant beyond its support, so
+ *  the region is widened to [0, largest upper support of all functions]
+ *  (region_widened + a note). Throws when the channel has a single basis
+ *  function. */
 RemoveReport remove_basis(CurveView &c, double centre_request, bool radial);
 
 }  // namespace potedit

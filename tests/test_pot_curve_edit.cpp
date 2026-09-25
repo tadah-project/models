@@ -1,12 +1,16 @@
 #include "catch2/catch.hpp"
 #include <tadah/core/context.h>
+#include <tadah/core/core_types.h>
 #include <tadah/core/logger.h>
 #include <tadah/core/number_format.h>
 #include <tadah/core/periodic_table.h>
 #include <tadah/models/eam/pot_curve_edit.h>
+#include <tadah/models/descriptors/basis_dispatch.h>
 #include <tadah/models/descriptors/d2/d2_knot5.h>
 #include <tadah/models/descriptors/dm/dm_ream.h>
+#include <tadah/models/descriptors/dm/embf0.h>
 
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <sstream>
@@ -166,6 +170,50 @@ Context make_foreign_mb_pot() {
   c.add("FIXINDEX", "1-5");
   for (double v : {1.5, -900.0, 12.0, 7.0, -3.0}) c.add("FIXWEIGHT", v);
   return c;
+}
+
+// Knot pot with per-function embedding degrees (the -2.9 knot is cubic).
+Context make_knot3_pot() {
+  Context c = make_knot_pot();
+  c.remove("TYPEMB");
+  c.add("TYPEMB", "DM_REAM");
+  for (int v : {2, 2, 0, 2, 3, 0, 0, 3}) c.add("TYPEMB", v);  // nKe = 3
+  c.add("TYPEMB", "Ta");
+  c.add("TYPEMB", "Ta");
+  for (double v : {5.0, 3.0, 5.0}) c.add("KDEGEMB", v);
+  return c;
+}
+
+Context with_embf0(Context c, const std::string &mode) {
+  c.add("EMBF0", mode);
+  return c;
+}
+
+std::string stored_embf0_text(const Context &c) {
+  return c.stored_value("EMBF0").value_or("");
+}
+
+// The embedding energy the runtime evaluates: w . calc_aed of a DM_REAM
+// built from a (rebuilt) potential Context, at each density in rhos, with w
+// the F coefficients (summed in order).
+std::vector<double> ream_energies(Context pot, const std::vector<double> &w,
+                                  const std::vector<double> &rhos) {
+  pot.add("VERBOSE", 0);
+  DM_REAM dm(pot);
+  REQUIRE(dm.size() == w.size());
+  std::vector<double> E;
+  for (double rho : rhos) {
+    tadah::core::rho_type rhoi;
+    dm.init_rhoi(rhoi);
+    rhoi(0) = rho;
+    tadah::core::aed_type aed(dm.size());
+    aed.set_zero();
+    dm.calc_aed(rhoi, aed);
+    double e = 0.0;
+    for (std::size_t m = 0; m < dm.size(); ++m) e += w[m] * aed(m);
+    E.push_back(e);
+  }
+  return E;
 }
 
 // Max |difference| of value/deriv/deriv2 between two curve views over a
@@ -454,11 +502,24 @@ TEST_CASE_METHOD(EditFixture, "potedit: REMOVE selection and compensation",
     REQUIRE(out.get<double>("RCUT2B") == Approx(4.2));
   }
   SECTION("embedding (right-active) removal compensates too") {
+    // The fixture has no EMBF0 line -> ZERO: the -2.9 knot has g(0) = 2.9^5,
+    // so the region is the widened F domain (see the [embf0] cases).
     PotEAMView v = parse_pot_view(make_knot_pot());
     RemoveReport rep = remove_basis(v.F, -2.9, false);
     REQUIRE(rep.removed_mu == -2.9);
     REQUIRE(rep.compensated);
     REQUIRE(rep.resid_comp <= rep.resid_plain);
+    REQUIRE(rep.region_widened);
+  }
+  SECTION("embedding (right-active) removal, EMBF0 FREE (raw basis)") {
+    PotEAMView v = parse_pot_view(with_embf0(make_knot_pot(), "FREE"));
+    REQUIRE_FALSE(v.F.zero_ref);
+    RemoveReport rep = remove_basis(v.F, -2.9, false);
+    REQUIRE(rep.removed_mu == -2.9);
+    REQUIRE(rep.compensated);
+    REQUIRE(rep.resid_comp <= rep.resid_plain);
+    REQUIRE_FALSE(rep.region_widened);
+    REQUIRE(rep.notes.empty());
   }
   SECTION("degree array entry removed and all-quintic collapses to absent") {
     PotEAMView v = parse_pot_view(make_knot_pot());
@@ -740,4 +801,281 @@ TEST_CASE_METHOD(EditFixture,
   REQUIRE(out.get<int>("TYPEMB", 4) == 3);  // nAmp
   REQUIRE(out.get<int>("TYPEMB", 5) == 2);  // nEc (F shrank)
   REQUIRE(out.get<double>("RCUTMB") == Approx(4.9));
+  REQUIRE(stored_embf0_text(out) == "ZERO");
+}
+
+TEST_CASE_METHOD(EditFixture,
+                 "potedit: EMBF0 — DM_REAM potentials always declare it, "
+                 "others never do", "[potedit][embf0]") {
+  SECTION("legacy DM_REAM potential (no key): ZERO, written explicitly") {
+    for (Context pot : {make_knot_pot(), make_blip_pot()}) {
+      REQUIRE_FALSE(pot.has_stored("EMBF0"));
+      PotEAMView v = parse_pot_view(pot);
+      REQUIRE(v.embf0 == EmbF0Mode::Zero);
+      REQUIRE(v.F.zero_ref);
+      REQUIRE_FALSE(v.phi.zero_ref);
+      REQUIRE_FALSE(v.rho.zero_ref);
+      const Context out = rebuild_pot_context(v);
+      REQUIRE(stored_embf0_text(out) == "ZERO");
+      REQUIRE(out.size("EMBF0") == 1);
+      REQUIRE(parse_pot_view(out).embf0 == EmbF0Mode::Zero);
+    }
+  }
+  SECTION("EMBF0 FREE is preserved (canonical spelling)") {
+    for (Context pot : {with_embf0(make_knot_pot(), "FREE"),
+                        with_embf0(make_blip_pot(), "free")}) {
+      PotEAMView v = parse_pot_view(pot);
+      REQUIRE(v.embf0 == EmbF0Mode::Free);
+      REQUIRE_FALSE(v.F.zero_ref);
+      const Context out = rebuild_pot_context(v);
+      REQUIRE(stored_embf0_text(out) == "FREE");
+      REQUIRE(out.size("EMBF0") == 1);
+    }
+  }
+  SECTION("explicit EMBF0 ZERO is preserved") {
+    PotEAMView v = parse_pot_view(with_embf0(make_blip_pot(), "ZERO"));
+    REQUIRE(v.F.zero_ref);
+    REQUIRE(stored_embf0_text(rebuild_pot_context(v)) == "ZERO");
+  }
+  SECTION("pure two-body and foreign many-body potentials never gain it") {
+    for (Context pot : {make_pure2b_pot(), make_foreign_mb_pot()}) {
+      const Context out = rebuild_pot_context(parse_pot_view(pot));
+      REQUIRE_FALSE(out.has_stored("EMBF0"));
+    }
+    // a stray key on a potential without DM_REAM is dropped
+    for (Context pot : {with_embf0(make_pure2b_pot(), "FREE"),
+                        with_embf0(make_foreign_mb_pot(), "ZERO")}) {
+      const Context out = rebuild_pot_context(parse_pot_view(pot));
+      REQUIRE_FALSE(out.has_stored("EMBF0"));
+    }
+  }
+  SECTION("an invalid EMBF0 is rejected") {
+    REQUIRE_THROWS_WITH(parse_pot_view(with_embf0(make_knot_pot(), "ON")),
+                        Catch::Contains("EMBF0 must be ZERO or FREE"));
+  }
+}
+
+TEST_CASE_METHOD(EditFixture,
+                 "potedit: the F view evaluates what DM_REAM evaluates "
+                 "(EMBF0 ZERO and FREE)", "[potedit][embf0]") {
+  const std::vector<double> xs = {0.0, 1e-9, 0.05, 0.1, 0.3, 0.9,
+                                  1.4, 2.2,  3.1,  4.5, 6.0};
+  // knot fixtures carry c = -2.9 (g(0) = 2.9^5; 2.9^3 when cubic); the blip
+  // fixture has two bumps covering 0.
+  for (const char *family : {"knot", "knot3", "blip"}) {
+    const std::string f(family);
+    const Context base = f == "knot"    ? make_knot_pot()
+                         : f == "knot3" ? make_knot3_pot()
+                                        : make_blip_pot();
+    const PotEAMView vz = parse_pot_view(base);
+    const PotEAMView vf = parse_pot_view(with_embf0(base, "FREE"));
+    REQUIRE(vz.F.zero_ref);
+    REQUIRE_FALSE(vf.F.zero_ref);
+    const std::vector<double> Ez =
+        ream_energies(rebuild_pot_context(vz), vz.F.coeff, xs);
+    const std::vector<double> Ef =
+        ream_energies(rebuild_pot_context(vf), vf.F.coeff, xs);
+
+    // exactly 0 at rho == 0 under ZERO (view and runtime); raw F(0) != 0
+    REQUIRE(vz.F.value(0.0) == 0.0);
+    REQUIRE(Ez[0] == 0.0);
+    const double F0 = vf.F.value(0.0);
+    REQUIRE(F0 != 0.0);
+
+    for (std::size_t i = 0; i < xs.size(); ++i) {
+      const double x = xs[i];
+      INFO(family << " x=" << x);
+      // independent sums of the raw / zero-referenced embedding basis
+      double raw = 0.0, zref = 0.0;
+      const CurveView &F = vz.F;
+      for (std::size_t k = 0; k < F.n(); ++k) {
+        const double g = embedding_value(F.family, x, F.width(k), F.mu[k],
+                                         F.degree(k));
+        const double g0 = embedding_value(F.family, 0.0, F.width(k), F.mu[k],
+                                          F.degree(k));
+        raw += F.coeff[k] * g;
+        zref += F.coeff[k] * (g - g0);
+      }
+      const double tz = 1e-12 * std::max(1.0, std::fabs(zref));
+      const double tf = 1e-12 * std::max(1.0, std::fabs(raw));
+      CHECK(std::fabs(vz.F.value(x) - zref) <= tz);
+      CHECK(std::fabs(vz.F.value(x) - Ez[i]) <= tz);
+      CHECK(std::fabs(vf.F.value(x) - raw) <= tf);
+      CHECK(std::fabs(vf.F.value(x) - Ef[i]) <= tf);
+      // the two references differ by the constant raw F(0) ...
+      CHECK(std::fabs((vf.F.value(x) - vz.F.value(x)) - F0) <=
+            1e-12 * std::max({1.0, std::fabs(raw), std::fabs(F0)}));
+      // ... and share every derivative exactly
+      CHECK(vz.F.deriv(x) == vf.F.deriv(x));
+      CHECK(vz.F.deriv2(x) == vf.F.deriv2(x));
+    }
+  }
+}
+
+TEST_CASE_METHOD(EditFixture, "potedit: REMOVE under EMBF0 ZERO",
+                 "[potedit][embf0]") {
+  SECTION("a bump covering 0 widens the region; the compensated curve "
+          "stays close to the original zero-referenced curve") {
+    CurveView zero;
+    zero.family = BasisKind::Blip;
+    zero.zero_ref = true;
+    zero.mu = {0.0, 0.1, 0.2, 1.0, 2.0};
+    zero.eta = {1.0, 1.0, 1.0, 1.0, 1.0};
+    zero.coeff = {3.0, -2.0, 1.5, 0.7, -0.4};
+    const CurveView before = zero;
+
+    RemoveReport rep = remove_basis(zero, 0.1, false);
+    REQUIRE(rep.removed_mu == 0.1);
+    REQUIRE(rep.region_widened);
+    REQUIRE(rep.notes.size() == 1);
+    // largest upper support: 2.0 + 2/1.0
+    CHECK(rep.notes[0].find("widened to the F domain [0, 4]") !=
+          std::string::npos);
+    REQUIRE(rep.compensated);
+    std::vector<std::size_t> adj = rep.adjusted;
+    std::sort(adj.begin(), adj.end());
+    REQUIRE(adj == std::vector<std::size_t>{0, 2});  // the two neighbours
+    REQUIRE(rep.resid_comp <= rep.resid_plain);
+    REQUIRE(rep.vresid_comp < rep.vresid_plain);
+    REQUIRE(zero.value(0.0) == 0.0);
+
+    // plain removal leaves the constant c_r g_r(0) beyond the bump; the
+    // compensated curve stays close over the whole F domain (tail included)
+    CurveView plain = before;
+    plain.mu.erase(plain.mu.begin() + 1);
+    plain.eta.erase(plain.eta.begin() + 1);
+    plain.coeff.erase(plain.coeff.begin() + 1);
+    double dev_comp = 0.0, dev_plain = 0.0;
+    for (int i = 0; i < 2001; ++i) {
+      const double x = 6.0 * i / 2000.0;
+      dev_comp = std::max(dev_comp, std::fabs(zero.value(x) - before.value(x)));
+      dev_plain =
+          std::max(dev_plain, std::fabs(plain.value(x) - before.value(x)));
+    }
+    CHECK(dev_plain > 1.0);
+    CHECK(dev_comp < 0.05 * dev_plain);
+
+    // FREE twin: the bump's own support (HEAD), no note
+    CurveView free = before;
+    free.zero_ref = false;
+    RemoveReport rf = remove_basis(free, 0.1, false);
+    REQUIRE(rf.compensated);
+    REQUIRE_FALSE(rf.region_widened);
+    REQUIRE(rf.notes.empty());
+  }
+  SECTION("a COMPENSATOR covering 0 widens the region too; a support-edge "
+          "g(0) at rounding level does not") {
+    // dx = 0.1, eta = 10 (support +-0.2): removing mu = 0.2 (g(0) = B(-2)
+    // = 0) adjusts the neighbours 0.1 (g(0) = B(-1) = 0.25) and 0.3, whose
+    // g(0) != 0 shifts F by a constant beyond 0.3 -- the whole F domain.
+    CurveView zero;
+    zero.family = BasisKind::Blip;
+    zero.zero_ref = true;
+    for (int k = 0; k <= 20; ++k) {
+      zero.mu.push_back(0.1 * k);
+      zero.eta.push_back(10.0);
+      zero.coeff.push_back(std::sin(0.7 * k) + 0.3);
+    }
+    const CurveView before = zero;
+    RemoveReport rep = remove_basis(zero, 0.2, false);
+    REQUIRE(rep.removed_mu == 0.2);
+    REQUIRE(rep.compensated);
+    REQUIRE(rep.region_widened);
+    REQUIRE(rep.notes.size() == 1);
+    CHECK(rep.notes[0].find("a compensating function covers rho = 0") !=
+          std::string::npos);
+    REQUIRE(zero.value(0.0) == 0.0);
+    // the compensation objective (value/1st/2nd rows) over the widened
+    // region, which includes the constant tail the compensators' g(0) would
+    // otherwise leave unaccounted
+    REQUIRE(rep.resid_comp <= rep.resid_plain);
+
+    // FREE twin: local region as in 1.5.0
+    CurveView free = before;
+    free.zero_ref = false;
+    RemoveReport rf = remove_basis(free, 0.2, false);
+    REQUIRE_FALSE(rf.region_widened);
+
+    // mu = 0.5: removed and compensators (0.4, 0.6) all have g(0) = 0
+    CurveView far = before;
+    RemoveReport rr = remove_basis(far, 0.5, false);
+    REQUIRE_FALSE(rr.region_widened);
+    REQUIRE(rr.notes.empty());
+  }
+  SECTION("fixtures: g(0) != 0 widens under ZERO, never under FREE") {
+    struct Case {
+      const char *tag;
+      bool knot;
+      double centre;
+      bool widened_zero;
+    };
+    for (const Case &cs : {Case{"knot -2.9 (g(0) = 2.9^5)", true, -2.9, true},
+                           // g(0) = 0, but its compensator -2.9 covers 0
+                           Case{"knot 0.9 (compensator -2.9 covers 0)", true,
+                                0.9, true},
+                           Case{"blip 0.1 (covers 0)", false, 0.1, true},
+                           // clear of 0, but its compensators 0.9 and 0.1
+                           // cover 0 (the non-widening case is the dense
+                           // grid section above)
+                           Case{"blip 2.9 (compensators cover 0)", false, 2.9,
+                                true}}) {
+      INFO(cs.tag);
+      const Context base = cs.knot ? make_knot_pot() : make_blip_pot();
+      PotEAMView vz = parse_pot_view(base);
+      RemoveReport rz = remove_basis(vz.F, cs.centre, false);
+      REQUIRE(rz.removed_mu == cs.centre);
+      REQUIRE(rz.region_widened == cs.widened_zero);
+      REQUIRE(rz.notes.size() == (cs.widened_zero ? 1u : 0u));
+      REQUIRE(rz.resid_comp <= rz.resid_plain);
+      REQUIRE(vz.F.value(0.0) == 0.0);
+      // the rebuilt potential still evaluates F(0) = 0 at runtime
+      const std::vector<double> E =
+          ream_energies(rebuild_pot_context(vz), vz.F.coeff, {0.0, 0.7});
+      REQUIRE(E[0] == 0.0);
+      CHECK(std::fabs(E[1] - vz.F.value(0.7)) <=
+            1e-12 * std::max(1.0, std::fabs(E[1])));
+
+      PotEAMView vf = parse_pot_view(with_embf0(base, "FREE"));
+      RemoveReport rf = remove_basis(vf.F, cs.centre, false);
+      REQUIRE(rf.removed_mu == cs.centre);
+      REQUIRE_FALSE(rf.region_widened);
+      REQUIRE(rf.notes.empty());
+      REQUIRE(rf.resid_comp <= rf.resid_plain);
+    }
+  }
+}
+
+TEST_CASE_METHOD(EditFixture,
+                 "potedit: ADD keeps DM_REAM energies bitwise (EMBF0 ZERO "
+                 "and FREE)", "[potedit][embf0]") {
+  const std::vector<double> rhos = {0.0, 1e-9, 0.05, 0.3, 0.9,
+                                    1.4, 2.2,  3.1,  4.5};
+  struct Case {
+    const char *tag;
+    bool knot;
+    double centre;
+  };
+  for (const char *mode : {"ZERO", "FREE"}) {
+    for (const Case &cs : {Case{"knot, centre > 0", true, 0.4},
+                           Case{"knot, centre < 0 (g(0) != 0)", true, -1.5},
+                           Case{"blip, bump clear of 0", false, 2.4},
+                           Case{"blip, bump covering 0", false, 0.3}}) {
+      INFO(mode << ": " << cs.tag);
+      PotEAMView v = parse_pot_view(
+          with_embf0(cs.knot ? make_knot_pot() : make_blip_pot(), mode));
+      REQUIRE(v.F.zero_ref == (std::string(mode) == "ZERO"));
+      const CurveView before = v.F;
+      const std::vector<double> E0 =
+          ream_energies(rebuild_pot_context(v), v.F.coeff, rhos);
+      add_basis(v.F, AddSpec{cs.centre, {}, {}}, false);
+      REQUIRE(v.F.coeff.back() == 0.0);
+      const std::vector<double> E1 =
+          ream_energies(rebuild_pot_context(v), v.F.coeff, rhos);
+      for (std::size_t i = 0; i < rhos.size(); ++i) {
+        INFO("rho=" << rhos[i]);
+        REQUIRE(E1[i] == E0[i]);
+      }
+      REQUIRE(curve_maxdiff(before, v.F, 0.0, 6.0) == 0.0);
+    }
+  }
 }

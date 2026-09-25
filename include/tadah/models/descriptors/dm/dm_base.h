@@ -2,7 +2,9 @@
 #define DM_BASE_H
 
 #include <tadah/models/descriptors/d_base.h>
+#include <tadah/models/descriptors/dm/embf0.h>
 #include <cstdint>
+#include <optional>
 #include <string>
 
 namespace tadah {
@@ -155,7 +157,10 @@ public:
    *
    *  eam_embed(): embedding value and derivative collapsed against the FULL
    *  model weight vector `w_full` (indexed with this descriptor's own block
-   *  offset internally, so callers never handle offsets).
+   *  offset internally, so callers never handle offsets). It must equal the
+   *  w-weighted embedding block that calc_aed() writes, at every rho_bar,
+   *  including the descriptor's embedding reference (DM_REAM: EMBF0 ZERO
+   *  evaluates the zero-referenced basis, so F(0) = 0 exactly).
    *
    *  Default: not EAM-form. */
   virtual bool eam_form() const { return false; }
@@ -168,6 +173,22 @@ public:
                          const double /*rho_bar*/,
                          double &F, double &Fp) const {
     F = 0.0; Fp = 0.0;
+  }
+
+  /** \brief Embedding reference (EMBF0) of an EAM-form embedding block.
+   *
+   *  nullopt for descriptors without an EMBF0-controlled embedding. */
+  virtual std::optional<EmbF0Mode> embf0_mode() const { return std::nullopt; }
+
+  /** \brief Raw embedding value at zero density, sum_m w_m g_m(0).
+   *
+   *  The isolated-atom embedding energy under EMBF0 FREE, and the constant
+   *  per-atom energy that EMBF0 ZERO removes. Diagnostic only (journals):
+   *  never feeds an evaluated number. @p w_full is the full model weight
+   *  vector of a linear model. nullopt when not applicable. */
+  virtual std::optional<double>
+  raw_embedding_f0(const tadah::core::t_type & /*w_full*/) const {
+    return std::nullopt;
   }
 
   /** \brief Calculate density */

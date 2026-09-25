@@ -3,10 +3,12 @@
 #include <tadah/models/linear_regressor.h>
 #include <tadah/models/descriptors/d_basis_functions.h>
 #include <tadah/models/descriptors/basis_dispatch.h>
+#include <tadah/models/descriptors/dm/embf0.h>
 
 #include <algorithm>
 #include <cmath>
 #include <functional>
+#include <stdexcept>
 
 namespace tadah {
 namespace models {
@@ -21,6 +23,20 @@ EAMRefit::EAMRefit(const EAMSetflIO &eam, const EAMRefitConfig &cfg)
   r_lo_   = std::max(cfg_.r_lo_frac * rcut_, eam_.dr());
   rhomax_ = eam_.rhomax();
   rho_join_ = rhomax_;  // dense default: F_setfl == F_fit on the table range
+  if (cfg_.embf0_zero) {
+    // EMBF0 ZERO: the table's F(0), removed from every absolute use of the
+    // table embedding (F_ref). Cached once; the spline is never modified.
+    if (eam_.frho_spline().empty())
+      throw std::runtime_error(
+          "EAMRefit: the EAM table splines are not built — call "
+          "EAMSetflIO::build_splines() before constructing EAMRefit.");
+    F0tab_ = eam_.F_tab(0.0);
+  }
+}
+
+double EAMRefit::F_ref(double rho) const {
+  if (!cfg_.embf0_zero) return eam_.F_tab(rho);   // FREE: the table verbatim
+  return eam_.F_tab(rho) - F0tab_;                // ZERO: exactly 0 at rho = 0
 }
 
 // Hard cutoff (Cut_Dummy): f_c=1 inside r_cut, 0 beyond — matches LAMMPS
@@ -197,10 +213,21 @@ FitStats EAMRefit::lsq_fit_windowed(const std::vector<double> &xs,
                                     const tadah::core::v_type &widths,
                                     bool apply_cutoff,
                                     tadah::core::v_type &coeffs,
-                                    bool pin, double pin_x, double pin_y) const {
+                                    bool pin, double pin_x, double pin_y,
+                                    bool zero_ref) const {
   const std::size_t Nd = xs.size();
   const std::size_t Nb = centers.size();
   coeffs.assign(Nb, 0.0);
+
+  // EMBF0 ZERO (zero_ref): every value use below takes the zero-referenced
+  // column b_k(x) - b_k(0), b_k(0) from the SAME evaluator as the columns.
+  // Computed only under ZERO; the raw-basis (FREE) statements are unchanged.
+  tadah::core::v_type b0;
+  if (zero_ref) {
+    b0.assign(Nb, 0.0);
+    for (std::size_t k = 0; k < Nb; ++k)
+      b0[k] = basisval(0.0, centers[k], widths[k]);
+  }
 
   // Partition blips by support overlap with the window (blip support: |x-c| <
   // 2/eta for blips, ~3 sigma for gaussians) and samples by location.
@@ -235,6 +262,18 @@ FitStats EAMRefit::lsq_fit_windowed(const std::vector<double> &xs,
     for (std::size_t r = 0; r < rows.size(); ++r) {
       const std::size_t i = rows[r];
       const double fc = apply_cutoff ? cutoff(xs[i]) : 1.0;
+      if (zero_ref) {  // EMBF0 ZERO: the same row, zero-referenced columns
+        double held = 0.0;
+        for (std::size_t k = 0; k < Nb; ++k)
+          if (coeffs[k] != 0.0)
+            held += coeffs[k] *
+                    (basisval(xs[i], centers[k], widths[k]) - b0[k]) * fc;
+        T(r) = ys[i] - held;
+        for (std::size_t q = 0; q < cols.size(); ++q)
+          Phi(r, q) = (basisval(xs[i], centers[cols[q]], widths[cols[q]]) -
+                       b0[cols[q]]) * fc;
+        continue;
+      }
       // subtract the contribution of already-solved (other-block) blips
       double held = 0.0;
       for (std::size_t k = 0; k < Nb; ++k)
@@ -244,7 +283,14 @@ FitStats EAMRefit::lsq_fit_windowed(const std::vector<double> &xs,
       for (std::size_t q = 0; q < cols.size(); ++q)
         Phi(r, q) = basisval(xs[i], centers[cols[q]], widths[cols[q]]) * fc;
     }
-    if (with_pin) {  // heavily-weighted single constraint row
+    if (with_pin && zero_ref) {  // EMBF0 ZERO (fit() passes no pin: the
+      const double sw = 1e4;     // F(0) row would be identically zero)
+      const std::size_t r = rows.size();
+      T(r) = pin_y * sw;
+      for (std::size_t q = 0; q < cols.size(); ++q)
+        Phi(r, q) = (basisval(pin_x, centers[cols[q]], widths[cols[q]]) -
+                     b0[cols[q]]) * sw;
+    } else if (with_pin) {  // heavily-weighted single constraint row
       const double sw = 1e4;
       const std::size_t r = rows.size();
       T(r) = pin_y * sw;
@@ -273,8 +319,13 @@ FitStats EAMRefit::lsq_fit_windowed(const std::vector<double> &xs,
   for (std::size_t i : sA) {
     const double fc = apply_cutoff ? cutoff(xs[i]) : 1.0;
     double pred = 0.0;
-    for (std::size_t k = 0; k < Nb; ++k)
-      pred += coeffs[k] * basisval(xs[i], centers[k], widths[k]) * fc;
+    if (zero_ref)  // EMBF0 ZERO: zero-referenced columns
+      for (std::size_t k = 0; k < Nb; ++k)
+        pred += coeffs[k] *
+                (basisval(xs[i], centers[k], widths[k]) - b0[k]) * fc;
+    else
+      for (std::size_t k = 0; k < Nb; ++k)
+        pred += coeffs[k] * basisval(xs[i], centers[k], widths[k]) * fc;
     const double res = pred - ys[i];
     se += res * res; ae += std::fabs(res); mx = std::max(mx, std::fabs(res));
   }
@@ -381,16 +432,24 @@ void EAMRefit::fit() {
   for (int i = 0; i < nrho_samp; ++i) {
     const double rho = rhomax_ * i / (nrho_samp - 1);
     xrho.push_back(rho);
-    yF.push_back(eam_.F_tab(rho));
+    yF.push_back(F_ref(rho));   // FREE: eam_.F_tab(rho) verbatim
   }
   const double rho_win_hi = (adaptive && rho_reach_ > 0.0) ? rho_reach_
                                                            : rhomax_;
   if (adaptive) make_grid_windowed(0.0, rhomax_, cfg_.nF, 0.0, rho_win_hi,
                                    cF_, sF_, false);   // F: no r cutoff
   else          make_grid(0.0, rhomax_, cfg_.nF, cF_, sF_, false);
-  // pin = the isolated-atom reference F(0) (the table's own value)
-  F_stats_ = lsq_fit_windowed(xrho, yF, 0.0, rho_win_hi, cF_, sF_, false,
-                              cmb_, cfg_.constrain_F0, 0.0, eam_.F_tab(0.0));
+  if (cfg_.embf0_zero) {
+    // EMBF0 ZERO: fit what DM_REAM evaluates — the zero-referenced basis
+    // against F_ref. F(0) = 0 exactly by construction, so no pin row.
+    F_stats_ = lsq_fit_windowed(xrho, yF, 0.0, rho_win_hi, cF_, sF_, false,
+                                cmb_, false, 0.0, 0.0, /*zero_ref=*/true);
+  } else {
+    // pin = the isolated-atom reference F(0) (the table's own value)
+    F_stats_ = lsq_fit_windowed(xrho, yF, 0.0, rho_win_hi, cF_, sF_, false,
+                                cmb_, cfg_.constrain_F0, 0.0, eam_.F_tab(0.0));
+  }
+  refresh_embedding_reference();
 
   // ---- concatenated linear weights [c2b | cmb] ----
   weights_.clear();
@@ -404,6 +463,16 @@ inline int deg_at(const std::vector<int> &d, std::size_t k) {
   return (k < d.size()) ? d[k] : 5;
 }
 }  // namespace
+
+// g_m(0) with F_fit's own evaluator (embedding orientation, per-atom degree)
+// — the value DM_REAM subtracts (embedding_value at rho = 0).
+void EAMRefit::refresh_embedding_reference() {
+  g0F_.clear();
+  if (!cfg_.embf0_zero) return;   // FREE: raw basis, no reference
+  g0F_.resize(cF_.size());
+  for (std::size_t m = 0; m < cF_.size(); ++m)
+    g0F_[m] = basisval(0.0, cF_[m], sF_[m], /*emb=*/true, deg_at(degF_, m));
+}
 
 double EAMRefit::phi_fit(double r) const {
   const double fc = cutoff(r);
@@ -426,6 +495,16 @@ double EAMRefit::rho_fit(double r) const {
 }
 
 double EAMRefit::F_fit(double rho) const {
+  if (cfg_.embf0_zero) {
+    // EMBF0 ZERO: F(rho) = sum_m c_m (g_m(rho) - g_m(0)), as DM_REAM; exactly
+    // 0.0 at rho == 0 whatever the FP contraction.
+    if (rho == 0.0) return 0.0;
+    double acc = 0.0;
+    for (std::size_t m = 0; m < cF_.size(); ++m)
+      acc += cmb_[m] * (basisval(rho, cF_[m], sF_[m], /*emb=*/true,
+                                 deg_at(degF_, m)) - g0F_[m]);
+    return acc;
+  }
   double acc = 0.0;
   for (std::size_t m = 0; m < cF_.size(); ++m)
     acc += cmb_[m] * basisval(rho, cF_[m], sF_[m], /*emb=*/true,
@@ -453,7 +532,8 @@ void EAMRefit::set_blip_fit(Fn which, const std::vector<double> &mu,
     case Fn::RHO: assign(crho_, mu); assign(srho_, eta);
                   assign(arho_, c); degrho_ = deg; break;
     case Fn::F:   assign(cF_, mu); assign(sF_, eta);
-                  assign(cmb_, c); degF_ = deg; break;
+                  assign(cmb_, c); degF_ = deg;
+                  refresh_embedding_reference(); break;
   }
 }
 
@@ -484,10 +564,13 @@ void EAMRefit::finalize_injected(double rwin_lo, double rho_win_hi) {
                         [&](double r) { return eam_.rho_tab(r); }, rwin_lo,
                         rcut_);
   F_stats_ = stats_on([&](double x) { return F_fit(x); },
-                      [&](double x) { return eam_.F_tab(x); }, 0.0,
+                      [&](double x) { return F_ref(x); }, 0.0,  // FREE: F_tab
                       rho_win_hi);
 }
 
+// EMBF0 ZERO needs no change here: F_setfl(0) = F_fit(0) = 0.0, and F_tab(0)
+// cancels in the join offset, so beyond the join the continuation is
+// F_ref + (F_fit - F_ref)(rho_join).
 double EAMRefit::F_setfl(double rho) const {
   if (rho <= rho_join_) return F_fit(rho);
   return eam_.F_tab(rho) + (F_fit(rho_join_) - eam_.F_tab(rho_join_));
@@ -599,6 +682,10 @@ tadah::core::Context EAMRefit::build_pot_context() const {
                       ? *std::max_element(crho_.begin(), crho_.end())
                       : rcut_);
   c.add("RCTYPEMB", cfg_.rctype);
+  // The embedding reference the F weights were fitted in (every DM_REAM
+  // potential carries it explicitly).
+  c.add("EMBF0", std::string(embf0_name(cfg_.embf0_zero ? EmbF0Mode::Zero
+                                                        : EmbF0Mode::Free)));
 
   // ---- linear weights [c2b | cmb] ----
   for (double v : weights_) c.add("WEIGHTS", v);
