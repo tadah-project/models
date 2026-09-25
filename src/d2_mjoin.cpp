@@ -45,6 +45,12 @@ void D2_mJoin::calc_all(const int Zi, const int Zj, const double rij,
   }
 }
 
+bool D2_mJoin::applies_to_every_element_pair() const {
+  for (auto d : ds)
+    if (!d->applies_to_every_element_pair()) return false;
+  return true;
+}
+
 std::string D2_mJoin::label() const {
   return lab;
 }

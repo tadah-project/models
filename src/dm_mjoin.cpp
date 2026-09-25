@@ -77,6 +77,12 @@ void DM_mJoin::calc_rho(
       d->calc_rho(Zi,Zj,rij,rij_sq,vec_ij,rho,scale);
   }
 }
+bool DM_mJoin::applies_to_every_element_pair() const {
+  for (auto d : ds)
+    if (!d->applies_to_every_element_pair()) return false;
+  return true;
+}
+
 std::string DM_mJoin::label() const {
   return lab;
 }

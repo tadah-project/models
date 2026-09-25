@@ -79,6 +79,8 @@ public:
     tadah::core::fd_type &fd_ij, 
     const double scale=1) const override;
   std::string label() const override;
+  /** Every joined descriptor applies to every element pair. */
+  bool applies_to_every_element_pair() const override;
   void init_rhoi(tadah::core::rho_type& rhoi) override;
   void calc_rho(
     const int Zi,

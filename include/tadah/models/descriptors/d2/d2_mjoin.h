@@ -57,6 +57,8 @@ public:
   void calc_dXijdri(const int Zi, const int Zj, const double rij, const double rij_sq, tadah::core::fd_type &fd_ij, const double scale=1) const override;
   void calc_all(const int Zi, const int Zj, const double rij, const double rij_sq, tadah::core::aed_type &aed, tadah::core::fd_type &fd_ij, const double scale=1) const override;
   std::string label() const override;
+  /** Every joined descriptor applies to every element pair. */
+  bool applies_to_every_element_pair() const override;
 
   void set_fidx(size_t fidx_) override;
   void init() override;

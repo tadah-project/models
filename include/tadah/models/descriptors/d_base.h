@@ -178,6 +178,13 @@ public:
   virtual bool reinit(const tadah::core::Context& /*ctx*/) { return false; }
 
   virtual bool is_init_for_atoms(int Zi, int Zj) const;
+  /** \brief True when this descriptor applies to every pair of elements,
+   *  i.e. its TYPE2B/TYPEMB element pairs include `* *`.
+   *
+   *  A meta descriptor (D2_mJoin, DM_mJoin) applies to every pair only when
+   *  each descriptor it joins does. See require_dimer_element_pairs().
+   */
+  virtual bool applies_to_every_element_pair() const;
   virtual void init_for_atoms(int Zi, int Zj);
   virtual void init_for_atoms(const std::vector<std::string> &Zs);
   virtual void uninit_for_atoms(int Zi, int Zj);

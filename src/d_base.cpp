@@ -180,6 +180,13 @@ double D_Base::get_rcut() const {
 bool D_Base::is_init_for_atoms(int Zi, int Zj) const {
   return init_for_atoms_map.is_init(Zi,Zj) ;
 }
+bool D_Base::applies_to_every_element_pair() const {
+  // init_for_atoms() keeps the map symmetric; Z runs over 1..118.
+  for (int Zi = 1; Zi < 119; ++Zi)
+    for (int Zj = Zi; Zj < 119; ++Zj)
+      if (!is_init_for_atoms(Zi, Zj)) return false;
+  return true;
+}
 void D_Base::init_for_atoms(int Zi, int Zj) {
   init_for_atoms_map.init(Zi,Zj);
 }
