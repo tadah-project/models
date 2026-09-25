@@ -57,6 +57,19 @@ bool model_is_linear(const tadah::core::Context &ctx) {
   return bf && (*bf == "BF_Linear" || *bf == "Kern_Linear");
 }
 
+std::string embf0_absent_consequence(bool linear) {
+  if (linear)
+    return "this potential is evaluated with the default EMBF0 ZERO (F(0) = 0 "
+           "by construction). A potential written by tadah 1.5.0 or earlier "
+           "now gives every atomic energy shifted by -F(0) (forces and "
+           "stresses are unchanged for this linear model); add 'EMBF0 FREE' "
+           "to the potential to reproduce its energies.";
+  return "this potential is evaluated with the default EMBF0 ZERO (F(0) = 0 "
+         "by construction). The model is non-linear in the descriptor, so for "
+         "a potential written by tadah 1.5.0 or earlier its energies AND "
+         "forces change; add 'EMBF0 FREE' to the potential to reproduce them.";
+}
+
 void normalise_embf0_key(tadah::core::Context &c) {
   if (context_has_ream(c)) {
     const EmbF0Mode m = stored_embf0(c).value_or(EmbF0Mode::Zero);

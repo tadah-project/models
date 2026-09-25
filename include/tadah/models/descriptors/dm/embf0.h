@@ -44,6 +44,15 @@ bool context_has_ream(const tadah::core::Context &ctx);
  *  Kern_Linear); false when MODEL is absent or non-linear. Never inserts. */
 bool model_is_linear(const tadah::core::Context &ctx);
 
+/** What a trained DM_REAM potential without an EMBF0 line means under the
+ *  default ZERO, relative to tadah 1.5.0 and earlier, and how to migrate
+ *  ("this potential is evaluated with the default EMBF0 ZERO ... add 'EMBF0
+ *  FREE' ..."). One text shared by DM_REAM's once-per-process Logger notice
+ *  and the LAMMPS pair style's pair_coeff WARNING. @p linear: the model is
+ *  linear in the descriptor (model_is_linear): only the energies shift;
+ *  otherwise energies and forces change. */
+std::string embf0_absent_consequence(bool linear);
+
 /** Potential writers: a context with a DM_REAM block gets an explicit,
  *  canonical EMBF0 line (ZERO when absent); a context without one has a
  *  stray EMBF0 removed (WARNING once per process), so potentials without a

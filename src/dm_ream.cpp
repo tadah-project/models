@@ -25,21 +25,9 @@ void notice_missing_embf0(const tadah::core::Context &ctx) {
             "(zero-referenced embedding, F(0) = 0 by construction).");
     return;
   }
-  if (model_is_linear(ctx))
-    log.log(tadah::core::LogLevel::WARNING,
-            "DM_REAM: EMBF0 not set; this potential is evaluated with the "
-            "default EMBF0 ZERO (F(0) = 0 by construction). A potential "
-            "written by tadah 1.5.0 or earlier now gives every atomic energy "
-            "shifted by -F(0) (forces and stresses are unchanged for this "
-            "linear model); add 'EMBF0 FREE' to the potential to reproduce "
-            "its energies.");
-  else
-    log.log(tadah::core::LogLevel::WARNING,
-            "DM_REAM: EMBF0 not set; this potential is evaluated with the "
-            "default EMBF0 ZERO (F(0) = 0 by construction). The model is "
-            "non-linear in the descriptor, so for a potential written by "
-            "tadah 1.5.0 or earlier its energies AND forces change; add "
-            "'EMBF0 FREE' to the potential to reproduce them.");
+  log.log(tadah::core::LogLevel::WARNING,
+          "DM_REAM: EMBF0 not set; " +
+              embf0_absent_consequence(model_is_linear(ctx)));
 }
 }  // namespace
 

@@ -5,6 +5,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- `embf0_absent_consequence(bool linear)` (`embf0.h`): the text that explains what a trained DM_REAM potential without an `EMBF0` line means under the default `ZERO` and how to migrate (`EMBF0 FREE`). DM_REAM's once-per-process notice now builds its WARNING from it (output byte-identical), and the LAMMPS pair style prints the same text in its `pair_coeff` WARNING (BUG-08).
+
 ## [1.5.1] — 2026-09-25
 
 ### Fixed

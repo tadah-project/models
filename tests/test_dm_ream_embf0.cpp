@@ -556,6 +556,21 @@ TEST_CASE_METHOD(ReamEmbf0Fixture, "DM_REAM EMBF0: key handling",
   }
 }
 
+TEST_CASE("EMBF0: absent-key consequence text (DM_REAM notice, LAMMPS "
+          "pair_coeff WARNING)",
+          "[ream][embf0][notice]") {
+  using Catch::Matchers::Contains;
+  const std::string lin = embf0_absent_consequence(true);
+  const std::string nl = embf0_absent_consequence(false);
+  for (const std::string *t : {&lin, &nl}) {
+    REQUIRE_THAT(*t, Contains("default EMBF0 ZERO"));
+    REQUIRE_THAT(*t, Contains("tadah 1.5.0 or earlier"));
+    REQUIRE_THAT(*t, Contains("'EMBF0 FREE'"));
+  }
+  REQUIRE_THAT(lin, Contains("forces and stresses are unchanged"));
+  REQUIRE_THAT(nl, Contains("energies AND forces change"));
+}
+
 TEST_CASE_METHOD(ReamEmbf0Fixture,
                  "DM_REAM EMBF0: the reference follows the block offset (fidx)",
                  "[ream][embf0]") {
