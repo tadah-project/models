@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.5.1] — 2026-09-25
+
 ### Fixed
 - **`D2_mJoin` / `DM_mJoin` no longer round their grids.** `D_mJoin::parse_context()` re-rendered every split CGRID/SGRID/CEMBFUNC/SEMBFUNC/AMPGRIDMB/KDEG\* value with NUMERIC (default 12) fixed decimals on every construction and every `reinit()`: values closer than 1e-12 collapsed, values below 5e-13 became 0, and an HPO step that small on an mJoin grid was invisible to the descriptor. The split is lossless now, so standalone mJoin numerics shift by up to 5e-13 absolute. Neither `parse_context()` nor the evidence-approximation solver (`ea.h`) inserts NUMERIC into the caller's context any more (one source of the `NUMERIC 12` line in HPO potentials). Test: `test_mjoin_precision.cpp`.
 - `D_Base::get_grid` accepts subnormal grid values (e.g. `1e-310` written by an HPO step) instead of failing with "Invalid grid specification".
