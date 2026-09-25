@@ -1,12 +1,12 @@
-[![pipeline](https://git.ecdf.ed.ac.uk/tadah/models/badges/develop/pipeline.svg)](https://git.ecdf.ed.ac.uk/tadah/models/-/commits/develop)
-[![coverage](https://git.ecdf.ed.ac.uk/tadah/models/badges/develop/coverage.svg)](https://git.ecdf.ed.ac.uk/tadah/models/-/commits/develop)
+[![pipeline](https://git.ecdf.ed.ac.uk/tadah/models/badges/v1-dev/pipeline.svg)](https://git.ecdf.ed.ac.uk/tadah/models/-/commits/v1-dev)
+[![coverage](https://git.ecdf.ed.ac.uk/tadah/models/badges/v1-dev/coverage.svg)](https://git.ecdf.ed.ac.uk/tadah/models/-/commits/v1-dev)
 [![license](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
-[![version](https://img.shields.io/badge/version-1.5.1-blue.svg)](https://git.ecdf.ed.ac.uk/tadah/models/-/tags)
+[![version](https://img.shields.io/badge/version-1.6.0-blue.svg)](https://git.ecdf.ed.ac.uk/tadah/models/-/tags)
 
 # MODELS
 
 Physics and machine-learning components of the
-[Tadah!](https://tadah.readthedocs.io/develop/) MLIP toolchain. MODELS
+[Tadah!](https://tadah.readthedocs.io/v1-dev/) MLIP toolchain. MODELS
 implements:
 
 - **Regressors** — `M_KRR` (kernel ridge regression) and `M_BLR`
@@ -25,9 +25,9 @@ implements:
 
 These classes are referenced by name in user-facing configuration
 files; for the user view see
-[descriptors](https://tadah.readthedocs.io/develop/descriptors.html),
-[cutoffs](https://tadah.readthedocs.io/develop/cutoffs.html), and
-[regressors](https://tadah.readthedocs.io/develop/regressors.html)
+[descriptors](https://tadah.readthedocs.io/v1-dev/descriptors.html),
+[cutoffs](https://tadah.readthedocs.io/v1-dev/cutoffs.html), and
+[regressors](https://tadah.readthedocs.io/v1-dev/regressors.html)
 in the umbrella documentation.
 
 ## You don't need to use this directly
@@ -35,7 +35,7 @@ in the umbrella documentation.
 MODELS is an internal module of the Tadah! MLIP toolchain. It is
 fetched automatically (via CMake `FetchContent`) by MLIP, MD, and HPO. End users install the umbrella project
 [Tadah!MLIP](https://git.ecdf.ed.ac.uk/tadah/tadah.mlip) — see the
-[installation guide](https://tadah.readthedocs.io/develop/installation.html).
+[installation guide](https://tadah.readthedocs.io/v1-dev/installation.html).
 
 ## Contributing
 

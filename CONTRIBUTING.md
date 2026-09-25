@@ -2,7 +2,7 @@
 
 The full multi-repo contributor guide for the Tadah! project lives on
 the umbrella repository:
-<https://git.ecdf.ed.ac.uk/tadah/tadah.mlip/-/blob/develop/CONTRIBUTING.md>
+<https://git.ecdf.ed.ac.uk/tadah/tadah.mlip/-/blob/v1-dev/CONTRIBUTING.md>
 
 This file covers what is specific to MODELS. Bug reports and
 feature requests on this module use the GitLab issue tracker on this
@@ -46,4 +46,4 @@ The general recipe is
    can dispatch on the configuration name.
 3. Add a test under `tests/`.
 4. Document the new class in
-   [Tadah.MLIP/docs/source/descriptors.rst](https://git.ecdf.ed.ac.uk/tadah/tadah.mlip/-/blob/develop/docs/source/descriptors.rst).
+   [Tadah.MLIP/docs/source/descriptors.rst](https://git.ecdf.ed.ac.uk/tadah/tadah.mlip/-/blob/v1-dev/docs/source/descriptors.rst).
