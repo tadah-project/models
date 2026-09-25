@@ -7,6 +7,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [1.5.1] — 2026-09-23
 
+### Added
+- `require_dimer_element_pairs(context, d2, dm)` (`descriptors/dimer_element_pairs.h`) and `D_Base::applies_to_every_element_pair()`. The `DIMER` evaluators (MLIP's `DescriptorsCalc::calc_dimer`, `pair_style tadah`'s `compute_dimers`) evaluate every atom as Z=1, so a `TYPE2B`/`TYPEMB` descriptor declared for specific element pairs (`N N`) applied to no pair they see, and the model predicted from zero descriptors without a word (`tadah predict` gave 0 eV for the published Tadah!N2 potential with `N N` pairs). With `DIMER` on, each switched-on, non-empty descriptor must apply to every element pair, i.e. be declared with `* *`; otherwise the function throws `DIMER evaluates every atom as Z=1; declare TYPE2B/TYPEMB with * * element pairs` and names the line. A `D2_mJoin`/`DM_mJoin` applies to every pair when each descriptor it joins does. MLIP and Tadah.LAMMPS call it when they load a potential. Test: `test_dimer_element_pairs.cpp`.
+
 ### Changed
 - Framework version `1.5.1`, read from CORE's `blueprint/blueprint_tadah.toml` after the Tadah dependencies are fetched, so the module reports the right version in every layout (sibling checkout or FetchContent). A missing blueprint is now a configure error instead of a silent `0.0.0`.
 - Tests take Catch2 and its test discovery from cmake-tools (`tadah_setup_tests()`, `include(Catch)`); the vendored `tests/catch2/catch.hpp`, `tests/Catch.cmake` and `tests/CatchAddTests.cmake` are removed. Every discovered CTest entry now selects exactly its own test case and passes `--warn NoTests`, so an entry that matches no test case fails instead of passing.
