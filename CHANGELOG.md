@@ -5,6 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **`D2_mJoin` / `DM_mJoin` no longer round their grids.** `D_mJoin::parse_context()` re-rendered every split CGRID/SGRID/CEMBFUNC/SEMBFUNC/AMPGRIDMB/KDEG\* value with NUMERIC (default 12) fixed decimals on every construction and every `reinit()`: values closer than 1e-12 collapsed, values below 5e-13 became 0, and an HPO step that small on an mJoin grid was invisible to the descriptor. The split is lossless now, so standalone mJoin numerics shift by up to 5e-13 absolute. Neither `parse_context()` nor the evidence-approximation solver (`ea.h`) inserts NUMERIC into the caller's context any more (one source of the `NUMERIC 12` line in HPO potentials). Test: `test_mjoin_precision.cpp`.
+- `D_Base::get_grid` accepts subnormal grid values (e.g. `1e-310` written by an HPO step) instead of failing with "Invalid grid specification".
+- **`normalize_knot_rcut` (train, predict, `refit --edit`, hpo startup) sets a knot channel's RCUT2B/RCUTMB to exactly its largest knot.** A stated value within 1e-9 relative was kept, while hpo re-derives the cutoff exactly, so the same potential could run with slightly different cutoffs in train/predict and in hpo. A gap above 1e-9 relative is still a WARNING; a smaller one (e.g. the ~3e-13 left in knot potentials written by <= 1.5.0) is fixed at INFO, except under a smooth cutoff: `pair_style tadah` reads the stated RCUT, so LAMMPS then differs from train/predict/hpo, and the WARNING says to re-write the potential (train, `refit --edit` or hpo `best_pot.tadah`). Test: `test_pot_curve_edit.cpp`.
+
 ## [1.4.0] — 2026-07-14
 
 ### Added

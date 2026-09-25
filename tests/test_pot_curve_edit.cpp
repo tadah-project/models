@@ -1,11 +1,15 @@
 #include "catch2/catch.hpp"
 #include <tadah/core/context.h>
+#include <tadah/core/logger.h>
+#include <tadah/core/number_format.h>
 #include <tadah/core/periodic_table.h>
 #include <tadah/models/eam/pot_curve_edit.h>
 #include <tadah/models/descriptors/d2/d2_knot5.h>
 #include <tadah/models/descriptors/dm/dm_ream.h>
 
 #include <cmath>
+#include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -501,6 +505,122 @@ TEST_CASE_METHOD(EditFixture, "potedit: derived/normalized knot RCUT",
     REQUIRE_FALSE(normalize_knot_rcut(b, "test"));
     REQUIRE(b.get<double>("RCUT2B") == 5.0);
   }
+  SECTION("a consistent stated RCUT is left alone") {
+    Context k = make_knot_pot();
+    REQUIRE_FALSE(normalize_knot_rcut(k, "test"));
+    REQUIRE(k.get<double>("RCUT2B") == 5.0);
+  }
+}
+
+TEST_CASE_METHOD(EditFixture,
+                 "potedit: normalize_knot_rcut rewrites ANY difference "
+                 "exactly; WARNING only above 1e-9 relative",
+                 "[potedit][lossless]") {
+  // Every consumer (train, predict, refit --edit, hpo) must evaluate the
+  // same cutoff as hpo's per-evaluation derivation, so no dead band: a
+  // stated value 3e-13 off (the <= 1.5.0 12-decimal CGRID gap) is fixed
+  // too, quietly (INFO); a real mismatch still warns.
+  auto &log = tadah::core::Logger::instance();
+  const auto old_level = log.getLogLevel();
+  log.setLogLevel(tadah::core::LogLevel::WARNING);
+  auto normalize_capturing = [](Context &k, std::string &out) {
+    std::ostringstream captured;
+    std::streambuf *old_buf = std::cout.rdbuf(captured.rdbuf());
+    const bool changed = normalize_knot_rcut(k, "test");
+    std::cout.rdbuf(old_buf);
+    out = captured.str();
+    return changed;
+  };
+  std::string text;
+  for (double off : {3e-13, -3e-13, 1e-11, -1e-11}) {
+    INFO("offset " << off);
+    Context k = make_knot_pot();
+    k.remove("RCUT2B");
+    k.add("RCUT2B", 5.0 + off);
+    REQUIRE(normalize_capturing(k, text));
+    CHECK(k.get<double>("RCUT2B") == 5.0);    // exact, not Approx
+    CHECK(k.get<double>("RCUT2BMAX") == 5.0);
+    CHECK(text.find("WARNING") == std::string::npos);
+    REQUIRE_FALSE(normalize_capturing(k, text));  // idempotent
+  }
+  for (double off : {1e-8, -1e-8, 0.3}) {
+    INFO("offset " << off);
+    Context k = make_knot_pot();
+    k.remove("RCUT2B");
+    k.add("RCUT2B", 5.0 + off);
+    REQUIRE(normalize_capturing(k, text));
+    CHECK(k.get<double>("RCUT2B") == 5.0);
+    CHECK(text.find("RCUT2B") != std::string::npos);
+    // the stated value is printed exactly (it may differ in digit 13)
+    CHECK(text.find(tadah::core::format_roundtrip(5.0 + off)) !=
+          std::string::npos);
+  }
+  log.setLogLevel(old_level);
+}
+
+TEST_CASE_METHOD(EditFixture,
+                 "potedit: normalize_knot_rcut under a smooth cutoff warns "
+                 "that pair_style tadah reads the stated RCUT",
+                 "[potedit][lossless]") {
+  // Under a smooth RCTYPE the cutoff enters f_c(r) of every pair, and the
+  // LAMMPS plugin (never modified) reads the stated RCUT: a legacy knot pot
+  // with a 3e-13 gap then predicts differently in LAMMPS than in
+  // train/predict/hpo. That must be visible at the default level; under
+  // Cut_Dummy (prediction-exact) it stays INFO without the note.
+  auto &log = tadah::core::Logger::instance();
+  const auto old_level = log.getLogLevel();
+  log.setLogLevel(tadah::core::LogLevel::WARNING);
+  auto normalize_capturing = [](Context &k, std::string &out) {
+    std::ostringstream captured;
+    std::streambuf *old_buf = std::cout.rdbuf(captured.rdbuf());
+    const bool changed = normalize_knot_rcut(k, "test");
+    std::cout.rdbuf(old_buf);
+    out = captured.str();
+    return changed;
+  };
+  std::string text;
+  for (const char *rctype : {"Cut_Cos", "Cut_Poly"}) {
+    for (double off : {3e-13, -3e-13, 0.3}) {
+      INFO(rctype << " offset " << off);
+      Context k = make_knot_pot();
+      k.remove("RCTYPE2B");
+      k.add("RCTYPE2B", rctype);
+      k.remove("RCUT2B");
+      k.add("RCUT2B", 5.0 + off);
+      REQUIRE(normalize_capturing(k, text));
+      CHECK(k.get<double>("RCUT2B") == 5.0);
+      CHECK(text.find("WARNING") != std::string::npos);
+      CHECK(text.find("pair_style tadah") != std::string::npos);
+      CHECK(text.find(tadah::core::format_roundtrip(5.0 + off)) !=
+            std::string::npos);
+      REQUIRE_FALSE(normalize_capturing(k, text));  // idempotent, silent
+      CHECK(text.empty());
+    }
+  }
+  // the many-body knot channel follows its own RCTYPEMB
+  {
+    Context k = make_knot_pot();
+    k.remove("RCTYPEMB");
+    k.add("RCTYPEMB", "Cut_Cos");
+    k.remove("RCUTMB");
+    k.add("RCUTMB", 4.8 + 3e-13);
+    REQUIRE(normalize_capturing(k, text));
+    CHECK(text.find("WARNING") != std::string::npos);
+    CHECK(text.find("RCUTMB") != std::string::npos);
+    CHECK(text.find("pair_style tadah") != std::string::npos);
+  }
+  // hard cutoff: sub-1e-9 gap stays below WARNING, and no LAMMPS note
+  {
+    Context k = make_knot_pot();  // RCTYPE2B Cut_Dummy
+    k.remove("RCUT2B");
+    k.add("RCUT2B", 5.0 + 3e-13);
+    log.setLogLevel(tadah::core::LogLevel::INFO);
+    REQUIRE(normalize_capturing(k, text));
+    CHECK(text.find("INFO") != std::string::npos);
+    CHECK(text.find("WARNING") == std::string::npos);
+    CHECK(text.find("pair_style tadah") == std::string::npos);
+  }
+  log.setLogLevel(old_level);
 }
 
 TEST_CASE_METHOD(EditFixture, "potedit: pure two-body potentials",

@@ -16,8 +16,11 @@
 // - Knot channels: the basis vanishes C^4-smoothly at its own largest knot,
 //   so the TRUE effective cutoff IS max(knot centre) and RCUT2B/RCUTMB are
 //   DERIVED quantities — `derived_knot_rcut` computes them and
-//   `normalize_knot_rcut` warns + rewrites a stale stated value. Moving RCUT
-//   anywhere >= max knot is prediction-exact.
+//   `normalize_knot_rcut` rewrites any stated value that differs (warning
+//   when the gap is real, or under a smooth cutoff, where pair_style tadah
+//   still reads the stated value). Moving RCUT anywhere >= max knot is
+//   prediction-exact under a hard cutoff only: a smooth cutoff's f_c(r)
+//   depends on RCUT for every pair.
 // - Blip channels: RCUT is AUTHORITATIVE and is never auto-changed. Under a
 //   discontinuous cutoff (Cut_Dummy) a bump whose support crosses RCUT is
 //   hard-truncated mid-tail -> phi(RCUT) != 0 -> an energy/force step at the
@@ -135,10 +138,16 @@ std::optional<double> derived_knot_rcut(const core::Context &ctx,
 
 /** \brief F2 normalisation shared by every consumer (refit --edit, train,
  *  predict, hpo startup): for each KNOT channel compare the stated
- *  RCUT2B/RCUTMB against `derived_knot_rcut` and, on mismatch, log a WARNING
- *  (prefixed with `who`) and rewrite the key in ctx (RCUT*MAX follows via
- *  Context internal-key derivation). Bump channels are never modified.
- *  Returns true if anything changed. */
+ *  RCUT2B/RCUTMB against `derived_knot_rcut` and, whenever they differ at
+ *  all (exact comparison), rewrite the key in ctx (RCUT*MAX follows via
+ *  Context internal-key derivation), so every consumer uses the same
+ *  cutoff. A difference above 1e-9 relative is logged as a WARNING, a
+ *  smaller one (e.g. the ~3e-13 gap of <= 1.5.0 knot pots) at INFO; both
+ *  prefixed with `who`. Under a smooth cutoff (not
+ *  `channel_cutoff_is_discontinuous`) any difference is a WARNING that
+ *  also says pair_style tadah reads the stated value (LAMMPS then differs
+ *  from train/predict/hpo on that file until it is re-written). Bump
+ *  channels are never modified. Returns true if anything changed. */
 bool normalize_knot_rcut(core::Context &ctx, const std::string &who);
 
 /** \brief Support half-width w of a BUMP channel, from the pot Context alone:
