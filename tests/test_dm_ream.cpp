@@ -67,8 +67,12 @@ TEST_CASE_METHOD(ReamFixture, "DM_REAM constructs and sizes", "[ream]") {
   REQUIRE(dm.rhoip_size() == 5);    // one g'_m per output
 }
 
-TEST_CASE_METHOD(ReamFixture, "DM_REAM energy matches the intended basis sum", "[ream]") {
+namespace {
+// Embedding outputs vs the public blip basis. EMBF0 ZERO (default): the
+// zero-referenced basis B(s(rho-c)) - B(s(0-c)); EMBF0 FREE: the raw basis.
+void check_ream_basis_sum(bool free) {
   Context c = make_ream_context();
+  if (free) c.add("EMBF0", "FREE");
   DM_REAM dm(c);
   Cut_Cos fc(c.get<double>("RCUTMB"));
   dm.set_fcut(&fc, false);
@@ -106,11 +110,21 @@ TEST_CASE_METHOD(ReamFixture, "DM_REAM energy matches the intended basis sum", "
   dm.calc_aed(rho0, aed);
   double excited = 0.0;
   for (std::size_t m = 0; m < cemb.size(); ++m) {
-    const double expected = B(semb[m] * (rho0_expected - cemb[m]));
+    const double raw = B(semb[m] * (rho0_expected - cemb[m]));
+    const double expected = free ? raw : raw - B(semb[m] * (0.0 - cemb[m]));
     REQUIRE(aed(m) == Approx(expected).margin(1e-12));
     excited += std::fabs(aed(m));
   }
   REQUIRE(excited > 0.0);
+}
+} // namespace
+
+TEST_CASE_METHOD(ReamFixture, "DM_REAM energy matches the intended basis sum",
+                 "[ream][embf0]") {
+  SECTION("EMBF0 ZERO (default): zero-referenced basis") {
+    check_ream_basis_sum(false);
+  }
+  SECTION("EMBF0 FREE: raw basis") { check_ream_basis_sum(true); }
 }
 
 TEST_CASE_METHOD(ReamFixture, "DM_REAM force matches finite-difference of energy", "[ream]") {

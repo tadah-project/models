@@ -3,11 +3,33 @@
 #include <tadah/core/logger.h>
 #include <tadah/core/stats/data_stats.h>
 #include <algorithm>
+#include <atomic>
 
 #include <stdexcept>
 
 namespace tadah {
 namespace models {
+
+namespace {
+// One notice per process when a DM_REAM model is built from a context that
+// does not declare EMBF0 (the default ZERO applies). A trained potential
+// (WEIGHTS stored) gets a WARNING: if it was written by tadah 1.5.0 or
+// earlier its energies change.
+std::atomic<bool> embf0_noticed{false};
+void notice_missing_embf0(const tadah::core::Context &ctx) {
+  if (embf0_noticed.exchange(true)) return;
+  auto &log = tadah::core::Logger::instance();
+  if (!ctx.has_stored("WEIGHTS")) {
+    log.log(tadah::core::LogLevel::INFO,
+            "DM_REAM: EMBF0 not set; using the default EMBF0 ZERO "
+            "(zero-referenced embedding, F(0) = 0 by construction).");
+    return;
+  }
+  log.log(tadah::core::LogLevel::WARNING,
+          "DM_REAM: EMBF0 not set; " +
+              embf0_absent_consequence(model_is_linear(ctx)));
+}
+}  // namespace
 
 DM_REAM::DM_REAM() { init(); }
 
@@ -74,6 +96,7 @@ DM_REAM::DM_REAM(const tadah::core::Context& ctx) : DM_Base(ctx) {
   D_Base::printGrid(cemb, "CEMBFUNC");
 
   validate_grids();
+  setup_embedding_reference(ctx);
 
   s         = cemb.size();   // M embedding outputs (linear weights live in M_BLR)
   rhoisize  = 1;             // scalar density rho_i
@@ -143,6 +166,30 @@ double DM_REAM::dgemb(std::size_t m, double rho) const {
   return embedding_deriv(basis, rho, s, cemb[m], emb_deg(m));
 }
 
+void DM_REAM::setup_embedding_reference(const tadah::core::Context& ctx) {
+  const bool declared = ctx.has_stored("EMBF0");
+  // absent -> default ZERO, materialised; throws on an invalid value before
+  // any member changes
+  const EmbF0Mode mode = embf0_from_context(ctx);
+  if (!declared) notice_missing_embf0(ctx);
+  tadah::core::v_type g0a, g0e;
+  if (mode == EmbF0Mode::Zero) {   // FREE: raw basis, no reference, no FP work
+    const std::size_t M = cemb.size();
+    g0a.resize(M);
+    g0e.resize(M);
+    for (std::size_t m = 0; m < M; ++m) {
+      g0a[m] = gemb(m, 0.0);                       // calc_aed's routine
+      const double s = (m < semb.size()) ? semb[m] : 1.0;
+      double v, d;
+      embedding_value_deriv(basis, 0.0, s, cemb[m], v, d, emb_deg(m));
+      g0e[m] = v;                                  // eam_embed's routine
+    }
+  }
+  embf0_ = mode;
+  g0_aed_.swap(g0a);
+  g0_emb_.swap(g0e);
+}
+
 // ------------------------------ density --------------------------------
 
 void DM_REAM::calc_rho(
@@ -167,9 +214,23 @@ void DM_REAM::calc_aed(
 {
   const double rho_i = rho(rfidx);
   const std::size_t M = cemb.size();
+  if (embf0_ == EmbF0Mode::Free) {
+    for (std::size_t m = 0; m < M; ++m) {
+      aed(fidx + m) += gemb(m, rho_i);   // F(rho) = sum_m c_m g_m(rho)  (c_m in M_BLR)
+      rho(drfidx + m) = dgemb(m, rho_i); // store g'_m(rho_i) for the force descriptor
+    }
+    return;
+  }
+  // EMBF0 ZERO: F(rho) = sum_m c_m (g_m(rho) - g_m(0)). At rho == 0 every
+  // output is exactly zero, so nothing is added (exact whatever the FP
+  // contraction); g'_m(0) is still stored for the force descriptor.
+  if (rho_i == 0.0) {
+    for (std::size_t m = 0; m < M; ++m) rho(drfidx + m) = dgemb(m, rho_i);
+    return;
+  }
   for (std::size_t m = 0; m < M; ++m) {
-    aed(fidx + m) += gemb(m, rho_i);   // F(rho) = sum_m c_m g_m(rho)  (c_m in M_BLR)
-    rho(drfidx + m) = dgemb(m, rho_i); // store g'_m(rho_i) for the force descriptor
+    aed(fidx + m) += gemb(m, rho_i) - g0_aed_[m];
+    rho(drfidx + m) = dgemb(m, rho_i);
   }
 }
 
@@ -253,15 +314,39 @@ void DM_REAM::eam_embed(const tadah::core::t_type &w_full, const double rho_bar,
                         double &F, double &Fp) const {
   F = 0.0; Fp = 0.0;
   const std::size_t M = cemb.size();
+  if (embf0_ == EmbF0Mode::Free) {
+    for (std::size_t m = 0; m < M; ++m) {
+      const double w = w_full(fidx + m);
+      const double s = (m < semb.size()) ? semb[m] : 1.0;
+      double emb_value, emb_deriv;
+      embedding_value_deriv(basis, rho_bar, s, cemb[m],
+                            emb_value, emb_deriv, emb_deg(m));
+      F  += w * emb_value;
+      Fp += w * emb_deriv;
+    }
+    return;
+  }
+  // EMBF0 ZERO: the same zero-referenced basis as calc_aed, subtracted per
+  // term so this kernel mirrors w.aed; F' is untouched.
   for (std::size_t m = 0; m < M; ++m) {
     const double w = w_full(fidx + m);
     const double s = (m < semb.size()) ? semb[m] : 1.0;
     double emb_value, emb_deriv;
     embedding_value_deriv(basis, rho_bar, s, cemb[m],
                           emb_value, emb_deriv, emb_deg(m));
-    F  += w * emb_value;
+    F  += w * (emb_value - g0_emb_[m]);
     Fp += w * emb_deriv;
   }
+  if (rho_bar == 0.0) F = 0.0;
+}
+
+std::optional<double>
+DM_REAM::raw_embedding_f0(const tadah::core::t_type &w_full) const {
+  const std::size_t M = cemb.size();
+  if (w_full.size() < fidx + M) return std::nullopt;
+  double acc = 0.0;
+  for (std::size_t m = 0; m < M; ++m) acc += w_full(fidx + m) * gemb(m, 0.0);
+  return acc;
 }
 
 // ------------------------------- misc ----------------------------------
@@ -386,6 +471,7 @@ bool DM_REAM::reinit(const tadah::core::Context& ctx) {
   if (ctx.contains("KDEGEMB") && ctx.size("KDEGEMB") > 0)
     get_grid(ctx, "KDEGEMB", demb_deg);
   validate_grids();
+  setup_embedding_reference(ctx);   // unconditional: CEMBFUNC/SEMBFUNC may move
   s         = cemb.size();
   rhoisize  = 1;
   rhoipsize = s;

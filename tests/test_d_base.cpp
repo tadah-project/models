@@ -4,8 +4,14 @@
 #include <tadah/core/context.h>
 #include <tadah/core/core_types.h>
 #include <tadah/core/periodic_table.h>
+#include <tadah/core/core_user_config_parser.h>
+#include <tadah/core/number_format.h>
 
 #include <cmath>
+#include <limits>
+#include <sstream>
+#include <string>
+#include <vector>
 
 using namespace tadah::core;
 using namespace tadah::models;
@@ -198,4 +204,48 @@ TEST_CASE_METHOD(WatomTestFixture, "WATOM single-species H reduces to old per-Zj
   D2_Blip d(c);
   CHECK(d.dweight_dw_n(1, 1, 1) == Approx(1.0));
   CHECK(d.weights[1][1] == Approx(1.0));
+}
+
+TEST_CASE("D_Base::get_grid reads the subnormal values the lossless writers "
+          "produce", "[D_Base][lossless]") {
+  // Context::add(double) and write_potential() now keep a subnormal (the
+  // old fixed-decimal rendering flushed it to 0); std::stod threw
+  // out_of_range on it, so get_grid rejected the grid.
+  const double sub = 1e-310;
+  const double dmin = std::numeric_limits<double>::denorm_min();
+  SECTION("plain tokens") {
+    const v_type g = D_Base::get_grid(std::vector<std::string>{
+        "1.0", format_roundtrip(sub), "2.0", format_roundtrip(-dmin)});
+    REQUIRE(g.size() == 4);
+    CHECK(g[1] == sub);
+    CHECK(g[3] == -dmin);
+  }
+  SECTION("LIN/GEOM endpoints") {
+    const v_type g = D_Base::get_grid(
+        std::vector<std::string>{"LIN", "3", "0", "1e-310"});
+    REQUIRE(g.size() == 3);
+    CHECK(g.back() == sub);
+  }
+  SECTION("Context add -> write_potential -> reparse -> get_grid") {
+    Context c;
+    c.add("CGRID2B", std::vector<double>{1.0, sub, 2.0});
+    std::ostringstream os;
+    c.write_potential(os, 18);
+    std::istringstream in(os.str());
+    const Context back = CoreUserConfigParser().parse(in);
+    v_type g;
+    D_Base::get_grid(back, "CGRID2B", g);
+    REQUIRE(g.size() == 3);
+    CHECK(g[0] == 1.0);
+    CHECK(g[1] == sub);
+    CHECK(g[2] == 2.0);
+  }
+  SECTION("non-numbers and overflow are still rejected") {
+    CHECK_THROWS_AS(D_Base::get_grid(std::vector<std::string>{"abc"}),
+                    std::invalid_argument);
+    CHECK_THROWS_AS(D_Base::get_grid(std::vector<std::string>{"1e400"}),
+                    std::invalid_argument);
+    CHECK_THROWS_AS(D_Base::get_grid(std::vector<std::string>{"1.5x"}),
+                    std::invalid_argument);
+  }
 }

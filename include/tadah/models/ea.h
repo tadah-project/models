@@ -128,8 +128,6 @@ class EA {
       // D is a filter factors matrix
       double *d = new double[sizeS];
 
-      int numeric=context.get<int>("NUMERIC");
-
       tadah::core::t_type m_n(sizeS);
       int m = svd.rows();
       int n = svd.cols();
@@ -177,8 +175,8 @@ class EA {
           break;
         }
       }
-      if (convergence_status && verbose) std::cout << "Number of steps for convergence: " + tadah::core::to_string(counter,numeric) << std::endl;
-      if (!convergence_status && verbose) std::cout << "Max number of steps reached: " + tadah::core::to_string(counter,numeric) << std::endl;
+      if (convergence_status && verbose) std::cout << "Number of steps for convergence: " + std::to_string(counter) << std::endl;
+      if (!convergence_status && verbose) std::cout << "Max number of steps reached: " + std::to_string(counter) << std::endl;
 
       delete [] eval;
       delete [] d;

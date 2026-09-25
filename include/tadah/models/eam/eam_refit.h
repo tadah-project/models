@@ -44,7 +44,13 @@ struct EAMRefitConfig {
   double reach_smin  = 0.75;   ///< reachability probe: min linear compression a/a0
                                ///<  (0.75 ~ V/V0 = 0.42, multi-hundred-GPa regime)
   double reach_margin = 1.25;  ///< safety margin on the reachable rho window
-  bool constrain_F0  = true;   ///< pin F(0) to the table's value (isolated-atom ref)
+  bool constrain_F0  = true;   ///< pin F(0) to the table's value (isolated-atom ref);
+                               ///<  FREE only (exact by construction under ZERO)
+  /// EMBF0 ZERO: fit and evaluate the zero-referenced embedding
+  /// g~_m(rho) = g_m(rho) - g_m(0) against F_ref = F_tab - F_tab(0), so
+  /// F(0) = 0 exactly (the DM_REAM default). false = EMBF0 FREE: the raw basis
+  /// against the raw table, bit-identical to tadah 1.5.0.
+  bool embf0_zero = true;
 };
 
 /** \brief Goodness-of-fit statistics for one 1-D fit. */
@@ -63,10 +69,23 @@ struct FitStats {
  *   3. embedding \f$F(\rho) \to \sum_m c^{mb}_m g_m(\rho)\f$ (linear weights),
  * then assembles a standard `pot.tadah` Context (D2_Blip + DM_REAM) whose
  * WEIGHTS are `[c^{2b} | c^{mb}]`.
+ *
+ * Under EMBF0 ZERO (EAMRefitConfig::embf0_zero) the embedding is fitted and
+ * evaluated in the zero-referenced basis \f$g_m(\rho)-g_m(0)\f$ against the
+ * zero-referenced table F_ref, exactly as DM_REAM evaluates it.
  */
 class EAMRefit {
 public:
+  /** `eam` must have its splines built (EAMSetflIO::build_splines()). */
   EAMRefit(const EAMSetflIO &eam, const EAMRefitConfig &cfg);
+
+  /** EMBF0 ZERO (true) or FREE (false), from EAMRefitConfig::embf0_zero. */
+  bool embf0_zero() const { return cfg_.embf0_zero; }
+
+  /** The table embedding in the reference the native F represents: FREE ->
+   *  eam.F_tab(rho) verbatim; ZERO -> eam.F_tab(rho) - eam.F_tab(0), exactly 0
+   *  at rho = 0. The table itself is never modified (DM_EAM reads it). */
+  double F_ref(double rho) const;
 
   /** Basis family, parsed from EAMRefitConfig::basis into the shared BasisKind
    *  enum. For Knot5 the orientation is per channel: phi/rho LEFT-active
@@ -92,13 +111,14 @@ public:
                     const std::vector<double> &c,
                     const std::vector<int> &deg = {});
   /** Rebuild WEIGHTS and the per-function stats after injections. Stats are
-   *  evaluated on [rwin_lo, rcut] (phi, rho) and [0, rho_win_hi] (F). */
+   *  evaluated on [rwin_lo, rcut] (phi, rho) and [0, rho_win_hi] (F, against
+   *  F_ref). */
   void finalize_injected(double rwin_lo, double rho_win_hi);
 
   // Native fitted functions (cutoff-weighted; ready for the setfl writer).
   double phi_fit(double r) const;     ///< pair function phi(r)
   double rho_fit(double r) const;     ///< density rho(r)
-  double F_fit(double rho) const;     ///< embedding F(rho)
+  double F_fit(double rho) const;     ///< embedding F(rho) (ZERO: F_fit(0) == 0.0)
 
   // Tabulation variants for the round-trip setfl: identical to *_fit above the
   // inner fit bound r_lo; below it a smooth C2-matched exp(A+B*dr+C*dr^2)
@@ -113,7 +133,9 @@ public:
   /** F for the setfl writer: F_fit inside [0, rho_join], the ORIGINAL table
    *  (offset-matched at the join) beyond it. Dense mode: rho_join = rhomax,
    *  identical to F_fit; compact mode: rho_join = the reachable-window edge
-   *  (the blips only cover the window — beyond it they decay to garbage). */
+   *  (the blips only cover the window — beyond it they decay to garbage).
+   *  EMBF0 ZERO: F_setfl(0) == F_fit(0) == 0.0, and F_tab(0) cancels in the
+   *  join offset, so the continuation follows F_ref. */
   double F_setfl(double rho) const;
   void set_rho_join(double rj) { rho_join_ = rj; }
   double rho_join() const { return rho_join_; }
@@ -168,6 +190,9 @@ private:
    *  the remaining samples with the remaining blips, stage-A contribution
    *  subtracted (crude but sane tail, no scale competition with the window).
    *  Optional pin: one heavily-weighted row y(pin_x)=pin_y in stage A.
+   *  `zero_ref` (EMBF0 ZERO, embedding channel): every value use (pin row
+   *  included) takes the zero-referenced column b_k(x) - b_k(0); fit() then
+   *  passes no pin (the F(0) row would be identically zero).
    *  Returned stats cover the window samples only. */
   FitStats lsq_fit_windowed(const std::vector<double> &xs,
                             const std::vector<double> &ys,
@@ -176,7 +201,12 @@ private:
                             const tadah::core::v_type &widths,
                             bool apply_cutoff,
                             tadah::core::v_type &coeffs,
-                            bool pin, double pin_x, double pin_y) const;
+                            bool pin, double pin_x, double pin_y,
+                            bool zero_ref = false) const;
+  /** EMBF0 ZERO: recompute g0F_ = g_m(0) with F_fit's evaluator. Called
+   *  whenever the F basis changes (fit(), set_blip_fit(Fn::F)); clears it
+   *  under FREE. */
+  void refresh_embedding_reference();
   double cutoff(double r) const;
 
   const EAMSetflIO &eam_;
@@ -186,10 +216,12 @@ private:
   double rho_join_ = 0.0;  ///< F tabulation join (ctor sets rhomax)
   double r_reach_ = 0.0, rho_reach_ = 0.0;
   bool lattice_known_ = false;
+  double F0tab_ = 0.0;     ///< EMBF0 ZERO: eam.F_tab(0) (ctor; unused under FREE)
 
   tadah::core::v_type cgrid2b_, sgrid2b_, c2b_;   // two-body
   tadah::core::v_type crho_, srho_, arho_;        // density (baked)
   tadah::core::v_type cF_, sF_, cmb_;             // embedding (linear)
+  tadah::core::v_type g0F_;                       // ZERO: g_m(0); empty (FREE)
   std::vector<int> deg2b_, degrho_, degF_;        // knot degrees (empty = all 5)
   tadah::core::v_type weights_;                   // [c2b | cmb]
 

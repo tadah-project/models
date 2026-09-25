@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <iomanip>
 #include <limits>
 #include <sstream>
 #include <stdexcept>
@@ -18,6 +19,7 @@
 #include <tadah/models/descriptors/d2/d2_blip5.h>
 #include <tadah/models/descriptors/d2/d2_knot5.h>
 #include <tadah/models/descriptors/dm/dm_ream.h>
+#include <tadah/core/number_format.h>
 
 namespace tadah {
 namespace models {
@@ -81,6 +83,14 @@ void add_degs(core::Context &c, const std::string &key,
   for (int d : deg) c.add(key, static_cast<double>(d));
 }
 
+// Raw basis function k of a curve at x, with CurveView::value's evaluator
+// (for the bump families the bare radial form IS the embedding form).
+double basis_value(const CurveView &c, std::size_t k, double x) {
+  return c.right_active
+      ? embedding_value(c.family, x, c.width(k), c.mu[k], c.degree(k))
+      : radial_value_bare(c.family, x, c.width(k), c.mu[k], c.degree(k));
+}
+
 }  // namespace
 
 // ---------------------------------------------------------------------------
@@ -93,6 +103,16 @@ double CurveView::support_infinity() {
 
 double CurveView::value(double x) const {
   if (!right_active && rcut > 0.0 && x > rcut) return 0.0;  // Cut_Dummy
+  if (zero_ref) {
+    // EMBF0 ZERO: sum_k coeff_k (g_k(x) - g_k(0)), each term formed as
+    // DM_REAM::calc_aed forms it; exactly 0 at x == 0.
+    if (x == 0.0) return 0.0;
+    double acc = 0.0;
+    for (std::size_t k = 0; k < n(); ++k)
+      acc += coeff[k] *
+             (basis_value(*this, k, x) - basis_value(*this, k, 0.0));
+    return acc;
+  }
   double acc = 0.0;
   for (std::size_t k = 0; k < n(); ++k) {
     acc += coeff[k] * (right_active
@@ -240,6 +260,14 @@ PotEAMView parse_pot_view(const core::Context &ctx) {
     // ---- F (embedding) ----
     v.F.family = mbk;
     v.F.right_active = (mbk == BasisKind::Knot5);
+    // EMBF0 is a property of the potential (absent -> the default ZERO):
+    // the F view evaluates the embedding reference DM_REAM evaluates.
+    try {
+      v.embf0 = stored_embf0(ctx).value_or(EmbF0Mode::Zero);
+    } catch (const std::exception &e) {
+      throw std::runtime_error(std::string("pot edit: ") + e.what());
+    }
+    v.F.zero_ref = (v.embf0 == EmbF0Mode::Zero);
     v.F.mu = read_grid(ctx, "CEMBFUNC");
     if (v.F.mu.empty())
       throw std::runtime_error("pot edit: CEMBFUNC is empty.");
@@ -309,8 +337,9 @@ core::Context rebuild_pot_context(const PotEAMView &v) {
   // ---- many-body ----
   // DM_REAM is regenerated from the (possibly edited) rho/F views; a pure
   // two-body potential has nothing to write; a FOREIGN many-body descriptor
-  // is left completely untouched (its keys survive in the cloned Context and
-  // its WEIGHTS block rides along in v.tail).
+  // is left untouched (its keys survive in the cloned Context and its
+  // WEIGHTS block rides along in v.tail) — only EMBF0 follows the writers'
+  // rule below.
   if (ream) {
     // DM_REAM <bcode> <nC> <nS> <nAmp> <nEc> <nEs> <nKd> <nKe> El El
     c.remove("TYPEMB");
@@ -334,6 +363,13 @@ core::Context rebuild_pot_context(const PotEAMView &v) {
     c.remove("SEMBFUNC");
     if (!knotmb) add_all(c, "SEMBFUNC", v.F.eta);
     add_degs(c, "KDEGEMB", v.F.deg);
+    // every DM_REAM potential tadah writes declares its embedding reference
+    c.remove("EMBF0");
+    c.add("EMBF0", std::string(embf0_name(v.embf0)));
+  } else {
+    // pure two-body / foreign: the writers' rule (a stray EMBF0 is dropped;
+    // a foreign DM_mJoin that carries DM_REAM gets the explicit key)
+    normalise_embf0_key(c);
   }
 
   // ---- weights + HPO coefficient-search seed (mirrors build_pot_context) ----
@@ -420,26 +456,59 @@ bool normalize_knot_rcut(core::Context &ctx, const std::string &who) {
     const std::string key = std::string("RCUT") + sfx;
     const bool have = ctx.contains(key) && ctx.size(key) > 0;
     const double stated = have ? ctx.get<double>(key) : -1.0;
-    if (have &&
-        std::fabs(stated - *derived) <=
-            1e-9 * std::max(1.0, std::fabs(*derived)))
-      continue;
+    // Exact: every consumer (train, predict, refit --edit, hpo startup and
+    // hpo's per-evaluation derivation) must use the same cutoff, so ANY
+    // difference is rewritten. Only a real mismatch is worth a WARNING; a
+    // gap within 1e-9 relative (e.g. the ~3e-13 left by the <= 1.5.0
+    // writers, which rounded CGRID to 12 decimals but not RCUT) is fixed
+    // at INFO.
+    if (have && stated == *derived) continue;
+    const bool mismatch =
+        !have || std::fabs(stated - *derived) >
+                     1e-9 * std::max(1.0, std::fabs(*derived));
+    // Shortest exact text: the values may differ in the 13th digit.
+    const std::string d_txt = core::format_roundtrip(*derived);
     std::ostringstream msg;
     msg << who << ": " << key << " ";
     if (!have) {
       msg << "is missing";
     } else if (stated < *derived) {
-      msg << stated << " is SMALLER than the largest knot (" << fmt(*derived)
+      msg << core::format_roundtrip(stated)
+          << " is SMALLER than the largest knot (" << d_txt
           << ") — knots beyond " << key << " were silently truncated";
     } else {
-      msg << stated << " differs from the largest knot (" << fmt(*derived)
+      msg << core::format_roundtrip(stated)
+          << " differs from the largest knot (" << d_txt
           << ") — the knot basis vanishes at its largest knot, so the "
           << "effective cutoff is the knot position";
     }
-    msg << "; using the derived value " << fmt(*derived)
+    msg << "; using the derived value " << d_txt
         << ". To change the effective cutoff, move the CGRID" << sfx
         << " knot positions.";
-    core::Logger::instance().log(core::LogLevel::WARNING, msg.str());
+    // pair_style tadah (Tadah.LAMMPS, never modified here) reads the stated
+    // RCUT from a potential file and does not re-derive it. Under a smooth
+    // cutoff the RCUT value enters f_c(r) of every pair, so LAMMPS then
+    // differs from train/predict/hpo on that file, even for a sub-1e-9 gap:
+    // say so at default visibility. A hard cutoff (Cut_Dummy) past the
+    // largest knot is prediction-exact: no note, INFO stays INFO.
+    const bool smooth_note = have && !channel_cutoff_is_discontinuous(ctx, sfx);
+    if (smooth_note) {
+      std::ostringstream gap;
+      gap << std::setprecision(2)
+          << std::fabs(stated - *derived) / std::max(1.0, std::fabs(*derived));
+      msg << " Under the smooth RCTYPE" << sfx << " the cutoff value enters "
+          << "every pair term, and pair_style tadah (LAMMPS) reads the stated "
+          << key << " without re-deriving it: on a potential file stating "
+          << core::format_roundtrip(stated) << ", LAMMPS differs from tadah "
+          << "train/predict/hpo (relative " << key << " gap " << gap.str()
+          << ") until the potential is re-written — a potential written by "
+          << "tadah train, tadah refit --edit or tadah hpo (best_pot.tadah) "
+          << "carries the derived value.";
+    }
+    core::Logger::instance().log(
+        (mismatch || smooth_note) ? core::LogLevel::WARNING
+                                  : core::LogLevel::INFO,
+        msg.str());
     ctx.remove(key);
     ctx.add(key, *derived);
     changed = true;
@@ -627,6 +696,27 @@ RemoveReport remove_basis(CurveView &c, double centre_request, bool radial) {
   }
 
   if (rep.removed_coeff != 0.0) {
+    // ---- zero-referenced F (EMBF0 ZERO): g_k(0) of every function ----
+    // Filled only under zero_ref; the raw path does no extra work.
+    std::vector<double> g0;
+    if (c.zero_ref) {
+      g0.resize(c.n());
+      for (std::size_t k = 0; k < c.n(); ++k) g0[k] = basis_value(c, k, 0.0);
+    }
+
+    // ---- compensators: up to two remaining BFs nearest in centre ----
+    std::vector<std::size_t> J;
+    {
+      std::vector<std::size_t> idx;
+      for (std::size_t k = 0; k < c.n(); ++k)
+        if (k != r) idx.push_back(k);
+      std::sort(idx.begin(), idx.end(), [&](std::size_t a, std::size_t b) {
+        return std::fabs(c.mu[a] - c.mu[r]) < std::fabs(c.mu[b] - c.mu[r]);
+      });
+      for (std::size_t i = 0; i < std::min<std::size_t>(2, idx.size()); ++i)
+        J.push_back(idx[i]);
+    }
+
     // ---- affected region ----
     const double r_lo = radial ? kCompensationRLoFrac * c.rcut : 0.0;
     double lo, hi;
@@ -647,24 +737,58 @@ RemoveReport remove_basis(CurveView &c, double centre_request, bool radial) {
       lo = c.mu[r];
       hi = x_hi + 0.25 * std::max(x_hi - x_lo, 1e-12);
     }
+    // A function "covers rho = 0" when |g(0)| exceeds a rounding-level
+    // threshold (the bumps are peak-normalised; an argument landing on a
+    // support edge by one ulp gives g(0) ~ 1e-48, which must not count).
+    auto covers0 = [&](std::size_t k) {
+      return c.zero_ref && std::fabs(g0[k]) > 1e-12;
+    };
+    bool comp_covers0 = false;
+    for (std::size_t j : J) comp_covers0 = comp_covers0 || covers0(j);
+    if (covers0(r) || comp_covers0) {
+      // Removing c_r (g_r - g_r(0)) with g_r(0) != 0 changes F across the
+      // WHOLE F domain: a bump leaves the constant +c_r g_r(0) beyond its
+      // support, a right-active knot (mu_r < 0) is active over all of it.
+      // Adjusting a compensator j with g_j(0) != 0 does the same with
+      // -dc_j g_j(0). Sample [0, largest upper support of all functions];
+      // right-active knots are open above: the convention of the knot branch
+      // (largest knot + a quarter of the span, 0 included).
+      double top = 0.0;
+      bool open = false;
+      for (std::size_t k = 0; k < c.n(); ++k) {
+        const double up = c.support(k).second;
+        if (up == CurveView::support_infinity()) open = true;
+        else top = std::max(top, up);
+      }
+      if (open) {
+        const double x_lo =
+            std::min(0.0, *std::min_element(c.mu.begin(), c.mu.end()));
+        const double x_hi =
+            std::max(0.0, *std::max_element(c.mu.begin(), c.mu.end()));
+        top = std::max(top, x_hi + 0.25 * std::max(x_hi - x_lo, 1e-12));
+      }
+      lo = 0.0;
+      hi = top;
+      rep.region_widened = true;
+      rep.notes.push_back(
+          std::string("EMBF0 ZERO: ") +
+          (covers0(r)
+               ? "the removed function has g(0) = " + fmt(g0[r]) +
+                     " (c g(0) = " + fmt(c.coeff[r] * g0[r]) + ")"
+               : std::string("a compensating function covers rho = 0")) +
+          ", so the edit changes F across the whole F domain (a function "
+          "with g(0) != 0 leaves the constant c g(0) beyond its support); "
+          "the compensation region was widened to the F domain [0, " +
+          fmt(top) + "].");
+    }
 
     if (hi > lo) {
-      // ---- compensators: up to two remaining BFs nearest in centre ----
-      std::vector<std::size_t> J;
-      {
-        std::vector<std::size_t> idx;
-        for (std::size_t k = 0; k < c.n(); ++k)
-          if (k != r) idx.push_back(k);
-        std::sort(idx.begin(), idx.end(), [&](std::size_t a, std::size_t b) {
-          return std::fabs(c.mu[a] - c.mu[r]) < std::fabs(c.mu[b] - c.mu[r]);
-        });
-        for (std::size_t i = 0; i < std::min<std::size_t>(2, idx.size()); ++i)
-          J.push_back(idx[i]);
-      }
-
       // ---- stacked value/1st/2nd rows on a dense sample of [lo, hi] ----
       constexpr std::size_t N = 512;
       auto bf = [&](std::size_t k, int order, double x) {
+        // zero_ref: the value order is g_k(x) - g_k(0) (exactly 0 at x == 0);
+        // the derivatives are the same in both embedding references.
+        if (order == 0 && c.zero_ref) return basis_value(c, k, x) - g0[k];
         if (c.right_active) {
           if (order == 0) return embedding_value (c.family, x, c.width(k), c.mu[k], c.degree(k));
           if (order == 1) return embedding_deriv (c.family, x, c.width(k), c.mu[k], c.degree(k));

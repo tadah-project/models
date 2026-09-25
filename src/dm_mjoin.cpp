@@ -87,6 +87,20 @@ std::string DM_mJoin::label() const {
   return lab;
 }
 
+std::optional<EmbF0Mode> DM_mJoin::embf0_mode() const {
+  for (auto d : ds)
+    if (auto m = d->embf0_mode()) return m;
+  return std::nullopt;
+}
+
+std::optional<double>
+DM_mJoin::raw_embedding_f0(const tadah::core::t_type &w_full) const {
+  std::optional<double> acc;
+  for (auto d : ds)
+    if (auto v = d->raw_embedding_f0(w_full)) acc = acc.value_or(0.0) + *v;
+  return acc;
+}
+
 void DM_mJoin::set_fidx(size_t fidx_) {
   fidx = fidx_;
   ds[0]->set_fidx(fidx_);

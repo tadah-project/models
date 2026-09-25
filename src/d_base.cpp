@@ -1,4 +1,5 @@
 #include "tadah/core/core_types.h"
+#include "tadah/core/number_format.h"
 #include "tadah/core/utils.h"
 #include <algorithm>
 #include <cmath>
@@ -16,25 +17,27 @@ core::v_type D_Base::get_grid(const std::vector<std::string>&vold) {
   auto it = vold.begin();
   while (it != vold.end()) {
     std::string token = *it++;
+    // core::to_double: std::stod that also accepts a subnormal value (the
+    // lossless Context/pot writers produce one for every subnormal double).
     if (core::to_upper(token) == "LIN") {
       size_t cg = std::stoul(*it++);
-      double cgmin = std::stod(*it++);
-      double cgmax = std::stod(*it++);
+      double cgmin = core::to_double(*it++);
+      double cgmax = core::to_double(*it++);
       core::v_type v = core::linspace(cgmin, cgmax, cg);
       vnew.insert(vnew.end(), v.begin(), v.end());
     }
     else if (core::to_upper(token) == "GEOM") {
       size_t cg = std::stoul(*it++);
-      double cgmin = std::stod(*it++);
-      double cgmax = std::stod(*it++);
+      double cgmin = core::to_double(*it++);
+      double cgmax = core::to_double(*it++);
       core::v_type v = core::geomspace(cgmin, cgmax, cg, exp(1));
       vnew.insert(vnew.end(), v.begin(), v.end());
     }
-    else if (!core::is_number(token)) {
-      throw std::invalid_argument("Invalid grid specification: " + token);
-    }
     else {
-      vnew.push_back(std::stod(token));
+      double v = 0.0;
+      if (!core::parse_number(token, v))
+        throw std::invalid_argument("Invalid grid specification: " + token);
+      vnew.push_back(v);
     }
   }
   return vnew;

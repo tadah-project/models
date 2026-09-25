@@ -4,6 +4,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <tadah/core/number_format.h>
 #include <tadah/models/descriptors/d_mjoin.h>
 #include <tadah/models/descriptors/d_base.h>
 #include <vector>
@@ -41,17 +42,16 @@ bool mjoin_can_handle(const tadah::core::Context &c, const std::string &type_str
 D_mJoin::D_mJoin() {}
 D_mJoin::~D_mJoin() {}
 
-std::vector<std::string> convert_to_strings(const tadah::core::v_type& vec, int precision) {
+// Lossless: each value is written as its shortest round-trip text, so the
+// sub-descriptor contexts see bit-identical grids. (A fixed NUMERIC-decimal
+// rendering here used to round every expanded grid value, and flush values
+// below 10^-NUMERIC to zero, on every mJoin construction and reinit.)
+std::vector<std::string> convert_to_strings(const tadah::core::v_type& vec) {
   std::vector<std::string> result;
-  std::ostringstream oss;
-  oss << std::fixed << std::setprecision(precision);
-
+  result.reserve(vec.size());
   for (double num : vec) {
-    oss.str("");   // Clear the stream
-    oss << num;
-    result.push_back(oss.str());
+    result.push_back(tadah::core::format_roundtrip(num));
   }
-
   return result;
 }
 
@@ -132,33 +132,32 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
   c.get(rcutkey, rcut);
   data_map[rcutkey]={&rcut, 0};
 
-  size_t p = c.get<size_t>("NUMERIC");
   std::vector<std::string> cgrid;
   if (c.contains(cgridkey)) {
     cgrid.resize(c.size(cgridkey));
     c.get(cgridkey, cgrid);
-    cgrid = convert_to_strings(D_Base::get_grid(cgrid),p); 
+    cgrid = convert_to_strings(D_Base::get_grid(cgrid));
     data_map[cgridkey] = {&cgrid, 0};
   }
   std::vector<std::string> sgrid;
   if (c.contains(sgridkey)) {
     sgrid.resize(c.size(sgridkey));
     c.get(sgridkey, sgrid);
-    sgrid = convert_to_strings(D_Base::get_grid(sgrid),p); 
+    sgrid = convert_to_strings(D_Base::get_grid(sgrid));
     data_map[sgridkey] = {&sgrid, 0};
   }
   std::vector<std::string> cembgrid;
   if (c.contains("CEMBFUNC")) {
     cembgrid.resize(c.size("CEMBFUNC"));
     c.get("CEMBFUNC", cembgrid);
-    cembgrid = convert_to_strings(D_Base::get_grid(cembgrid),p); 
+    cembgrid = convert_to_strings(D_Base::get_grid(cembgrid));
     data_map["CEMBFUNC"] = {&cembgrid, 0};
   }
   std::vector<std::string> sembgrid;
   if (c.contains("SEMBFUNC")) {
     sembgrid.resize(c.size("SEMBFUNC"));
     c.get("SEMBFUNC", sembgrid);
-    sembgrid = convert_to_strings(D_Base::get_grid(sembgrid),p); 
+    sembgrid = convert_to_strings(D_Base::get_grid(sembgrid));
     data_map["SEMBFUNC"] = {&sembgrid, 0};
   }
   // additional splittable lists: density amplitudes (optimizable key) and
@@ -170,7 +169,7 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
     if (c.contains(k)) {
       extra_lists[e].resize(c.size(k));
       c.get(k, extra_lists[e]);
-      extra_lists[e] = convert_to_strings(D_Base::get_grid(extra_lists[e]),p);
+      extra_lists[e] = convert_to_strings(D_Base::get_grid(extra_lists[e]));
       data_map[k] = {&extra_lists[e], 0};
     }
   }

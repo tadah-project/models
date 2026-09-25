@@ -5,6 +5,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- `embf0_absent_consequence(bool linear)` (`embf0.h`): the text that explains what a trained DM_REAM potential without an `EMBF0` line means under the default `ZERO` and how to migrate (`EMBF0 FREE`). DM_REAM's once-per-process notice now builds its WARNING from it (output byte-identical), and the LAMMPS pair style prints the same text in its `pair_coeff` WARNING (BUG-08).
+
 ## [1.6.0] — 2026-09-25
 
 ### Added
@@ -29,6 +32,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - a line with element pairs where the grid sizes belong, such as `TYPE2B D2_Blip * *` or `TYPEMB DM_Blip 1 N N`, was read as parameters followed by no element pair, so the descriptor applied to no pair of elements and a potential predicted wrong energies without an error. It now fails with `TYPE2B D2_Blip takes 2 parameters before its element pairs; parameter 1, the number of CGRID2B values, must be a non-negative integer, not "*": TYPE2B D2_Blip * *`.
 
   The check is `D_Base::element_tokens`, used by `D2_Base` and `DM_Base`: the line must have every parameter, and each size parameter (one per list key of the descriptor, the tokens `D_mJoin` reads as sizes) must be a non-negative integer. The descriptors read and convert their other parameters themselves. Test: `test_descriptor_type_line.cpp`.
+
+## [1.5.1] — 2026-09-25
+
+### Fixed
+- **`D2_mJoin` / `DM_mJoin` no longer round their grids.** `D_mJoin::parse_context()` re-rendered every split CGRID/SGRID/CEMBFUNC/SEMBFUNC/AMPGRIDMB/KDEG\* value with NUMERIC (default 12) fixed decimals on every construction and every `reinit()`: values closer than 1e-12 collapsed, values below 5e-13 became 0, and an HPO step that small on an mJoin grid was invisible to the descriptor. The split is lossless now, so standalone mJoin numerics shift by up to 5e-13 absolute. Neither `parse_context()` nor the evidence-approximation solver (`ea.h`) inserts NUMERIC into the caller's context any more (one source of the `NUMERIC 12` line in HPO potentials). Test: `test_mjoin_precision.cpp`.
+- `D_Base::get_grid` accepts subnormal grid values (e.g. `1e-310` written by an HPO step) instead of failing with "Invalid grid specification".
+- **`normalize_knot_rcut` (train, predict, `refit --edit`, hpo startup) sets a knot channel's RCUT2B/RCUTMB to exactly its largest knot.** A stated value within 1e-9 relative was kept, while hpo re-derives the cutoff exactly, so the same potential could run with slightly different cutoffs in train/predict and in hpo. A gap above 1e-9 relative is still a WARNING; a smaller one (e.g. the ~3e-13 left in knot potentials written by <= 1.5.0) is fixed at INFO, except under a smooth cutoff: `pair_style tadah` reads the stated RCUT, so LAMMPS then differs from train/predict/hpo, and the WARNING says to re-write the potential (train, `refit --edit` or hpo `best_pot.tadah`). Test: `test_pot_curve_edit.cpp`.
+
+### Changed
+- **BREAKING — DM_REAM evaluates F(0) = 0 by construction (`EMBF0 ZERO`, the new default).** Every embedding basis function is zero-referenced, g~_m(rho) = g_m(rho) - g_m(0), in `calc_aed` AND `eam_embed` (the LAMMPS EAMFAST path), with g_m(0) recomputed in the constructor and in every `reinit()` from the CEMBFUNC/SEMBFUNC/KDEGEMB values actually evaluated, and an explicit rho == 0 short-circuit so an isolated atom gives exactly 0.0 regardless of FP contraction. For linear models forces and stresses are unchanged (g'_m is untouched) and every atomic energy moves by the same constant; for non-linear models (BF_Polynomial2, non-linear KRR kernels) energies and forces change. `EMBF0 FREE` keeps the raw basis of 1.5.0 (textually unchanged code path, bit-identical). A DM_REAM model built from a context without the key prints a one-time notice (WARNING for a trained potential). New `embf0.h` helpers (`stored_embf0`, `context_has_ream`, `normalise_embf0_key`, `check_embf0_precedence`, ...); `DM_Base::embf0_mode()` / `raw_embedding_f0()` (DM_mJoin forwards).
+- **`tadah refit` fits what the potential evaluates.** Under `EMBF0 ZERO` the dense `EAMRefit` fits the zero-referenced embedding against the zero-referenced table F_tab(rho) - F_tab(0) (`F_ref`; the table spline is never modified), `F_fit`/`F_setfl` are zero-referenced (refit.eam starts at F = 0.0 exactly), the soft F(0) pin is not used (exact by construction), and `build_pot_context` writes the `EMBF0` line. `EMBF0 FREE` keeps the 1.5.0 fit bit-identical.
+- **`refit --edit` (potedit) edits F in the potential's reference.** `CurveView` evaluates the zero-referenced F under ZERO; `remove_basis` compensates with zero-referenced functions and widens the region to `[0, largest support]` when the removed function has g(0) != 0 (reported); `rebuild_pot_context` writes the `EMBF0` line (DM_REAM only).
 
 ## [1.4.0] — 2026-07-14
 

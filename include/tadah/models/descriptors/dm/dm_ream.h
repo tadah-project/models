@@ -26,9 +26,21 @@ namespace models {
  *    \f$a_n\f$ supplied in \ref AMPGRIDMB (these are NOT linear weights — they are
  *    found by a 1-D least-squares pre-fit and stored in the descriptor), and
  *  - represents the **embedding** as
- *    \f$F(\rho)=\sum_{m} c_m\,g_m(\rho)\f$ where the \f$g_m\f$ are the descriptor
- *    output components (one per \ref CEMBFUNC entry) and the \f$c_m\f$ are the
- *    M_BLR **linear weights**.
+ *    \f$F(\rho)=\sum_{m} c_m\,\tilde g_m(\rho)\f$ where the \f$\tilde g_m\f$
+ *    are the descriptor output components (one per \ref CEMBFUNC entry) and
+ *    the \f$c_m\f$ are the M_BLR **linear weights**.
+ *
+ * Embedding reference (key \ref EMBF0, a property of the potential):
+ *  - `EMBF0 ZERO` (default): \f$\tilde g_m(\rho) = g_m(\rho) - g_m(0)\f$, with
+ *    \f$g_m(0)\f$ computed in the constructor and in every reinit() from the
+ *    CEMBFUNC/SEMBFUNC/KDEGEMB values actually evaluated. Hence
+ *    \f$F(0) = 0\f$ exactly for any weights: an isolated atom has zero
+ *    embedding energy by construction (exactly 0.0: rho == 0 short-circuits).
+ *  - `EMBF0 FREE`: the raw basis \f$\tilde g_m = g_m\f$ of tadah 1.5.0 and
+ *    earlier, where \f$F(0)=\sum_m c_m g_m(0)\f$.
+ *  The derivatives \f$g'_m\f$ are identical in both modes, so for a model
+ *  linear in the descriptor forces and stresses are identical and every
+ *  atomic energy differs by the same constant.
  *
  * Keys (single element, \f$L=0\f$ scalar density):
  *  - \ref CGRIDMB / \ref SGRIDMB : density basis centres / widths (size Nρ)
@@ -54,7 +66,8 @@ namespace models {
  * (\mu_n - r)_+^5\f$ (vanishes C^4-smoothly at its knot, so with all knots
  * \f$\le r_{cut}\f$ the density vanishes smoothly at the cutoff), while the
  * embedding basis is RIGHT-active, \f$g_m(\rho) = (\rho - \mu_m)_+^5\f$
- * (F free at high density, F(0) anchored by the fit). SGRID* entries are a
+ * (F free at high density; F(0) = 0 by construction under EMBF0 ZERO, and
+ * only knots with mu_m < 0 reach rho = 0 at all). SGRID* entries are a
  * pure gauge for this family and are conventionally 1.0.
  *
  * \note Like \ref D2_Blip / \ref DM_Blip, the per-pair density carries the
@@ -102,6 +115,18 @@ private:
   /** Family-aware grid validation (ctor + reinit): size consistency, the
    *  knot family's width-channel absence, KDEG* in {3,5}. */
   void validate_grids() const;
+
+  // embedding reference (EMBF0): ZERO subtracts g_m(0) from every embedding
+  // output; the two g0 arrays are filled only under ZERO, each with the
+  // routine of the path that uses it (calc_aed: gemb; eam_embed: the fused
+  // embedding_value_deriv), from the members actually evaluated.
+  EmbF0Mode embf0_ = EmbF0Mode::Zero;
+  tadah::core::v_type g0_aed_;   // g_m(0) via gemb()
+  tadah::core::v_type g0_emb_;   // g_m(0) via embedding_value_deriv()
+  /** Reads EMBF0 (materialising the default ZERO into @p ctx, so the model
+   *  Context -- and every potential written from it -- carries the key) and
+   *  recomputes g0 from the current members. Ctor and every reinit(). */
+  void setup_embedding_reference(const tadah::core::Context& ctx);
 
   bool warned_rcut_ = false;  ///< one-shot guard for the truncation warning
   /** Last-resort guard (ctor + reinit), knot family only: a density knot
@@ -154,12 +179,17 @@ public:
 
   /* EAM collapse (see DM_Base): V_i = F(rho_i) exactly, so expose the scalar
    * density rho(r) (amp-baked, cutoff- and WATOM-weighted) and the
-   * weight-collapsed embedding F(rho) = sum_m w_m g_m(rho). */
+   * weight-collapsed embedding F(rho) = sum_m w_m g~_m(rho), with the same
+   * EMBF0 reference as calc_aed (ZERO: g~ = g - g(0), F(0) = 0 exactly). */
   bool eam_form() const override { return true; }
   void eam_density(const int Zi, const int Zj, const double rij,
                    double &rho, double &rhop) const override;
   void eam_embed(const tadah::core::t_type &w_full, const double rho_bar,
                  double &F, double &Fp) const override;
+
+  std::optional<EmbF0Mode> embf0_mode() const override { return embf0_; }
+  std::optional<double>
+  raw_embedding_f0(const tadah::core::t_type &w_full) const override;
 };
 } // namespace models
 } // namespace tadah
