@@ -12,6 +12,7 @@
 #include <tadah/models/descriptors/param_meta.h>
 #include <tadah/models/descriptors/basis_kind.h>
 #include <cmath>
+#include <utility>
 #include <vector>
 #include <bitset>
 
@@ -110,6 +111,55 @@ public:
    *  pairs so callers can rely on prior state being preserved on
    *  unlisted slots. */
   void update_weights(const tadah::core::Context &c);
+
+  /** One `weights[Zi][Zj] = weights[Zj][Zi] = w` write of update_weights. */
+  struct WatomWrite {
+    int Zi;
+    int Zj;
+    double w;
+  };
+
+  /** The WATOM key as update_weights reads it. */
+  struct WatomSpec {
+    WatomMode mode = WatomMode::Empty;
+    /** The listed values: per-species w_n (parallel to ATOM) or the value
+     *  of each pair triple, in WATOM order. */
+    std::vector<double> values;
+    /** PerSpecies: Z of each ATOM entry, in ATOM order. */
+    std::vector<int> Zs;
+    /** PairTriple: (Zi, Zj) of each triple, in WATOM order. */
+    std::vector<std::pair<int, int>> pairs;
+    /** The weights[][] writes, in update_weights order (per-species: the
+     *  diagonal w_i, then sqrt(w_i w_j) for j > i). */
+    std::vector<WatomWrite> writes;
+  };
+
+  /** Parse WATOM from @p c exactly as update_weights applies it (the two
+   *  input formats documented there). Mode Empty when WATOM is absent or
+   *  empty, or when a per-species WATOM has no ATOM list. Throws for a
+   *  pair-triple list whose length is not a multiple of 3 and for unknown
+   *  element symbols. */
+  static WatomSpec parse_watom(const tadah::core::Context &c);
+
+  /** Density forms that guarantee rho >= 0 (DM_REAM RHOFORM NONNEG and
+   *  MONOTONE) need every density pair weight W = weights[Zi][Zj] > 0:
+   *  throws DensityFormError (rhoform.h), prefixed by @p who, when a WATOM
+   *  value in @p c is not finite and > 0 (per-species values give
+   *  W = sqrt(w_i w_j) > 0 exactly when every w_i > 0). Reads the context,
+   *  not `weights`: DC_Selector::reinit calls the descriptor's reinit()
+   *  before update_weights(). No WATOM (all weights 1.0) passes. */
+  static void require_positive_density_weights(const tadah::core::Context &c,
+                                               const std::string &who);
+
+  /** The density pair weights W = weights[Zi][Zj] that WATOM in @p c sets,
+   *  in update_weights' write order: per species w_i, then sqrt(w_i w_j)
+   *  for j > i; pair triples each triple's value. Empty when WATOM is
+   *  absent, or per species without ATOM (the weights stay 1.0). Reads
+   *  stored values only and resolves no element symbol, so a density check
+   *  can run without the periodic table. Throws std::runtime_error, as
+   *  parse_watom does, for a pair-triple list whose length is not a
+   *  multiple of 3, and for a value that is not one whole number. */
+  static std::vector<double> density_pair_weights(const tadah::core::Context &c);
 
   /** Resolve a 1-based per-species WATOM arg_pos (matching
    *  `OPTIM WATOM (n)`) to the atomic number Z of the n-th ATOM entry

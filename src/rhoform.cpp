@@ -1,0 +1,181 @@
+#include <tadah/models/descriptors/dm/rhoform.h>
+#include <tadah/core/logger.h>
+
+#include <algorithm>
+#include <atomic>
+#include <cctype>
+#include <iterator>
+
+namespace tadah {
+namespace models {
+
+namespace {
+std::string upper(std::string s) {
+  std::transform(s.begin(), s.end(), s.begin(),
+                 [](unsigned char ch) { return std::toupper(ch); });
+  return s;
+}
+std::atomic<bool> warned_stray{false};
+
+void warn_ignored(const std::string &what) {
+  tadah::core::Logger::instance().log(tadah::core::LogLevel::WARNING, what);
+}
+
+// The cutoffs measured non-negative and non-increasing on [0, rcut]
+// (rhoform_cutoff_whitelisted, rhoform_cutoff_whitelist_text).
+const char *const kMonotoneCutoffs[] = {"Cut_Dummy", "Cut_Cos",  "Cut_CosS",
+                                        "Cut_Tanh",  "Cut_PT",   "Cut_Poly",
+                                        "Cut_PolyS"};
+}  // namespace
+
+const char *rhoform_name(RhoForm f) {
+  switch (f) {
+    case RhoForm::Signed:   return "SIGNED";
+    case RhoForm::NonNeg:   return "NONNEG";
+    case RhoForm::Monotone: return "MONOTONE";
+  }
+  return "SIGNED";  // unreachable (enum is exhaustive above)
+}
+
+bool rhoform_is_positive(RhoForm f) { return f != RhoForm::Signed; }
+
+RhoForm parse_rhoform(const std::string &value) {
+  const std::string v = upper(value);
+  if (v == "SIGNED") return RhoForm::Signed;
+  if (v == "NONNEG") return RhoForm::NonNeg;
+  if (v == "MONOTONE") return RhoForm::Monotone;
+  throw DensityFormError("RHOFORM must be SIGNED, NONNEG or MONOTONE (got '" +
+                         value + "').");
+}
+
+namespace {
+// The three forms, shared by the absent-key and the invalid-value messages.
+const char *const kFormList =
+    "SIGNED (rho = W f_c sum a_n psi_n with signed a_n, the tadah <= 1.5.1 "
+    "density; add 'RHOFORM SIGNED' to use an existing potential unchanged), "
+    "NONNEG (the same with every a_n >= 0: rho >= 0 by construction) or "
+    "MONOTONE (rho = W f_c sum a_n S_n(r), S_n the integrated bump, "
+    "a_n >= 0: rho >= 0 and non-increasing by construction).";
+}  // namespace
+
+std::string rhoform_absent_message() {
+  return std::string("DM_REAM: RHOFORM is required: ") + kFormList;
+}
+
+std::optional<RhoForm> stored_rhoform(const tadah::core::Context &ctx) {
+  const auto v = ctx.stored_value("RHOFORM");
+  if (!v) return std::nullopt;
+  return parse_rhoform(*v);
+}
+
+RhoForm require_rhoform(const tadah::core::Context &ctx,
+                        const std::string &who) {
+  const std::string prefix = who.empty() ? std::string() : who + ": ";
+  const auto v = ctx.stored_value("RHOFORM");
+  if (!v) throw DensityFormError(prefix + rhoform_absent_message());
+  try {
+    return parse_rhoform(*v);
+  } catch (const DensityFormError &) {
+    throw DensityFormError(prefix + "DM_REAM: RHOFORM '" + *v +
+                           "' is not a density form: use " + kFormList);
+  }
+}
+
+void normalise_rhoform_key(tadah::core::Context &c) {
+  if (context_has_ream(c)) {
+    const RhoForm f = require_rhoform(c, "");
+    c.remove("RHOFORM");
+    c.add("RHOFORM", std::string(rhoform_name(f)));
+    return;
+  }
+  if (c.has_stored("RHOFORM")) {
+    c.remove("RHOFORM");
+    if (!warned_stray.exchange(true))
+      warn_ignored("RHOFORM is ignored and not written: the potential has no "
+                   "DM_REAM many-body block.");
+  }
+}
+
+void check_rhoform_precedence(const tadah::core::Context &pot,
+                              const tadah::core::Context &task,
+                              const std::string &pot_name) {
+  if (!context_has_ream(pot)) {
+    if (const auto pv = pot.stored_value("RHOFORM"))
+      warn_ignored("RHOFORM " + *pv + " is ignored: " + pot_name +
+                   " has no DM_REAM many-body block.");
+    if (const auto tv = task.stored_value("RHOFORM"))
+      warn_ignored("RHOFORM " + *tv + " from the task configuration is "
+                   "ignored: " + pot_name +
+                   " has no DM_REAM many-body block.");
+    return;
+  }
+  // The potential must declare its own form: a task value never supplies it.
+  if (!pot.has_stored("RHOFORM") && task.has_stored("RHOFORM"))
+    throw DensityFormError(
+        pot_name + ": the task configuration's RHOFORM does not apply (the "
+        "form belongs to the potential, whose density amplitudes were "
+        "fitted in it); add the RHOFORM line to " + pot_name + ". " +
+        rhoform_absent_message());
+  const RhoForm pv = require_rhoform(pot, pot_name);
+  const auto tv = stored_rhoform(task);
+  if (tv && *tv != pv)
+    throw DensityFormError(
+        "RHOFORM conflict: " + pot_name + " declares RHOFORM " +
+        rhoform_name(pv) + " but the task configuration sets RHOFORM " +
+        rhoform_name(*tv) +
+        ". RHOFORM is a property of the potential (its density amplitudes "
+        "were fitted in that form); edit the potential file instead.");
+}
+
+std::string rhoform_subject(RhoForm f) {
+  return std::string("DM_REAM: RHOFORM ") + rhoform_name(f);
+}
+
+bool rhoform_cutoff_whitelisted(const std::string &label) {
+  for (const char *l : kMonotoneCutoffs)
+    if (label == l) return true;
+  return false;
+}
+
+std::string rhoform_cutoff_whitelist_text() {
+  const std::size_t n = std::size(kMonotoneCutoffs);
+  std::string s;
+  for (std::size_t i = 0; i < n; ++i)
+    s += std::string(i == 0 ? "" : i + 1 == n ? " or " : ", ") +
+         kMonotoneCutoffs[i];
+  return s;
+}
+
+const char *monotone_knot_refusal_text() {
+  return "a non-negative knot density is already non-increasing with a "
+         "non-increasing cutoff";
+}
+
+OptimLowerBound optim_key_lower_bound(const std::string &key,
+                                      std::optional<RhoForm> form) {
+  if (form && rhoform_is_positive(*form) && upper(key) == "AMPGRIDMB")
+    return OptimLowerBound::NonNegative;
+  return OptimLowerBound::Free;
+}
+
+std::optional<OptimLowBoundRule> optim_low_bound_rule(
+    const std::string &key, std::optional<RhoForm> form) {
+  if (optim_key_lower_bound(key, form) == OptimLowerBound::NonNegative)
+    return OptimLowBoundRule{false, "every AMPGRIDMB amplitude >= 0"};
+  if (!form || !rhoform_is_positive(*form)) return std::nullopt;
+  const std::string k = upper(key);
+  if (k == "WATOM")
+    return OptimLowBoundRule{true, "every density pair weight W > 0"};
+  if (k == "SGRIDMB" && *form == RhoForm::Monotone)
+    return OptimLowBoundRule{true,
+                             "every SGRIDMB width > 0 (S_n steps down across "
+                             "the bump s_n (r - c_n))"};
+  return std::nullopt;
+}
+
+bool OptimLowBoundRule::admits(double lo) const {
+  return strict ? lo > 0.0 : lo >= 0.0;
+}
+
+}  // namespace models
+}  // namespace tadah

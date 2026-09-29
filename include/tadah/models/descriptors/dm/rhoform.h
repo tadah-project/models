@@ -1,0 +1,141 @@
+#ifndef TADAH_MODELS_RHOFORM_H
+#define TADAH_MODELS_RHOFORM_H
+
+#include <tadah/core/context.h>
+#include <tadah/models/descriptors/dm/embf0.h>
+#include <optional>
+#include <stdexcept>
+#include <string>
+
+namespace tadah {
+namespace models {
+
+/** \brief DM_REAM density form, selected by the mandatory RHOFORM key.
+ *
+ *  With W the WATOM pair weight, f_c the many-body cutoff and psi_n the
+ *  density basis function:
+ *  - Signed: rho = W f_c sum_n a_n psi_n with amplitudes of any sign, the
+ *    density of tadah 1.5.1 and earlier (bit for bit).
+ *  - NonNeg: the same expression with every a_n >= 0, W > 0 and the cutoff
+ *    clamped at max(f_c, 0): rho >= 0 exactly.
+ *  - Monotone: rho = W max(f_c, 0) sum_n a_n S_n, S_n the integrated bump
+ *    (1 inside the inner support edge, 0 beyond the outer edge), a_n >= 0,
+ *    s_n > 0, W > 0: rho >= 0 exactly and non-increasing to rounding. Bump
+ *    families only, with a whitelisted cutoff (rhoform_cutoff_whitelisted).
+ *
+ *  Key-handling contract: RHOFORM has no blueprint default and is mandatory
+ *  on every DM_REAM context. Every reader uses stored_rhoform() /
+ *  require_rhoform(), which read through Context::stored_value only, so an
+ *  absent key never materialises anything and never reaches Context::get
+ *  (which would log a spurious ERROR before throwing). */
+enum class RhoForm { Signed, NonNeg, Monotone };
+
+/** \brief Thrown by every density-form and density validation (the RHOFORM
+ *  key, the DM_REAM density grids, the density pair weights).
+ *
+ *  A distinct type so that code which probes a model by constructing it and
+ *  swallows the construction errors (HPO startup probes) can rethrow it. */
+class DensityFormError : public std::runtime_error {
+public:
+  using std::runtime_error::runtime_error;
+};
+
+/** "SIGNED" | "NONNEG" | "MONOTONE". */
+const char *rhoform_name(RhoForm f);
+
+/** True for NonNeg and Monotone, the forms that guarantee rho >= 0. */
+bool rhoform_is_positive(RhoForm f);
+
+/** Case-insensitive parse; throws DensityFormError for anything other than
+ *  SIGNED, NONNEG or MONOTONE. */
+RhoForm parse_rhoform(const std::string &value);
+
+/** The migration text for a DM_REAM context without RHOFORM ("DM_REAM:
+ *  RHOFORM is required: SIGNED (...), NONNEG (...) or MONOTONE (...)."). One
+ *  text shared by DM_REAM, HPO and the LAMMPS pair style. */
+std::string rhoform_absent_message();
+
+/** Form stored in @p ctx, or nullopt when the key is absent. Never inserts;
+ *  throws DensityFormError for an invalid stored value. */
+std::optional<RhoForm> stored_rhoform(const tadah::core::Context &ctx);
+
+/** Form stored in @p ctx. Throws DensityFormError with the migration text
+ *  (rhoform_absent_message) when the key is absent or invalid. @p who, when
+ *  not empty, prefixes the message ("<who>: DM_REAM: RHOFORM is required:
+ *  ..."); DM_REAM itself passes an empty @p who. Never inserts. */
+RhoForm require_rhoform(const tadah::core::Context &ctx,
+                        const std::string &who);
+
+/** Potential writers: a context with a DM_REAM block must declare RHOFORM
+ *  (absent -> DensityFormError with the migration text; nothing is
+ *  inserted) and gets it canonicalised to upper case; a context without one
+ *  has a stray RHOFORM removed (WARNING once per process), so potentials
+ *  without a DM_REAM block never carry the key. */
+void normalise_rhoform_key(tadah::core::Context &c);
+
+/** Engines that merge a task context over a loaded potential (predict,
+ *  analysis): call with the potential as read and the task context BEFORE
+ *  merging. RHOFORM is a property of the potential, so a potential with a
+ *  DM_REAM block but no RHOFORM throws (DensityFormError, migration text)
+ *  whatever the task says: the task cannot supply the key. Different
+ *  explicit values throw as well. A RHOFORM on either side of a potential
+ *  without a DM_REAM block gives a WARNING (ignored). */
+void check_rhoform_precedence(const tadah::core::Context &pot,
+                              const tadah::core::Context &task,
+                              const std::string &pot_name);
+
+/** "DM_REAM: RHOFORM <form>", the subject of every form-rule message
+ *  (ReamDensity::validate, the density pair weights). */
+std::string rhoform_subject(RhoForm f);
+
+/** True when the cutoff class @p label (Cut_Base::label(), RCTYPEMB) is
+ *  measured non-negative and non-increasing on [0, rcut], as RHOFORM
+ *  MONOTONE requires: Cut_Dummy, Cut_Cos, Cut_CosS, Cut_Tanh, Cut_PT,
+ *  Cut_Poly and Cut_PolyS (the last two dip to -2.7e-15 near rcut, which the
+ *  positive forms clamp at 0). Cut_SinInv (increasing) and every other label
+ *  are refused. Exact, case-sensitive match. */
+bool rhoform_cutoff_whitelisted(const std::string &label);
+
+/** The cutoffs rhoform_cutoff_whitelisted() accepts, for messages:
+ *  "Cut_Dummy, Cut_Cos, Cut_CosS, Cut_Tanh, Cut_PT, Cut_Poly or Cut_PolyS". */
+std::string rhoform_cutoff_whitelist_text();
+
+/** Why RHOFORM MONOTONE refuses the knot family (basis code 2), for every
+ *  refusal message: "a non-negative knot density is already non-increasing
+ *  with a non-increasing cutoff" (use RHOFORM NONNEG). */
+const char *monotone_knot_refusal_text();
+
+/** \brief Lower-bound class of an OPTIM key's box under a density form. */
+enum class OptimLowerBound {
+  Free,        ///< the form imposes nothing (the key's own rules apply)
+  NonNegative  ///< lo = max(0, v - d): AMPGRIDMB under NONNEG and MONOTONE
+};
+
+/** Lower-bound class of the OPTIM key @p key (case-insensitive) under the
+ *  density form @p form (nullopt: no DM_REAM block). Shared by the MLIP
+ *  hpotarget writer / retarget and the HPO AUTO boxes. */
+OptimLowerBound optim_key_lower_bound(const std::string &key,
+                                      std::optional<RhoForm> form);
+
+/** \brief What a density form requires of the low bound of an OPTIM box. */
+struct OptimLowBoundRule {
+  bool strict;              ///< lo > 0 (else lo >= 0)
+  const char *requirement;  ///< "every AMPGRIDMB amplitude >= 0", ...
+  /** True when @p lo satisfies the rule (NaN never does). */
+  bool admits(double lo) const;
+};
+
+/** The rule RHOFORM @p form sets on the low bound of an OPTIM box on @p key
+ *  (case-insensitive), nullopt when it sets none. Under NONNEG and
+ *  MONOTONE: AMPGRIDMB lo >= 0 (optim_key_lower_bound), WATOM lo > 0 (every
+ *  density pair weight W > 0) and, under MONOTONE, SGRIDMB lo > 0 (every
+ *  width > 0). A box whose low bound breaks the rule reaches densities
+ *  DM_REAM refuses: tadah hpo refuses it at startup, tadah analysis
+ *  check_bounds reports it. */
+std::optional<OptimLowBoundRule> optim_low_bound_rule(
+    const std::string &key, std::optional<RhoForm> form);
+
+}  // namespace models
+}  // namespace tadah
+
+#endif

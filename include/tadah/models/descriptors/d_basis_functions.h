@@ -400,6 +400,149 @@ inline double d2B5(double x_c) {
 }
 
 // =========================================================================
+// INTEGRATED-BUMP STEP FUNCTIONS (DM_REAM RHOFORM MONOTONE)
+// =========================================================================
+//
+// S(r) = (integral of the bump from r outwards) / (its integral over the
+// whole support), with x_c = eta*(r - mu), eta > 0. So S = 1 inside the inner
+// support edge, S(mu) = 1/2 exactly, S = 0 beyond the outer edge (the same
+// edge as the bump's) and dS/dr = -eta*bump(x_c)/A <= 0, A = the bump area in
+// x_c: 1.5 for B, 20/11 for B5, sqrt(pi/eta) for the Gaussian in r.
+// Evaluation rules (verified against 60-digit quadrature: tail error <= 1.4
+// ulp relative, plateau error <= 5.4e-17 absolute):
+//   - truncated-power products, never monomial expansions, with the
+//     left-to-right product order of B/B5;
+//   - one fixed dS/dr expression per family, shared by every derivative path;
+//   - SB5_value_deriv reuses B5_value_deriv's products, so its S is bitwise
+//     equal to SB5 and its derivative bitwise equal to dSB5.
+// The one-sided knot family has no step form (a non-negative knot density is
+// already non-increasing with a non-increasing cutoff).
+
+/** \brief Integrated cubic blip step \f$ S_B(x_c) \f$.
+ *
+ *  With \f$ a = |x_c| \f$ and \f$ Q(a) = (2-a)^4 - 4(1-a)_+^4 \f$:
+ *  \f$ S_B = Q/24 \f$ for \f$ x_c \ge 0 \f$ and \f$ 1 - Q/24 \f$ for
+ *  \f$ x_c < 0 \f$; exactly 1 for \f$ x_c \le -2 \f$, 0 for \f$ x_c \ge 2 \f$.
+ */
+inline double SB(double x_c) {
+  const double a = std::fabs(x_c);
+  if (a >= 2.0) return x_c > 0.0 ? 0.0 : 1.0;
+  const double t2 = 2.0 - a;
+  double p = t2 * t2 * t2 * t2;
+  if (a < 1.0) {
+    const double t1 = 1.0 - a;
+    p -= 4.0 * t1 * t1 * t1 * t1;
+  }
+  const double q = p / 24.0;
+  return x_c >= 0.0 ? q : 1.0 - q;
+}
+
+/** \brief \f$ dS_B/dr = -\eta\,B(x_c)/1.5 \f$ (the one expression every
+ *  derivative path uses). */
+inline double dSB(double x_c, double eta) {
+  return -eta * B(x_c) / 1.5;
+}
+
+/** \brief \f$ d^2S_B/dr^2 = -\eta\,dB/dr / 1.5 = -\eta^2 B'(x_c)/1.5 \f$. */
+inline double d2SB(double x_c, double eta) {
+  return -eta * dB(x_c, eta) / 1.5;
+}
+
+/** \brief Integrated quintic bump step \f$ S_{B5}(x_c) \f$.
+ *
+ *  With \f$ a = |x_c| \f$ and
+ *  \f$ P(a) = (3-a)^6 - 6(2-a)_+^6 + 15(1-a)_+^6 \f$:
+ *  \f$ S_{B5} = P/720 \f$ for \f$ x_c \ge 0 \f$ and \f$ 1 - P/720 \f$ for
+ *  \f$ x_c < 0 \f$; exactly 1 for \f$ x_c \le -3 \f$, 0 for \f$ x_c \ge 3 \f$.
+ */
+inline double SB5(double x_c) {
+  const double a = std::fabs(x_c);
+  if (a >= 3.0) return x_c > 0.0 ? 0.0 : 1.0;
+  const double t3 = 3.0 - a;
+  double p = t3 * t3 * t3 * t3 * t3 * t3;
+  if (a < 2.0) {
+    const double t2 = 2.0 - a;
+    p -= 6.0 * t2 * t2 * t2 * t2 * t2 * t2;
+  }
+  if (a < 1.0) {
+    const double t1 = 1.0 - a;
+    p += 15.0 * t1 * t1 * t1 * t1 * t1 * t1;
+  }
+  const double q = p / 720.0;
+  return x_c >= 0.0 ? q : 1.0 - q;
+}
+
+/** \brief \f$ dS_{B5}/dr = -\eta\,B_5(x_c)\cdot 11/20 \f$, given the bump
+ *  value \p b5 = B5(x_c) (the one expression every derivative path uses). */
+inline double dSB5_from_B5(double b5, double eta) {
+  return -eta * b5 * 11.0 / 20.0;
+}
+
+/** \brief \f$ dS_{B5}/dr = -\eta\,B_5(x_c)\cdot 11/20 \f$. */
+inline double dSB5(double x_c, double eta) {
+  return dSB5_from_B5(B5(x_c), eta);
+}
+
+/** \brief \f$ d^2S_{B5}/dr^2 = -\eta\,dB_5/dr \cdot 11/20 \f$. */
+inline double d2SB5(double x_c, double eta) {
+  return -eta * dB5(x_c, eta) * 11.0 / 20.0;
+}
+
+/** Evaluate SB5 and its radial derivative together.
+ *
+ *  Starts from B5_value_deriv's products t3^5, 6 t2^5 and 15 t1^5 and
+ *  multiplies each by its t, so @p value is bitwise equal to SB5(x_c) and
+ *  @p deriv bitwise equal to dSB5(x_c, eta). */
+inline void SB5_value_deriv(double x_c, double eta,
+                            double &value, double &deriv) {
+  const double a = std::fabs(x_c);
+  if (a >= 3.0) {
+    value = x_c > 0.0 ? 0.0 : 1.0;
+    deriv = dSB5_from_B5(0.0, eta);
+    return;
+  }
+  const double t3 = 3.0 - a;
+  const double p3 = t3 * t3 * t3 * t3 * t3;
+  double acc_b = p3;         // B5's accumulator
+  double acc_s = p3 * t3;    // SB5's accumulator
+  if (a < 2.0) {
+    const double t2 = 2.0 - a;
+    const double p2 = 6.0 * t2 * t2 * t2 * t2 * t2;
+    acc_b -= p2;
+    acc_s -= p2 * t2;
+  }
+  if (a < 1.0) {
+    const double t1 = 1.0 - a;
+    const double p1 = 15.0 * t1 * t1 * t1 * t1 * t1;
+    acc_b += p1;
+    acc_s += p1 * t1;
+  }
+  const double q = acc_s / 720.0;
+  value = x_c >= 0.0 ? q : 1.0 - q;
+  deriv = dSB5_from_B5(acc_b / 66.0, eta);
+}
+
+/** \brief Integrated Gaussian step
+ *  \f$ S_G(r) = \tfrac12\,\mathrm{erfc}(\sqrt{\eta}\,(r-\mu)) \f$.
+ *
+ *  Written with erfc, never as 1 - erf (which loses every digit in the
+ *  tail). The Gaussian has no compact support, so neither has its step. */
+inline double SG(double r, double eta, double miu) {
+  return 0.5 * erfc(std::sqrt(eta) * (r - miu));
+}
+
+/** \brief \f$ dS_G/dr = -\sqrt{\eta/\pi}\,e^{-\eta(r-\mu)^2} \f$. */
+inline double dSG(double r, double eta, double miu) {
+  const double pi = 3.14159265358979323846264338327950288;
+  return -std::sqrt(eta / pi) * exp(-eta * (r - miu) * (r - miu));
+}
+
+/** \brief \f$ d^2S_G/dr^2 = 2\eta(r-\mu)\sqrt{\eta/\pi}\,e^{-\eta(r-\mu)^2} \f$. */
+inline double d2SG(double r, double eta, double miu) {
+  return -2.0 * eta * (r - miu) * dSG(r, eta, miu);
+}
+
+// =========================================================================
 // ONE-SIDED QUINTIC KNOT FUNCTIONS (truncated powers)
 // =========================================================================
 //

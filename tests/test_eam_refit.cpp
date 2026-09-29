@@ -6,10 +6,15 @@
 #include <tadah/models/descriptors/d_basis_functions.h>
 #include <tadah/models/descriptors/dm/dm_ream.h>
 #include <tadah/models/descriptors/dm/embf0.h>
+#include <tadah/models/descriptors/dm/rhoform.h>
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
+#include <functional>
+#include <limits>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -682,7 +687,7 @@ TEST_CASE_METHOD(RefitFixture,
 
 TEST_CASE_METHOD(RefitFixture,
                  "EAMRefit EMBF0 ZERO is invariant to a constant shift of the "
-                 "table F; FREE pins the shifted F(0)",
+                 "table F, FREE pins the shifted F(0)",
                  "[refit][embf0]") {
   // The Ta table has F(0) = 0; a shifted copy (F + 0.37 eV) exercises every
   // F_ref use: a raw F_tab left anywhere in the ZERO fit shows up as a 0.37 eV
@@ -741,5 +746,266 @@ TEST_CASE_METHOD(RefitFixture,
     REQUIRE(rs.F_ref(0.9) == eam_s.F_tab(0.9));   // raw table verbatim
     REQUIRE(rs.build_pot_context().stored_value("EMBF0") ==
             std::optional<std::string>("FREE"));
+  }
+}
+
+// ---------------------------------------------------------------------------
+//  RHOFORM (FEAT-02): the density is fitted, evaluated and written in the
+//  declared form
+// ---------------------------------------------------------------------------
+namespace {
+// Distance in units in the last place of two finite doubles (0: same bits).
+std::uint64_t ulp_distance(double a, double b) {
+  if (a == b) return 0;
+  auto key = [](double v) {
+    std::int64_t i;
+    std::memcpy(&i, &v, sizeof i);
+    return i < 0 ? std::numeric_limits<std::int64_t>::min() - i : i;
+  };
+  const std::int64_t ka = key(a), kb = key(b);
+  return ka > kb ? static_cast<std::uint64_t>(ka - kb)
+                 : static_cast<std::uint64_t>(kb - ka);
+}
+
+// A smooth single-element fcc setfl (rcut 5, a0 3.6) with the density table
+// rho(r): phi(r) = 3 (1 - r/rcut)^3, F(rho) = -2 sqrt(rho) + 0.05 rho.
+void write_rho_setfl(const std::string &path,
+                     const std::function<double(double)> &rho) {
+  const int nr = 400, nrho = 400;
+  const double rcut = 5.0, dr = rcut / (nr - 1);
+  const double rhomax = 60.0, drho = rhomax / (nrho - 1);
+  std::ofstream os(path);
+  os << "# synthetic single-element EAM (RHOFORM tests)\n# 2\n# 3\n"
+     << "1 Cu\n"
+     << nrho << " " << drho << " " << nr << " " << dr << " " << rcut << "\n"
+     << "29 63.55 3.6 fcc\n";
+  os << std::setprecision(17);
+  for (int i = 0; i < nrho; ++i)
+    os << (-2.0 * std::sqrt(i * drho) + 0.05 * i * drho)
+       << ((i % 5 == 4) ? "\n" : " ");
+  os << "\n";
+  for (int i = 0; i < nr; ++i) os << rho(i * dr) << ((i % 5 == 4) ? "\n" : " ");
+  os << "\n";
+  for (int i = 0; i < nr; ++i) {
+    const double r = i * dr, x = 1.0 - r / rcut;
+    os << (x > 0 ? 3.0 * x * x * x * r : 0.0) << ((i % 5 == 4) ? "\n" : " ");
+  }
+  os << "\n";
+}
+
+EAMRefitConfig coarse_config(const std::string &basis, RhoForm form) {
+  EAMRefitConfig cfg;
+  cfg.basis = basis;
+  cfg.rho_form = form;
+  cfg.n2b = 24;
+  cfg.nrho = 20;
+  cfg.nF = 60;
+  return cfg;
+}
+}  // namespace
+
+TEST_CASE_METHOD(RefitFixture,
+                 "EAMRefit RHOFORM: rho_fit is the pair density of its own "
+                 "potential in every form",
+                 "[refit][rhoform]") {
+  EAMSetflIO eam;
+  eam.read_setfl("tests_data/eam.alloy");  // Ravelo Ta2: rho >= 0, decreasing
+  eam.build_splines();
+  const double rc = eam.rcut();
+  struct Case {
+    const char *basis;
+    RhoForm form;
+  };
+  for (const Case &cs :
+       {Case{"Blip", RhoForm::Signed}, Case{"Blip", RhoForm::NonNeg},
+        Case{"Blip", RhoForm::Monotone}, Case{"Blip5", RhoForm::Signed},
+        Case{"Blip5", RhoForm::NonNeg}, Case{"Blip5", RhoForm::Monotone},
+        Case{"Gaussian", RhoForm::Monotone}}) {
+    INFO(cs.basis << " RHOFORM " << rhoform_name(cs.form));
+    EAMRefit refit(eam, coarse_config(cs.basis, cs.form));
+    REQUIRE(refit.rho_form() == cs.form);
+    refit.fit();
+    tadah::core::Context pot = refit.build_pot_context();
+    REQUIRE(pot.stored_value("RHOFORM") ==
+            std::optional<std::string>(rhoform_name(cs.form)));
+    if (rhoform_is_positive(cs.form))
+      for (std::size_t n = 0; n < pot.size("AMPGRIDMB"); ++n)
+        REQUIRE(pot.get<double>("AMPGRIDMB", n) >= 0.0);
+    pot.add("VERBOSE", 0);
+    DM_REAM dm(pot);  // validates the form (amplitudes, widths, cutoff)
+    REQUIRE(dm.density().form == cs.form);
+    const int Z = 73;
+    std::uint64_t worst = 0;
+    double rho_max = 0.0;
+    for (int i = 0; i < 4000; ++i) {
+      const double r = 0.1 * rc + (0.9 * rc) * i / 4000.0;  // r < rcut
+      const double a = refit.rho_fit(r), b = dm.pair_density(Z, Z, r);
+      REQUIRE(std::isfinite(a));
+      worst = std::max(worst, ulp_distance(a, b));
+      rho_max = std::max(rho_max, std::fabs(a));
+    }
+    std::cout << "[refit] " << cs.basis << " RHOFORM "
+              << rhoform_name(cs.form)
+              << ": max ulp(rho_fit, pair_density) = " << worst << std::endl;
+    CHECK(worst <= 1);
+    // the tabulation keeps the form's sign below r_lo as well
+    if (rhoform_is_positive(cs.form))
+      for (int i = 0; i <= 400; ++i)
+        REQUIRE(refit.rho_setfl(rc * i / 400.0) >= 0.0);
+    // MONOTONE: non-increasing to rounding (Blip steps have ulp rises)
+    if (cs.form == RhoForm::Monotone) {
+      double prev = refit.rho_fit(0.05 * rc), rise = 0.0;
+      for (int i = 1; i <= 20000; ++i) {
+        const double r = 0.05 * rc + 0.95 * rc * i / 20000.0;
+        const double v = refit.rho_fit(r);
+        rise = std::max(rise, v - prev);
+        prev = v;
+      }
+      CHECK(rise <= 64.0 * std::numeric_limits<double>::epsilon() * rho_max);
+    }
+  }
+}
+
+TEST_CASE_METHOD(RefitFixture,
+                 "EAMRefit RHOFORM: NONNEG equals SIGNED on a table whose "
+                 "unconstrained fit is non-negative, MONOTONE fits the "
+                 "decreasing Ta density",
+                 "[refit][rhoform]") {
+  EAMSetflIO eam;
+  eam.read_setfl("tests_data/eam.alloy");
+  eam.build_splines();
+  EAMRefit rs(eam, coarse_config("Blip5", RhoForm::Signed));
+  EAMRefit rn(eam, coarse_config("Blip5", RhoForm::NonNeg));
+  EAMRefit rm(eam, coarse_config("Blip5", RhoForm::Monotone));
+  rs.fit();
+  rn.fit();
+  rm.fit();
+  const tadah::core::Context ps = rs.build_pot_context();
+  const tadah::core::Context pn = rn.build_pot_context();
+  REQUIRE(ps.size("AMPGRIDMB") == pn.size("AMPGRIDMB"));
+  double amax = 0.0, dmax = 0.0, smin = 1e300;
+  for (std::size_t n = 0; n < ps.size("AMPGRIDMB"); ++n) {
+    const double a = ps.get<double>("AMPGRIDMB", n);
+    smin = std::min(smin, a);
+    amax = std::max(amax, std::fabs(a));
+    dmax = std::max(dmax, std::fabs(pn.get<double>("AMPGRIDMB", n) - a));
+  }
+  REQUIRE(smin > 0.0);            // the GELSD optimum is already feasible
+  CHECK(dmax <= 1e-12 * amax);    // NNLS = its passive-set LS solution
+  // phi and F never see the form
+  REQUIRE(rs.weights().size() == rn.weights().size());
+  for (std::size_t k = 0; k < rs.weights().size(); ++k)
+    REQUIRE(rs.weights()[k] == rn.weights()[k]);
+  // the step expansion fits a smooth decreasing density closely
+  std::cout << "[refit] Ta rho fit max|err|: SIGNED " << rs.rho_stats().maxabs
+            << "  NONNEG " << rn.rho_stats().maxabs << "  MONOTONE "
+            << rm.rho_stats().maxabs << std::endl;
+  CHECK(rm.rho_stats().maxabs <= 1e-4 * eam.rho_tab(rm.r_lo()));
+  CHECK(rm.rho_stats().maxabs < 1e-2 * rs.rho_stats().maxabs);
+}
+
+TEST_CASE_METHOD(RefitFixture,
+                 "EAMRefit RHOFORM: table pre-checks and form guards",
+                 "[refit][rhoform]") {
+  SECTION("NONNEG / MONOTONE refuse a negative table, naming r") {
+    const std::string p = "tmp_rhoform_neg.eam.alloy";
+    // negative for r > rcut (1 - sqrt(0.02)) = 4.29 A
+    write_rho_setfl(p, [](double r) {
+      const double x = 1.0 - r / 5.0;
+      return x * x - 0.02;
+    });
+    EAMSetflIO eam;
+    eam.read_setfl(p);
+    std::remove(p.c_str());
+    eam.build_splines();
+    for (RhoForm f : {RhoForm::NonNeg, RhoForm::Monotone}) {
+      INFO(rhoform_name(f));
+      EAMRefit refit(eam, coarse_config("Blip", f));
+      REQUIRE_THROWS_WITH(
+          refit.fit(),
+          Catch::Contains(std::string("RHOFORM ") + rhoform_name(f) +
+                          " cannot fit this table") &&
+              Catch::Contains("< 0 at r = 4.29") &&
+              Catch::Contains("Use RHOFORM SIGNED"));
+    }
+    EAMRefit signed_fit(eam, coarse_config("Blip", RhoForm::Signed));
+    REQUIRE_NOTHROW(signed_fit.fit());
+  }
+  SECTION("MONOTONE refuses a rising table, naming r; NONNEG fits it") {
+    const std::string p = "tmp_rhoform_rise.eam.alloy";
+    // a bump on a decreasing background: rises just below r = 3.5
+    write_rho_setfl(p, [](double r) {
+      const double x = 1.0 - r / 5.0, g = (r - 3.5) / 0.2;
+      return x * x + 0.05 * std::exp(-g * g);
+    });
+    EAMSetflIO eam;
+    eam.read_setfl(p);
+    std::remove(p.c_str());
+    eam.build_splines();
+    EAMRefit mono(eam, coarse_config("Blip", RhoForm::Monotone));
+    REQUIRE_THROWS_WITH(mono.fit(),
+                        Catch::Contains("RHOFORM MONOTONE cannot fit this "
+                                        "table: the tabulated density rises") &&
+                            Catch::Contains("at r = 3.") &&
+                            Catch::Contains("Use RHOFORM NONNEG or SIGNED"));
+    EAMRefit nonneg(eam, coarse_config("Blip", RhoForm::NonNeg));
+    REQUIRE_NOTHROW(nonneg.fit());
+    const tadah::core::Context pot = nonneg.build_pot_context();
+    for (std::size_t n = 0; n < pot.size("AMPGRIDMB"); ++n)
+      REQUIRE(pot.get<double>("AMPGRIDMB", n) >= 0.0);
+  }
+  SECTION("MONOTONE: the knot family and an increasing cutoff are refused") {
+    EAMSetflIO eam;
+    eam.read_setfl("tests_data/eam.alloy");
+    eam.build_splines();
+    REQUIRE_THROWS_AS(EAMRefit(eam, coarse_config("Knot5", RhoForm::Monotone)),
+                      DensityFormError);
+    REQUIRE_THROWS_WITH(
+        EAMRefit(eam, coarse_config("Knot3", RhoForm::Monotone)),
+        Catch::Contains("not defined for the knot family") &&
+            Catch::Contains("use RHOFORM NONNEG"));
+    EAMRefitConfig sininv = coarse_config("Blip5", RhoForm::Monotone);
+    sininv.rctype = "Cut_SinInv";
+    REQUIRE_THROWS_WITH(EAMRefit(eam, sininv),
+                        Catch::Contains("got Cut_SinInv"));
+    REQUIRE_NOTHROW(EAMRefit(eam, coarse_config("Knot5", RhoForm::NonNeg)));
+    sininv.rho_form = RhoForm::NonNeg;  // only MONOTONE needs the whitelist
+    REQUIRE_NOTHROW(EAMRefit(eam, sininv));
+  }
+  SECTION("positive forms: injected density amplitudes must be >= 0") {
+    EAMSetflIO eam;
+    eam.read_setfl("tests_data/eam.alloy");
+    eam.build_splines();
+    EAMRefit nn(eam, coarse_config("Blip5", RhoForm::NonNeg));
+    REQUIRE_THROWS_WITH(
+        nn.set_blip_fit(EAMRefit::Fn::RHO, {2.4, 3.2}, {1.5, 1.5},
+                        {0.4, -0.2}),
+        Catch::Contains("RHOFORM NONNEG density amplitudes must be finite "
+                        "and >= 0; injected amplitude 2 is -0.2"));
+    REQUIRE_NOTHROW(nn.set_blip_fit(EAMRefit::Fn::RHO, {2.4, 3.2}, {1.5, 1.5},
+                                    {0.4, 0.0}));
+    EAMRefit sg(eam, coarse_config("Blip5", RhoForm::Signed));
+    REQUIRE_NOTHROW(sg.set_blip_fit(EAMRefit::Fn::RHO, {2.4, 3.2}, {1.5, 1.5},
+                                    {0.4, -0.2}));
+  }
+  SECTION("LAMBDA is honoured by the non-negative solve") {
+    EAMSetflIO eam;
+    eam.read_setfl("tests_data/eam.alloy");
+    eam.build_splines();
+    auto amp_norm = [&](double lambda) {
+      EAMRefitConfig cfg = coarse_config("Blip5", RhoForm::Monotone);
+      cfg.lambda = lambda;
+      EAMRefit refit(eam, cfg);
+      refit.fit();
+      const tadah::core::Context pot = refit.build_pot_context();
+      double s = 0.0;
+      for (std::size_t n = 0; n < pot.size("AMPGRIDMB"); ++n) {
+        const double a = pot.get<double>("AMPGRIDMB", n);
+        REQUIRE(a >= 0.0);
+        s += a * a;
+      }
+      return s;
+    };
+    CHECK(amp_norm(1e-2) < amp_norm(0.0));
   }
 }

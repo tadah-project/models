@@ -19,6 +19,8 @@
 #include <tadah/models/descriptors/d2/d2_blip5.h>
 #include <tadah/models/descriptors/d2/d2_knot5.h>
 #include <tadah/models/descriptors/dm/dm_ream.h>
+#include <tadah/models/descriptors/dm/ream_density.h>
+#include <tadah/models/descriptors/dm/rhoform.h>
 #include <tadah/core/number_format.h>
 
 namespace tadah {
@@ -84,8 +86,11 @@ void add_degs(core::Context &c, const std::string &key,
 }
 
 // Raw basis function k of a curve at x, with CurveView::value's evaluator
-// (for the bump families the bare radial form IS the embedding form).
+// (for the bump families the bare radial form IS the embedding form; a
+// RHOFORM MONOTONE density evaluates the integrated bump S_k).
 double basis_value(const CurveView &c, std::size_t k, double x) {
+  if (c.form == RhoForm::Monotone)
+    return radial_step_value_bare(c.family, x, c.width(k), c.mu[k]);
   return c.right_active
       ? embedding_value(c.family, x, c.width(k), c.mu[k], c.degree(k))
       : radial_value_bare(c.family, x, c.width(k), c.mu[k], c.degree(k));
@@ -114,6 +119,11 @@ double CurveView::value(double x) const {
     return acc;
   }
   double acc = 0.0;
+  if (form == RhoForm::Monotone) {  // the integrated bumps S_k
+    for (std::size_t k = 0; k < n(); ++k)
+      acc += coeff[k] * radial_step_value_bare(family, x, width(k), mu[k]);
+    return acc;
+  }
   for (std::size_t k = 0; k < n(); ++k) {
     acc += coeff[k] * (right_active
         ? embedding_value(family, x, width(k), mu[k], degree(k))
@@ -125,6 +135,11 @@ double CurveView::value(double x) const {
 double CurveView::deriv(double x) const {
   if (!right_active && rcut > 0.0 && x > rcut) return 0.0;
   double acc = 0.0;
+  if (form == RhoForm::Monotone) {
+    for (std::size_t k = 0; k < n(); ++k)
+      acc += coeff[k] * radial_step_deriv_bare(family, x, width(k), mu[k]);
+    return acc;
+  }
   for (std::size_t k = 0; k < n(); ++k) {
     acc += coeff[k] * (right_active
         ? embedding_deriv(family, x, width(k), mu[k], degree(k))
@@ -136,6 +151,11 @@ double CurveView::deriv(double x) const {
 double CurveView::deriv2(double x) const {
   if (!right_active && rcut > 0.0 && x > rcut) return 0.0;
   double acc = 0.0;
+  if (form == RhoForm::Monotone) {
+    for (std::size_t k = 0; k < n(); ++k)
+      acc += coeff[k] * radial_step_deriv2_bare(family, x, width(k), mu[k]);
+    return acc;
+  }
   for (std::size_t k = 0; k < n(); ++k) {
     acc += coeff[k] * (right_active
         ? embedding_deriv2(family, x, width(k), mu[k], degree(k))
@@ -151,6 +171,8 @@ std::pair<double, double> CurveView::support(std::size_t k) const {
         : std::make_pair(-support_infinity(), mu[k]);
   }
   const double w = bump_halfwidth(family) / width(k);
+  if (form == RhoForm::Monotone)  // S_k = 1 below the bump
+    return {-support_infinity(), mu[k] + w};
   return {mu[k] - w, mu[k] + w};
 }
 
@@ -216,6 +238,13 @@ PotEAMView parse_pot_view(const core::Context &ctx) {
   } else {
     v.mb = MBKind::None;
   }
+  // RHOFORM is mandatory wherever a DM_REAM block is active (also inside a
+  // foreign DM_mJoin, whose keys the rebuild writes back): a key-less
+  // potential gets the migration text here, not a rebuild self-check error.
+  if (context_has_ream(ctx)) {
+    const RhoForm form = require_rhoform(ctx, "pot edit");
+    if (v.mb == MBKind::Ream) v.rho.form = form;
+  }
 
   if (!ctx.contains("ATOM") || ctx.size("ATOM") == 0)
     throw std::runtime_error("pot edit: the potential has no ATOM key.");
@@ -256,6 +285,16 @@ PotEAMView parse_pot_view(const core::Context &ctx) {
         throw std::runtime_error("pot edit: SGRIDMB/CGRIDMB size mismatch.");
     }
     v.rho.rcut = ctx.get<double>("RCUTMB");
+    // The density must be valid in its form before it is edited: the checks
+    // DM_REAM applies on load (amplitude signs, widths, the MONOTONE basis
+    // and cutoff, the density pair weights), with their messages.
+    if (rhoform_is_positive(v.rho.form)) {
+      try {
+        ReamDensity::validate_context(ctx);
+      } catch (const DensityFormError &e) {
+        throw DensityFormError(std::string("pot edit: ") + e.what());
+      }
+    }
 
     // ---- F (embedding) ----
     v.F.family = mbk;
@@ -364,12 +403,17 @@ core::Context rebuild_pot_context(const PotEAMView &v) {
     if (!knotmb) add_all(c, "SEMBFUNC", v.F.eta);
     add_degs(c, "KDEGEMB", v.F.deg);
     // every DM_REAM potential tadah writes declares its embedding reference
+    // and its density form
     c.remove("EMBF0");
     c.add("EMBF0", std::string(embf0_name(v.embf0)));
+    c.remove("RHOFORM");
+    c.add("RHOFORM", std::string(rhoform_name(v.rho.form)));
   } else {
-    // pure two-body / foreign: the writers' rule (a stray EMBF0 is dropped;
-    // a foreign DM_mJoin that carries DM_REAM gets the explicit key)
+    // pure two-body / foreign: the writers' rule (a stray key is dropped;
+    // a foreign DM_mJoin that carries DM_REAM gets the explicit EMBF0 and
+    // keeps its RHOFORM, canonicalised)
     normalise_embf0_key(c);
+    normalise_rhoform_key(c);
   }
 
   // ---- weights + HPO coefficient-search seed (mirrors build_pot_context) ----
@@ -604,8 +648,12 @@ AddReport add_basis(CurveView &c, const AddSpec &s, bool radial,
       rep.eta_used = acc / static_cast<double>(m);
     }
     const double w = bump_halfwidth(c.family) / rep.eta_used;
+    // A MONOTONE step is 1 below its bump and 0 beyond its outer edge
+    // centre + w: one lying beyond rcut is 1 on the whole range, so only its
+    // outer edge is judged, in the words of a step.
+    const bool step = (c.form == RhoForm::Monotone);
     if (radial && c.rcut > 0.0) {
-      if (s.centre - w >= c.rcut)
+      if (!step && s.centre - w >= c.rcut)
         throw std::runtime_error(
             "pot edit: the new basis function's support [" +
             fmt(s.centre - w) + ", " + fmt(s.centre + w) +
@@ -620,6 +668,13 @@ AddReport add_basis(CurveView &c, const AddSpec &s, bool radial,
                         fmt(bump_halfwidth(c.family) / (c.rcut - s.centre)) +
                         " or move the centre inward"
                   : "move the centre below RCUT";
+          if (step)
+            throw std::runtime_error(
+                "pot edit: the new step's outer edge centre + w/eta = " +
+                fmt(s.centre + w) + " lies beyond RCUT = " + fmt(c.rcut) +
+                " — under the hard Cut_Dummy cutoff the step would be "
+                "truncated into an energy jump at the cutoff (RCUT is never "
+                "changed for blip potentials); " + hint + ".");
           throw std::runtime_error(
               "pot edit: the new basis function's support [" +
               fmt(s.centre - w) + ", " + fmt(s.centre + w) +
@@ -628,9 +683,21 @@ AddReport add_basis(CurveView &c, const AddSpec &s, bool radial,
               "truncated into an energy step at the cutoff (RCUT is never "
               "changed for blip potentials); " + hint + ".");
         }
-        rep.warnings.push_back(
-            "the new basis function's support crosses RCUT = " + fmt(c.rcut) +
-            "; the smooth cutoff damps the overhang to zero there.");
+        if (step && s.centre - w >= c.rcut)
+          rep.warnings.push_back(
+              "the new step equals 1 on the whole range [0, RCUT = " +
+              fmt(c.rcut) + "]: its amplitude a adds a f_c(r) to the "
+              "density.");
+        else if (step)
+          rep.warnings.push_back(
+              "the new step's outer edge centre + w/eta = " +
+              fmt(s.centre + w) + " lies beyond RCUT = " + fmt(c.rcut) +
+              "; the smooth cutoff damps the step to zero there.");
+        else
+          rep.warnings.push_back(
+              "the new basis function's support crosses RCUT = " +
+              fmt(c.rcut) +
+              "; the smooth cutoff damps the overhang to zero there.");
       }
     }
   } else if (radial) {
@@ -722,7 +789,9 @@ RemoveReport remove_basis(CurveView &c, double centre_request, bool radial) {
     double lo, hi;
     if (!knot) {
       const double w = bump_halfwidth(c.family) / c.width(r);
-      lo = c.mu[r] - w;
+      // RHOFORM MONOTONE: the removed step contributed its full height
+      // everywhere below the bump, down to the inner sampling bound
+      lo = c.form == RhoForm::Monotone ? r_lo : c.mu[r] - w;
       hi = c.mu[r] + w;
       if (radial) {
         lo = std::max(lo, r_lo);
@@ -789,6 +858,11 @@ RemoveReport remove_basis(CurveView &c, double centre_request, bool radial) {
         // zero_ref: the value order is g_k(x) - g_k(0) (exactly 0 at x == 0);
         // the derivatives are the same in both embedding references.
         if (order == 0 && c.zero_ref) return basis_value(c, k, x) - g0[k];
+        if (c.form == RhoForm::Monotone) {  // the integrated bumps S_k
+          if (order == 0) return radial_step_value_bare (c.family, x, c.width(k), c.mu[k]);
+          if (order == 1) return radial_step_deriv_bare (c.family, x, c.width(k), c.mu[k]);
+          return radial_step_deriv2_bare(c.family, x, c.width(k), c.mu[k]);
+        }
         if (c.right_active) {
           if (order == 0) return embedding_value (c.family, x, c.width(k), c.mu[k], c.degree(k));
           if (order == 1) return embedding_deriv (c.family, x, c.width(k), c.mu[k], c.degree(k));
@@ -849,16 +923,111 @@ RemoveReport remove_basis(CurveView &c, double centre_request, bool radial) {
         return true;
       };
 
+      // ---- RHOFORM NONNEG / MONOTONE: bounded least squares ----
+      // The same objective with every amplitude kept >= 0, c_j + dc_j >= 0:
+      // a convex quadratic in <= 2 variables. Each compensator is either
+      // free or at its bound (dc_j = -c_j); every such active set is solved
+      // by its reduced normal equations, and the feasible candidate with
+      // the smallest objective dc^T G dc - 2 h^T dc is the optimum. "Both at
+      // the bound" is always feasible, so a solution always exists.
+      // A compensator whose weighted column is negligible on the region (a
+      // bump whose support misses it; rounding level relative to the
+      // removed function's column) does not enter the objective: every dc_j
+      // is optimal there, and holding it at the bound would wipe its
+      // amplitude outside the region unseen. It stays fixed (dc_j = 0,
+      // `inert`) and out of the enumeration; with no other compensator
+      // there is no usable system (false: plain removal, as under SIGNED).
+      auto solve_bounded = [&](std::array<double, 2> &dc,
+                               std::vector<std::size_t> &held,
+                               std::array<bool, 2> &inert) -> bool {
+        double G[2][2] = {{0, 0}, {0, 0}}, h[2] = {0, 0}, gr = 0.0;
+        for (int m = 0; m < 3; ++m) {
+          if (wm[m] == 0.0) continue;
+          const double w2 = wm[m] * wm[m];
+          for (std::size_t i = 0; i < N; ++i) {
+            gr += w2 * t[m][i] * t[m][i];
+            for (std::size_t a = 0; a < nj; ++a) {
+              h[a] += w2 * A[m][i][a] * t[m][i];
+              for (std::size_t b = 0; b < nj; ++b)
+                G[a][b] += w2 * A[m][i][a] * A[m][i][b];
+            }
+          }
+        }
+        // the removed function's own column: t / c_r (c_r != 0 here)
+        gr /= c.coeff[r] * c.coeff[r];
+        bool any_live = false;
+        for (std::size_t a = 0; a < nj; ++a) {
+          inert[a] = !(G[a][a] > 1e-24 * gr);
+          any_live = any_live || !inert[a];
+        }
+        if (!any_live) return false;
+        bool found = false;
+        double best = 0.0;
+        for (unsigned mask = 0; mask < (1u << nj); ++mask) {
+          bool skip = false;
+          for (std::size_t a = 0; a < nj; ++a)
+            skip = skip || ((mask & (1u << a)) && inert[a]);
+          if (skip) continue;  // an inert compensator is never at its bound
+          std::array<double, 2> x{0.0, 0.0};
+          std::vector<std::size_t> fr;
+          for (std::size_t a = 0; a < nj; ++a) {
+            if (mask & (1u << a)) x[a] = -c.coeff[J[a]];
+            else if (!inert[a]) fr.push_back(a);
+          }
+          if (fr.size() == 2) {
+            const double det = G[0][0] * G[1][1] - G[0][1] * G[1][0];
+            if (std::fabs(det) <= 1e-12 * std::fabs(G[0][0] * G[1][1]))
+              continue;  // singular face: its optimum lies on an edge
+            x[0] = (h[0] * G[1][1] - h[1] * G[0][1]) / det;
+            x[1] = (h[1] * G[0][0] - h[0] * G[1][0]) / det;
+          } else if (fr.size() == 1) {
+            const std::size_t a = fr[0], b = 1 - a;
+            if (G[a][a] <= 0.0) continue;
+            x[a] = (h[a] - (nj == 2 ? G[a][b] * x[b] : 0.0)) / G[a][a];
+          }
+          bool feasible = true;
+          for (std::size_t a : fr)
+            feasible = feasible && c.coeff[J[a]] + x[a] >= 0.0;
+          if (!feasible) continue;
+          double f = 0.0;
+          for (std::size_t a = 0; a < nj; ++a) {
+            f -= 2.0 * h[a] * x[a];
+            for (std::size_t b = 0; b < nj; ++b) f += x[a] * G[a][b] * x[b];
+          }
+          if (found && !(f < best)) continue;
+          found = true;
+          best = f;
+          dc = x;
+          held.clear();
+          for (std::size_t a = 0; a < nj; ++a)
+            if (mask & (1u << a)) held.push_back(J[a]);
+        }
+        return found;
+      };
+
       std::array<double, 2> dc{0.0, 0.0};
+      std::array<bool, 2> inert{false, false};
       std::size_t nuse = nj;
-      bool ok = nuse > 0 && solve(nuse, dc);
-      if (!ok && nuse == 2) {
-        nuse = 1;
-        ok = solve(nuse, dc);
-        if (ok)
-          rep.warnings.push_back(
-              "compensation system ill-conditioned with two neighbours; "
-              "adjusted only the nearest one.");
+      bool ok = false;
+      if (rhoform_is_positive(c.form)) {
+        std::vector<std::size_t> held;
+        ok = nuse > 0 && solve_bounded(dc, held, inert);
+        for (std::size_t j : held)
+          rep.notes.push_back(
+              std::string("RHOFORM ") + rhoform_name(c.form) +
+              ": the compensating amplitude of the basis function at " +
+              fmt(c.mu[j]) + " is held at its bound 0 (every amplitude "
+              "stays >= 0).");
+      } else {
+        ok = nuse > 0 && solve(nuse, dc);
+        if (!ok && nuse == 2) {
+          nuse = 1;
+          ok = solve(nuse, dc);
+          if (ok)
+            rep.warnings.push_back(
+                "compensation system ill-conditioned with two neighbours; "
+                "adjusted only the nearest one.");
+        }
       }
 
       // ---- residuals (stacked weighted + value-only RMS) ----
@@ -880,6 +1049,7 @@ RemoveReport remove_basis(CurveView &c, double centre_request, bool radial) {
       if (ok) {
         std::tie(rep.resid_comp, rep.vresid_comp) = resid(true);
         for (std::size_t j = 0; j < nuse; ++j) {
+          if (inert[j]) continue;  // positive forms: fixed, dc_j == 0
           c.coeff[J[j]] += dc[j];
           rep.adjusted.push_back(J[j]);
           rep.delta_c.push_back(dc[j]);

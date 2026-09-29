@@ -271,6 +271,7 @@ Context make_draw_ctx(const EmbDraw &d, const char *embf0) {
   c.add("CGRIDMB", "2.0 3.5 5.0");
   if (!knot) c.add("SGRIDMB", "1.0 1.0 1.0");
   c.add("AMPGRIDMB", knot ? "0.010 0.00625 0.003" : "0.40 0.25 0.12");
+  c.add("RHOFORM", "SIGNED");
   c.add("CEMBFUNC", d.c);  // lossless: the descriptor sees these exact doubles
   if (!knot) c.add("SEMBFUNC", d.s);
   if (kdeg) c.add("KDEGEMB", std::vector<double>(d.M(), 3.0));
@@ -909,7 +910,7 @@ TEST_CASE_METHOD(ReamEmbf0Fixture,
 // ------------------------------------------------------------------------
 
 TEST_CASE_METHOD(ReamEmbf0Fixture,
-                 "DM_REAM EMBF0 ZERO: forces match FD of the energy; energies "
+                 "DM_REAM EMBF0 ZERO: forces match FD of the energy, energies "
                  "shift by -F(0) per atom",
                  "[ream][embf0][knot5][blip5]") {
   // Knot5 (deg 5 and deg 3) with negative embedding knots (g(0) != 0) and

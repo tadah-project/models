@@ -3,8 +3,11 @@
 #include "tadah/core/utils.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
+#include <stdexcept>
 #include <string>
 #include <tadah/models/descriptors/d_base.h>
+#include <tadah/models/descriptors/dm/rhoform.h>
 #include <utility>
 #include <vector>
 namespace tadah {
@@ -66,48 +69,115 @@ void D_Base::update_weights(const tadah::core::Context &c) {
   watom_Z_by_arg_pos.clear();
   watom_pair_by_arg_pos.clear();
   watom_mode = WatomMode::Empty;
-  if (!c.contains("WATOM") || c.size("WATOM") == 0) return;
+  WatomSpec spec = parse_watom(c);
+  watom_mode = spec.mode;
+  if (spec.mode == WatomMode::PerSpecies)
+    watom_Z_by_arg_pos = std::move(spec.Zs);
+  else if (spec.mode == WatomMode::PairTriple)
+    watom_pair_by_arg_pos = std::move(spec.pairs);
+  for (const WatomWrite &e : spec.writes) {
+    weights[e.Zi][e.Zj] = e.w;
+    weights[e.Zj][e.Zi] = e.w;
+  }
+}
+D_Base::WatomSpec D_Base::parse_watom(const tadah::core::Context &c) {
+  WatomSpec spec;
+  if (!c.contains("WATOM") || c.size("WATOM") == 0) return spec;
 
   const size_t n = c.size("WATOM");
   const bool per_species =
     tadah::core::is_number(c.get<std::string>("WATOM", 0));
 
   if (per_species) {
-    if (!c.contains("ATOM")) return;
-    watom_mode = WatomMode::PerSpecies;
+    if (!c.contains("ATOM")) return spec;
     std::vector<int> Zs(n);
     for (size_t i = 0; i < n; ++i) {
       Zs[i] = tadah::core::PeriodicTable::find_by_symbol(
                 c.get<std::string>("ATOM", i)).Z;
     }
-    watom_Z_by_arg_pos = Zs;
+    spec.mode = WatomMode::PerSpecies;
     for (size_t i = 0; i < n; ++i) {
       const double wi = c.get<double>("WATOM", i);
-      weights[Zs[i]][Zs[i]] = wi;
+      spec.values.push_back(wi);
+      spec.writes.push_back({Zs[i], Zs[i], wi});
       for (size_t j = i + 1; j < n; ++j) {
         const double w = std::sqrt(wi * c.get<double>("WATOM", j));
-        weights[Zs[i]][Zs[j]] = w;
-        weights[Zs[j]][Zs[i]] = w;
+        spec.writes.push_back({Zs[i], Zs[j], w});
       }
     }
+    spec.Zs = std::move(Zs);
   } else {
     if (n % 3 != 0) {
       throw std::runtime_error(
         "WATOM pair format: expected sym sym value triples");
     }
-    watom_mode = WatomMode::PairTriple;
-    watom_pair_by_arg_pos.reserve(n / 3);
+    spec.mode = WatomMode::PairTriple;
+    spec.pairs.reserve(n / 3);
     for (size_t i = 0; i < n; i += 3) {
       const int Zi = tadah::core::PeriodicTable::find_by_symbol(
                        c.get<std::string>("WATOM", i)).Z;
       const int Zj = tadah::core::PeriodicTable::find_by_symbol(
                        c.get<std::string>("WATOM", i + 1)).Z;
       const double w = c.get<double>("WATOM", i + 2);
-      weights[Zi][Zj] = w;
-      weights[Zj][Zi] = w;
-      watom_pair_by_arg_pos.emplace_back(Zi, Zj);
+      spec.values.push_back(w);
+      spec.writes.push_back({Zi, Zj, w});
+      spec.pairs.emplace_back(Zi, Zj);
     }
   }
+  return spec;
+}
+void D_Base::require_positive_density_weights(const tadah::core::Context &c,
+                                              const std::string &who) {
+  const WatomSpec spec = parse_watom(c);
+  for (size_t k = 0; k < spec.values.size(); ++k) {
+    const double w = spec.values[k];
+    if (std::isfinite(w) && w > 0.0) continue;
+    const std::string entry =
+        spec.mode == WatomMode::PerSpecies
+            ? "WATOM entry " + std::to_string(k + 1) + " (" +
+                  c.get<std::string>("ATOM", k) + ")"
+            : "WATOM pair " + std::to_string(k + 1) + " (" +
+                  c.get<std::string>("WATOM", 3 * k) + " " +
+                  c.get<std::string>("WATOM", 3 * k + 1) + ")";
+    throw DensityFormError(
+        who + ": every density pair weight must be finite and > 0; " + entry +
+        " is " + core::format_roundtrip(w) + ".");
+  }
+}
+std::vector<double> D_Base::density_pair_weights(const tadah::core::Context &c) {
+  std::vector<std::string> tok;
+  for (size_t i = 0;; ++i) {
+    const auto t = c.stored_value("WATOM", i);
+    if (!t) break;
+    tok.push_back(*t);
+  }
+  std::vector<double> w;
+  if (tok.empty()) return w;
+  auto num = [&](size_t i) {
+    char *end = nullptr;
+    const double v = std::strtod(tok[i].c_str(), &end);
+    if (tok[i].empty() || end != tok[i].c_str() + tok[i].size())
+      throw std::runtime_error("WATOM entry " + std::to_string(i + 1) + " ('" +
+                               tok[i] + "') is not a number");
+    return v;
+  };
+  if (tadah::core::is_number(tok[0])) {
+    // per species, parallel to ATOM (parse_watom: no ATOM, no weights)
+    if (!c.has_stored("ATOM")) return w;
+    std::vector<double> ws;
+    for (size_t i = 0; i < tok.size(); ++i) ws.push_back(num(i));
+    for (size_t i = 0; i < ws.size(); ++i) {
+      w.push_back(ws[i]);
+      for (size_t j = i + 1; j < ws.size(); ++j)
+        w.push_back(std::sqrt(ws[i] * ws[j]));
+    }
+    return w;
+  }
+  if (tok.size() % 3 != 0)
+    throw std::runtime_error(
+        "WATOM pair format: expected sym sym value triples");
+  for (size_t i = 2; i < tok.size(); i += 3) w.push_back(num(i));
+  return w;
 }
 int D_Base::get_atom_Z_for_arg_pos(int arg_pos) const {
   if (arg_pos < 1) return 0;
