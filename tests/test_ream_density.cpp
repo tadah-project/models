@@ -956,3 +956,113 @@ TEST_CASE_METHOD(DensityFixture,
   CHECK(ReamDensity::from_context(with_code("+0")).basis == BasisKind::Blip);
   REQUIRE_NOTHROW(DM_REAM(with_code("0")));
 }
+
+TEST_CASE_METHOD(DensityFixture,
+                 "rhoform: the OPTIM low-bound rules follow the density basis, "
+                 "as ReamDensity::validate does",
+                 "[ream][rhoform][optim_rule]") {
+  const std::vector<BasisKind> bump = {BasisKind::Blip, BasisKind::Blip5,
+                                       BasisKind::Gaussian};
+  SECTION("NONNEG: SGRIDMB > 0 for the Gaussian basis only") {
+    const auto g =
+        optim_low_bound_rule("SGRIDMB", RhoForm::NonNeg, BasisKind::Gaussian);
+    REQUIRE(g);
+    CHECK(g->strict);
+    CHECK_FALSE(g->admits(-0.5));
+    CHECK_FALSE(g->admits(0.0));
+    CHECK_FALSE(g->admits(std::nan("")));
+    CHECK(g->admits(1e-3));
+    CHECK_THAT(g->requirement, Contains("every SGRIDMB width > 0") &&
+                                   Contains("Gaussian"));
+    CHECK(optim_low_bound_rule("sgridmb", RhoForm::NonNeg,
+                               BasisKind::Gaussian));
+    for (BasisKind b : {BasisKind::Blip, BasisKind::Blip5, BasisKind::Knot5})
+      CHECK_FALSE(optim_low_bound_rule("SGRIDMB", RhoForm::NonNeg, b));
+    // an unknown basis (an hpotarget file names no potential): no basis rule
+    CHECK_FALSE(optim_low_bound_rule("SGRIDMB", RhoForm::NonNeg, std::nullopt));
+  }
+  SECTION("MONOTONE: SGRIDMB > 0 for every basis; SIGNED: no rule") {
+    for (BasisKind b : bump) {
+      INFO(basis_name(b));
+      const auto m = optim_low_bound_rule("SGRIDMB", RhoForm::Monotone, b);
+      REQUIRE(m);
+      CHECK(m->strict);
+      CHECK_FALSE(optim_low_bound_rule("SGRIDMB", RhoForm::Signed, b));
+      CHECK_FALSE(optim_low_bound_rule("SGRIDMB", std::nullopt, b));
+    }
+    CHECK(optim_low_bound_rule("SGRIDMB", RhoForm::Monotone, std::nullopt));
+  }
+  SECTION("AMPGRIDMB and WATOM do not depend on the basis") {
+    for (const auto b : {std::optional<BasisKind>(), std::optional<BasisKind>(
+                                                         BasisKind::Gaussian)}) {
+      for (RhoForm f : {RhoForm::NonNeg, RhoForm::Monotone}) {
+        const auto a = optim_low_bound_rule("AMPGRIDMB", f, b);
+        REQUIRE(a);
+        CHECK_FALSE(a->strict);
+        CHECK(a->admits(0.0));
+        const auto w = optim_low_bound_rule("WATOM", f, b);
+        REQUIRE(w);
+        CHECK(w->strict);
+      }
+      CHECK_FALSE(optim_low_bound_rule("AMPGRIDMB", RhoForm::Signed, b));
+      CHECK_FALSE(optim_low_bound_rule("CGRIDMB", RhoForm::Monotone, b));
+    }
+  }
+  SECTION("a box low bound the rule admits is a width the density accepts") {
+    // The single source of truth: for every form and bump basis, a width
+    // w as the low bound of an SGRIDMB box passes the rule exactly when
+    // ReamDensity::validate accepts a density with that width.
+    for (const char *form : {"SIGNED", "NONNEG", "MONOTONE"}) {
+      for (BasisKind b : bump) {
+        for (double w : {-0.5, 1.0}) {
+          INFO(form << " " << basis_name(b) << " SGRIDMB width " << w);
+          Layout L = layout(b, true);
+          L.s[0] = w;
+          const Context c = ream_ctx(L, form, "Cut_Cos");
+          bool density_ok = true;
+          try {
+            ReamDensity::validate_context(c);
+          } catch (const DensityFormError &) {
+            density_ok = false;
+          }
+          const auto rule = optim_low_bound_rule(
+              "SGRIDMB", parse_rhoform(form), optim_rule_basis(c));
+          CHECK((!rule || rule->admits(w)) == density_ok);
+        }
+      }
+    }
+  }
+  SECTION("optim_rule_basis reads the seed's DM_REAM basis") {
+    CHECK_FALSE(optim_rule_basis(Context()).has_value());
+    for (BasisKind b : {BasisKind::Blip, BasisKind::Blip5, BasisKind::Gaussian,
+                        BasisKind::Knot5})
+      CHECK(optim_rule_basis(ream_ctx(layout(b, true), "NONNEG",
+                                      "Cut_Cos")) == b);
+    // a DM_mJoin: Gaussian when a DM_REAM child is (a joined SGRIDMB box
+    // does not say whose entries it holds), else the first DM_REAM child's
+    auto mjoin = [](const char *second_code) {
+      Context c;
+      c.add("VERBOSE", 0);
+      for (int k = 0; k < 3; ++k) c.add("RCTYPEMB", "Cut_Cos");
+      for (int k = 0; k < 3; ++k) c.add("RCUTMB", 5.0);
+      c.add("INITMB", "true");
+      c.add("TYPEMB", "DM_mJoin");
+      c.add("TYPEMB", "DM_Blip 0 2 2 Ta Ta");
+      c.add("TYPEMB", "DM_REAM 3 2 2 2 2 2 0 0 Ta Ta");
+      c.add("TYPEMB", std::string("DM_REAM ") + second_code +
+                          " 2 2 2 2 2 0 0 Ta Ta");
+      c.add("CGRIDMB", "1.7 2.3 2.0 3.0 2.5 3.5");
+      c.add("SGRIDMB", "0.5 0.7 1.0 1.0 1.0 1.0");
+      c.add("AMPGRIDMB", "0.4 0.2 0.3 0.1");
+      c.add("RHOFORM", "NONNEG");
+      c.add("CEMBFUNC", "0.0 0.5 0.0 0.5");
+      c.add("SEMBFUNC", "1.0 1.0 1.0 1.0");
+      return c;
+    };
+    CHECK(optim_rule_basis(mjoin("1")) == BasisKind::Gaussian);
+    CHECK(optim_rule_basis(mjoin("0")) == BasisKind::Blip5);
+    // a basis code that does not convert is an error here too
+    CHECK_THROWS_WITH(optim_rule_basis(mjoin("x")),
+                      Contains("TYPEMB basis code 'x' is not an integer"));
+  }
+}
