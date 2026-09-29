@@ -157,6 +157,16 @@ class PassiveQR {
 
 }  // namespace
 
+const char *nnls_stop_text(NnlsStop stop) {
+  switch (stop) {
+    case NnlsStop::KuhnTucker:   return "a Kuhn-Tucker point";
+    case NnlsStop::IterationCap: return "the iteration cap";
+    case NnlsStop::Refused:
+      return "every column with a dual above the tolerance was refused";
+  }
+  return "a Kuhn-Tucker point";  // unreachable (enum is exhaustive above)
+}
+
 NnlsResult nnls(const double *A, std::size_t m, std::size_t n,
                 const double *b, double *x, const double *row_weights,
                 const unsigned char *col_mask, double lambda) {
@@ -238,26 +248,41 @@ NnlsResult nnls(const double *A, std::size_t m, std::size_t n,
     // column that is numerically dependent on the passive set, or whose
     // coefficient comes out <= 0, is skipped in this iteration.
     std::vector<char> rejected(nf, 0);
+    std::size_t n_rejected = 0;
     bool entered = false;
     while (!entered) {
       std::size_t t = nf;
       double wt = tol;
       for (std::size_t q = 0; q < nf; ++q)
         if (!in_p[q] && !rejected[q] && w[q] > wt) { wt = w[q]; t = q; }
-      if (t == nf) { done = true; break; }        // Kuhn-Tucker point
+      if (t == nf) {
+        // No column left to try: a Kuhn-Tucker point only when none was
+        // refused. A refused column's dual is above the tolerance, so x is
+        // then feasible but not proven optimal.
+        if (n_rejected > 0) {
+          res.converged = false;
+          res.stop = NnlsStop::Refused;
+          res.refused = n_rejected;
+        }
+        done = true;
+        break;
+      }
       if (res.iterations >= max_iter) {
         res.converged = false;
+        res.stop = NnlsStop::IterationCap;
         done = true;
         break;
       }
       if (!f.append(t)) {
         rejected[t] = 1;
+        ++n_rejected;
         continue;
       }
       f.solve(zz);
       if (!(zz.back() > 0.0)) {
         f.pop();
         rejected[t] = 1;
+        ++n_rejected;
         continue;
       }
       P.push_back(t);

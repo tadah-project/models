@@ -7,6 +7,23 @@
 namespace tadah {
 namespace models {
 
+/** \brief Why nnls() stopped. */
+enum class NnlsStop {
+  /** Every zero-set dual is at most the dual tolerance: a Kuhn-Tucker
+   *  point to the accuracy of those duals. */
+  KuhnTucker,
+  /** The iteration cap (3 n + 10) was reached. */
+  IterationCap,
+  /** Columns with a dual above the tolerance remained, but each was refused
+   *  (numerically dependent on the passive columns, or a coefficient <= 0
+   *  on entry), so no column could enter. */
+  Refused
+};
+
+/** "a Kuhn-Tucker point", "the iteration cap", "every column with a dual
+ *  above the tolerance was refused": the reason, for messages. */
+const char *nnls_stop_text(NnlsStop stop);
+
 /** \brief Result of nnls(). */
 struct NnlsResult {
   /** The passive set at termination: the columns with x_j > 0, ascending.
@@ -20,10 +37,16 @@ struct NnlsResult {
   std::size_t iterations = 0;
   /** True: every zero-set dual, computed from the final passive
    *  factorisation, is at most the dual tolerance, i.e. x is a Kuhn-Tucker
-   *  point to the accuracy of those duals. False when the iteration cap
-   *  (3 n + 10) stopped the solver: x is then feasible (every x_j >= 0) but
-   *  not proven optimal. */
+   *  point to the accuracy of those duals (stop == KuhnTucker). False when
+   *  the iteration cap (3 n + 10) stopped the solver, or when every column
+   *  whose dual was above the tolerance was refused: x is then feasible
+   *  (every x_j >= 0) but not proven optimal. */
   bool converged = true;
+  /** Why the solver stopped. */
+  NnlsStop stop = NnlsStop::KuhnTucker;
+  /** At a Refused stop, the number of columns refused in the last attempt
+   *  whose dual was above the tolerance; 0 otherwise. */
+  std::size_t refused = 0;
 };
 
 /**
@@ -45,7 +68,10 @@ struct NnlsResult {
  * square exhausts double precision. A column whose QR diagonal shows it
  * numerically dependent on the passive columns (|R_pp| <= 100 eps |a_p|),
  * or whose coefficient comes out <= 0 on entry, is not admitted in that
- * iteration (Lawson and Hanson's safeguard against cycling). As in Lawson
+ * iteration (Lawson and Hanson's safeguard against cycling). When every
+ * column with a dual above the tolerance is refused, the solver stops
+ * without convergence (NnlsStop::Refused): x is feasible, not a proven
+ * Kuhn-Tucker point. As in Lawson
  * and Hanson, the dual w = A^T r is formed from the residual of the passive
  * factorisation, r = Q [0; (Q^T b)[p, m)], never from b - A x: the forward
  * error of x (cond(A_P) eps |x| and more) flips the sign of the small duals

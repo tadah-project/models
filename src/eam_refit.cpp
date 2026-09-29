@@ -324,9 +324,10 @@ FitStats EAMRefit::lsq_fit_windowed(const std::vector<double> &xs,
     if (!res.converged)
       tadah::core::Logger::instance().log(tadah::core::LogLevel::WARNING,
           std::string("EAMRefit: the RHOFORM ") + rhoform_name(form) +
-          " non-negative least-squares block stopped at its iteration cap "
-          "(" + std::to_string(res.iterations) + " iterations): the "
-          "amplitudes are >= 0 but not proven optimal.");
+          " non-negative least-squares block stopped before a Kuhn-Tucker "
+          "point (" + nnls_stop_text(res.stop) + ", after " +
+          std::to_string(res.iterations) + " iterations): the amplitudes "
+          "are >= 0 but not proven optimal.");
     for (std::size_t q = 0; q < n; ++q) coeffs[cols[q]] = x[q];
   };
 
