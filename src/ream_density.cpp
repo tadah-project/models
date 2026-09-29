@@ -62,6 +62,27 @@ double ReamDensity::width(std::size_t n) const {
   return n < srho.size() ? srho[n] : 1.0;
 }
 
+BasisKind ReamDensity::basis_from_context(const tadah::core::Context &ctx) {
+  static const char *const kKnown =
+      " (known: 0=Blip, 1=Gaussian, 2=Knot5, 3=Blip5).";
+  const auto tok = ctx.stored_value("TYPEMB", 1);
+  if (!tok)
+    throw std::runtime_error(
+        std::string("TYPEMB has no basis code (TYPEMB DM_REAM <basis code> "
+                    "...") + ")" + kKnown);
+  if (!tadah::core::is_integer_literal(*tok))
+    throw std::runtime_error("TYPEMB basis code '" + *tok +
+                             "' is not an integer" + kKnown);
+  int code = 0;
+  try {
+    code = std::stoi(*tok);
+  } catch (const std::out_of_range &) {
+    throw std::runtime_error("TYPEMB basis code '" + *tok +
+                             "' is not a basis code" + kKnown);
+  }
+  return basis_kind_from_code(code);
+}
+
 ReamDensity ReamDensity::from_context(const tadah::core::Context &ctx) {
   ReamDensity d;
   d.form = require_rhoform(ctx, "");
@@ -71,15 +92,9 @@ ReamDensity ReamDensity::from_context(const tadah::core::Context &ctx) {
     throw DensityFormError(
         "DM_REAM density: the context is not a bare DM_REAM block (TYPEMB " +
         (label ? *label : std::string("absent")) + ").");
-  // The basis code as DM_REAM reads it (Context::get<int>): absent or
-  // non-numeric -> 0 (Blip).
-  int bcode = 0;
-  if (const auto tok = ctx.stored_value("TYPEMB", 1)) {
-    std::istringstream iss(*tok);
-    if (!(iss >> bcode)) bcode = 0;
-  }
+  // The basis code as DM_REAM reads it (basis_from_context).
   try {
-    d.basis = basis_kind_from_code(bcode);
+    d.basis = basis_from_context(ctx);
   } catch (const std::runtime_error &e) {
     throw DensityFormError(std::string("DM_REAM density: ") + e.what());
   }

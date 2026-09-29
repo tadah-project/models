@@ -70,9 +70,12 @@ void DM_REAM::load(const tadah::core::Context &ctx) {
   // checks), embedding, 4. the density pair weights, 5. the embedding
   // reference. Everything goes into temporaries; the members are swapped in
   // only at the end.
-  int bcode = 0;
-  try { bcode = ctx.get<int>("TYPEMB", 1); } catch (...) { bcode = 0; }
-  const BasisKind b = basis_kind_from_code(bcode);
+  BasisKind b;
+  try {
+    b = ReamDensity::basis_from_context(ctx);
+  } catch (const std::runtime_error &e) {
+    throw std::runtime_error(std::string("DM_REAM: ") + e.what());
+  }
   require_rhoform(ctx, "");
   ReamDensity d = ReamDensity::from_context(ctx);
   tadah::core::v_type ce, se, de;

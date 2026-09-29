@@ -74,14 +74,24 @@ public:
   /** Width of term @p n (1.0, ignored, for the knot family). */
   double width(std::size_t n) const;
 
-  /** Reads RHOFORM, the TYPEMB basis code (token 1; absent or non-numeric =
-   *  0, Blip, as DM_REAM reads it), CGRIDMB, SGRIDMB, AMPGRIDMB and KDEGMB
-   *  through Context::has_stored / stored_value / D_Base::get_grid only, so
-   *  it never materialises a blueprint default and never logs. @p ctx must be
-   *  a bare DM_REAM context (TYPEMB token 0 is DM_REAM). Throws
-   *  DensityFormError when RHOFORM (the migration text), CGRIDMB or
-   *  AMPGRIDMB is absent, when the basis code is unknown or when TYPEMB is
-   *  not DM_REAM. Does not validate(). */
+  /** The TYPEMB basis code of a bare DM_REAM context (TYPEMB token 1), as
+   *  DM_REAM reads it: an integer literal ([+-]digits) naming a known basis
+   *  (basis_kind_from_code). Throws std::runtime_error, without a prefix
+   *  ("TYPEMB basis code 'x' is not an integer (known: 0=Blip, ...)"), when
+   *  the token is absent, is not an integer literal or names no basis;
+   *  DM_REAM prefixes "DM_REAM: ", from_context "DM_REAM density: ". There
+   *  is no fallback: such a token was read as 0 (Blip), or as its integer
+   *  prefix ("2.5" as 2). */
+  static BasisKind basis_from_context(const tadah::core::Context &ctx);
+
+  /** Reads RHOFORM, the TYPEMB basis code (basis_from_context), CGRIDMB,
+   *  SGRIDMB, AMPGRIDMB and KDEGMB through Context::has_stored /
+   *  stored_value / D_Base::get_grid only, so it never materialises a
+   *  blueprint default and never logs. @p ctx must be a bare DM_REAM context
+   *  (TYPEMB token 0 is DM_REAM). Throws DensityFormError when RHOFORM (the
+   *  migration text), CGRIDMB or AMPGRIDMB is absent, when the basis code is
+   *  absent, not an integer or unknown, or when TYPEMB is not DM_REAM. Does
+   *  not validate(). */
   static ReamDensity from_context(const tadah::core::Context &ctx);
 
   /** Validates the grids for the form (DensityFormError naming the offending
