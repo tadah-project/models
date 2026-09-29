@@ -54,7 +54,8 @@ struct EAMRefitConfig {
   bool embf0_zero = true;
   /// RHOFORM: the density form the density amplitudes are fitted in and the
   /// written potential declares (dense fit, rho_fit, rho_setfl). SIGNED: the
-  /// signed expansion sum_n a_n psi_n by GELSD, bit-identical to tadah 1.5.1.
+  /// signed expansion sum_n a_n psi_n by GELSD, bit-identical to the fit
+  /// before RHOFORM existed.
   /// NONNEG: the same columns by non-negative least squares (every a_n >= 0).
   /// MONOTONE: the integrated-bump steps S_n by non-negative least squares
   /// (bump families only; the cutoff rctype must be whitelisted). The
@@ -235,7 +236,7 @@ private:
    *  included) takes the zero-referenced column b_k(x) - b_k(0); fit() then
    *  passes no pin (the F(0) row would be identically zero).
    *  `form` (density channel; Signed for phi and F): Signed solves every
-   *  block by GELSD (tadah 1.5.1, bit for bit); NonNeg solves it by
+   *  block by GELSD (as before RHOFORM, bit for bit); NonNeg solves it by
    *  non-negative least squares on the same columns; Monotone by
    *  non-negative least squares on the integrated-bump step columns S_k
    *  (whose support (-inf, c_k + half] joins the window block whenever it

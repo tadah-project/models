@@ -11,7 +11,8 @@
 
 // Every method of ReamDensity lives in this translation unit, which MODELS
 // compiles -O3 without -march=native or -ffast-math. Do not move any of it
-// into a header: the SIGNED sums are pinned bit for bit to tadah 1.5.1, and
+// into a header: the SIGNED sums are pinned bit for bit to the density
+// before RHOFORM (every tadah before 1.6.0), and
 // a -march=native unit contracts a*b+c into an FMA (measured to change the
 // density bits of 7 of the 9 campaign fixtures).
 
@@ -181,7 +182,7 @@ void ReamDensity::validate_context(const tadah::core::Context &ctx) {
 }
 
 // ------------------------------ point values ------------------------------
-// SIGNED and NONNEG are verbatim copies of the tadah 1.5.1 DM_REAM loops
+// SIGNED and NONNEG are verbatim copies of the DM_REAM loops before RHOFORM
 // (rho_raw, rho_raw_deriv, the eam_density sum): acc += a_n * term, n
 // ascending, W outside. NONNEG and MONOTONE clamp the cutoff value at 0
 // first; the form is branched on outside the n-loop.

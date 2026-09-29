@@ -15,7 +15,7 @@ namespace models {
  *  With W the WATOM pair weight, f_c the many-body cutoff and psi_n the
  *  density basis function:
  *  - Signed: rho = W f_c sum_n a_n psi_n with amplitudes of any sign, the
- *    density of tadah 1.5.1 and earlier (bit for bit).
+ *    density of every tadah before 1.6.0 (bit for bit).
  *  - NonNeg: the same expression with every a_n >= 0, W > 0 and the cutoff
  *    clamped at max(f_c, 0): rho >= 0 exactly.
  *  - Monotone: rho = W max(f_c, 0) sum_n a_n S_n, S_n the integrated bump

@@ -50,10 +50,11 @@ struct RhoBarScan {
  *  Every method is defined out of line in MODELS/src/ream_density.cpp,
  *  which is compiled -O3 without -march=native or -ffast-math: FMA
  *  contraction in a -march=native unit changes the bits of the sum, and the
- *  SIGNED form is pinned bit for bit to tadah 1.5.1.
+ *  SIGNED form is pinned bit for bit to the density before RHOFORM (every
+ *  tadah before 1.6.0).
  *
  *  Guarantees, on a density that passed validate():
- *  - SIGNED: none (bitwise the tadah 1.5.1 density).
+ *  - SIGNED: none (bitwise the density of every tadah before 1.6.0).
  *  - NONNEG: rho_raw >= 0 exactly.
  *  - MONOTONE: rho_raw >= 0 exactly and non-increasing in r to rounding
  *    (S_B5 has 1-ulp rises for |x| < ~1.2; Cut_Poly/PolyS rise at the 1e-15
