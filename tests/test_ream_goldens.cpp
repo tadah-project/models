@@ -1,11 +1,12 @@
-/* FEAT-02 goldens: the DM_REAM density paths against the bits of tadah 1.5.1.
+/* FEAT-02 goldens: the DM_REAM density paths against the bits of the density
+ * before RHOFORM (every tadah before 1.6.0).
  *
  * ream_goldens_data.h holds, for 5 families (Blip, Blip5, Knot5, Knot3,
  * Gaussian) x 3 cutoffs (Cut_Dummy, Cut_Cos, Cut_Poly) x 2 amplitude sets
  * (signed, all non-negative), calc_rho's increment, the calc_dXijdri force
  * prefactor and eam_density's rho and rho' at 56-64 distances in (0, rcut],
- * captured as hex floats from tadah 1.5.1 (the tree before the density
- * forms: MODELS 4c4144b). RHOFORM SIGNED must reproduce every value bit for
+ * captured as hex floats from the tree before the density forms (MODELS
+ * 4c4144b). RHOFORM SIGNED must reproduce every value bit for
  * bit on both amplitude sets, and RHOFORM NONNEG on the non-negative set
  * (every cutoff here is >= 0, so the max(f_c, 0) clamp is inert).
  */
@@ -116,7 +117,7 @@ std::size_t mismatches(const ream_goldens::Case &gc, const char *form,
       if (bits(got[q]) == bits(want[q])) continue;
       if (bad++ == 0)
         first = std::string(what[q]) + " at r = " + hex(r) + ": got " +
-                hex(got[q]) + ", tadah 1.5.1 " + hex(want[q]);
+                hex(got[q]) + ", before RHOFORM " + hex(want[q]);
     }
   }
   return bad;
@@ -125,7 +126,7 @@ std::size_t mismatches(const ream_goldens::Case &gc, const char *form,
 }  // namespace
 
 TEST_CASE_METHOD(GoldenFixture,
-                 "DM_REAM goldens: RHOFORM SIGNED is bitwise the tadah 1.5.1 density "
+                 "DM_REAM goldens: RHOFORM SIGNED is bitwise the density before RHOFORM "
                  "(signed and non-negative amplitudes)",
                  "[ream][rhoform][goldens]") {
   std::size_t npts = 0;
@@ -143,7 +144,7 @@ TEST_CASE_METHOD(GoldenFixture,
 }
 
 TEST_CASE_METHOD(GoldenFixture,
-                 "DM_REAM goldens: RHOFORM NONNEG is bitwise the tadah 1.5.1 density "
+                 "DM_REAM goldens: RHOFORM NONNEG is bitwise the density before RHOFORM "
                  "on non-negative amplitudes",
                  "[ream][rhoform][goldens]") {
   std::size_t ncases = 0;

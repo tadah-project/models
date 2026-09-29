@@ -21,10 +21,24 @@
 #include <string>
 #include <vector>
 
+#include <unistd.h>
+
 using namespace tadah::models;
 
 namespace {
 struct RefitFixture { RefitFixture() { tadah::core::PeriodicTable::initialize(); } };
+
+/* A scratch file name unique per process (ctest runs the cases as
+ * concurrent processes), removed however the test case ends (a failed
+ * REQUIRE throws past a trailing std::remove). */
+struct ScratchFile {
+  std::string path;
+  explicit ScratchFile(const std::string &stem)
+      : path(stem + "_" + std::to_string(::getpid()) + ".eam.alloy") {}
+  ScratchFile(const ScratchFile &) = delete;
+  ScratchFile &operator=(const ScratchFile &) = delete;
+  ~ScratchFile() { std::remove(path.c_str()); }
+};
 
 // Minimal single-element setfl (header + tiny tabulated block) with a chosen
 // lattice token and lattice constant. Enough for read_setfl(); do NOT call
@@ -908,7 +922,8 @@ TEST_CASE_METHOD(RefitFixture,
                  "EAMRefit RHOFORM: table pre-checks and form guards",
                  "[refit][rhoform]") {
   SECTION("NONNEG / MONOTONE refuse a negative table, naming r") {
-    const std::string p = "tmp_rhoform_neg.eam.alloy";
+    const ScratchFile f("tmp_rhoform_neg");
+    const std::string &p = f.path;
     // negative for r > rcut (1 - sqrt(0.02)) = 4.29 A
     write_rho_setfl(p, [](double r) {
       const double x = 1.0 - r / 5.0;
@@ -916,7 +931,6 @@ TEST_CASE_METHOD(RefitFixture,
     });
     EAMSetflIO eam;
     eam.read_setfl(p);
-    std::remove(p.c_str());
     eam.build_splines();
     for (RhoForm f : {RhoForm::NonNeg, RhoForm::Monotone}) {
       INFO(rhoform_name(f));
@@ -932,7 +946,8 @@ TEST_CASE_METHOD(RefitFixture,
     REQUIRE_NOTHROW(signed_fit.fit());
   }
   SECTION("MONOTONE refuses a rising table, naming r; NONNEG fits it") {
-    const std::string p = "tmp_rhoform_rise.eam.alloy";
+    const ScratchFile f("tmp_rhoform_rise");
+    const std::string &p = f.path;
     // a bump on a decreasing background: rises just below r = 3.5
     write_rho_setfl(p, [](double r) {
       const double x = 1.0 - r / 5.0, g = (r - 3.5) / 0.2;
@@ -940,7 +955,6 @@ TEST_CASE_METHOD(RefitFixture,
     });
     EAMSetflIO eam;
     eam.read_setfl(p);
-    std::remove(p.c_str());
     eam.build_splines();
     EAMRefit mono(eam, coarse_config("Blip", RhoForm::Monotone));
     REQUIRE_THROWS_WITH(mono.fit(),

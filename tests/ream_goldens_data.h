@@ -1,7 +1,8 @@
-// Frozen reference data; do not edit. Captured from tadah 1.5.1 (MODELS 4c4144b,
-// CORE d335423, the tree before the density forms) by a standalone program
-// linked against that MODELS library and built with its flags (-O3, no
-// -march=native, no -ffast-math); capture sha256
+// Frozen reference data; do not edit. Captured from the tree before the
+// density forms (MODELS 4c4144b, CORE d335423; the density of every tadah
+// before 1.6.0) by a standalone program linked against that MODELS library
+// and built with its flags (-O3, no -march=native, no -ffast-math); capture
+// sha256
 // 99e878f87a1d2edcae27d3add469357f77f42862be58fe24e88eeed07d4b9f5f.
 //
 // Every case is a single-species DM_REAM (Ta, WATOM 0.8125, RCUTMB 5.5,
