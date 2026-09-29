@@ -18,6 +18,8 @@
 //   * radial_*   : LEFT-active knots, cutoff-weighted (density / two-body).
 //   * embedding_*: RIGHT-active knots, NO cutoff (embedding F(rho)).
 //   * *_bare     : no cutoff weight (basis analysis / plotting).
+//   * radial_step_*: the integrated-bump step S of the bump families
+//                  (DM_REAM RHOFORM MONOTONE); the knot family throws.
 
 #include <string>
 
@@ -32,6 +34,13 @@ namespace basis_detail {
   throw std::runtime_error(
       "basis_dispatch: unhandled BasisKind code " +
       std::to_string(static_cast<int>(k)));
+}
+
+[[noreturn]] inline void no_step_form(BasisKind k) {
+  throw std::runtime_error(
+      std::string("basis_dispatch: the ") + basis_name(k) +
+      " family has no integrated-bump step form (RHOFORM MONOTONE is "
+      "defined for the bump families Blip, Blip5 and Gaussian only).");
 }
 
 }  // namespace basis_detail
@@ -183,6 +192,97 @@ inline double radial_deriv2_bare(BasisKind k, double r,
     case BasisKind::Blip5:    return s * s * d2B5(s * (r - c));
     case BasisKind::Knot5:    return deg == 3 ? d2K3L(r - c) : d2K5L(r - c);
     case BasisKind::Gaussian: return d2G(r, s, c);
+  }
+  basis_detail::unknown_basis(k);
+}
+
+// --------------------------------------------------------------------------
+//  Integrated-bump step  S_c(r) * f_c(r)   (DM_REAM RHOFORM MONOTONE)
+//  Bump families only (s = eta > 0); the knot family throws. The cutoff
+//  weighting mirrors the radial_* functions: value = S * fc and
+//  deriv = fc * dS + fcp * S, the operand order of radial_value_deriv.
+// --------------------------------------------------------------------------
+
+/** \brief S_c(r) * f_c(r) for the given bump basis. */
+inline double radial_step_value(BasisKind k, double r, double fc,
+                                double s, double c) {
+  switch (k) {
+    case BasisKind::Blip:     return SB (s * (r - c)) * fc;
+    case BasisKind::Blip5:    return SB5(s * (r - c)) * fc;
+    case BasisKind::Gaussian: return SG (r, s, c) * fc;
+    case BasisKind::Knot5:    basis_detail::no_step_form(k);
+  }
+  basis_detail::unknown_basis(k);
+}
+
+/** \brief d/dr [ S_c(r) * f_c(r) ] for the given bump basis (fcp = f_c'). */
+inline double radial_step_deriv(BasisKind k, double r, double fc, double fcp,
+                                double s, double c) {
+  switch (k) {
+    case BasisKind::Blip: {
+      const double x = s * (r - c);
+      return fc * dSB(x, s) + fcp * SB(x);
+    }
+    case BasisKind::Blip5: {
+      const double x = s * (r - c);
+      return fc * dSB5(x, s) + fcp * SB5(x);
+    }
+    case BasisKind::Gaussian:
+      return fc * dSG(r, s, c) + fcp * SG(r, s, c);
+    case BasisKind::Knot5:    basis_detail::no_step_form(k);
+  }
+  basis_detail::unknown_basis(k);
+}
+
+/** Evaluate a cutoff-weighted step and its derivative together. The Blip5
+ *  path is fused (SB5_value_deriv); both results are bitwise equal to
+ *  radial_step_value / radial_step_deriv for every family. */
+inline void radial_step_value_deriv(BasisKind k, double r, double fc,
+                                    double fcp, double s, double c,
+                                    double &value, double &deriv) {
+  if (k == BasisKind::Blip5) {
+    double bare_value, bare_deriv;
+    SB5_value_deriv(s * (r - c), s, bare_value, bare_deriv);
+    value = bare_value * fc;
+    deriv = fc * bare_deriv + fcp * bare_value;
+    return;
+  }
+  value = radial_step_value(k, r, fc, s, c);
+  deriv = radial_step_deriv(k, r, fc, fcp, s, c);
+}
+
+/** \brief S_c(r) with no cutoff weight (refit fitters, curve editing). */
+inline double radial_step_value_bare(BasisKind k, double r, double s,
+                                     double c) {
+  switch (k) {
+    case BasisKind::Blip:     return SB (s * (r - c));
+    case BasisKind::Blip5:    return SB5(s * (r - c));
+    case BasisKind::Gaussian: return SG (r, s, c);
+    case BasisKind::Knot5:    basis_detail::no_step_form(k);
+  }
+  basis_detail::unknown_basis(k);
+}
+
+/** \brief d/dr S_c(r) with no cutoff weight. */
+inline double radial_step_deriv_bare(BasisKind k, double r, double s,
+                                     double c) {
+  switch (k) {
+    case BasisKind::Blip:     return dSB (s * (r - c), s);
+    case BasisKind::Blip5:    return dSB5(s * (r - c), s);
+    case BasisKind::Gaussian: return dSG (r, s, c);
+    case BasisKind::Knot5:    basis_detail::no_step_form(k);
+  }
+  basis_detail::unknown_basis(k);
+}
+
+/** \brief d^2/dr^2 S_c(r) with no cutoff weight. */
+inline double radial_step_deriv2_bare(BasisKind k, double r, double s,
+                                      double c) {
+  switch (k) {
+    case BasisKind::Blip:     return d2SB (s * (r - c), s);
+    case BasisKind::Blip5:    return d2SB5(s * (r - c), s);
+    case BasisKind::Gaussian: return d2SG (r, s, c);
+    case BasisKind::Knot5:    basis_detail::no_step_form(k);
   }
   basis_detail::unknown_basis(k);
 }

@@ -175,6 +175,7 @@ TEST_CASE_METHOD(Blip5Fixture, "DM_REAM Blip5 (bcode 3): symmetric channels",
   c.add("CGRIDMB", "2.0 3.5 5.0");
   c.add("SGRIDMB", "1.0 1.0 1.0");
   c.add("AMPGRIDMB",    "0.40 0.25 0.12");
+  c.add("RHOFORM", "SIGNED");
   c.add("CEMBFUNC", "0.0 0.5 1.0");
   c.add("SEMBFUNC", "1.5 1.5 1.5");
   DM_REAM dm(c);

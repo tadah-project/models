@@ -4,10 +4,16 @@
 #include <tadah/models/descriptors/d_basis_functions.h>
 #include <tadah/models/descriptors/basis_dispatch.h>
 #include <tadah/models/descriptors/dm/embf0.h>
+#include <tadah/models/descriptors/dm/rhoform.h>
+#include <tadah/models/nnls.h>
+#include <tadah/core/logger.h>
+#include <tadah/core/number_format.h>
+#include <tadah/core/utils.h>
 
 #include <algorithm>
 #include <cmath>
 #include <functional>
+#include <limits>
 #include <stdexcept>
 
 namespace tadah {
@@ -31,6 +37,21 @@ EAMRefit::EAMRefit(const EAMSetflIO &eam, const EAMRefitConfig &cfg)
           "EAMRefit: the EAM table splines are not built — call "
           "EAMSetflIO::build_splines() before constructing EAMRefit.");
     F0tab_ = eam_.F_tab(0.0);
+  }
+  if (cfg_.rho_form == RhoForm::Monotone) {
+    // MONOTONE fits integrated-bump steps: the bump families only, under a
+    // cutoff that keeps rho non-increasing (the checks DM_REAM applies when
+    // it loads the written potential, made before any fitting work).
+    if (family_ == BasisKind::Knot5)
+      throw DensityFormError(
+          "EAMRefit: RHOFORM MONOTONE is not defined for the knot family "
+          "(basis " + cfg_.basis + "): use RHOFORM NONNEG: " +
+          monotone_knot_refusal_text() + ".");
+    if (!rhoform_cutoff_whitelisted(cfg_.rctype))
+      throw DensityFormError(
+          "EAMRefit: RHOFORM MONOTONE requires a non-negative, "
+          "non-increasing many-body cutoff: rctype must be one of " +
+          rhoform_cutoff_whitelist_text() + " (got " + cfg_.rctype + ").");
   }
 }
 
@@ -214,10 +235,25 @@ FitStats EAMRefit::lsq_fit_windowed(const std::vector<double> &xs,
                                     bool apply_cutoff,
                                     tadah::core::v_type &coeffs,
                                     bool pin, double pin_x, double pin_y,
-                                    bool zero_ref) const {
+                                    bool zero_ref, RhoForm form) const {
   const std::size_t Nd = xs.size();
   const std::size_t Nb = centers.size();
   coeffs.assign(Nb, 0.0);
+
+  // RHOFORM NONNEG / MONOTONE (density channel only): every block is solved
+  // by non-negative least squares, NONNEG on the bump columns, MONOTONE on
+  // the integrated-bump step columns S_k. SIGNED (and the phi / F channels)
+  // keep the GELSD statements below unchanged.
+  const bool positive = rhoform_is_positive(form);
+  if (positive && zero_ref)
+    throw std::logic_error(
+        "EAMRefit::lsq_fit_windowed: a density form applies to the density "
+        "channel only, zero_ref to the embedding channel only.");
+  auto column = [&](double x, std::size_t k) {
+    return form == RhoForm::Monotone
+               ? radial_step_value_bare(family_, x, widths[k], centers[k])
+               : basisval(x, centers[k], widths[k]);
+  };
 
   // EMBF0 ZERO (zero_ref): every value use below takes the zero-referenced
   // column b_k(x) - b_k(0), b_k(0) from the SAME evaluator as the columns.
@@ -242,7 +278,13 @@ FitStats EAMRefit::lsq_fit_windowed(const std::vector<double> &xs,
                         : (family_ == BasisKind::Blip5)
                             ? 3.0 / widths[k]
                             : 2.0 / widths[k];
-    if (centers[k] + half >= win_lo && centers[k] - half <= win_hi)
+    // A step column S_k is 1 below the bump, so its support (-inf,
+    // c + half] reaches the window whenever its outer edge does.
+    const bool in_window =
+        form == RhoForm::Monotone
+            ? centers[k] + half >= win_lo
+            : centers[k] + half >= win_lo && centers[k] - half <= win_hi;
+    if (in_window)
       bA.push_back(k);
     else
       bB.push_back(k);
@@ -250,12 +292,54 @@ FitStats EAMRefit::lsq_fit_windowed(const std::vector<double> &xs,
   for (std::size_t i = 0; i < Nd; ++i)
     (xs[i] >= win_lo && xs[i] <= win_hi ? sA : sB).push_back(i);
 
+  // Positive forms: the same block (held coefficients subtracted, optional
+  // pin row) as a column-major array for nnls(); LAMBDA enters as its
+  // appended sqrt(lambda) I rows, the LinearRegressor convention.
+  auto solve_block_nnls = [&](const std::vector<std::size_t> &rows,
+                              const std::vector<std::size_t> &cols,
+                              bool with_pin) {
+    const std::size_t m = rows.size() + (with_pin ? 1 : 0);
+    const std::size_t n = cols.size();
+    std::vector<double> A(m * n, 0.0), b(m, 0.0), x(n, 0.0);
+    for (std::size_t r = 0; r < rows.size(); ++r) {
+      const std::size_t i = rows[r];
+      const double fc = apply_cutoff ? cutoff(xs[i]) : 1.0;
+      double held = 0.0;
+      for (std::size_t k = 0; k < Nb; ++k)
+        if (coeffs[k] != 0.0) held += coeffs[k] * column(xs[i], k) * fc;
+      b[r] = ys[i] - held;
+      for (std::size_t q = 0; q < n; ++q)
+        A[q * m + r] = column(xs[i], cols[q]) * fc;
+    }
+    if (with_pin) {  // heavily-weighted single constraint row
+      const double sw = 1e4;
+      const std::size_t r = rows.size();
+      b[r] = pin_y * sw;
+      for (std::size_t q = 0; q < n; ++q)
+        A[q * m + r] = column(pin_x, cols[q]) * sw;
+    }
+    const NnlsResult res =
+        nnls(A.data(), m, n, b.data(), x.data(), nullptr, nullptr,
+             cfg_.lambda);
+    if (!res.converged)
+      tadah::core::Logger::instance().log(tadah::core::LogLevel::WARNING,
+          std::string("EAMRefit: the RHOFORM ") + rhoform_name(form) +
+          " non-negative least-squares block stopped at its iteration cap "
+          "(" + std::to_string(res.iterations) + " iterations): the "
+          "amplitudes are >= 0 but not proven optimal.");
+    for (std::size_t q = 0; q < n; ++q) coeffs[cols[q]] = x[q];
+  };
+
   auto solve_block = [&](const std::vector<std::size_t> &rows,
                          const std::vector<std::size_t> &cols,
                          bool with_pin) {
     if (cols.empty()) return;
     const std::size_t extra = with_pin ? 1 : 0;
     if (rows.size() + extra == 0) return;
+    if (positive) {
+      solve_block_nnls(rows, cols, with_pin);
+      return;
+    }
     tadah::core::phi_type Phi(rows.size() + extra + cols.size(), cols.size());
     Phi.set_zero();
     tadah::core::t_type T(rows.size() + extra + cols.size());
@@ -323,6 +407,9 @@ FitStats EAMRefit::lsq_fit_windowed(const std::vector<double> &xs,
       for (std::size_t k = 0; k < Nb; ++k)
         pred += coeffs[k] *
                 (basisval(xs[i], centers[k], widths[k]) - b0[k]) * fc;
+    else if (positive)  // RHOFORM NONNEG / MONOTONE: the form's columns
+      for (std::size_t k = 0; k < Nb; ++k)
+        pred += coeffs[k] * column(xs[i], k) * fc;
     else
       for (std::size_t k = 0; k < Nb; ++k)
         pred += coeffs[k] * basisval(xs[i], centers[k], widths[k]) * fc;
@@ -411,6 +498,11 @@ void EAMRefit::fit() {
     rwin_lo = std::min(std::max(r_lo_, r_K), 0.8 * r_reach_);
   }
 
+  // ---- RHOFORM NONNEG / MONOTONE: can the form follow the table? ----
+  // Checked before any fitting: a table outside the form would otherwise
+  // burn the whole escalation ladder on fits that can never pass.
+  check_rho_table(rwin_lo);
+
   // ---- 1. pair phi(r) -> 2-body linear weights ----
   if (adaptive) make_grid_windowed(r_lo_, rcut_, cfg_.n2b, rwin_lo, rcut_,
                                    cgrid2b_, sgrid2b_, true);
@@ -423,7 +515,8 @@ void EAMRefit::fit() {
                                    crho_, srho_, true);
   else          make_grid(r_lo_, rcut_, cfg_.nrho, crho_, srho_, true);
   rho_stats_ = lsq_fit_windowed(xr, yrho, rwin_lo, rcut_, crho_, srho_,
-                                true, arho_, false, 0.0, 0.0);
+                                true, arho_, false, 0.0, 0.0,
+                                /*zero_ref=*/false, cfg_.rho_form);
 
   // ---- 3. embedding F(rho) over [0, rhomax] -> many-body linear weights ----
   const int nrho_samp = std::max(2048, cfg_.nF * cfg_.oversample);
@@ -484,14 +577,68 @@ double EAMRefit::phi_fit(double r) const {
   return acc * fc;
 }
 
+double EAMRefit::rho_term(double r, std::size_t n) const {
+  if (cfg_.rho_form == RhoForm::Monotone)  // the integrated bump S_n
+    return radial_step_value_bare(family_, r, srho_[n], crho_[n]);
+  return basisval(r, crho_[n], srho_[n], false, deg_at(degrho_, n));
+}
+
+// The terms in DM_REAM's order (ascending n, a_n times the term, the cutoff
+// outside the sum): for r < rcut, where both cutoffs are 1, this is the pair
+// density of the written potential, including under MONOTONE.
 double EAMRefit::rho_fit(double r) const {
   const double fc = cutoff(r);
   if (fc == 0.0) return 0.0;
   double acc = 0.0;
   for (std::size_t n = 0; n < crho_.size(); ++n)
-    acc += arho_[n] * basisval(r, crho_[n], srho_[n], false,
-                               deg_at(degrho_, n));
+    acc += arho_[n] * rho_term(r, n);
   return acc * fc;
+}
+
+void EAMRefit::check_rho_table(double win_lo) const {
+  if (!rhoform_is_positive(cfg_.rho_form)) return;
+  // The table nodes r_i = i dr of the fit window, not spline samples: the
+  // cubic interpolant of a monotone table can overshoot between nodes near
+  // a steep edge, which no form has to follow (the fit only approximates
+  // it). The tolerance covers the rounding of the printed table values.
+  const std::vector<double> &tab = eam_.rhor();
+  std::vector<std::size_t> nodes;
+  double amax = 0.0;
+  for (std::size_t i = 0; i < tab.size(); ++i) {
+    const double r = static_cast<double>(i) * eam_.dr();
+    if (r < win_lo || r > rcut_) continue;
+    nodes.push_back(i);
+    amax = std::max(amax, std::fabs(tab[i]));
+  }
+  const double tol = 8.0 * std::numeric_limits<double>::epsilon() * amax;
+  const std::string form = rhoform_name(cfg_.rho_form);
+  const std::string window = "the fit window [" +
+                             tadah::core::to_string(win_lo, 6) + ", " +
+                             tadah::core::to_string(rcut_, 6) + "] A";
+  for (const std::size_t i : nodes) {
+    if (!(tab[i] < -tol)) continue;
+    throw std::runtime_error(
+        "EAMRefit: RHOFORM " + form + " cannot fit this table: the "
+        "tabulated density is rho = " + tadah::core::format_roundtrip(tab[i]) +
+        " < 0 at r = " +
+        tadah::core::to_string(static_cast<double>(i) * eam_.dr(), 6) +
+        " A, inside " + window + ", and a " + form + " density is >= 0 "
+        "(every amplitude a_n >= 0). Use RHOFORM SIGNED.");
+  }
+  if (cfg_.rho_form != RhoForm::Monotone) return;
+  for (std::size_t q = 0; q + 1 < nodes.size(); ++q) {
+    const std::size_t i = nodes[q], j = nodes[q + 1];
+    if (!(tab[j] - tab[i] > tol)) continue;
+    throw std::runtime_error(
+        "EAMRefit: RHOFORM MONOTONE cannot fit this table: the tabulated "
+        "density rises from rho = " + tadah::core::format_roundtrip(tab[i]) +
+        " at r = " +
+        tadah::core::to_string(static_cast<double>(i) * eam_.dr(), 6) +
+        " A to " + tadah::core::format_roundtrip(tab[j]) + " at r = " +
+        tadah::core::to_string(static_cast<double>(j) * eam_.dr(), 6) +
+        " A, inside " + window + ", and a MONOTONE density is "
+        "non-increasing. Use RHOFORM NONNEG or SIGNED.");
+  }
 }
 
 double EAMRefit::F_fit(double rho) const {
@@ -529,8 +676,20 @@ void EAMRefit::set_blip_fit(Fn which, const std::vector<double> &mu,
   switch (which) {
     case Fn::PHI: assign(cgrid2b_, mu); assign(sgrid2b_, eta);
                   assign(c2b_, c); deg2b_ = deg; break;
-    case Fn::RHO: assign(crho_, mu); assign(srho_, eta);
-                  assign(arho_, c); degrho_ = deg; break;
+    case Fn::RHO:
+      // The positive forms keep every amplitude >= 0 (what DM_REAM
+      // validates on load); an injected fit must honour it.
+      if (rhoform_is_positive(cfg_.rho_form))
+        for (std::size_t n = 0; n < c.size(); ++n)
+          if (!std::isfinite(c[n]) || c[n] < 0.0)
+            throw DensityFormError(
+                std::string("EAMRefit: RHOFORM ") +
+                rhoform_name(cfg_.rho_form) + " density amplitudes must be "
+                "finite and >= 0; injected amplitude " +
+                std::to_string(n + 1) + " is " +
+                tadah::core::format_roundtrip(c[n]) + ".");
+      assign(crho_, mu); assign(srho_, eta);
+      assign(arho_, c); degrho_ = deg; break;
     case Fn::F:   assign(cF_, mu); assign(sF_, eta);
                   assign(cmb_, c); degF_ = deg;
                   refresh_embedding_reference(); break;
@@ -589,7 +748,10 @@ double EAMRefit::phi_setfl(double r) const {
 
 double EAMRefit::rho_setfl(double r) const {
   if (r >= r_lo_) return rho_fit(r);
-  return eam_.rho_tab(r) + (rho_fit(r_lo_) - eam_.rho_tab(r_lo_));
+  const double v = eam_.rho_tab(r) + (rho_fit(r_lo_) - eam_.rho_tab(r_lo_));
+  // RHOFORM NONNEG / MONOTONE: the offset continuation stays >= 0 as well
+  if (rhoform_is_positive(cfg_.rho_form)) return v > 0.0 ? v : 0.0;
+  return v;
 }
 
 tadah::core::Context EAMRefit::build_pot_context() const {
@@ -686,6 +848,9 @@ tadah::core::Context EAMRefit::build_pot_context() const {
   // potential carries it explicitly).
   c.add("EMBF0", std::string(embf0_name(cfg_.embf0_zero ? EmbF0Mode::Zero
                                                         : EmbF0Mode::Free)));
+  // The density form the amplitudes were fitted in (mandatory on every
+  // DM_REAM potential; canonical upper case).
+  c.add("RHOFORM", std::string(rhoform_name(cfg_.rho_form)));
 
   // ---- linear weights [c2b | cmb] ----
   for (double v : weights_) c.add("WEIGHTS", v);

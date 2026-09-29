@@ -31,6 +31,7 @@ Context make_ream_context() {
   c.add("CGRIDMB", "1.0 2.0 3.0 4.0");
   c.add("SGRIDMB", "1.0 1.0 1.0 1.0");
   c.add("AMPGRIDMB",    "0.40 0.25 0.12 0.05");
+  c.add("RHOFORM", "SIGNED");
   // embedding expansion (5 terms; M output components)
   c.add("CEMBFUNC", "0.0 0.4 0.8 1.2 1.6");
   c.add("SEMBFUNC", "1.5 1.5 1.5 1.5 1.5");
@@ -187,6 +188,7 @@ TEST_CASE_METHOD(ReamFixture, "DM_REAM rejects unknown basis code", "[ream]") {
   c.add("RCTYPEMB", "Cut_Cos");
   c.add("TYPEMB", "DM_REAM");
   c.add("TYPEMB", 7);          // unknown basis code: must ERROR, not -> Blip
+  // (no RHOFORM: the basis code is refused before the density form is read)
   c.add("TYPEMB", 2); c.add("TYPEMB", 2); c.add("TYPEMB", 2);
   c.add("TYPEMB", 2); c.add("TYPEMB", 2);
   c.add("TYPEMB", 0); c.add("TYPEMB", 0);
@@ -222,6 +224,7 @@ Context make_ream_context_bcode(int bcode, bool mixed_deg) {
   c.add("CGRIDMB", "2.0 3.5 5.0");
   if (!knot) c.add("SGRIDMB", "1.0 1.0 1.0");
   c.add("AMPGRIDMB", "0.40 0.25 0.12");
+  c.add("RHOFORM", "NONNEG");  // non-negative amplitudes: bitwise SIGNED
   c.add("CEMBFUNC", "0.0 0.4 0.8");
   if (!knot) c.add("SEMBFUNC", "1.0 1.0 1.0");
   if (mixed_deg) {

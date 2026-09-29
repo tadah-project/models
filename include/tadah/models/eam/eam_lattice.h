@@ -97,6 +97,77 @@ inline std::vector<double> neighbour_distances(const std::string &lattice,
   return out;
 }
 
+/** \brief One neighbour shell of a monatomic lattice: distance in units of
+ *  the lattice constant, and the number of neighbours at that distance. */
+struct Shell {
+  double d;  ///< shell radius / a
+  int m;     ///< multiplicity
+};
+
+/** Neighbour shells (d, m) of a monatomic bcc/fcc/hcp crystal with
+ *  d <= @p dmax (d in units of the lattice constant a; hcp: a is the
+ *  in-plane constant, ideal c/a = sqrt(8/3)), sorted by ascending d.
+ *
+ *  bcc and fcc are grouped by the exact integer n4 = |2R/a|^2, with
+ *  d = sqrt(n4)/2 and n4 <= 4 dmax^2, so every shell radius is one exactly
+ *  rounded square root. hcp groups the sorted neighbour_distances(hcp, 1,
+ *  dmax) at a relative tolerance of 1e-12 and represents a shell by its
+ *  smallest member (equivalent neighbours of the hcp lattice differ by an
+ *  ulp). The lattice name is case-insensitive; anything other than
+ *  bcc/fcc/hcp, or a non-finite dmax, throws.
+ *
+ *  Cost: the lattice points of the cube |i|, |j|, |k| <= dmax + 2 are
+ *  visited, O(dmax^3) time. bcc/fcc count the multiplicities per n4
+ *  (memory O(dmax^2)); hcp stores every distance within dmax (O(dmax^3)).
+ *  Callers bound dmax (HPO RHOBARGATE: at most 20 lattice constants). */
+inline std::vector<Shell> shells(const std::string &lattice, double dmax) {
+  std::string lat = lattice;
+  for (auto &ch : lat)
+    ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+  if (!supported(lat) || !std::isfinite(dmax))
+    throw std::runtime_error(
+        "eam_lattice::shells: needs lattice bcc, fcc or hcp and a finite "
+        "radius (got lattice '" + lattice + "', dmax " +
+        std::to_string(dmax) + ").");
+  std::vector<Shell> out;
+  if (!(dmax > 0.0)) return out;
+  if (lat == "hcp") {
+    std::vector<double> d = neighbour_distances(lat, 1.0, dmax);
+    std::sort(d.begin(), d.end());
+    for (const double x : d) {
+      if (!out.empty() && x - out.back().d <= 1e-12 * out.back().d)
+        ++out.back().m;
+      else
+        out.push_back({x, 1});
+    }
+    return out;
+  }
+  // bcc/fcc: 2R/a = (2i + bx, 2j + by, 2k + bz) with the doubled basis
+  // offsets, so n4 = |2R/a|^2 is an exact integer label of the shell; the
+  // points are counted per n4, which also sorts the shells.
+  const std::vector<std::array<int, 3>> basis =
+      lat == "fcc"
+          ? std::vector<std::array<int, 3>>{{0, 0, 0}, {1, 1, 0},
+                                            {1, 0, 1}, {0, 1, 1}}
+          : std::vector<std::array<int, 3>>{{0, 0, 0}, {1, 1, 1}};
+  const long N = static_cast<long>(std::ceil(dmax)) + 1;
+  const double n4max = 4.0 * dmax * dmax;
+  std::vector<int> count(static_cast<std::size_t>(n4max) + 1, 0);
+  for (long i = -N; i <= N; ++i)
+    for (long j = -N; j <= N; ++j)
+      for (long k = -N; k <= N; ++k)
+        for (const auto &b : basis) {
+          const long x = 2 * i + b[0], y = 2 * j + b[1], z = 2 * k + b[2];
+          const long n4 = x * x + y * y + z * z;
+          if (n4 == 0 || static_cast<double>(n4) > n4max) continue;
+          ++count[static_cast<std::size_t>(n4)];
+        }
+  for (std::size_t n4 = 1; n4 < count.size(); ++n4)
+    if (count[n4] > 0)
+      out.push_back({std::sqrt(static_cast<double>(n4)) / 2.0, count[n4]});
+  return out;
+}
+
 /** Energy per atom of a monatomic bcc/fcc/hcp crystal at lattice constant
  *  \p a by a direct pair/density sum within \p rcut. NaN for an unsupported
  *  lattice. `phi`,`rho`,`F` may be tabulated originals or fitted functions —

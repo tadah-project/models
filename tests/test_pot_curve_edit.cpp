@@ -68,6 +68,7 @@ Context make_knot_pot() {
   c.add("TYPEMB", "Ta");
   for (double v : {4.8, 2.5}) c.add("CGRIDMB", v);
   for (double v : {0.01, -1.2}) c.add("AMPGRIDMB", v);
+  c.add("RHOFORM", "SIGNED");  // a negative amplitude: SIGNED only
   for (double v : {0.9, -2.9, 0.1}) c.add("CEMBFUNC", v);
   c.add("RCUTMB", 4.8);
   c.add("RCTYPEMB", "Cut_Dummy");
@@ -108,6 +109,7 @@ Context make_blip_pot() {
   for (double v : {4.8, 2.5}) c.add("CGRIDMB", v);
   for (double v : {1.0, 1.1}) c.add("SGRIDMB", v);
   for (double v : {0.01, -1.2}) c.add("AMPGRIDMB", v);
+  c.add("RHOFORM", "SIGNED");  // a negative amplitude: SIGNED only
   for (double v : {0.9, 2.9, 0.1}) c.add("CEMBFUNC", v);
   for (double v : {1.5, 2.0, 1.8}) c.add("SEMBFUNC", v);
   c.add("RCUTMB", 4.8);
@@ -575,7 +577,7 @@ TEST_CASE_METHOD(EditFixture, "potedit: derived/normalized knot RCUT",
 
 TEST_CASE_METHOD(EditFixture,
                  "potedit: normalize_knot_rcut rewrites ANY difference "
-                 "exactly; WARNING only above 1e-9 relative",
+                 "exactly, WARNING only above 1e-9 relative",
                  "[potedit][lossless]") {
   // Every consumer (train, predict, refit --edit, hpo) must evaluate the
   // same cutoff as hpo's per-evaluation derivation, so no dead band: a
@@ -1077,5 +1079,355 @@ TEST_CASE_METHOD(EditFixture,
       }
       REQUIRE(curve_maxdiff(before, v.F, 0.0, 6.0) == 0.0);
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+//  RHOFORM (FEAT-02): the Rho view in the declared density form
+// ---------------------------------------------------------------------------
+namespace {
+// make_blip_pot with a five-bump non-negative density (every support inside
+// RCUTMB = 4.8) declared in `form`; the given amplitudes replace the default.
+Context make_positive_blip_pot(const std::string &form,
+                               std::vector<double> amps = {0.5, 0.3, 0.2,
+                                                           0.08, 0.02},
+                               std::vector<double> mus = {1.6, 2.3, 3.0, 3.7,
+                                                          4.2},
+                               std::vector<double> etas = {2.0, 2.0, 2.0, 2.0,
+                                                           4.0}) {
+  Context c = make_blip_pot();
+  for (const char *k : {"TYPEMB", "CGRIDMB", "SGRIDMB", "AMPGRIDMB", "RHOFORM"})
+    c.remove(k);
+  const int n = static_cast<int>(mus.size());
+  c.add("TYPEMB", "DM_REAM");
+  for (int v : {0, n, n, n, 3, 3, 0, 0}) c.add("TYPEMB", v);
+  c.add("TYPEMB", "Cu");
+  c.add("TYPEMB", "Cu");
+  for (double v : mus) c.add("CGRIDMB", v);
+  for (double v : etas) c.add("SGRIDMB", v);
+  for (double v : amps) c.add("AMPGRIDMB", v);
+  c.add("RHOFORM", form);
+  return c;
+}
+
+// remove_basis's compensation objective, by brute force: the stacked value /
+// 1st / 2nd derivative residual of (sum_j dc_j g_j - c_r g_r) on N = 512
+// points of [lo, hi], each order weighted by 1 / RMS of the removed term.
+double compensation_objective(const CurveView &c, std::size_t r,
+                              const std::vector<std::size_t> &J,
+                              const std::vector<double> &dc, double lo,
+                              double hi) {
+  auto single = [&](std::size_t k) {
+    CurveView one = c;
+    one.mu = {c.mu[k]};
+    one.eta = {c.eta[k]};
+    one.coeff = {1.0};
+    return one;
+  };
+  const CurveView gr = single(r);
+  std::vector<CurveView> gj;
+  for (std::size_t j : J) gj.push_back(single(j));
+  double f = 0.0;
+  for (int m = 0; m < 3; ++m) {
+    auto ev = [m](const CurveView &v, double x) {
+      return m == 0 ? v.value(x) : m == 1 ? v.deriv(x) : v.deriv2(x);
+    };
+    double ss = 0.0, acc = 0.0;
+    for (int i = 0; i < 512; ++i) {
+      const double x = lo + (hi - lo) * i / 511.0;
+      const double t = c.coeff[r] * ev(gr, x);
+      ss += t * t;
+      double d = -t;
+      for (std::size_t q = 0; q < J.size(); ++q) d += dc[q] * ev(gj[q], x);
+      acc += d * d;
+    }
+    if (ss > 0.0) f += acc / (ss / 512.0);
+  }
+  return f;
+}
+
+// The DM_REAM pair density of a potential Context at r (W = 1: Cu, WATOM 1).
+double pot_pair_density(Context pot, double r) {
+  pot.add("VERBOSE", 0);
+  DM_REAM dm(pot);
+  return dm.pair_density(29, 29, r);
+}
+}  // namespace
+
+TEST_CASE_METHOD(EditFixture,
+                 "potedit: RHOFORM is required, validated and kept",
+                 "[potedit][rhoform]") {
+  SECTION("a DM_REAM potential without RHOFORM: the migration text") {
+    Context c = make_blip_pot();
+    c.remove("RHOFORM");
+    REQUIRE_THROWS_AS(parse_pot_view(c), DensityFormError);
+    REQUIRE_THROWS_WITH(parse_pot_view(c),
+                        Catch::Contains("pot edit: DM_REAM: RHOFORM is "
+                                        "required: SIGNED") &&
+                            !Catch::Contains("internal error"));
+    // a pure two-body potential needs none
+    REQUIRE_NOTHROW(parse_pot_view(make_pure2b_pot()));
+  }
+  SECTION("the form is parsed case-insensitively and written canonical") {
+    for (const char *in : {"nonneg", "Monotone", "SIGNED"}) {
+      INFO(in);
+      PotEAMView v = parse_pot_view(make_positive_blip_pot(in));
+      const RhoForm f = parse_rhoform(in);
+      REQUIRE(v.rho.form == f);
+      REQUIRE(v.phi.form == RhoForm::Signed);
+      REQUIRE(v.F.form == RhoForm::Signed);
+      const Context out = rebuild_pot_context(v);
+      REQUIRE(out.stored_value("RHOFORM") ==
+              std::optional<std::string>(rhoform_name(f)));
+    }
+  }
+  SECTION("an input that violates its declared form is refused at parse") {
+    Context c = make_blip_pot();  // amplitudes 0.01, -1.2
+    c.remove("RHOFORM");
+    c.add("RHOFORM", "NONNEG");
+    REQUIRE_THROWS_AS(parse_pot_view(c), DensityFormError);
+    REQUIRE_THROWS_WITH(parse_pot_view(c),
+                        Catch::Contains("pot edit: DM_REAM: RHOFORM NONNEG "
+                                        "requires every AMPGRIDMB entry") &&
+                            Catch::Contains("entry 2 is -1.2"));
+    Context k = make_knot_pot();
+    k.remove("RHOFORM");
+    k.add("RHOFORM", "MONOTONE");
+    REQUIRE_THROWS_WITH(parse_pot_view(k), Catch::Contains("knot family"));
+    Context w = make_positive_blip_pot("NONNEG");
+    w.remove("WATOM");
+    w.add("WATOM", 0.0);
+    REQUIRE_THROWS_WITH(parse_pot_view(w),
+                        Catch::Contains("pot edit: DM_REAM: RHOFORM NONNEG: "
+                                        "every density pair weight must be "
+                                        "finite and > 0"));
+  }
+  SECTION("a stray RHOFORM is dropped from a potential without DM_REAM") {
+    Context c = make_pure2b_pot();
+    c.add("RHOFORM", "SIGNED");
+    const Context out = rebuild_pot_context(parse_pot_view(c));
+    REQUIRE_FALSE(out.has_stored("RHOFORM"));
+  }
+}
+
+TEST_CASE_METHOD(EditFixture,
+                 "potedit: the Rho view evaluates the declared form as "
+                 "DM_REAM does",
+                 "[potedit][rhoform]") {
+  for (const char *form : {"SIGNED", "NONNEG", "MONOTONE"}) {
+    INFO(form);
+    const Context pot = make_positive_blip_pot(form);
+    PotEAMView v = parse_pot_view(pot);
+    const CurveView &rho = v.rho;
+    for (int i = 0; i < 600; ++i) {
+      const double r = 0.3 + 4.49 * i / 600.0;  // r < RCUTMB = 4.8
+      REQUIRE(rho.value(r) == pot_pair_density(pot, r));
+    }
+    // derivatives against central differences (away from the Blip knots,
+    // where the third derivative jumps)
+    for (double r : {1.23, 2.17, 2.93, 3.41, 3.83, 4.31}) {
+      const double h = 1e-5;
+      const double fd1 = (rho.value(r + h) - rho.value(r - h)) / (2 * h);
+      const double fd2 = (rho.deriv(r + h) - rho.deriv(r - h)) / (2 * h);
+      CHECK(rho.deriv(r) == Approx(fd1).margin(1e-8));
+      CHECK(rho.deriv2(r) == Approx(fd2).margin(1e-6));
+    }
+    const auto sup = rho.support(4);  // mu 4.2, eta 4: half-width 0.5
+    CHECK(sup.second == Approx(4.7));
+    if (std::string(form) == "MONOTONE")
+      CHECK(sup.first == -CurveView::support_infinity());
+    else
+      CHECK(sup.first == Approx(3.7));
+  }
+}
+
+TEST_CASE_METHOD(EditFixture, "potedit: ADD under RHOFORM MONOTONE",
+                 "[potedit][rhoform]") {
+  PotEAMView v = parse_pot_view(make_positive_blip_pot("MONOTONE"));
+  const CurveView before = v.rho;
+  const AddReport rep = add_basis(v.rho, AddSpec{2.6, 2.0, {}}, true);
+  REQUIRE(v.rho.coeff.back() == 0.0);  // a valid MONOTONE amplitude
+  REQUIRE(curve_maxdiff(before, v.rho, 0.2, 8.0) == 0.0);
+  const Context out = rebuild_pot_context(v);  // self-checks DM_REAM
+  REQUIRE(out.stored_value("RHOFORM") ==
+          std::optional<std::string>("MONOTONE"));
+  (void)rep;
+  // A step whose bump lies beyond RCUT (4.8) is 1 on the whole range: the
+  // rule on its outer edge applies (hard cutoff), not "could never
+  // contribute", and the messages describe a step.
+  PotEAMView m = parse_pot_view(make_positive_blip_pot("MONOTONE"));
+  REQUIRE_THROWS_WITH(add_basis(m.rho, AddSpec{5.5, 4.0, {}}, true),
+                      Catch::Contains("the new step's outer edge centre + "
+                                      "w/eta = 6 lies beyond RCUT = 4.8") &&
+                          Catch::Contains("truncated into an energy jump"));
+  PotEAMView s = parse_pot_view(make_positive_blip_pot("SIGNED"));
+  REQUIRE_THROWS_WITH(add_basis(s.rho, AddSpec{5.5, 4.0, {}}, true),
+                      Catch::Contains("lies entirely beyond RCUT"));
+  // under a smooth cutoff such a step is legitimate: it adds a f_c(r)
+  PotEAMView w = parse_pot_view(make_positive_blip_pot("MONOTONE"));
+  const AddReport wr =
+      add_basis(w.rho, AddSpec{5.5, 4.0, {}}, true, /*hard_cutoff=*/false);
+  REQUIRE(wr.warnings.size() == 1);
+  CHECK_THAT(wr.warnings[0],
+             Catch::Contains("the new step equals 1 on the whole range "
+                             "[0, RCUT = 4.8]") &&
+                 Catch::Contains("adds a f_c(r)"));
+  // a step whose bump straddles RCUT: its outer edge is damped there
+  PotEAMView x = parse_pot_view(make_positive_blip_pot("MONOTONE"));
+  REQUIRE_THROWS_WITH(add_basis(x.rho, AddSpec{4.6, 4.0, {}}, true),
+                      Catch::Contains("the new step's outer edge centre + "
+                                      "w/eta = 5.1 lies beyond RCUT = 4.8"));
+  const AddReport xr =
+      add_basis(x.rho, AddSpec{4.6, 4.0, {}}, true, /*hard_cutoff=*/false);
+  REQUIRE(xr.warnings.size() == 1);
+  CHECK_THAT(xr.warnings[0],
+             Catch::Contains("the new step's outer edge centre + w/eta = 5.1 "
+                             "lies beyond RCUT = 4.8; the smooth cutoff damps "
+                             "the step to zero there"));
+}
+
+TEST_CASE_METHOD(EditFixture,
+                 "potedit: REMOVE under NONNEG / MONOTONE keeps every "
+                 "amplitude >= 0",
+                 "[potedit][rhoform]") {
+  SECTION("feasible unconstrained compensation: the same as SIGNED") {
+    PotEAMView sg = parse_pot_view(make_positive_blip_pot("SIGNED"));
+    PotEAMView nn = parse_pot_view(make_positive_blip_pot("NONNEG"));
+    const RemoveReport rs = remove_basis(sg.rho, 3.0, true);
+    const RemoveReport rn = remove_basis(nn.rho, 3.0, true);
+    REQUIRE(rs.compensated);
+    REQUIRE(rn.compensated);
+    for (double a : sg.rho.coeff) REQUIRE(a >= 0.0);
+    REQUIRE(nn.rho.coeff == sg.rho.coeff);
+    REQUIRE(rn.notes.empty());
+  }
+  SECTION("an active bound: a compensator is held at 0 (optimal)") {
+    // both neighbours of the removed bump at 3.0 lie on its right: the
+    // unconstrained fit takes the outer one (3.8) negative to cancel the tail
+    const std::vector<double> amps{0.5, 0.2, 0.05, 0.01, 0.02};
+    const std::vector<double> mus{1.2, 3.0, 3.4, 3.8, 4.3};
+    const std::vector<double> etas{2.0, 2.0, 2.0, 2.0, 4.0};
+    PotEAMView sg =
+        parse_pot_view(make_positive_blip_pot("SIGNED", amps, mus, etas));
+    const RemoveReport rs = remove_basis(sg.rho, 3.0, true);
+    REQUIRE(rs.compensated);
+    REQUIRE(sg.rho.coeff[2] < 0.0);  // the unconstrained answer leaves NONNEG
+    for (const char *form : {"NONNEG", "MONOTONE"}) {
+      INFO(form);
+      PotEAMView v =
+          parse_pot_view(make_positive_blip_pot(form, amps, mus, etas));
+      const CurveView before = v.rho;
+      const RemoveReport rep = remove_basis(v.rho, 3.0, true);
+      REQUIRE(rep.compensated);
+      REQUIRE(rep.adjusted == std::vector<std::size_t>{2, 3});
+      for (double a : v.rho.coeff) REQUIRE(a >= 0.0);
+      REQUIRE(v.rho.coeff[2] == 0.0);  // 0.01 + (-0.01): exactly the bound
+      bool held = false;
+      for (const auto &n : rep.notes)
+        held = held || n.find("basis function at 3.8 is held at its bound "
+                              "0") != std::string::npos;
+      REQUIRE(held);
+      REQUIRE(rep.resid_comp <= rep.resid_plain);
+      // optimal over the feasible set: no grid point c_j + dc_j >= 0 does
+      // better than the enumerated active-set solution
+      const double lo = std::string(form) == "MONOTONE"
+                            ? kCompensationRLoFrac * before.rcut
+                            : 2.0;
+      const double hi = 4.0;
+      const std::vector<std::size_t> J{2, 3};
+      const double f_sol =
+          compensation_objective(before, 1, J, rep.delta_c, lo, hi);
+      double f_grid = 1e300;
+      for (int a = 0; a <= 120; ++a)
+        for (int b = 0; b <= 120; ++b) {
+          const std::vector<double> dc{-0.05 + 0.4 * a / 120.0,
+                                       -0.01 + 0.2 * b / 120.0};
+          f_grid = std::min(f_grid,
+                            compensation_objective(before, 1, J, dc, lo, hi));
+        }
+      CHECK(f_sol <= f_grid * (1.0 + 1e-12));
+      // the edited potential loads in its form
+      const Context out = rebuild_pot_context(v);
+      REQUIRE(out.stored_value("RHOFORM") ==
+              std::optional<std::string>(form));
+    }
+  }
+  SECTION("a single compensator at its bound") {
+    CurveView c;
+    c.family = BasisKind::Blip;
+    c.mu = {3.0, 3.7};
+    c.eta = {2.0, 2.0};
+    c.coeff = {0.2, 0.001};
+    c.rcut = 4.8;
+    CurveView sg = c;
+    REQUIRE(remove_basis(sg, 3.0, true).compensated);
+    REQUIRE(sg.coeff[0] < 0.0);  // unconstrained: about -0.064
+    CurveView nn = c;
+    nn.form = RhoForm::NonNeg;
+    const RemoveReport rn = remove_basis(nn, 3.0, true);
+    REQUIRE(rn.compensated);
+    REQUIRE(nn.coeff == std::vector<double>{0.0});
+    REQUIRE(rn.notes.size() == 1);
+  }
+  SECTION("a compensator with no support in the region stays unchanged") {
+    // narrow Blip5 bumps (w/eta = 0.15): the region of the bump at 2.0 is
+    // [1.85, 2.15], which the neighbours at 1.0, 1.5 and 3.2 never reach
+    SECTION("both compensators disjoint: plain removal, as under SIGNED") {
+      CurveView c;
+      c.family = BasisKind::Blip5;
+      c.rcut = 5.0;
+      c.mu = {1.0, 2.0, 3.2};
+      c.eta = {20.0, 20.0, 20.0};
+      c.coeff = {0.5, 0.4, 0.3};
+      CurveView sg = c;
+      const RemoveReport rs = remove_basis(sg, 2.0, true);
+      REQUIRE_FALSE(rs.compensated);
+      CurveView nn = c;
+      nn.form = RhoForm::NonNeg;
+      const RemoveReport rn = remove_basis(nn, 2.0, true);
+      REQUIRE_FALSE(rn.compensated);
+      REQUIRE(rn.adjusted.empty());
+      REQUIRE(rn.notes.empty());
+      REQUIRE(rn.warnings == rs.warnings);
+      REQUIRE(nn.coeff == std::vector<double>{0.5, 0.3});
+      REQUIRE(nn.coeff == sg.coeff);
+    }
+    SECTION("the nearest disjoint, the second overlapping") {
+      CurveView c;
+      c.family = BasisKind::Blip5;
+      c.rcut = 5.0;
+      c.mu = {1.5, 2.0, 2.55, 4.0};
+      c.eta = {20.0, 20.0, 4.0, 20.0};
+      c.coeff = {0.5, 0.4, 0.3, 0.2};
+      c.form = RhoForm::NonNeg;
+      const RemoveReport rep = remove_basis(c, 2.0, true);
+      REQUIRE(rep.compensated);
+      REQUIRE(rep.adjusted == std::vector<std::size_t>{2});
+      REQUIRE(c.coeff[0] == 0.5);  // the disjoint bump at 1.5, untouched
+      REQUIRE(c.coeff[2] == 0.2);
+      for (double a : c.coeff) REQUIRE(a >= 0.0);
+      REQUIRE(rep.resid_comp <= rep.resid_plain);
+    }
+  }
+  SECTION("MONOTONE: the region runs down to the inner sampling bound") {
+    PotEAMView v = parse_pot_view(make_positive_blip_pot("MONOTONE"));
+    const CurveView before = v.rho;
+    const RemoveReport rep = remove_basis(v.rho, 3.0, true);
+    REQUIRE(rep.compensated);
+    for (double a : v.rho.coeff) REQUIRE(a >= 0.0);
+    // the compensated step curve is closer to the original than plain
+    // removal, over [0.15 rcut, the removed step's outer edge]
+    CurveView plain = before;
+    plain.mu.erase(plain.mu.begin() + 2);
+    plain.eta.erase(plain.eta.begin() + 2);
+    plain.coeff.erase(plain.coeff.begin() + 2);
+    double se_comp = 0.0, se_plain = 0.0;
+    const double lo = kCompensationRLoFrac * before.rcut, hi = 4.0;
+    for (int i = 0; i < 512; ++i) {
+      const double x = lo + (hi - lo) * i / 511.0;
+      se_comp += std::pow(v.rho.value(x) - before.value(x), 2);
+      se_plain += std::pow(plain.value(x) - before.value(x), 2);
+    }
+    REQUIRE(se_comp < se_plain);
   }
 }

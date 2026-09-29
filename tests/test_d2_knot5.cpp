@@ -234,6 +234,7 @@ TEST_CASE_METHOD(Knot5Fixture, "DM_REAM Knot5 (bcode 2): basis orientation",
   c.add("TYPEMB", "H");
   c.add("CGRIDMB", "3.0 4.5 6.0");
   c.add("AMPGRIDMB",    "0.40 0.25 0.12");
+  c.add("RHOFORM", "NONNEG");  // non-negative amplitudes: bitwise SIGNED
   c.add("CEMBFUNC", "0.0 0.5 1.0");
   DM_REAM dm(c);
   Cut_Cos fc(6.0);
@@ -335,6 +336,7 @@ TEST_CASE_METHOD(Knot5Fixture, "DM_REAM mixed degrees (DGRID*)", "[knot5][knotmi
   c.add("TYPEMB", "H");
   c.add("CGRIDMB", "3.0 4.5 6.0");
   c.add("AMPGRIDMB",    "0.40 0.25 0.12");
+  c.add("RHOFORM", "SIGNED");
   c.add("KDEGMB", "5 3 5");
   c.add("CEMBFUNC", "0.0 0.5 1.0");
   c.add("KDEGEMB", "3 5 5");

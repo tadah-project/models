@@ -74,6 +74,7 @@ Context make_mjoin_ctx(const char *embf0) {
   c.add("SGRIDMB", kBumpS);
   c.add("AMPGRIDMB", kBumpA);
   c.add("AMPGRIDMB", kKnotA);
+  c.add("RHOFORM", "SIGNED");  // one global form for every DM_REAM child
   c.add("CEMBFUNC", kBumpEc);
   c.add("CEMBFUNC", kKnotEc);
   c.add("SEMBFUNC", kBumpEs);
@@ -93,6 +94,7 @@ Context make_ream_ctx(bool knot, const char *embf0) {
   c.add("CGRIDMB", knot ? kKnotC : kBumpC);
   if (!knot) c.add("SGRIDMB", kBumpS);
   c.add("AMPGRIDMB", knot ? kKnotA : kBumpA);
+  c.add("RHOFORM", "SIGNED");
   c.add("CEMBFUNC", knot ? kKnotEc : kBumpEc);
   if (!knot) c.add("SEMBFUNC", kBumpEs);
   if (embf0) c.add("EMBF0", embf0);

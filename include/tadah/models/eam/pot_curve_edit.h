@@ -41,6 +41,7 @@
 #include <tadah/core/context.h>
 #include <tadah/models/descriptors/basis_kind.h>
 #include <tadah/models/descriptors/dm/embf0.h>
+#include <tadah/models/descriptors/dm/rhoform.h>
 
 namespace tadah {
 namespace models {
@@ -67,6 +68,11 @@ struct CurveView {
   /// true only for F of an EMBF0 ZERO potential: the zero-referenced
   /// embedding basis g_k(x) - g_k(0) that DM_REAM evaluates (see value())
   bool zero_ref = false;
+  /// Rho of a DM_REAM potential: its RHOFORM (Signed for Phi and F). Under
+  /// Monotone basis function k is the integrated bump S_k (value, deriv,
+  /// deriv2, support); under NonNeg and Monotone every coeff is >= 0 and
+  /// the edits keep it so.
+  RhoForm form = RhoForm::Signed;
   std::vector<double> mu;
   std::vector<double> eta;    ///< empty for the knot family
   std::vector<double> coeff;
@@ -92,7 +98,8 @@ struct CurveView {
 
   /// Active x-interval of BF k. One-sided knots return a half-line encoded
   /// with +-support_infinity() on the open side. With zero_ref, BF k is the
-  /// constant -g_k(0) outside this interval (its derivatives vanish).
+  /// constant -g_k(0) outside this interval (its derivatives vanish). Under
+  /// RHOFORM MONOTONE the step S_k is 1 below the bump: (-inf, mu + w/eta).
   std::pair<double, double> support(std::size_t k) const;
   static double support_infinity();
 };
@@ -121,6 +128,7 @@ struct PotEAMView {
   /// MBKind::Ream only: the embedding reference (stored EMBF0; absent ->
   /// the default ZERO). F.zero_ref is (embf0 == EmbF0Mode::Zero).
   EmbF0Mode embf0 = EmbF0Mode::Zero;
+  // The density form (RHOFORM, mandatory for DM_REAM) is rho.form.
 };
 
 /** \brief Parse a knot/blip potential Context into per-channel views.
@@ -129,18 +137,23 @@ struct PotEAMView {
  *  with WEIGHTS and cannot survive an edit). The many-body term is optional:
  *  absent/inactive (pure two-body), DM_REAM (fully editable), or any other
  *  descriptor (pair channel only). For DM_REAM the stored EMBF0 (absent ->
- *  ZERO) sets `embf0` and F.zero_ref, so the F view evaluates what DM_REAM
- *  evaluates. Throws std::runtime_error with an actionable message otherwise
- *  (D2_mJoin, Gaussian/D2_BP, inconsistent arrays, invalid EMBF0). */
+ *  ZERO) sets `embf0` and F.zero_ref, and the stored RHOFORM sets rho.form,
+ *  so the F and Rho views evaluate what DM_REAM evaluates. A potential with
+ *  a DM_REAM block (also inside a foreign DM_mJoin) must declare RHOFORM:
+ *  absent or invalid -> DensityFormError with the migration text
+ *  (require_rhoform). Throws std::runtime_error with an actionable message
+ *  otherwise (D2_mJoin, Gaussian/D2_BP, inconsistent arrays, invalid
+ *  EMBF0). */
 PotEAMView parse_pot_view(const core::Context &ctx);
 
 /** \brief Rebuild a full potential Context from an (edited) view: grids,
  *  KDEG / SGRID / AMPGRIDMB arrays, TYPE2B/TYPEMB count tokens, WEIGHTS =
  *  [phi|F], FIXINDEX "1-K" + FIXWEIGHT, RCUT2B/RCUTMB (derived for knot
- *  channels, preserved for bump channels) and, for DM_REAM, an explicit
- *  EMBF0 line (`embf0`); any other potential goes through
- *  normalise_embf0_key (a stray EMBF0 is dropped). Self-checks by
- *  constructing the D2/DM descriptors from the result before returning. */
+ *  channels, preserved for bump channels) and, for DM_REAM, explicit EMBF0
+ *  (`embf0`) and RHOFORM (rho.form, canonical upper case) lines; any other
+ *  potential goes through normalise_embf0_key / normalise_rhoform_key (a
+ *  stray key is dropped). Self-checks by constructing the D2/DM descriptors
+ *  from the result before returning. */
 core::Context rebuild_pot_context(const PotEAMView &v);
 
 /** \brief Effective cutoff of a knot channel, from the pot Context alone.
@@ -197,14 +210,18 @@ struct AddReport {
 
 /** \brief Insert one basis function with coefficient 0 (curve, derivatives
  *  and extrapolation bit-identical until the coefficient is varied; with
- *  zero_ref too, as 0 * (g(x) - g(0)) is +-0).
+ *  zero_ref too, as 0 * (g(x) - g(0)) is +-0; 0 is a valid amplitude under
+ *  RHOFORM NONNEG and MONOTONE).
  *  `radial` selects the validation rules (centre > 0, rcut interplay).
  *  Throws on invalid spec (eta on knots, deg on bumps, bad centre, bump
  *  support entirely beyond rcut). With `hard_cutoff` (the Cut_Dummy default;
  *  callers with a pot Context pass `channel_cutoff_is_discontinuous`), a bump
  *  support merely CROSSING rcut is also an error — the overhang would be
  *  hard-truncated into an energy step at the cutoff; under a smooth cutoff it
- *  is only warned about. */
+ *  is only warned about. Under RHOFORM MONOTONE the step's outer edge
+ *  mu + w/eta is checked the same way, with messages that describe a step:
+ *  a step whose bump lies beyond rcut is not refused, as it is 1 on the
+ *  whole range (under a smooth cutoff it adds a f_c(r), warned). */
 AddReport add_basis(CurveView &c, const AddSpec &s, bool radial,
                     bool hard_cutoff = true);
 
@@ -233,8 +250,15 @@ struct RemoveReport {
  *  the value rows use g(x) - g(0), and when the removed function has
  *  g(0) != 0 its removal also shifts F by a constant beyond its support, so
  *  the region is widened to [0, largest upper support of all functions]
- *  (region_widened + a note). Throws when the channel has a single basis
- *  function. */
+ *  (region_widened + a note). Under RHOFORM NONNEG / MONOTONE (Rho) the
+ *  adjustment is the bounded least-squares solution with every
+ *  c_j + dc_j >= 0 (the free/at-bound active sets of the <= 2 compensators
+ *  are enumerated; a note names a compensator held at 0; a compensator with
+ *  no support in the affected region stays unchanged, and with none left
+ *  the removal is plain, with the SIGNED warning); under MONOTONE the
+ *  functions are the steps S_k and the affected region runs from the inner
+ *  sampling bound to the removed step's outer edge. Throws when the channel
+ *  has a single basis function. */
 RemoveReport remove_basis(CurveView &c, double centre_request, bool radial);
 
 }  // namespace potedit

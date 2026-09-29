@@ -5,6 +5,7 @@
 #include <tadah/core/core_types.h>
 #include <tadah/models/eam/eam_setfl_io.h>
 #include <tadah/models/descriptors/basis_kind.h>
+#include <tadah/models/descriptors/dm/rhoform.h>
 
 #include <string>
 #include <vector>
@@ -51,6 +52,14 @@ struct EAMRefitConfig {
   /// F(0) = 0 exactly (the DM_REAM default). false = EMBF0 FREE: the raw basis
   /// against the raw table, bit-identical to tadah 1.5.0.
   bool embf0_zero = true;
+  /// RHOFORM: the density form the density amplitudes are fitted in and the
+  /// written potential declares (dense fit, rho_fit, rho_setfl). SIGNED: the
+  /// signed expansion sum_n a_n psi_n by GELSD, bit-identical to tadah 1.5.1.
+  /// NONNEG: the same columns by non-negative least squares (every a_n >= 0).
+  /// MONOTONE: the integrated-bump steps S_n by non-negative least squares
+  /// (bump families only; the cutoff rctype must be whitelisted). The
+  /// positive forms refuse a table the form cannot follow (see fit()).
+  RhoForm rho_form = RhoForm::Signed;
 };
 
 /** \brief Goodness-of-fit statistics for one 1-D fit. */
@@ -65,7 +74,9 @@ struct FitStats {
  *
  * Performs three independent 1-D least-squares expansions:
  *   1. pair  \f$\phi(r)=z2r/r \to \sum_k c^{2b}_k B_k(r)\f$  (linear weights),
- *   2. density \f$\rho(r) \to \sum_n a_n \psi_n(r)\f$       (baked coefficients),
+ *   2. density \f$\rho(r) \to \sum_n a_n T_n(r)\f$       (baked coefficients;
+ *      T_n = \f$\psi_n\f$ under RHOFORM SIGNED/NONNEG, the integrated bump S_n
+ *      under MONOTONE; every a_n >= 0 under NONNEG/MONOTONE),
  *   3. embedding \f$F(\rho) \to \sum_m c^{mb}_m g_m(\rho)\f$ (linear weights),
  * then assembles a standard `pot.tadah` Context (D2_Blip + DM_REAM) whose
  * WEIGHTS are `[c^{2b} | c^{mb}]`.
@@ -73,14 +84,24 @@ struct FitStats {
  * Under EMBF0 ZERO (EAMRefitConfig::embf0_zero) the embedding is fitted and
  * evaluated in the zero-referenced basis \f$g_m(\rho)-g_m(0)\f$ against the
  * zero-referenced table F_ref, exactly as DM_REAM evaluates it.
+ *
+ * The density is fitted, evaluated (rho_fit, rho_setfl, the stats) and
+ * written (RHOFORM) in the form EAMRefitConfig::rho_form, so rho_fit(r)
+ * equals the pair density of the DM_REAM built from build_pot_context() for
+ * r < rcut (Cut_Dummy).
  */
 class EAMRefit {
 public:
-  /** `eam` must have its splines built (EAMSetflIO::build_splines()). */
+  /** `eam` must have its splines built (EAMSetflIO::build_splines()).
+   *  RHOFORM MONOTONE with the knot family, or with a cutoff rctype that
+   *  rhoform_cutoff_whitelisted() refuses, throws DensityFormError. */
   EAMRefit(const EAMSetflIO &eam, const EAMRefitConfig &cfg);
 
   /** EMBF0 ZERO (true) or FREE (false), from EAMRefitConfig::embf0_zero. */
   bool embf0_zero() const { return cfg_.embf0_zero; }
+
+  /** The density form (EAMRefitConfig::rho_form). */
+  RhoForm rho_form() const { return cfg_.rho_form; }
 
   /** The table embedding in the reference the native F represents: FREE ->
    *  eam.F_tab(rho) verbatim; ZERO -> eam.F_tab(rho) - eam.F_tab(0), exactly 0
@@ -93,7 +114,12 @@ public:
    *  (x - mu)_+^5 — exactly the LEFT/RIGHT split the shared dispatcher applies. */
   BasisKind family() const { return family_; }
 
-  /** Run the three least-squares fits. */
+  /** Run the three least-squares fits. Under RHOFORM NONNEG and MONOTONE
+   *  the tabulated density is checked on the fit window first (the table
+   *  nodes r_i in [window lo, rcut]): a node value below -tol (NONNEG and
+   *  MONOTONE) or a rise rho_tab(r_{i+1}) - rho_tab(r_i) > tol (MONOTONE)
+   *  throws std::runtime_error naming r, tol = 8 eps max|rho_tab| on the
+   *  window, since no fit in the form can follow such a table. */
   void fit();
 
   /** Reachability analysis only (fit() also performs it): computes r_reach /
@@ -101,11 +127,20 @@ public:
    *  fitting. */
   void analyze_reachability();
 
+  /** The RHOFORM NONNEG/MONOTONE table pre-check fit() runs on its fit
+   *  window [win_lo, rcut] (see fit(); std::runtime_error naming r); SIGNED:
+   *  no-op. Public for fitters that inject their own expansion (compact
+   *  mode), which must refuse the same tables. */
+  void check_rho_table(double win_lo) const;
+
   // ---- compact-mode injection (parameters optimised externally, e.g. the
   //      HPO ladder + Ceres fitter) ----
   enum class Fn { PHI, RHO, F };
   /** Inject an externally optimised blip expansion for one function.
-   *  `deg` (knot family only): per-atom degree 5|3; empty = all quintic. */
+   *  `deg` (knot family only): per-atom degree 5|3; empty = all quintic.
+   *  Fn::RHO under RHOFORM NONNEG/MONOTONE: `c` holds the amplitudes of the
+   *  form's own terms (psi_n or S_n) and must be finite and >= 0
+   *  (DensityFormError otherwise). */
   void set_blip_fit(Fn which, const std::vector<double> &mu,
                     const std::vector<double> &eta,
                     const std::vector<double> &c,
@@ -117,7 +152,10 @@ public:
 
   // Native fitted functions (cutoff-weighted; ready for the setfl writer).
   double phi_fit(double r) const;     ///< pair function phi(r)
-  double rho_fit(double r) const;     ///< density rho(r)
+  /// density rho(r) in the declared form: sum_n a_n T_n(r) times the hard
+  /// cutoff, summed in ascending n (DM_REAM's order, so for r < rcut it is
+  /// the pair density of the build_pot_context() potential)
+  double rho_fit(double r) const;
   double F_fit(double rho) const;     ///< embedding F(rho) (ZERO: F_fit(0) == 0.0)
 
   // Tabulation variants for the round-trip setfl: identical to *_fit above the
@@ -126,6 +164,9 @@ public:
   // otherwise leave an attractive hole at extreme compression). The native
   // pot.tadah carries only the blips — its validity domain starts at r_lo.
   double phi_setfl(double r) const;
+  /** rho_fit above r_lo; below it the original table offset-matched at r_lo,
+   *  clamped at 0 under RHOFORM NONNEG/MONOTONE (the tabulated continuation
+   *  keeps rho >= 0; the form's guarantees are those of rho_fit, r >= r_lo). */
   double rho_setfl(double r) const;
   /** z2r(r) = phi_setfl(r)*r for the setfl writer — finite at r=0 (the
    *  continuation operates on z2r, since phi diverges as z2r(0)/r). */
@@ -193,6 +234,12 @@ private:
    *  `zero_ref` (EMBF0 ZERO, embedding channel): every value use (pin row
    *  included) takes the zero-referenced column b_k(x) - b_k(0); fit() then
    *  passes no pin (the F(0) row would be identically zero).
+   *  `form` (density channel; Signed for phi and F): Signed solves every
+   *  block by GELSD (tadah 1.5.1, bit for bit); NonNeg solves it by
+   *  non-negative least squares on the same columns; Monotone by
+   *  non-negative least squares on the integrated-bump step columns S_k
+   *  (whose support (-inf, c_k + half] joins the window block whenever it
+   *  reaches win_lo). LAMBDA applies in every form.
    *  Returned stats cover the window samples only. */
   FitStats lsq_fit_windowed(const std::vector<double> &xs,
                             const std::vector<double> &ys,
@@ -202,7 +249,11 @@ private:
                             bool apply_cutoff,
                             tadah::core::v_type &coeffs,
                             bool pin, double pin_x, double pin_y,
-                            bool zero_ref = false) const;
+                            bool zero_ref = false,
+                            RhoForm form = RhoForm::Signed) const;
+  /** Density term n of the fitted expansion without the cutoff: psi_n
+   *  (SIGNED, NONNEG) or the integrated bump S_n (MONOTONE). */
+  double rho_term(double r, std::size_t n) const;
   /** EMBF0 ZERO: recompute g0F_ = g_m(0) with F_fit's evaluator. Called
    *  whenever the F basis changes (fit(), set_blip_fit(Fn::F)); clears it
    *  under FREE. */

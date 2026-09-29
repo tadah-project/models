@@ -1,6 +1,7 @@
 #ifndef DM_REAM_H
 #define DM_REAM_H
 #include <tadah/models/descriptors/dm/dm_base.h>
+#include <tadah/models/descriptors/dm/ream_density.h>
 
 namespace tadah {
 namespace models {
@@ -22,13 +23,43 @@ namespace models {
  * the two functions can carry the linear weights. DM_REAM therefore:
  *
  *  - represents the **density** as a fixed (baked) expansion
- *    \f$\rho(r)=\sum_{n} a_n\,\psi_n(r)\,f_c(r)\f$ with coefficients
+ *    \f$\rho(r)=W\sum_{n} a_n\,T_n(r)\,f_c(r)\f$ in the declared density
+ *    form (below) with coefficients
  *    \f$a_n\f$ supplied in \ref AMPGRIDMB (these are NOT linear weights — they are
  *    found by a 1-D least-squares pre-fit and stored in the descriptor), and
  *  - represents the **embedding** as
  *    \f$F(\rho)=\sum_{m} c_m\,\tilde g_m(\rho)\f$ where the \f$\tilde g_m\f$
  *    are the descriptor output components (one per \ref CEMBFUNC entry) and
  *    the \f$c_m\f$ are the M_BLR **linear weights**.
+ *
+ * Density form (key \ref RHOFORM, a property of the potential; MANDATORY:
+ * a context without it throws DensityFormError with the migration text
+ * rhoform_absent_message()). With W = `weights[Zi][Zj]` (WATOM), f_c the
+ * many-body cutoff, \f$\psi_n\f$ the basis function of centre n and
+ * \f$S_n\f$ its integrated bump (d_basis_functions.h: 1 inside the bump's
+ * inner support edge, 1/2 at its centre, 0 beyond its outer edge):
+ *  - `RHOFORM SIGNED`: \f$\rho = W\sum_n a_n\,\psi_n f_c\f$ with signed
+ *    \f$a_n\f$, bit for bit the density of tadah 1.5.1 and earlier; no
+ *    guarantee.
+ *  - `RHOFORM NONNEG`: the same with every \f$a_n \ge 0\f$, W > 0 and f_c
+ *    replaced by max(f_c, 0): \f$\rho \ge 0\f$ exactly. With the knot family,
+ *    knots <= RCUTMB and a non-increasing cutoff (not Cut_SinInv) rho is
+ *    also non-increasing and convex.
+ *  - `RHOFORM MONOTONE`: \f$\rho = W\sum_n a_n\,S_n \max(f_c, 0)\f$ with
+ *    \f$a_n \ge 0\f$, SGRIDMB > 0, W > 0, a bump family (not the knot
+ *    family) and a whitelisted cutoff (rhoform_cutoff_whitelisted):
+ *    \f$\rho \ge 0\f$ exactly and non-increasing to rounding, so the
+ *    lattice density rhobar(a) is non-increasing on every lattice.
+ *    \f$\partial\rho/\partial a_n = W S_n f_c\f$ is non-local: an
+ *    amplitude moves the density everywhere inside its bump's outer edge.
+ * The form is validated in the constructor and in every reinit() (after
+ * the basis code, before the embedding): amplitudes, centres and widths
+ * (every entry finite under the positive forms), cutoff and the WATOM pair
+ * weights (read from the context). reinit() has the strong
+ * exception guarantee: a context that fails validation leaves the
+ * descriptor unchanged. The density itself is evaluated by one ReamDensity
+ * (ream_density.h), which calc_rho, the force descriptors, eam_density and
+ * pair_density all delegate to.
  *
  * Embedding reference (key \ref EMBF0, a property of the potential):
  *  - `EMBF0 ZERO` (default): \f$\tilde g_m(\rho) = g_m(\rho) - g_m(0)\f$, with
@@ -45,6 +76,7 @@ namespace models {
  * Keys (single element, \f$L=0\f$ scalar density):
  *  - \ref CGRIDMB / \ref SGRIDMB : density basis centres / widths (size Nρ)
  *  - \ref AMPGRIDMB                       : baked density coefficients \f$a_n\f$ (size Nρ)
+ *  - \ref RHOFORM                         : density form SIGNED | NONNEG | MONOTONE
  *  - \ref CEMBFUNC / \ref SEMBFUNC      : embedding basis centres / widths (size M)
  *
  * `TYPEMB` layout (the d_base.h keys contract):
@@ -82,39 +114,39 @@ private:
   // through the single dispatcher in basis_dispatch.h — no scattered
   // if(basis==...) ladders live in this class any more.
   BasisKind basis = BasisKind::Blip;
-  // density expansion (baked)
-  tadah::core::v_type crho;   // CGRIDMB
-  tadah::core::v_type srho;   // SGRIDMB
-  tadah::core::v_type arho;   // AMPGRIDMB  (fixed coefficients)
+  // density expansion (baked), in its RHOFORM: CGRIDMB, SGRIDMB, AMPGRIDMB,
+  // KDEGMB. The one evaluator every density path delegates to.
+  ReamDensity dens_;
   // embedding expansion (linear weights live in the model)
   tadah::core::v_type cemb;   // CEMBFUNC
   tadah::core::v_type semb;   // SEMBFUNC
   // optional per-atom degrees for the knot family (bcode 2): 3|5, empty = 5
-  tadah::core::v_type drho_deg;  // KDEGMB
   tadah::core::v_type demb_deg;  // KDEGEMB
-  int rho_deg(std::size_t n) const {
-    return n < drho_deg.size() ? static_cast<int>(drho_deg[n]) : 5;
-  }
   int emb_deg(std::size_t m) const {
     return m < demb_deg.size() ? static_cast<int>(demb_deg[m]) : 5;
   }
 
-  // ---- inline basis helpers (family selected by `basis`) ----
-  /** Density radial value (cutoff-weighted) for centre n at distance r. */
-  double psi(std::size_t n, double r, double fc) const;
-  /** Density radial r-derivative (cutoff product rule) for centre n. */
-  double dpsi(std::size_t n, double r, double fc, double fcp) const;
-  /** Sum_n a_n psi_n(r) f_c(r). */
+  /** Sum_n a_n T_n(r) f_c(r) (ReamDensity::value). */
   double rho_raw(double r, double fc) const;
-  /** d/dr [ Sum_n a_n psi_n(r) f_c(r) ]. */
+  /** d/dr of rho_raw (ReamDensity::deriv). */
   double rho_raw_deriv(double r, double fc, double fcp) const;
   /** Embedding value g_m(rho) (no cutoff). */
   double gemb(std::size_t m, double rho) const;
   /** Embedding derivative g'_m(rho) w.r.t. rho. */
   double dgemb(std::size_t m, double rho) const;
-  /** Family-aware grid validation (ctor + reinit): size consistency, the
-   *  knot family's width-channel absence, KDEG* in {3,5}. */
-  void validate_grids() const;
+  /** Embedding-grid validation (the density grids are validated by
+   *  ReamDensity::validate): CEMBFUNC present, the knot family's width
+   *  channel absence, CEMBFUNC/SEMBFUNC sizes, no zero SEMBFUNC, KDEGEMB
+   *  size and entries in {3,5}. */
+  static void validate_embedding(BasisKind b, const tadah::core::v_type &ce,
+                                 const tadah::core::v_type &se,
+                                 const tadah::core::v_type &de);
+  /** Reads every grid of @p ctx into temporaries (basis code, RHOFORM,
+   *  density, embedding, EMBF0), validates them (density form and WATOM
+   *  pair weights included) and computes the embedding reference; the
+   *  members change only after every check has passed (strong exception
+   *  guarantee). Ctor and every reinit(). */
+  void load(const tadah::core::Context &ctx);
 
   // embedding reference (EMBF0): ZERO subtracts g_m(0) from every embedding
   // output; the two g0 arrays are filled only under ZERO, each with the
@@ -123,10 +155,16 @@ private:
   EmbF0Mode embf0_ = EmbF0Mode::Zero;
   tadah::core::v_type g0_aed_;   // g_m(0) via gemb()
   tadah::core::v_type g0_emb_;   // g_m(0) via embedding_value_deriv()
-  /** Reads EMBF0 (materialising the default ZERO into @p ctx, so the model
-   *  Context -- and every potential written from it -- carries the key) and
-   *  recomputes g0 from the current members. Ctor and every reinit(). */
-  void setup_embedding_reference(const tadah::core::Context& ctx);
+  /** g_m(0) of the embedding (@p b, @p ce, @p se, @p de) by each path's own
+   *  routine: @p g0a as calc_aed evaluates it (gemb), @p g0e as eam_embed
+   *  does (embedding_value_deriv). Used under EMBF0 ZERO; load() reads EMBF0
+   *  through Context::get, which materialises the default ZERO into the
+   *  model Context, so every potential written from it carries the key. */
+  static void embedding_reference(BasisKind b, const tadah::core::v_type &ce,
+                                  const tadah::core::v_type &se,
+                                  const tadah::core::v_type &de,
+                                  tadah::core::v_type &g0a,
+                                  tadah::core::v_type &g0e);
 
   bool warned_rcut_ = false;  ///< one-shot guard for the truncation warning
   /** Last-resort guard (ctor + reinit), knot family only: a density knot
@@ -190,6 +228,15 @@ public:
   std::optional<EmbF0Mode> embf0_mode() const override { return embf0_; }
   std::optional<double>
   raw_embedding_f0(const tadah::core::t_type &w_full) const override;
+
+  /** The density calc_rho adds for the pair (Zi, Zj) at distance @p rij at
+   *  scale 1: exactly its increment `1.0 * W * rho_raw(rij, f_c(rij))`, 0 for
+   *  an uninitialised pair or rij > rcut. Not a DM_Base virtual (the plugin
+   *  ABI is unchanged); for tests and holders of a DM_REAM. */
+  double pair_density(const int Zi, const int Zj, const double rij) const;
+
+  /** The density evaluator (form, grids) of this descriptor. */
+  const ReamDensity &density() const { return dens_; }
 };
 } // namespace models
 } // namespace tadah
