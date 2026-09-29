@@ -2,6 +2,7 @@
 #include "tadah/core/number_format.h"
 #include "tadah/core/utils.h"
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstddef>
 #include <cstdlib>
@@ -81,13 +82,34 @@ void D_Base::update_weights(const tadah::core::Context &c) {
     weights[e.Zj][e.Zi] = e.w;
   }
 }
+bool D_Base::watom_number_shaped(const std::string &tok) {
+  std::size_t i = 0;
+  if (i < tok.size() && (tok[i] == '+' || tok[i] == '-')) ++i;
+  if (i < tok.size() &&
+      (std::isdigit(static_cast<unsigned char>(tok[i])) || tok[i] == '.'))
+    return true;
+  std::string w = tok.substr(i);
+  std::transform(w.begin(), w.end(), w.begin(),
+                 [](unsigned char ch) { return std::tolower(ch); });
+  return w == "inf" || w == "infinity" || w.rfind("nan", 0) == 0;
+}
+double D_Base::watom_value(const std::string &tok, std::size_t entry) {
+  double v = 0.0;
+  if (!tadah::core::parse_decimal_finite(tok, v))
+    throw std::runtime_error(
+        "WATOM entry " + std::to_string(entry) + " ('" + tok +
+        "') is not a decimal number: WATOM takes the number grammar of "
+        "potential and configuration files, [+-]digits[.digits][e[+-]digits] "
+        "(no hexadecimal, inf or nan, and a finite value)");
+  return v;
+}
 D_Base::WatomSpec D_Base::parse_watom(const tadah::core::Context &c) {
   WatomSpec spec;
   if (!c.contains("WATOM") || c.size("WATOM") == 0) return spec;
 
   const size_t n = c.size("WATOM");
   const bool per_species =
-    tadah::core::is_number(c.get<std::string>("WATOM", 0));
+    watom_number_shaped(c.get<std::string>("WATOM", 0));
 
   if (per_species) {
     if (!c.contains("ATOM")) return spec;
@@ -97,12 +119,14 @@ D_Base::WatomSpec D_Base::parse_watom(const tadah::core::Context &c) {
                 c.get<std::string>("ATOM", i)).Z;
     }
     spec.mode = WatomMode::PerSpecies;
+    for (size_t i = 0; i < n; ++i)
+      spec.values.push_back(
+          watom_value(c.get<std::string>("WATOM", i), i + 1));
     for (size_t i = 0; i < n; ++i) {
-      const double wi = c.get<double>("WATOM", i);
-      spec.values.push_back(wi);
+      const double wi = spec.values[i];
       spec.writes.push_back({Zs[i], Zs[i], wi});
       for (size_t j = i + 1; j < n; ++j) {
-        const double w = std::sqrt(wi * c.get<double>("WATOM", j));
+        const double w = std::sqrt(wi * spec.values[j]);
         spec.writes.push_back({Zs[i], Zs[j], w});
       }
     }
@@ -119,7 +143,7 @@ D_Base::WatomSpec D_Base::parse_watom(const tadah::core::Context &c) {
                        c.get<std::string>("WATOM", i)).Z;
       const int Zj = tadah::core::PeriodicTable::find_by_symbol(
                        c.get<std::string>("WATOM", i + 1)).Z;
-      const double w = c.get<double>("WATOM", i + 2);
+      const double w = watom_value(c.get<std::string>("WATOM", i + 2), i + 3);
       spec.values.push_back(w);
       spec.writes.push_back({Zi, Zj, w});
       spec.pairs.emplace_back(Zi, Zj);
@@ -154,15 +178,8 @@ std::vector<double> D_Base::density_pair_weights(const tadah::core::Context &c) 
   }
   std::vector<double> w;
   if (tok.empty()) return w;
-  auto num = [&](size_t i) {
-    char *end = nullptr;
-    const double v = std::strtod(tok[i].c_str(), &end);
-    if (tok[i].empty() || end != tok[i].c_str() + tok[i].size())
-      throw std::runtime_error("WATOM entry " + std::to_string(i + 1) + " ('" +
-                               tok[i] + "') is not a number");
-    return v;
-  };
-  if (tadah::core::is_number(tok[0])) {
+  auto num = [&](size_t i) { return watom_value(tok[i], i + 1); };
+  if (watom_number_shaped(tok[0])) {
     // per species, parallel to ATOM (parse_watom: no ATOM, no weights)
     if (!c.has_stored("ATOM")) return w;
     std::vector<double> ws;

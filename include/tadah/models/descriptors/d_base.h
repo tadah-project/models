@@ -137,10 +137,31 @@ public:
 
   /** Parse WATOM from @p c exactly as update_weights applies it (the two
    *  input formats documented there). Mode Empty when WATOM is absent or
-   *  empty, or when a per-species WATOM has no ATOM list. Throws for a
+   *  empty, or when a per-species WATOM has no ATOM list. The list is per
+   *  species when its first token is shaped like a number
+   *  (watom_number_shaped), pair triples otherwise. Every value is read by
+   *  watom_value. Throws for a value outside that grammar, for a
    *  pair-triple list whose length is not a multiple of 3 and for unknown
    *  element symbols. */
   static WatomSpec parse_watom(const tadah::core::Context &c);
+
+  /** The one reader of a WATOM value (@p entry: its 1-based position in the
+   *  WATOM list, for the message), used by parse_watom (the model),
+   *  density_pair_weights (the density checks, the HPO gates) and so by
+   *  every DM_REAM path: the decimal number grammar of potential and
+   *  configuration files (core::parse_decimal_finite; a subnormal is a
+   *  value). Throws std::runtime_error "WATOM entry N ('tok') is not a
+   *  decimal number: ..." for anything else: hexadecimal ("0x1p-1", which
+   *  istringstream read as 0 and strtod as 0.5), inf, nan, an overflow or
+   *  trailing characters. */
+  static double watom_value(const std::string &tok, std::size_t entry);
+
+  /** True when a WATOM token is shaped like a number, which makes the list
+   *  per species: a digit or '.' after an optional sign, or an inf/nan word
+   *  ("inf", "-Infinity", "nan"). Such a token is then read by watom_value,
+   *  so a misspelt number is refused as one instead of being taken for an
+   *  element symbol. */
+  static bool watom_number_shaped(const std::string &tok);
 
   /** Density forms that guarantee rho >= 0 (DM_REAM RHOFORM NONNEG and
    *  MONOTONE) need every density pair weight W = weights[Zi][Zj] > 0:
@@ -159,7 +180,7 @@ public:
    *  stored values only and resolves no element symbol, so a density check
    *  can run without the periodic table. Throws std::runtime_error, as
    *  parse_watom does, for a pair-triple list whose length is not a
-   *  multiple of 3, and for a value that is not one whole number. */
+   *  multiple of 3, and for a value outside watom_value's grammar. */
   static std::vector<double> density_pair_weights(const tadah::core::Context &c);
 
   /** Resolve a 1-based per-species WATOM arg_pos (matching
