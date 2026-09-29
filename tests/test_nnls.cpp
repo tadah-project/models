@@ -489,3 +489,34 @@ TEST_CASE("nnls: the theta_star_ON step layout of the FEAT-02 campaign "
     CHECK(res.passive == support);
   }
 }
+
+TEST_CASE("nnls: a stop because every column with a dual above the tolerance "
+          "was refused is not convergence",
+          "[nnls]") {
+  // a1 = (1, 0), a2 = (1 - d, d), b = (1, 1/2), d = 60 eps. a1 enters first
+  // (its dual 1 is the larger), x = (1, 0) and r = (0, 1/2). a2's dual is then
+  // d / 2 = 30 eps, above the tolerance 10 eps |M|_F |r| ~ 7.1 eps, but its
+  // component off a1 is d < 100 eps |a2|: a2 is refused as numerically
+  // dependent, and no other column can enter. x is feasible but not a
+  // Kuhn-Tucker point (the face x1 = 0 is lower by about d), so the solver
+  // must not report convergence.
+  const double eps = std::numeric_limits<double>::epsilon();
+  const double d = 60.0 * eps;
+  Problem p;
+  p.m = 2;
+  p.n = 2;
+  p.A = {1.0, 0.0, 1.0 - d, d};
+  p.b = {1.0, 0.5};
+  std::vector<double> x;
+  const NnlsResult res = solve(p, x);
+  CHECK(x[0] == 1.0);
+  CHECK(x[1] == 0.0);
+  CHECK(res.passive == std::vector<std::size_t>({0}));
+  CHECK_FALSE(res.converged);
+
+  // the same system with a2 a clear column: a Kuhn-Tucker point, converged
+  Problem q = p;
+  q.A = {1.0, 0.0, 0.5, 0.5};
+  const NnlsResult ok = solve(q, x);
+  CHECK(ok.converged);
+}
