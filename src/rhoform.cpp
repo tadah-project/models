@@ -1,6 +1,8 @@
 #include <tadah/models/descriptors/dm/rhoform.h>
 #include <tadah/models/descriptors/d_mjoin.h>
+#include <tadah/models/descriptors/dm/embf0.h>
 #include <tadah/models/descriptors/dm/ream_density.h>
+#include <tadah/models/eam/pot_curve_edit.h>
 
 #include <algorithm>
 #include <cctype>
@@ -150,22 +152,54 @@ OptimLowerBound optim_key_lower_bound(const std::string &key,
 std::optional<OptimLowBoundRule> optim_low_bound_rule(
     const std::string &key, std::optional<RhoForm> form,
     std::optional<BasisKind> basis) {
+  if (!form) return std::nullopt;
+  const std::string by = std::string("RHOFORM ") + rhoform_name(*form);
   if (optim_key_lower_bound(key, form) == OptimLowerBound::NonNegative)
-    return OptimLowBoundRule{false, "every AMPGRIDMB amplitude >= 0"};
-  if (!form || !rhoform_is_positive(*form)) return std::nullopt;
+    return OptimLowBoundRule{false, "every AMPGRIDMB amplitude >= 0", by};
+  if (!rhoform_is_positive(*form)) return std::nullopt;
   const std::string k = upper(key);
   if (k == "WATOM")
-    return OptimLowBoundRule{true, "every density pair weight W > 0"};
+    return OptimLowBoundRule{true, "every density pair weight W > 0", by};
   if (k == "SGRIDMB" && *form == RhoForm::Monotone)
     return OptimLowBoundRule{true,
                              "every SGRIDMB width > 0 (S_n steps down across "
-                             "the bump s_n (r - c_n))"};
+                             "the bump s_n (r - c_n))",
+                             by};
   // ReamDensity::validate: NONNEG needs s > 0 for the Gaussian basis only
   if (k == "SGRIDMB" && basis == BasisKind::Gaussian)
     return OptimLowBoundRule{true,
                              "every SGRIDMB width > 0 for the Gaussian basis "
                              "(exp(-s (r - c)^2) grows without bound for "
-                             "s < 0)"};
+                             "s < 0)",
+                             by};
+  return std::nullopt;
+}
+
+std::optional<OptimLowBoundRule> optim_low_bound_rule(
+    const std::string &key, const tadah::core::Context &ctx) {
+  std::optional<RhoForm> form;
+  std::optional<BasisKind> basis;
+  if (context_has_ream(ctx)) {
+    form = require_rhoform(ctx, "the OPTIM box rules");
+    basis = optim_rule_basis(ctx);
+  }
+  if (auto r = optim_low_bound_rule(key, form, basis)) return r;
+  // A radial bump channel: every width > 0 in every form.
+  const std::string k = upper(key);
+  if (k == "SGRIDMB" && basis && bump_halfwidth(*basis) > 0.0)
+    return OptimLowBoundRule{
+        true,
+        "every SGRIDMB width > 0 (a radial bump spans [c - w/s, c + w/s]; a "
+        "width <= 0 has no support edge)",
+        std::string("the DM_REAM ") + basis_name(*basis) + " density basis"};
+  if (k == "SGRID2B" && potedit::bump_channel_halfwidth(ctx, "2B")) {
+    const auto label = ctx.stored_value("TYPE2B", 0);
+    return OptimLowBoundRule{
+        true,
+        "every SGRID2B width > 0 (a radial bump spans [c - w/s, c + w/s]; a "
+        "width <= 0 has no support edge)",
+        "the " + label.value_or("TYPE2B") + " pair basis"};
+  }
   return std::nullopt;
 }
 

@@ -120,10 +120,15 @@ enum class OptimLowerBound {
 OptimLowerBound optim_key_lower_bound(const std::string &key,
                                       std::optional<RhoForm> form);
 
-/** \brief What a density form requires of the low bound of an OPTIM box. */
+/** \brief What a density form, or a radial bump channel, requires of the
+ *  low bound of an OPTIM box. */
 struct OptimLowBoundRule {
   bool strict;              ///< lo > 0 (else lo >= 0)
   const char *requirement;  ///< "every AMPGRIDMB amplitude >= 0", ...
+  /** What sets the rule, the subject of "<by> requires <requirement>":
+   *  "RHOFORM NONNEG", "the D2_Blip5 pair basis", "the DM_REAM Blip density
+   *  basis". */
+  std::string by;
   /** True when @p lo satisfies the rule (NaN never does). */
   bool admits(double lo) const;
 };
@@ -156,6 +161,22 @@ std::optional<OptimLowBoundRule> optim_low_bound_rule(
  *  does not convert ("DM_REAM: TYPEMB basis code 'x' is not an integer
  *  ..."). */
 std::optional<BasisKind> optim_rule_basis(const tadah::core::Context &ctx);
+
+/** The rule on the low bound of an OPTIM box on @p key (case-insensitive)
+ *  of the configuration or potential @p ctx, nullopt when there is none:
+ *  the density-form rule optim_low_bound_rule(key, form, basis) with the
+ *  RHOFORM of @p ctx and its density basis (optim_rule_basis), else, on a
+ *  radial bump channel, every width > 0 in every form -- SGRIDMB of a
+ *  DM_REAM Blip or Blip5 density (optim_rule_basis, so a DM_mJoin's
+ *  DM_REAM children count) and SGRID2B of a D2_Blip or D2_Blip5 pair term
+ *  (potedit::bump_channel_halfwidth): a bump spans [c - w/s, c + w/s], and
+ *  a width s <= 0 has no support edge, so no bump-support rule can hold it
+ *  inside the cutoff (owner decision 2026-09-29). tadah hpo refuses such a
+ *  box and such a seed width at startup; tadah analysis check_bounds
+ *  reports it. Throws the migration text (require_rhoform) for a DM_REAM
+ *  configuration without RHOFORM. */
+std::optional<OptimLowBoundRule> optim_low_bound_rule(
+    const std::string &key, const tadah::core::Context &ctx);
 
 }  // namespace models
 }  // namespace tadah
