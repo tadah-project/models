@@ -1,8 +1,8 @@
 #include <tadah/models/descriptors/dm/embf0.h>
+#include <tadah/core/key_notice.h>
 #include <tadah/core/logger.h>
 
 #include <algorithm>
-#include <atomic>
 #include <cctype>
 #include <stdexcept>
 
@@ -15,7 +15,6 @@ std::string upper(std::string s) {
                  [](unsigned char ch) { return std::toupper(ch); });
   return s;
 }
-std::atomic<bool> warned_stray{false};
 }  // namespace
 
 const char *embf0_name(EmbF0Mode m) {
@@ -70,6 +69,19 @@ std::string embf0_absent_consequence(bool linear) {
          "forces change; add 'EMBF0 FREE' to the potential to reproduce them.";
 }
 
+void report_ream_only_key(const std::string &key) {
+  tadah::core::report_ignored_key_once(
+      key, "Key " + key,
+      "it applies only to a DM_REAM many-body block, and the potential has "
+      "none (the key has no effect and is not written to a potential).");
+}
+
+void report_ream_only_keys(const tadah::core::Context &c) {
+  if (context_has_ream(c)) return;
+  for (const char *key : {"EMBF0", "RHOFORM"})
+    if (c.has_stored(key)) report_ream_only_key(key);
+}
+
 void normalise_embf0_key(tadah::core::Context &c) {
   if (context_has_ream(c)) {
     const EmbF0Mode m = stored_embf0(c).value_or(EmbF0Mode::Zero);
@@ -78,27 +90,22 @@ void normalise_embf0_key(tadah::core::Context &c) {
     return;
   }
   if (c.has_stored("EMBF0")) {
+    report_ream_only_key("EMBF0");
     c.remove("EMBF0");
-    if (!warned_stray.exchange(true))
-      tadah::core::Logger::instance().log(
-          tadah::core::LogLevel::WARNING,
-          "EMBF0 is ignored and not written: the potential has no DM_REAM "
-          "many-body block.");
   }
 }
 
 void check_embf0_precedence(const tadah::core::Context &pot,
                             const tadah::core::Context &task,
                             const std::string &pot_name) {
-  const auto tv = stored_embf0(task);
-  if (!tv) return;
   if (!context_has_ream(pot)) {
-    tadah::core::Logger::instance().log(
-        tadah::core::LogLevel::WARNING,
-        "EMBF0 " + std::string(embf0_name(*tv)) + " is ignored: " + pot_name +
-            " has no DM_REAM many-body block.");
+    // a key on either side has no effect (validated when it was read)
+    if (pot.has_stored("EMBF0") || task.has_stored("EMBF0"))
+      report_ream_only_key("EMBF0");
     return;
   }
+  const auto tv = stored_embf0(task);
+  if (!tv) return;
   const auto pv = stored_embf0(pot);
   if (pv && *pv != *tv)
     throw std::runtime_error(

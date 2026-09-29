@@ -69,8 +69,9 @@ RhoForm require_rhoform(const tadah::core::Context &ctx,
 /** Potential writers: a context with a DM_REAM block must declare RHOFORM
  *  (absent -> DensityFormError with the migration text; nothing is
  *  inserted) and gets it canonicalised to upper case; a context without one
- *  has a stray RHOFORM removed (WARNING once per process), so potentials
- *  without a DM_REAM block never carry the key. */
+ *  has a stray RHOFORM removed (report_ream_only_key: a stderr notice once
+ *  per process), so potentials without a DM_REAM block never carry the
+ *  key. */
 void normalise_rhoform_key(tadah::core::Context &c);
 
 /** Engines that merge a task context over a loaded potential (predict,
@@ -79,7 +80,8 @@ void normalise_rhoform_key(tadah::core::Context &c);
  *  DM_REAM block but no RHOFORM throws (DensityFormError, migration text)
  *  whatever the task says: the task cannot supply the key. Different
  *  explicit values throw as well. A RHOFORM on either side of a potential
- *  without a DM_REAM block gives a WARNING (ignored). */
+ *  without a DM_REAM block is ignored (report_ream_only_key: a stderr notice
+ *  once per process). */
 void check_rhoform_precedence(const tadah::core::Context &pot,
                               const tadah::core::Context &task,
                               const std::string &pot_name);

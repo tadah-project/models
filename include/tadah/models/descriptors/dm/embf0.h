@@ -53,9 +53,24 @@ bool model_is_linear(const tadah::core::Context &ctx);
  *  otherwise energies and forces change. */
 std::string embf0_absent_consequence(bool linear);
 
+/** EMBF0 and RHOFORM apply only to a DM_REAM many-body block. Reports the
+ *  key @p key of a potential or configuration without one (it has no effect
+ *  and is not written to a potential) on standard error, once per key and
+ *  process: "WARNING: Key <key> is ignored: it applies only to a DM_REAM
+ *  many-body block, and the potential has none (...)"
+ *  (core::report_ignored_key_once, the notice of a deprecated key: neither
+ *  the Logger level nor VERBOSE hides it, in LAMMPS either). */
+void report_ream_only_key(const std::string &key);
+
+/** report_ream_only_key() for each of EMBF0 and RHOFORM stored in @p c when
+ *  @p c has no DM_REAM block (context_has_ream); nothing otherwise. Called
+ *  wherever a model is built from a context (DC_Selector::init: tadah
+ *  train, predict, hpo and pair_style tadah). */
+void report_ream_only_keys(const tadah::core::Context &c);
+
 /** Potential writers: a context with a DM_REAM block gets an explicit,
  *  canonical EMBF0 line (ZERO when absent); a context without one has a
- *  stray EMBF0 removed (WARNING once per process), so potentials without a
+ *  stray EMBF0 removed (report_ream_only_key), so potentials without a
  *  DM_REAM block never carry the key. */
 void normalise_embf0_key(tadah::core::Context &c);
 
@@ -63,8 +78,8 @@ void normalise_embf0_key(tadah::core::Context &c);
  *  analysis): call with the potential as read and the task context BEFORE
  *  merging. Different explicit values -> std::runtime_error (EMBF0 is a
  *  property of the potential); a task value for a potential without the key
- *  -> INFO (the value applies); a task value for a potential without a
- *  DM_REAM block -> WARNING (ignored). */
+ *  -> INFO (the value applies); an EMBF0 on either side of a potential
+ *  without a DM_REAM block -> report_ream_only_key (ignored). */
 void check_embf0_precedence(const tadah::core::Context &pot,
                             const tadah::core::Context &task,
                             const std::string &pot_name);

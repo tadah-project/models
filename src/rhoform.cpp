@@ -1,8 +1,6 @@
 #include <tadah/models/descriptors/dm/rhoform.h>
-#include <tadah/core/logger.h>
 
 #include <algorithm>
-#include <atomic>
 #include <cctype>
 #include <iterator>
 
@@ -15,12 +13,6 @@ std::string upper(std::string s) {
                  [](unsigned char ch) { return std::toupper(ch); });
   return s;
 }
-std::atomic<bool> warned_stray{false};
-
-void warn_ignored(const std::string &what) {
-  tadah::core::Logger::instance().log(tadah::core::LogLevel::WARNING, what);
-}
-
 // The cutoffs measured non-negative and non-increasing on [0, rcut]
 // (rhoform_cutoff_whitelisted, rhoform_cutoff_whitelist_text).
 const char *const kMonotoneCutoffs[] = {"Cut_Dummy", "Cut_Cos",  "Cut_CosS",
@@ -90,10 +82,8 @@ void normalise_rhoform_key(tadah::core::Context &c) {
     return;
   }
   if (c.has_stored("RHOFORM")) {
+    report_ream_only_key("RHOFORM");
     c.remove("RHOFORM");
-    if (!warned_stray.exchange(true))
-      warn_ignored("RHOFORM is ignored and not written: the potential has no "
-                   "DM_REAM many-body block.");
   }
 }
 
@@ -101,13 +91,9 @@ void check_rhoform_precedence(const tadah::core::Context &pot,
                               const tadah::core::Context &task,
                               const std::string &pot_name) {
   if (!context_has_ream(pot)) {
-    if (const auto pv = pot.stored_value("RHOFORM"))
-      warn_ignored("RHOFORM " + *pv + " is ignored: " + pot_name +
-                   " has no DM_REAM many-body block.");
-    if (const auto tv = task.stored_value("RHOFORM"))
-      warn_ignored("RHOFORM " + *tv + " from the task configuration is "
-                   "ignored: " + pot_name +
-                   " has no DM_REAM many-body block.");
+    // a key on either side has no effect (validated when it was read)
+    if (pot.has_stored("RHOFORM") || task.has_stored("RHOFORM"))
+      report_ream_only_key("RHOFORM");
     return;
   }
   // The potential must declare its own form: a task value never supplies it.

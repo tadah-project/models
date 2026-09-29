@@ -5,6 +5,7 @@
 #include <tadah/core/intercept_layout.h>
 #include <tadah/models/descriptors/d_all.h>
 #include <tadah/models/cut_all.h>
+#include <tadah/models/descriptors/dm/embf0.h>
 #include <tadah/core/registry.h>
 
 namespace tadah {
@@ -41,6 +42,10 @@ namespace tadah {
 
         void init(const tadah::core::Context &context) {
           double rcutzero = 0.0; // for dummies
+
+          // EMBF0 / RHOFORM without a DM_REAM block have no effect: one
+          // stderr notice per key and process, wherever a model is built.
+          report_ream_only_keys(context);
 
           bias = static_cast<int>(tadah::core::n_intercept_columns(context));
 
