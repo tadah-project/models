@@ -1066,3 +1066,55 @@ TEST_CASE_METHOD(DensityFixture,
                       Contains("TYPEMB basis code 'x' is not an integer"));
   }
 }
+
+TEST_CASE_METHOD(DensityFixture,
+                 "WATOM: the model and the density pair weights read one "
+                 "number grammar",
+                 "[ream][rhoform][watom]") {
+  // The model (parse_watom, update_weights) read WATOM with istringstream,
+  // the density pair weights (the HPO gates) with strtod: "0x1p-1" was 0 in
+  // the model and 0.5 in a gate. Both now read the decimal grammar of the
+  // potential and configuration files and refuse anything else.
+  auto per_species = [](const std::string &w) {
+    Context c;
+    c.add("ATOM", "Ta");
+    c.add("WATOM", w);
+    return c;
+  };
+  auto triple = [](const std::string &w) {
+    Context c;
+    c.add("WATOM", "Ta Ta " + w);
+    return c;
+  };
+  for (const std::string bad : {"0x1p-1", "inf", "-inf", "nan", "1e400"}) {
+    for (const bool pair : {false, true}) {
+      INFO("WATOM value '" << bad << "'" << (pair ? " (pair triple)" : ""));
+      const Context c = pair ? triple(bad) : per_species(bad);
+      const std::string entry = pair ? "WATOM entry 3" : "WATOM entry 1";
+      CHECK_THROWS_WITH(D_Base::parse_watom(c),
+                        Contains(entry + " ('" + bad +
+                                 "') is not a decimal number"));
+      CHECK_THROWS_WITH(D_Base::density_pair_weights(c),
+                        Contains(entry + " ('" + bad +
+                                 "') is not a decimal number"));
+      CHECK_THROWS_WITH(D_Base::require_positive_density_weights(c, "who"),
+                        Contains("is not a decimal number"));
+      DM_REAM dm;
+      CHECK_THROWS_WITH(dm.update_weights(c),
+                        Contains("is not a decimal number"));
+    }
+  }
+  // the decimal grammar, a subnormal included: the same value on both paths
+  for (const std::string ok : {"0.5", "+2", "5.", ".25", "7.5e-3", "1e-310"}) {
+    for (const bool pair : {false, true}) {
+      INFO("WATOM value '" << ok << "'" << (pair ? " (pair triple)" : ""));
+      const Context c = pair ? triple(ok) : per_species(ok);
+      const auto spec = D_Base::parse_watom(c);
+      const std::vector<double> w = D_Base::density_pair_weights(c);
+      REQUIRE(spec.values.size() == 1);
+      REQUIRE(w.size() == 1);
+      CHECK(spec.values[0] == w[0]);
+      CHECK(w[0] == std::strtod(ok.c_str(), nullptr));
+    }
+  }
+}
