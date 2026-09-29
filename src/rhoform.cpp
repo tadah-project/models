@@ -1,4 +1,6 @@
 #include <tadah/models/descriptors/dm/rhoform.h>
+#include <tadah/models/descriptors/d_mjoin.h>
+#include <tadah/models/descriptors/dm/ream_density.h>
 
 #include <algorithm>
 #include <cctype>
@@ -146,7 +148,8 @@ OptimLowerBound optim_key_lower_bound(const std::string &key,
 }
 
 std::optional<OptimLowBoundRule> optim_low_bound_rule(
-    const std::string &key, std::optional<RhoForm> form) {
+    const std::string &key, std::optional<RhoForm> form,
+    std::optional<BasisKind> basis) {
   if (optim_key_lower_bound(key, form) == OptimLowerBound::NonNegative)
     return OptimLowBoundRule{false, "every AMPGRIDMB amplitude >= 0"};
   if (!form || !rhoform_is_positive(*form)) return std::nullopt;
@@ -157,7 +160,36 @@ std::optional<OptimLowBoundRule> optim_low_bound_rule(
     return OptimLowBoundRule{true,
                              "every SGRIDMB width > 0 (S_n steps down across "
                              "the bump s_n (r - c_n))"};
+  // ReamDensity::validate: NONNEG needs s > 0 for the Gaussian basis only
+  if (k == "SGRIDMB" && basis == BasisKind::Gaussian)
+    return OptimLowBoundRule{true,
+                             "every SGRIDMB width > 0 for the Gaussian basis "
+                             "(exp(-s (r - c)^2) grows without bound for "
+                             "s < 0)"};
   return std::nullopt;
+}
+
+std::optional<BasisKind> optim_rule_basis(const tadah::core::Context &ctx) {
+  if (!context_has_ream(ctx)) return std::nullopt;
+  auto basis_of = [](const tadah::core::Context &c) {
+    try {
+      return ReamDensity::basis_from_context(c);
+    } catch (const std::runtime_error &e) {
+      throw std::runtime_error(std::string("DM_REAM: ") + e.what());
+    }
+  };
+  const auto label = ctx.stored_value("TYPEMB", 0);
+  if (label && *label == "DM_REAM") return basis_of(ctx);
+  // a DM_mJoin: its DM_REAM children
+  std::optional<BasisKind> first;
+  for (const auto &child : D_mJoin::parse_context(ctx, "TYPEMB")) {
+    const auto l = child.stored_value("TYPEMB", 0);
+    if (!l || *l != "DM_REAM") continue;
+    const BasisKind b = basis_of(child);
+    if (b == BasisKind::Gaussian) return b;
+    if (!first) first = b;
+  }
+  return first;
 }
 
 bool OptimLowBoundRule::admits(double lo) const {

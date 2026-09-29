@@ -2,6 +2,7 @@
 #define TADAH_MODELS_RHOFORM_H
 
 #include <tadah/core/context.h>
+#include <tadah/models/descriptors/basis_kind.h>
 #include <tadah/models/descriptors/dm/embf0.h>
 #include <optional>
 #include <stdexcept>
@@ -128,14 +129,33 @@ struct OptimLowBoundRule {
 };
 
 /** The rule RHOFORM @p form sets on the low bound of an OPTIM box on @p key
- *  (case-insensitive), nullopt when it sets none. Under NONNEG and
- *  MONOTONE: AMPGRIDMB lo >= 0 (optim_key_lower_bound), WATOM lo > 0 (every
- *  density pair weight W > 0) and, under MONOTONE, SGRIDMB lo > 0 (every
- *  width > 0). A box whose low bound breaks the rule reaches densities
- *  DM_REAM refuses: tadah hpo refuses it at startup, tadah analysis
- *  check_bounds reports it. */
+ *  (case-insensitive) of a DM_REAM density in the TYPEMB basis @p basis,
+ *  nullopt when it sets none. Under NONNEG and MONOTONE: AMPGRIDMB lo >= 0
+ *  (optim_key_lower_bound), WATOM lo > 0 (every density pair weight W > 0)
+ *  and SGRIDMB lo > 0 (every width > 0) under MONOTONE for every basis and
+ *  under NONNEG for the Gaussian basis, whose exp(-s (r - c)^2) grows
+ *  without bound for s < 0 (the Blip bumps are even in s). These are the
+ *  rules ReamDensity::validate applies to the density: a box whose low
+ *  bound breaks one reaches densities DM_REAM refuses, so tadah hpo refuses
+ *  it at startup and tadah analysis check_bounds reports it. Both pass the
+ *  seed's basis (optim_rule_basis). @p basis nullopt: the basis is not
+ *  known (tadah refit --retarget, whose hpotarget file names no potential),
+ *  so the rules that depend on it are not applied there. */
 std::optional<OptimLowBoundRule> optim_low_bound_rule(
-    const std::string &key, std::optional<RhoForm> form);
+    const std::string &key, std::optional<RhoForm> form,
+    std::optional<BasisKind> basis);
+
+/** The basis optim_low_bound_rule() takes for the OPTIM boxes of the
+ *  configuration or potential @p ctx: nullopt without a DM_REAM block
+ *  (context_has_ream); the TYPEMB basis of a bare DM_REAM block
+ *  (ReamDensity::basis_from_context); for a DM_mJoin, the Gaussian basis
+ *  when one of its DM_REAM children uses it (an OPTIM box on a joined key
+ *  does not say whose entries it holds, so each entry is held to the
+ *  strictest child rule, as MONOTONE's SGRIDMB rule holds them all), else
+ *  the basis of its first DM_REAM child. Throws when a DM_REAM basis code
+ *  does not convert ("DM_REAM: TYPEMB basis code 'x' is not an integer
+ *  ..."). */
+std::optional<BasisKind> optim_rule_basis(const tadah::core::Context &ctx);
 
 }  // namespace models
 }  // namespace tadah
