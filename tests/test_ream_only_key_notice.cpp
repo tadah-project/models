@@ -8,6 +8,7 @@
 #include "catch2/catch.hpp"
 
 #include <tadah/core/context.h>
+#include <tadah/core/core_user_config_parser.h>
 #include <tadah/core/key_notice.h>
 #include <tadah/core/logger.h>
 #include <tadah/core/periodic_table.h>
@@ -18,6 +19,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <vector>
 
 using tadah::core::Context;
 using tadah::core::LogLevel;
@@ -158,4 +160,38 @@ TEST_CASE("A task EMBF0 or RHOFORM over a potential without a DM_REAM block "
         (rhoform_before ? 0u : 1u));
   CHECK(tadah::core::ignored_key_reported("EMBF0"));
   CHECK(tadah::core::ignored_key_reported("RHOFORM"));
+}
+
+TEST_CASE("A potential with a deprecated key and EMBF0 without DM_REAM, read "
+          "twice: each notice once per process",
+          "[embf0][key_notice][deprecated]") {
+  /* Owner decision (2026-09-29): one rule for every ignored key, deprecated
+   * (MBLOCK) or without effect (EMBF0 without DM_REAM): one stderr notice
+   * per key and process. */
+  tadah::core::PeriodicTable::initialize();
+  const std::vector<std::string> file = {
+      "ATOM Ta",        "INIT2B true",     "INITMB false",
+      "TYPE2B D2_Blip 3 3 Ta Ta",          "CGRID2B 2.2 3.2 4.2",
+      "SGRID2B 1.0 1.0 1.0",               "RCTYPE2B Cut_Cos",
+      "RCUT2B 5.0",     "MBLOCK 64",       "EMBF0 FREE",
+      "VERBOSE 0"};
+  const bool mblock_before = tadah::core::ignored_key_reported("MBLOCK");
+  const bool embf0_before = tadah::core::ignored_key_reported("EMBF0");
+  std::string err;
+  {
+    StreamCapture cap(LogLevel::ERROR);  // as in LAMMPS
+    for (int load = 0; load < 2; ++load) {
+      Context pot = tadah::core::CoreUserConfigParser().parse(file);
+      CHECK_FALSE(pot.has_stored("MBLOCK"));
+      tadah::models::DC_Selector model(pot);
+    }
+    err = cap.err();
+  }
+  INFO("stderr:\n" << err);
+  CHECK(count_of(err, "WARNING: Deprecated key MBLOCK is ignored") ==
+        (mblock_before ? 0u : 1u));
+  CHECK(count_of(err, std::string("WARNING: Key EMBF0") + kReason) ==
+        (embf0_before ? 0u : 1u));
+  CHECK(tadah::core::ignored_key_reported("MBLOCK"));
+  CHECK(tadah::core::ignored_key_reported("EMBF0"));
 }
