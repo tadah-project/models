@@ -911,3 +911,48 @@ TEST_CASE_METHOD(DensityFixture,
     REQUIRE_NOTHROW(D_Base::require_positive_density_weights(c, "x"));
   }
 }
+
+TEST_CASE_METHOD(DensityFixture,
+                 "DM_REAM: a TYPEMB basis code that does not convert is an "
+                 "error, not basis code 0 (Blip)",
+                 "[ream][rhoform][basis_code]") {
+  // TYPEMB token 1 is the basis code. A token that is not an integer
+  // literal was read as 0 (Blip) by DM_REAM (a failed Context::get<int>)
+  // and by ReamDensity (a failed istringstream), or as its integer prefix
+  // ("2.5" -> 2, the knot family). Files cannot hold such a token (the
+  // TYPE line is checked when it is read); a Context built in code can.
+  auto with_code = [](const std::string &code) {
+    Context c = ream_ctx(layout(BasisKind::Blip, true), "SIGNED", "Cut_Cos");
+    std::vector<std::string> t(c.size("TYPEMB"));
+    c.get("TYPEMB", t);
+    c.remove("TYPEMB");
+    for (std::size_t i = 0; i < t.size(); ++i)
+      if (i != 1 || !code.empty()) c.add("TYPEMB", i == 1 ? code : t[i]);
+    return c;
+  };
+  for (const std::string bad : {"x", "2.5", "0x0", "1e0", "+"}) {
+    INFO("basis code '" << bad << "'");
+    const Context c = with_code(bad);
+    REQUIRE(c.stored_value("TYPEMB", 1).value_or("") == bad);
+    CHECK_THROWS_AS(ReamDensity::from_context(c), DensityFormError);
+    CHECK_THROWS_WITH(ReamDensity::from_context(c),
+                      Contains("DM_REAM density: TYPEMB basis code '" + bad +
+                               "' is not an integer"));
+    CHECK_THROWS_WITH(DM_REAM(c), Contains("DM_REAM: TYPEMB basis code '" +
+                                           bad + "' is not an integer"));
+  }
+  // An absent basis code (a bare "TYPEMB DM_REAM"): the density refuses it;
+  // DM_REAM refuses the whole TYPE line first.
+  Context bare = ream_ctx(layout(BasisKind::Blip, true), "SIGNED", "Cut_Cos");
+  bare.remove("TYPEMB");
+  bare.add("TYPEMB", "DM_REAM");
+  CHECK_THROWS_WITH(ReamDensity::from_context(bare),
+                    Contains("DM_REAM density: TYPEMB has no basis code"));
+  // an unknown integer code is refused as before
+  CHECK_THROWS_WITH(ReamDensity::from_context(with_code("7")),
+                    Contains("DM_REAM density: "));
+  // every known code still loads (Blip written as "0" and "+0")
+  REQUIRE_NOTHROW(ReamDensity::from_context(with_code("0")));
+  CHECK(ReamDensity::from_context(with_code("+0")).basis == BasisKind::Blip);
+  REQUIRE_NOTHROW(DM_REAM(with_code("0")));
+}
