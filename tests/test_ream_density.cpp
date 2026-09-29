@@ -1068,6 +1068,92 @@ TEST_CASE_METHOD(DensityFixture,
 }
 
 TEST_CASE_METHOD(DensityFixture,
+                 "rhoform: the OPTIM low-bound rule of a configuration adds "
+                 "every radial bump width > 0 to the density-form rules",
+                 "[ream][rhoform][optim_rule][bump_width]") {
+  // Owner decision (2026-09-29, C8): a radial bump channel -- SGRID2B of a
+  // D2_Blip/D2_Blip5 pair term, SGRIDMB of a DM_REAM Blip/Blip5 density --
+  // needs every width > 0 in every RHOFORM: a bump spans [c - w/s, c + w/s],
+  // and a width <= 0 has no support edge. The density-form rules
+  // (optim_low_bound_rule(key, form, basis), what ReamDensity::validate
+  // refuses) come first and say which RHOFORM sets them.
+  SECTION("SGRIDMB of a DM_REAM bump density, every form") {
+    for (BasisKind b : {BasisKind::Blip, BasisKind::Blip5}) {
+      for (const char *form : {"SIGNED", "NONNEG", "MONOTONE"}) {
+        INFO(basis_name(b) << " " << form);
+        const Context c = ream_ctx(layout(b, true), form, "Cut_Cos");
+        const auto r = optim_low_bound_rule("SGRIDMB", c);
+        REQUIRE(r);
+        CHECK(r->strict);
+        CHECK_FALSE(r->admits(0.0));
+        CHECK_FALSE(r->admits(-1.0));
+        CHECK_FALSE(r->admits(std::nan("")));
+        CHECK(r->admits(1e-3));
+        CHECK_THAT(r->requirement, Contains("every SGRIDMB width > 0"));
+        if (std::string(form) == "MONOTONE")
+          CHECK(r->by == "RHOFORM MONOTONE");
+        else
+          CHECK(r->by == std::string("the DM_REAM ") + basis_name(b) +
+                             " density basis");
+        CHECK(optim_low_bound_rule("sgridmb", c));
+        CHECK_FALSE(optim_low_bound_rule("CGRIDMB", c));
+      }
+    }
+  }
+  SECTION("the density-form rules come first and name their RHOFORM") {
+    const Context g = ream_ctx(layout(BasisKind::Gaussian, true), "NONNEG",
+                               "Cut_Cos");
+    const auto rg = optim_low_bound_rule("SGRIDMB", g);
+    REQUIRE(rg);
+    CHECK(rg->by == "RHOFORM NONNEG");
+    CHECK_THAT(rg->requirement, Contains("Gaussian"));
+    // a Gaussian density is not a bump channel: no width rule under SIGNED
+    CHECK_FALSE(optim_low_bound_rule(
+        "SGRIDMB",
+        ream_ctx(layout(BasisKind::Gaussian, true), "SIGNED", "Cut_Cos")));
+    const auto ra = optim_low_bound_rule("AMPGRIDMB", g);
+    REQUIRE(ra);
+    CHECK(ra->by == "RHOFORM NONNEG");
+    CHECK_FALSE(ra->strict);
+    // the (key, form, basis) rules carry the same subject
+    const auto rf = optim_low_bound_rule("WATOM", RhoForm::Monotone,
+                                         std::nullopt);
+    REQUIRE(rf);
+    CHECK(rf->by == "RHOFORM MONOTONE");
+  }
+  SECTION("SGRID2B of a D2_Blip or D2_Blip5 pair term") {
+    for (const char *label : {"D2_Blip", "D2_Blip5"}) {
+      INFO(label);
+      Context c;
+      c.add("ATOM", "Ta");
+      c.add("INIT2B", "true");
+      c.add("INITMB", "false");
+      c.add("TYPE2B", std::string(label) + " 3 3 Ta Ta");
+      c.add("CGRID2B", "2.2 3.2 4.2");
+      c.add("SGRID2B", "1.0 1.0 1.0");
+      c.add("RCTYPE2B", "Cut_Cos");
+      c.add("RCUT2B", 5.0);
+      const auto r = optim_low_bound_rule("SGRID2B", c);
+      REQUIRE(r);
+      CHECK(r->strict);
+      CHECK_FALSE(r->admits(0.0));
+      CHECK(r->admits(0.25));
+      CHECK_THAT(r->requirement, Contains("every SGRID2B width > 0"));
+      CHECK(r->by == std::string("the ") + label + " pair basis");
+      CHECK(optim_low_bound_rule("sgrid2b", c));
+      CHECK_FALSE(optim_low_bound_rule("CGRID2B", c));
+      CHECK_FALSE(optim_low_bound_rule("SGRIDMB", c));  // no density
+    }
+  }
+  SECTION("a DM_REAM configuration without RHOFORM: the migration text") {
+    CHECK_THROWS_WITH(
+        optim_low_bound_rule(
+            "SGRIDMB", ream_ctx(layout(BasisKind::Blip5, true), "", "Cut_Cos")),
+        Contains("RHOFORM"));
+  }
+}
+
+TEST_CASE_METHOD(DensityFixture,
                  "WATOM: the model and the density pair weights read one "
                  "number grammar",
                  "[ream][rhoform][watom]") {
