@@ -148,7 +148,8 @@ public:
                     const std::vector<int> &deg = {});
   /** Rebuild WEIGHTS and the per-function stats after injections. Stats are
    *  evaluated on [rwin_lo, rcut] (phi, rho) and [0, rho_win_hi] (F, against
-   *  F_ref). */
+   *  F_ref), the windows of the injected fit, which fit_window_r_lo() and
+   *  fit_window_rho_hi() then return. */
   void finalize_injected(double rwin_lo, double rho_win_hi);
 
   // Native fitted functions (cutoff-weighted; ready for the setfl writer).
@@ -199,6 +200,17 @@ public:
   double r_reach()   const { return r_reach_; }    ///< min relevant pair distance
   double rho_reach() const { return rho_reach_; }  ///< max relevant density
   bool lattice_known() const { return lattice_known_; }
+
+  /** The windows the fit used: phi and rho were fitted on
+   *  [fit_window_r_lo(), rcut()], F on [0, fit_window_rho_hi()]. fit():
+   *  the radial window of its two-stage solve, min(max(r_lo, r_K),
+   *  0.8 r_reach) under placement "window" (r_K the largest r of a wall
+   *  above 30x the reachable scale), r_lo under "uniform", and never below
+   *  r_lo, where its samples and its grid start; the embedding window
+   *  rho_reach (window) or rhomax (uniform). finalize_injected(): its two
+   *  arguments, the windows of the injected fit. 0 before either. */
+  double fit_window_r_lo() const { return fit_r_lo_; }
+  double fit_window_rho_hi() const { return fit_rho_hi_; }  ///< see fit_window_r_lo()
 
 private:
   /** Evaluate one basis function. `emb` selects the embedding-channel
@@ -267,6 +279,7 @@ private:
   double rcut_, r_lo_, rhomax_;
   double rho_join_ = 0.0;  ///< F tabulation join (ctor sets rhomax)
   double r_reach_ = 0.0, rho_reach_ = 0.0;
+  double fit_r_lo_ = 0.0, fit_rho_hi_ = 0.0;  ///< the windows the fit used
   bool lattice_known_ = false;
   double F0tab_ = 0.0;     ///< EMBF0 ZERO: eam.F_tab(0) (ctor; unused under FREE)
 
