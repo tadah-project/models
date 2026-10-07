@@ -18,9 +18,11 @@
 #include <tadah/core/key_notice.h>
 #include <tadah/core/periodic_table.h>
 #include <tadah/models/cutoffs.h>
+#include <tadah/models/descriptors/d2/d2_bp.h>
 #include <tadah/models/descriptors/d2/d2_eam.h>
 #include <tadah/models/descriptors/d2/d2_mjoin.h>
 #include <tadah/models/descriptors/dm/dm_eam.h>
+#include <tadah/models/descriptors/dm/dm_mjoin.h>
 #include <tadah/models/eam/eam_setfl_io.h>
 
 #include <cstdio>
@@ -34,6 +36,7 @@ using tadah::models::Cut_Dummy;
 using tadah::models::D2_EAM;
 using tadah::models::D2_mJoin;
 using tadah::models::DM_EAM;
+using tadah::models::DM_mJoin;
 using tadah::models::EAMSetflIO;
 
 namespace {
@@ -370,6 +373,88 @@ TEST_CASE("DM_EAM refuses an RCUTMB other than its setfl file's cutoff",
   REQUIRE_NOTHROW(dm = std::make_unique<DM_EAM>(ok));
   CHECK(dm->get_rcut() == kSetflRcut);
   CHECK(ok.get<double>("RCUTMB") == kSetflRcut);
+}
+
+/* Pins: D_Base::cutoff_fixed_by(i) names what fixes value i of a
+ * descriptor's cutoff key, so that tadah hpo can refuse a search over it
+ * at startup: a D2_EAM and a DM_EAM built from tests_data/eam.alloy answer
+ *   D2_EAM takes the cutoff 5.58190742024 of its setfl file
+ *   'tests_data/eam.alloy' (SETFL)
+ * (DM_EAM the same with its name) for value 1; a D2_EAM built with INIT2B
+ * false, which reads no file, and a D2_BP answer "" (a free cutoff); a
+ * D2_mJoin of D2_BP and D2_EAM answers "" for RCUT2B value 1 (D2_BP's),
+ * D2_EAM's text for value 2 and "" for value 3, which no joined descriptor
+ * takes; a DM_mJoin of DM_Blip and DM_EAM answers likewise for RCUTMB.
+ * Before the fix: D_Base has no cutoff_fixed_by (does not compile); tadah
+ * hpo accepted OPTIM RCUT2B with D2_EAM, and every candidate other than
+ * the seed failed in the D2_EAM constructor (FAILSCORE). */
+TEST_CASE("D2_EAM and DM_EAM name the setfl file that fixes their cutoff",
+          "[D2][DM][eam][cutoff]") {
+  tadah::core::PeriodicTable::initialize();
+  const std::string d2_text =
+      "D2_EAM takes the cutoff 5.58190742024 of its setfl file "
+      "'tests_data/eam.alloy' (SETFL)";
+  const std::string dm_text =
+      "DM_EAM takes the cutoff 5.58190742024 of its setfl file "
+      "'tests_data/eam.alloy' (SETFL)";
+
+  Context c2 = d2_context("0");
+  c2.add("RCTYPE2B", "Cut_Cos");
+  CHECK(D2_EAM(c2).cutoff_fixed_by(0) == d2_text);
+  Context cm = dm_context("0");
+  cm.add("RCTYPEMB", "Cut_Cos");
+  CHECK(DM_EAM(cm).cutoff_fixed_by(0) == dm_text);
+
+  Context off = d2_context("0");
+  off.remove("INIT2B");
+  off.add("INIT2B", "false");
+  CHECK(D2_EAM(off).cutoff_fixed_by(0).empty());
+
+  Context bp;
+  bp.add("ATOM", "Ta");
+  bp.remove("INIT2B");
+  bp.add("INIT2B", "true");
+  bp.add("VERBOSE", 0);
+  bp.add("TYPE2B", "D2_BP 2 2 Ta Ta");
+  bp.add("CGRID2B", "2.6 3.3");
+  bp.add("SGRID2B", "1.0 1.0");
+  bp.add("RCUT2B", 4.5);
+  bp.add("RCTYPE2B", "Cut_Cos");
+  CHECK(tadah::models::D2_BP(bp).cutoff_fixed_by(0).empty());
+
+  Context j2;
+  j2.add("ATOM", "Ta");
+  j2.remove("INIT2B");
+  j2.add("INIT2B", "true");
+  j2.add("VERBOSE", 0);
+  j2.add("TYPE2B", "D2_mJoin D2_BP 2 2 Ta Ta D2_EAM 0 Ta Ta");
+  j2.add("CGRID2B", "2.6 3.3");
+  j2.add("SGRID2B", "1.0 1.0");
+  j2.add("RCTYPE2B", "Cut_Cos Cut_Cos");
+  j2.add("RCUT2B", 4.5);
+  j2.add("RCUT2B", kSetflRcut);
+  j2.add("SETFL", kSetfl);
+  D2_mJoin d2j(j2);
+  CHECK(d2j.cutoff_fixed_by(0).empty());
+  CHECK(d2j.cutoff_fixed_by(1) == d2_text);
+  CHECK(d2j.cutoff_fixed_by(2).empty());
+
+  Context jm;
+  jm.add("ATOM", "Ta");
+  jm.remove("INITMB");
+  jm.add("INITMB", "true");
+  jm.add("VERBOSE", 0);
+  jm.add("TYPEMB", "DM_mJoin DM_Blip 0 1 1 Ta Ta DM_EAM 0 Ta Ta");
+  jm.add("CGRIDMB", "1.0");
+  jm.add("SGRIDMB", "0.8");
+  jm.add("RCTYPEMB", "Cut_Cos Cut_Cos");
+  jm.add("RCUTMB", 5.0);
+  jm.add("RCUTMB", kSetflRcut);
+  jm.add("SETFL", kSetfl);
+  DM_mJoin dmj(jm);
+  CHECK(dmj.cutoff_fixed_by(0).empty());
+  CHECK(dmj.cutoff_fixed_by(1) == dm_text);
+  CHECK(dmj.cutoff_fixed_by(2).empty());
 }
 
 namespace {
