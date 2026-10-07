@@ -1,3 +1,5 @@
+#ifndef DM_POLY_HPP
+#define DM_POLY_HPP
 #include <tadah/models/descriptors/dm/dm_func.h>
 #include <tadah/models/descriptors/dm/dm_poly.h>
 #include <tadah/models/descriptors/dm/dm_impl_utils.h>
@@ -570,3 +572,5 @@ DM_Poly<ChannelFn, RadialBasis, AggMode>::meta() const {
 
 } // namespace models
 } // namespace tadah
+
+#endif

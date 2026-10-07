@@ -1,3 +1,5 @@
+#ifndef DM_mEAD_HPP
+#define DM_mEAD_HPP
 #include <tadah/models/descriptors/dm/dm_func.h>
 #include <tadah/models/descriptors/dm/dm_mEAD.h>
 #include <tadah/models/descriptors/dm/dm_impl_utils.h>
@@ -1259,3 +1261,5 @@ std::optional<DescriptorMeta> DM_mEAD<F>::meta() const {
 
 } // namespace models
 } // namespace tadah
+
+#endif
