@@ -56,6 +56,11 @@ std::string Kern_Polynomial::get_label() const
     return label;
 }
 
+size_t Kern_Polynomial::intercept_columns(const tadah::core::Context &c) const
+{
+  return dot_product_intercept_columns(c);
+}
+
 } // namespace models
 } // namespace tadah
 

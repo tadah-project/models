@@ -1,4 +1,5 @@
 #include <tadah/models/functions/basis_functions/bf_linear.h>
+#include <tadah/core/intercept_layout.h>
 namespace tadah {
 namespace models {
 
@@ -23,6 +24,11 @@ tadah::core::force_type BF_Linear::fpredict(const tadah::core::t_type &weights, 
         const tadah::core::aed_type& ) const
 {
     return -1*(fdij * weights);
+}
+
+size_t BF_Linear::intercept_columns(const tadah::core::Context &c) const
+{
+  return tadah::core::n_intercept_columns(c);
 }
 
 } // namespace models

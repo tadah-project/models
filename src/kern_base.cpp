@@ -1,4 +1,9 @@
 #include <tadah/models/functions/kernels/kern_base.h>
+#include <tadah/core/intercept_layout.h>
+
+#include <stdexcept>
+#include <string>
+#include <vector>
 namespace tadah {
 namespace models {
 
@@ -41,9 +46,23 @@ tadah::core::force_type Kern_Base::fpredict(const tadah::core::t_type &kweights,
 }
 void Kern_Base::read_basis_from_context(const tadah::core::Context &context, tadah::core::Matrix &basis) {
   // storage is in column-major order
-  if (!(context.contains("SBASIS") && context.contains("BASIS"))) return;
-  size_t sbasis = context.get<size_t>("SBASIS");
-  size_t vlen = context("BASIS").size()/sbasis;
+  if (!context.contains("BASIS")) return;
+  if (!context.contains("SBASIS"))
+    throw std::runtime_error(
+        "BASIS without SBASIS: SBASIS names the number of basis vectors "
+        "stored in BASIS.");
+  const size_t sbasis = context.get<size_t>("SBASIS");
+  const size_t nvalues = context.size("BASIS");
+  if (sbasis == 0)
+    throw std::runtime_error(
+        "SBASIS 0 with " + std::to_string(nvalues) + " BASIS values: "
+        "SBASIS must be the number of basis vectors stored in BASIS.");
+  if (nvalues == 0 || nvalues % sbasis != 0)
+    throw std::runtime_error(
+        "BASIS has " + std::to_string(nvalues) + " values, which is not a "
+        "multiple of SBASIS " + std::to_string(sbasis) + ": BASIS stores "
+        "SBASIS basis vectors of the descriptor's length, one after another.");
+  size_t vlen = nvalues/sbasis;
   std::vector<double> temp(sbasis*vlen);
   context.get<std::vector<double>>("BASIS",temp);
   basis.resize(vlen,sbasis);  // aeds are in column-major order
@@ -53,6 +72,12 @@ void Kern_Base::read_basis_from_context(const tadah::core::Context &context, tad
       basis(j,i) = temp[ii++];
     }
   }
+}
+size_t Kern_Base::dot_product_intercept_columns(const tadah::core::Context &c) const {
+  if (tadah::core::n_intercept_columns(c) == 0 || basis.cols() == 0) return 0;
+  for (size_t j=1; j<basis.rows(); ++j)
+    if (basis(j,0) != 0.0) return 0;
+  return 1;
 }
 const tadah::core::Matrix &Kern_Base::get_basis() const {
   return basis;
