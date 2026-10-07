@@ -133,8 +133,17 @@ for (int i = m; i < maxmn; ++i) {
     tadah::core::dgelsd_(&m, &n, &nrhs, a, &lda, b, &ldb, ws->s, &rcond, &rank,
                   ws->work, &ws->lwork, ws->iwork, &info);
 
-        if (info != 0) {
-            throw std::runtime_error("Error in DGELSD: info = " + std::to_string(info));
+        if (info > 0) {
+            throw std::runtime_error(
+                "DGELSD: the singular value decomposition of the design "
+                "matrix (" + std::to_string(m) + " rows, " + std::to_string(n) +
+                " columns) did not converge (info = " + std::to_string(info) +
+                ": that many off-diagonal elements of an intermediate "
+                "bidiagonal form did not converge to zero)");
+        }
+        if (info < 0) {
+            throw std::logic_error("DGELSD: argument " + std::to_string(-info) +
+                                   " had an illegal value (info = " + std::to_string(info) + "; with a finite design matrix, an internal error)");
         }
 
         // Copy solution to weights
@@ -157,8 +166,19 @@ for (int i = m; i < maxmn; ++i) {
         // Solve using DGELS
     tadah::core::dgels_(&trans, &m, &n, &nrhs, a, &lda, b, &ldb, ws->work, &ws->lwork, &info);
 
-        if (info != 0) {
-            throw std::runtime_error("Error in DGELS: info = " + std::to_string(info));
+        if (info > 0) {
+            throw RankDeficientError(
+                "DGELS: the design matrix (" + std::to_string(m) + " rows, " +
+                std::to_string(n) + " columns) does not have full column "
+                "rank: the diagonal element " + std::to_string(info) +
+                " of the triangular factor R of its QR factorisation is zero, "
+                "so its column " + std::to_string(info) + " is zero or a "
+                "linear combination of the columns before it",
+                info);
+        }
+        if (info < 0) {
+            throw std::logic_error("DGELS: argument " + std::to_string(-info) +
+                                   " had an illegal value (info = " + std::to_string(info) + "; with a finite design matrix, an internal error)");
         }
 
         // Copy solution to weights
@@ -180,8 +200,16 @@ for (int i = m; i < maxmn; ++i) {
     tadah::core::dgesdd_(&jobz, &m, &n, A.ptr(), &lda, ws->S, ws->U, &ldu,
               ws->VT, &ldvt, ws->work, &ws->lwork, ws->iwork, &info);
 
-        if (info != 0) {
-            throw std::runtime_error("Error in DGESVD: info = " + std::to_string(info));
+        if (info > 0) {
+            throw std::runtime_error(
+                "DGESDD: the singular value decomposition of the design "
+                "matrix (" + std::to_string(m) + " rows, " + std::to_string(n) +
+                " columns) did not converge (info = " + std::to_string(info) +
+                ")");
+        }
+        if (info < 0) {
+            throw std::logic_error("DGESDD: argument " + std::to_string(-info) +
+                                   " had an illegal value (info = " + std::to_string(info) + "; with a finite design matrix, an internal error)");
         }
 
         // Compute U^T B
@@ -228,15 +256,27 @@ for (int i = m; i < maxmn; ++i) {
 
         // Perform Cholesky factorization of A^T A
     tadah::core::dpotrf_(&uplo, &n, ws->AtA, &ldc, &info);
-        if (info != 0) {
-            throw std::runtime_error("Error in DPOTRF: tadah::core::Matrix is not positive definite; info = " + std::to_string(info));
+        if (info > 0) {
+            throw RankDeficientError(
+                "DPOTRF: the matrix A^T A of the design matrix A (" +
+                std::to_string(m) + " rows, " + std::to_string(n) +
+                " columns) is not positive definite: its leading minor of "
+                "order " + std::to_string(info) + " is not, so A does not "
+                "have full column rank or is too ill-conditioned for the "
+                "normal equations",
+                info);
+        }
+        if (info < 0) {
+            throw std::logic_error("DPOTRF: argument " + std::to_string(-info) +
+                                   " had an illegal value (info = " + std::to_string(info) + "; with a finite design matrix, an internal error)");
         }
 
         // Solve A^T A x = A^T B
         int nrhs = 1;
     tadah::core::dpotrs_(&uplo, &n, &nrhs, ws->AtA, &ldc, ws->Atb, &n, &info);
         if (info != 0) {
-            throw std::runtime_error("Error in DPOTRS: info = " + std::to_string(info));
+            throw std::logic_error("DPOTRS: argument " + std::to_string(-info) +
+                                   " had an illegal value (info = " + std::to_string(info) + "; with a finite design matrix, an internal error)");
         }
 
         // Copy solution to weights

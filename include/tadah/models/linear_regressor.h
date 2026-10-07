@@ -2,11 +2,15 @@
 #define LINEAR_REGRESSOR_H
 
 #include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <limits>
+#include <string>
 #include <tadah/core/context.h>
 #include <tadah/core/core_types.h>
 #include <tadah/core/intercept_layout.h>
 #include <tadah/core/lapack.h>
+#include <tadah/core/number_format.h>
 #include <tadah/models/ea.h>
 #include <tadah/models/factor_handle.h>
 #include <tadah/models/ols.h>
@@ -26,6 +30,87 @@ namespace models {
  * regression.
  */
 class LinearRegressor {
+
+  /* A design matrix laid out as DesignMatrix lays it out: its data rows,
+   * then one ridge row per column (zero with LAMBDA 0). */
+  static size_t data_rows(const tadah::core::phi_type &Phi) {
+    return Phi.rows() >= Phi.cols() ? Phi.rows() - Phi.cols() : Phi.rows();
+  }
+
+  /* True for a value that is not NaN or +-inf; a test on the bits, which
+   * -ffast-math does not optimise away. */
+  static bool finite_bits(double v) {
+    std::uint64_t u = 0;
+    std::memcpy(&u, &v, sizeof u);
+    return (u & UINT64_C(0x7ff0000000000000)) != UINT64_C(0x7ff0000000000000);
+  }
+
+  /* Refuses a design matrix or target with a value that is not finite,
+   * naming its row and column, before LAPACK is called: on NaN or inf
+   * LAPACK stops with an argument or convergence error (DGELSD info -4,
+   * DGELS -5, DGESDD 3), DPOTRF calls the matrix not positive definite, and
+   * an infinite target is fitted without an error. */
+  static void require_finite(const tadah::core::phi_type &Phi,
+                             const tadah::core::t_type &T) {
+    const size_t data = data_rows(Phi);
+    const std::string layout =
+        std::to_string(data) + " data rows, then " +
+        std::to_string(Phi.rows() - data) + " ridge rows";
+    for (size_t j = 0; j < Phi.cols(); ++j)
+      for (size_t i = 0; i < Phi.rows(); ++i)
+        if (!finite_bits(Phi(i, j)))
+          throw std::runtime_error(
+              "LinearRegressor::train: the design matrix holds a value that "
+              "is not finite (nan or inf) at row " + std::to_string(i + 1) +
+              ", column " + std::to_string(j + 1) + " (of " + layout +
+              ", and " + std::to_string(Phi.cols()) +
+              " columns): a descriptor or basis function gave it; no weights "
+              "were fitted");
+    for (size_t i = 0; i < T.size() && i < Phi.rows(); ++i)
+      if (!finite_bits(T[i]))
+        throw std::runtime_error(
+            "LinearRegressor::train: the target vector holds a value that is "
+            "not finite (nan or inf) at row " + std::to_string(i + 1) +
+            " (of " + layout + "); no weights were fitted");
+  }
+
+  /* The message of a fit OALGO 2 or 4 cannot make: what `e` found, the
+   * fit's data rows, weights and LAMBDA, and the remedies. */
+  [[noreturn]] static void throw_rank_deficient(int oalgo,
+                                                const RankDeficientError &e,
+                                                const tadah::core::phi_type &Phi,
+                                                double lambda) {
+    const size_t n = Phi.cols();
+    const size_t data = data_rows(Phi);
+    const std::string fit = std::to_string(data) + " data rows for " +
+                            std::to_string(n) + " weights, LAMBDA " +
+                            tadah::core::format_roundtrip(lambda);
+    std::string msg;
+    if (oalgo == 2) {
+      msg = "OALGO 2 (DGELS, QR) cannot fit these " + std::to_string(n) +
+            " weights: the design matrix (" + fit +
+            ") does not have full column rank: its column " +
+            std::to_string(e.column()) +
+            " is zero or a linear combination of the columns before it" +
+            (data < n ? " (fewer data rows than weights)" : "") +
+            ", so the least-squares weights are not unique.";
+    } else {
+      msg = "OALGO 4 (normal equations, Cholesky) cannot fit these " +
+            std::to_string(n) +
+            " weights: the matrix Phi^T Phi of the design matrix (" + fit +
+            ") is not positive definite (its leading minor of order " +
+            std::to_string(e.column()) +
+            " is not), so the design matrix does not have full column rank "
+            "or is too ill-conditioned for the normal equations.";
+    }
+    throw std::runtime_error(
+        msg +
+        " Use OALGO 1 (DGELSD) or OALGO 3 (SVD), which give the minimum-norm "
+        "weights, LAMBDA > 0 (a ridge penalty makes every column it "
+        "penalises full rank; it does not penalise the intercept columns of "
+        "BIAS), or more data (structures, FORCE or STRESS rows).");
+  }
+
 
   /**
    * @brief Train the model using the provided configuration and data matrices.
@@ -81,10 +166,15 @@ public:
 
     tadah::models::OLS ols(workspaceManager);
     // tadah::models::OLS ols;
+    require_finite(Phi, T);
     if (oalgo == 1) {
       ols.solve(Phi, T, weights, rcond, tadah::models::Algorithm::GELSD);
     } else if (oalgo == 2) {
-      ols.solve(Phi, T, weights, rcond, tadah::models::Algorithm::GELS);
+      try {
+        ols.solve(Phi, T, weights, rcond, tadah::models::Algorithm::GELS);
+      } catch (const RankDeficientError &e) {
+        throw_rank_deficient(2, e, Phi, lambda);
+      }
     } else if (oalgo == 3) {
       // SVD path applies a uniform ridge across all singular values; there is
       // no per-column knob, so intercept-aware regularisation is not
@@ -121,8 +211,12 @@ public:
       ols.solveWithPseudoinverse(Phi.rows(), Phi.cols(), T, weights,
                                  svd.getSVDWorkspace(), rcond, lambda);
     } else if (oalgo == 4) {
-      ols.solve(Phi, T, weights, rcond,
-                tadah::models::Algorithm::NormalEquations);
+      try {
+        ols.solve(Phi, T, weights, rcond,
+                  tadah::models::Algorithm::NormalEquations);
+      } catch (const RankDeficientError &e) {
+        throw_rank_deficient(4, e, Phi, lambda);
+      }
     } else {
       throw std::runtime_error("Unsupported OALGO: " + std::to_string(oalgo));
     }
@@ -224,6 +318,7 @@ public:
       }
     }
 
+    require_finite(Phi, T);
     tadah::models::OLS ols(workspaceManager);
     ols.solveAndCacheFactor(Phi, T, weights, factor, n_bias);
   }
