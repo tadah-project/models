@@ -27,8 +27,10 @@ namespace models {
  * although this is not required and user can mix it with any other descriptors
  * or use it on its own.
  *
- * This descriptor will enforce cutoff distance as specified in a \ref SETFL file.
- * Set \ref RCUTMB to the same value to suppress the warning message.
+ * \ref RCUTMB must be the cutoff of the setfl file (in a DM_mJoin, this
+ * descriptor's own RCUTMB value): the file defines its functions up to that
+ * cutoff. Another value is refused, naming both (require_setfl_cutoff();
+ * see \ref D2_EAM).
  *
  * The setfl parsing, cubic splines and extrapolation are provided by the shared
  * \ref EAMSetflIO class (also used by \ref D2_EAM and the `tadah refit` machinery).

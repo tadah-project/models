@@ -36,8 +36,12 @@ namespace models {
  *     RCUTMB   5.58190742024
  *     SETFL    Ta.eam.alloy
  *
- * This descriptor will enforce cutoff distance as specified in a \ref SETFL file.
- * Set \ref RCUT2B to the same value to suppress the warning message.
+ * \ref RCUT2B must be the cutoff of the setfl file (in a D2_mJoin, this
+ * descriptor's own RCUT2B value): the file defines its functions up to that
+ * cutoff. Another value is refused, naming both, e.g.
+ * `D2_EAM: RCUT2B 3 differs from the cutoff 5.58190742024 of the setfl file
+ * 'Ta.eam.alloy' (SETFL); set RCUT2B to the file's cutoff, 5.58190742024.`
+ * (require_setfl_cutoff()).
  *
  * The setfl parsing, cubic splines and extrapolation are provided by the shared
  * \ref EAMSetflIO class (also used by \ref DM_EAM and the `tadah refit` machinery).
