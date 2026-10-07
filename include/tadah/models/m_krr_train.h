@@ -11,9 +11,31 @@
 #include <tadah/models/memory/imodels_workspace_manager.h>
 
 #include <iostream>
+#include <stdexcept>
+#include <string>
 
 namespace tadah {
 namespace models {
+
+/**
+ * @brief Refuses FIXINDEX and FIXWEIGHT for M_KRR implementation 2 (MODEL
+ * M_KRR <kernel> 2, M_KRR_Train::train2).
+ *
+ * Its solve, (K + LAMBDA I) w = t on the basis vectors, fits every weight
+ * at once and pins none, so the keys would be ignored. A no-op without
+ * either key; with either, whatever its values, throws std::runtime_error
+ * naming @p kernel and implementation 1, which pins them.
+ */
+inline void refuse_fixed_weights_in_train2(const tadah::core::Context &ctx,
+                                           const std::string &kernel) {
+  if (!ctx.has_stored("FIXINDEX") && !ctx.has_stored("FIXWEIGHT")) return;
+  throw std::runtime_error(
+      "MODEL M_KRR " + kernel + " 2 cannot pin weights: implementation 2 "
+      "solves (K + LAMBDA I) w = t for the weights of all its basis vectors "
+      "at once, so FIXINDEX and FIXWEIGHT would be ignored. Use "
+      "implementation 1 (MODEL M_KRR " + kernel + " 1), which pins them, or "
+      "remove FIXINDEX and FIXWEIGHT.");
+}
 
 /**
  * @class M_KRR_Train
@@ -84,39 +106,17 @@ public:
     // one in the context is of an earlier fit or of a potential.
     context.remove("SIGMA");
 
-    const bool has_fixweight = context.contains("FIXWEIGHT");
-    const bool has_fixindex = context.contains("FIXINDEX");
-    if (has_fixweight != has_fixindex) {
-      throw std::runtime_error(
-          "FIXINDEX requires FIXWEIGHT (and vice versa). Provide both keys "
-          "with matching lengths; the i-th FIXWEIGHT value pins the weight "
-          "named by the i-th FIXINDEX entry. There is no auto-seeding from "
-          "WEIGHTS.");
-    }
+    // The weights FIXWEIGHT pins (core::parse_fixindex: 1-based, in
+    // declaration order, checked against the Phi.cols() weights and the
+    // FIXWEIGHT values; a lone key is refused); none without the keys.
+    std::vector<size_t> indices =
+        tadah::core::parse_fixindex(context, Phi.cols());
 
-    if (has_fixweight && has_fixindex) {
-      std::vector<std::string> indices_str(context.size("FIXINDEX"));
-      context.get("FIXINDEX", indices_str);
-
-      // Parse indices and perform checks
-      std::vector<size_t> indices = tadah::core::parse_indices(indices_str);
-
-      // Check that the min index is >= 1 and max index is <= Phi.cols()
-      if (!indices.empty()) {
-        size_t max_index = *std::max_element(indices.begin(), indices.end());
-        if (*std::min_element(indices.begin(), indices.end()) < 1 || max_index > Phi.cols()) {
-          throw std::runtime_error("FIXINDEX: Indices out of bounds: valid range is from 1 to " + std::to_string(Phi.cols()));
-        }
-      }
-
+    if (!indices.empty()) {
       // Adjust for 0-based indexing
       for (auto &i : indices) i--;
 
-      tadah::core::t_type w_f(context.size("FIXWEIGHT"));
-      if (w_f.size() != indices.size()) {
-        throw std::runtime_error("FIXWEIGHT and FIXINDEX differ in size: " + std::to_string(w_f.size()) + " and " + std::to_string(indices.size()));
-      }
-
+      tadah::core::t_type w_f(indices.size());
       context.get("FIXWEIGHT", w_f);
 
       // DesignMatrix's layout of the full matrix: its data rows, then one
@@ -182,13 +182,17 @@ public:
      * @brief Standard KRR training using covariance matrix computation.
      *
      * Trains the model on energies using the covariance matrix K. It
-     * writes no SIGMA, and removes one the context held.
+     * writes no SIGMA, and removes one the context held. It pins no
+     * weight: a context with FIXINDEX or FIXWEIGHT is refused
+     * (refuse_fixed_weights_in_train2).
      *
      * @param B Basis matrix.
      * @param T Target vector.
-     * @throws std::runtime_error if lambda is negative for evidence approximation.
+     * @throws std::runtime_error if lambda is negative for evidence
+     *         approximation, or with FIXINDEX or FIXWEIGHT.
      */
     void train2(tadah::core::Matrix &B, tadah::core::t_type &T) {
+        refuse_fixed_weights_in_train2(context, kernel.get_label());
         // This solve computes no covariance: a SIGMA in the context is of
         // an earlier fit or of a potential, not of these weights.
         context.remove("SIGMA");

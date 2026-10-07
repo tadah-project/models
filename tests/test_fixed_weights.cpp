@@ -11,12 +11,14 @@
 #include <tadah/models/m_krr_train.h>
 #include <tadah/models/functions/basis_functions/bf_linear.h>
 #include <tadah/models/functions/kernels/kern_linear.h>
+#include <tadah/models/functions/kernels/kern_rbf.h>
 #include <tadah/models/ols.h>
 #include <tadah/core/context.h>
 #include <tadah/core/core_types.h>
 
 #include <algorithm>
 #include <cmath>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -212,17 +214,183 @@ TEST_CASE("BLR lone FIXINDEX/FIXWEIGHT throws", "[fixed_weights]") {
   }
 }
 
+/* Pins: FIXINDEX 7 on the 8 x 4 design matrix is refused by M_BLR_Train
+ * and M_KRR_Train with the message of core::parse_fixindex, "FIXINDEX:
+ * index 7 is outside 1-4 (the model has 4 weights)".
+ * Before the fix: both said "FIXINDEX: Indices out of bounds: valid range
+ * is from 1 to 4" (this case, then for M_BLR_Train alone, checked "out of
+ * bounds"), so the expectation fails; the new text is the one every site
+ * gives. */
 TEST_CASE("BLR FIXINDEX out of bounds throws", "[fixed_weights]") {
-  Context c = make_ctx();
-  c.add("FIXINDEX", "7");
-  c.add("FIXWEIGHT", "0.7");
-
+  const std::string bound =
+      "FIXINDEX: index 7 is outside 1-4 (the model has 4 weights)";
   phi_type Phi = make_phi();
   t_type T = make_target(Phi);
+  SECTION("M_BLR_Train") {
+    Context c = make_ctx();
+    c.add("FIXINDEX", "7");
+    c.add("FIXWEIGHT", "0.7");
+    BF_Linear bf;
+    M_BLR_Train<BF_Linear> m(bf, c);
+    REQUIRE_THROWS_WITH(m.train(Phi, T), bound);
+  }
+  SECTION("M_KRR_Train") {
+    Context c = make_ctx();
+    c.add("FIXINDEX", "7");
+    c.add("FIXWEIGHT", "0.7");
+    Kern_Linear kern;
+    M_KRR_Train<Kern_Linear> m(kern, c);
+    REQUIRE_THROWS_WITH(m.train(Phi, T), bound);
+  }
+}
 
+namespace {
+
+/* The weights M_BLR_Train<BF_Linear> (krr false) or
+ * M_KRR_Train<Kern_Linear> (krr true) fit on the 8 x 4 design matrix with
+ * FIXINDEX `fixindex` (split on whitespace into its values, as a
+ * configuration line gives them) and the FIXWEIGHT values `fixweight`. */
+t_type fit_with_fixindex(bool krr, const std::string &fixindex,
+                         const std::vector<double> &fixweight) {
+  Context c = make_ctx();
+  c.add("FIXINDEX", fixindex);
+  for (double v : fixweight) c.add("FIXWEIGHT", v);
+  phi_type Phi = make_phi();
+  t_type T = make_target(Phi);
+  if (krr) {
+    Kern_Linear kern;
+    M_KRR_Train<Kern_Linear> m(kern, c);
+    m.train(Phi, T);
+    return m.get_weights();
+  }
   BF_Linear bf;
   M_BLR_Train<BF_Linear> m(bf, c);
-  REQUIRE_THROWS_WITH(m.train(Phi, T), Catch::Contains("out of bounds"));
+  m.train(Phi, T);
+  return m.get_weights();
+}
+
+std::string refusal_with_fixindex(bool krr, const std::string &fixindex,
+                                  const std::vector<double> &fixweight) {
+  try {
+    (void)fit_with_fixindex(krr, fixindex, fixweight);
+  } catch (const std::runtime_error &e) {
+    return e.what();
+  }
+  return "<no exception>";
+}
+
+}  // namespace
+
+/* Pins: FIXINDEX given as separate values ('FIXINDEX 4 1', the values '4'
+ * and '1', and 'FIXINDEX 4, 1', the values '4,' and '1') pins what the
+ * comma list 'FIXINDEX 4,1' pins, for M_BLR_Train and M_KRR_Train: the
+ * same four weights, bit for bit, weight 4 = 0.3 and weight 1 = -1.1.
+ * Before the fix: the trainers read FIXINDEX with the lenient
+ * core::parse_indices, which joined the values into '4 1', dropped it as
+ * one malformed segment ("Error: Non-numeric value or incorrect syntax
+ * found: 4 1" on stderr) and threw "FIXWEIGHT and FIXINDEX differ in size:
+ * 2 and 0" ('4, 1' was read, its joined text '4, 1' being a comma list). */
+TEST_CASE("BLR and KRR FIXINDEX given as separate values pins what the "
+          "comma list pins",
+          "[fixed_weights][fixindex]") {
+  for (int krr = 0; krr < 2; ++krr) DYNAMIC_SECTION(
+      (krr ? "M_KRR_Train<Kern_Linear>" : "M_BLR_Train<BF_Linear>")) {
+    const t_type ref = fit_with_fixindex(krr, "4,1", {0.3, -1.1});
+    REQUIRE(ref.size() == 4);
+    CHECK(ref[3] == 0.3);
+    CHECK(ref[0] == -1.1);
+    for (const char *fi : {"4 1", "4, 1"}) {
+      INFO("FIXINDEX " << fi);
+      t_type w;
+      REQUIRE_NOTHROW(w = fit_with_fixindex(krr, fi, {0.3, -1.1}));
+      REQUIRE(w.size() == 4);
+      for (size_t j = 0; j < 4; ++j) CHECK(w[j] == ref[j]);
+    }
+  }
+}
+
+/* Pins: M_BLR_Train and M_KRR_Train refuse a FIXINDEX that names a weight
+ * twice or holds a descending range, with core::parse_fixindex's message:
+ *  - '2,2' with FIXWEIGHT 0.7 0.7, and with FIXWEIGHT 0.7 (one value for
+ *    the one weight, FIXWEIGHT pairing by position): "FIXINDEX 2,2 names
+ *    weight 2 twice";
+ *  - '3-2' with FIXWEIGHT 0.1 0.2: "FIXINDEX: index '3-2' is a descending
+ *    range".
+ * Before the fix: '2,2' was deduplicated to weight 2 with a stderr warning,
+ * so with one FIXWEIGHT value the fit ran (weight 2 = 0.7) and with two it
+ * threw "FIXWEIGHT and FIXINDEX differ in size: 2 and 1"; '3-2' expanded to
+ * nothing ("differ in size: 2 and 0"). After core::parse_fixindex first
+ * read FIXINDEX, '2,2' with one value was refused as "FIXINDEX 2,2 has 2
+ * indices but FIXWEIGHT has 1 value" (this case pinned that): it compared
+ * the count before it looked for a repeat. */
+TEST_CASE("BLR and KRR FIXINDEX naming a weight twice or a descending range "
+          "is refused",
+          "[fixed_weights][fixindex]") {
+  for (int krr = 0; krr < 2; ++krr) DYNAMIC_SECTION(
+      (krr ? "M_KRR_Train<Kern_Linear>" : "M_BLR_Train<BF_Linear>")) {
+    CHECK_THAT(refusal_with_fixindex(krr, "2,2", {0.7, 0.7}),
+               Catch::Contains("FIXINDEX 2,2 names weight 2 twice"));
+    CHECK_THAT(refusal_with_fixindex(krr, "2,2", {0.7}),
+               Catch::Contains("FIXINDEX 2,2 names weight 2 twice"));
+    CHECK_THAT(refusal_with_fixindex(krr, "3-2", {0.1, 0.2}),
+               Catch::Contains("FIXINDEX: index '3-2' is a descending range"));
+  }
+}
+
+/* Pins: M_KRR_Train::train2, the solve of MODEL M_KRR <kernel> 2 ((K +
+ * LAMBDA I) w = t on the basis vectors, every weight at once), refuses a
+ * context with FIXINDEX or FIXWEIGHT, for Kern_Linear and Kern_RBF
+ * (MPARAMS 1.0), on four basis vectors: "MODEL M_KRR Kern_Linear 2 cannot
+ * pin weights: ..." naming implementation 1, for FIXINDEX 1 / FIXWEIGHT 14,
+ * FIXINDEX 2-1 with two values and a lone FIXINDEX 1 alike (the solve pins
+ * nothing, whatever the keys say); without them it fits its 4 weights.
+ * Before the fix: train2 read neither key: it fitted every weight with
+ * the pins ignored (weight 1 was not 14), and '2-1' and a lone FIXINDEX
+ * passed too (tadah train exited 0 and copied FIXINDEX and FIXWEIGHT into
+ * the potential). */
+TEST_CASE("M_KRR implementation 2 (train2) refuses FIXINDEX and FIXWEIGHT",
+          "[fixed_weights][fixindex][krr]") {
+  for (const char *kern : {"Kern_Linear", "Kern_RBF"}) {
+    auto train2 = [&](const std::string &fixindex,
+                      const std::vector<double> &fixweight) {
+      Context c = make_ctx();
+      c.remove("LAMBDA");
+      c.add("LAMBDA", "1e-3");
+      c.add("MPARAMS", "1.0");
+      if (!fixindex.empty()) c.add("FIXINDEX", fixindex);
+      for (double v : fixweight) c.add("FIXWEIGHT", v);
+      // Four basis vectors (the columns of the 8x4 matrix), one target
+      // value each.
+      Matrix B = make_phi();
+      t_type T(B.cols());
+      for (size_t j = 0; j < T.size(); ++j)
+        T[j] = 0.3 * static_cast<double>(j + 1);
+      if (std::string(kern) == "Kern_Linear") {
+        Kern_Linear k;
+        M_KRR_Train<Kern_Linear> m(k, c);
+        m.train2(B, T);
+        return m.get_weights();
+      }
+      Kern_RBF k(c);
+      M_KRR_Train<Kern_RBF> m(k, c);
+      m.train2(B, T);
+      return m.get_weights();
+    };
+    DYNAMIC_SECTION(kern) {
+      const std::string refusal =
+          std::string("MODEL M_KRR ") + kern + " 2 cannot pin weights: "
+          "implementation 2 solves (K + LAMBDA I) w = t for the weights of "
+          "all its basis vectors at once, so FIXINDEX and FIXWEIGHT would be "
+          "ignored. Use implementation 1 (MODEL M_KRR " + kern + " 1), "
+          "which pins them, or remove FIXINDEX and FIXWEIGHT.";
+      t_type w;
+      REQUIRE_NOTHROW(w = train2("", {}));
+      CHECK(w.size() == 4);
+      CHECK_THROWS_WITH(train2("1", {14.0}), refusal);
+      CHECK_THROWS_WITH(train2("2-1", {14.0, 3.0}), refusal);
+      CHECK_THROWS_WITH(train2("1", {}), refusal);
+    }
+  }
 }
 
 TEST_CASE("KRR linear partial fix places fixed values", "[fixed_weights]") {

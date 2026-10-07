@@ -77,39 +77,17 @@ public:
     // also when FIXINDEX pins every weight (no regression below).
     context.remove("SIGMA");
 
-    const bool has_fixweight = context.contains("FIXWEIGHT");
-    const bool has_fixindex = context.contains("FIXINDEX");
-    if (has_fixweight != has_fixindex) {
-      throw std::runtime_error(
-          "FIXINDEX requires FIXWEIGHT (and vice versa). Provide both keys "
-          "with matching lengths; the i-th FIXWEIGHT value pins the weight "
-          "named by the i-th FIXINDEX entry. There is no auto-seeding from "
-          "WEIGHTS.");
-    }
+    // The weights FIXWEIGHT pins (core::parse_fixindex: 1-based, in
+    // declaration order, checked against the Phi.cols() weights and the
+    // FIXWEIGHT values; a lone key is refused); none without the keys.
+    std::vector<size_t> indices =
+        tadah::core::parse_fixindex(context, Phi.cols());
 
-    if (has_fixweight && has_fixindex) {
-      std::vector<std::string> indices_str(context.size("FIXINDEX"));
-      context.get("FIXINDEX", indices_str);
-
-      // Parse indices and perform checks
-      std::vector<size_t> indices = tadah::core::parse_indices(indices_str);
-
-      // Check that the min index is >= 1 and max index is <= Phi.cols()
-      if (!indices.empty()) {
-        size_t max_index = *std::max_element(indices.begin(), indices.end());
-        if (*std::min_element(indices.begin(), indices.end()) < 1 || max_index > Phi.cols()) {
-          throw std::runtime_error("FIXINDEX: Indices out of bounds: valid range is from 1 to " + std::to_string(Phi.cols()));
-        }
-      }
-
+    if (!indices.empty()) {
       // Adjust for 0-based indexing
       for (auto &i : indices) i--;
 
-      tadah::core::t_type w_f(context.size("FIXWEIGHT"));
-      if (w_f.size() != indices.size()) {
-        throw std::runtime_error("FIXWEIGHT and FIXINDEX differ in size: " + std::to_string(w_f.size()) + " and " + std::to_string(indices.size()));
-      }
-
+      tadah::core::t_type w_f(indices.size());
       context.get("FIXWEIGHT", w_f);
 
       // DesignMatrix's layout of the full matrix: its data rows, then one
