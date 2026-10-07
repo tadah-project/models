@@ -125,8 +125,12 @@ public:
 
 
       if (Phi.cols() > 0) {
+        // The function's intercept columns among the free ones, at their
+        // new positions: the ridge leaves those out and penalises every
+        // other free column.
         LinearRegressor::train(context, Phi, T_r, weights, Sigma, *workspaceManager_,
-                               bf.intercept_columns(context),
+                               free_intercept_columns(bf.intercept_columns(context),
+                                                      move_map, Phi.cols()),
                                LinearRegressor::Layout::fixed(data_rows, move_map,
                                                               Phi.cols()));
       } else {
@@ -154,6 +158,13 @@ public:
         w_full[indices[k]] = w_f[k];
       }
       weights = w_full;
+      // OALGO 3 computed the covariance of the free weights: SIGMA of the
+      // potential is that of every weight, a pinned one with none
+      // (config_add_sigma replaces the free weights' SIGMA).
+      if (context.template get<int>("OALGO", 0) == 3 && n_free > 0) {
+        sigma_of_all_weights(Sigma, move_map, n_free, weights.size());
+        LinearRegressor::config_add_sigma(context, Sigma);
+      }
       trained = true;
     }
     else {

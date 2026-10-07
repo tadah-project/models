@@ -29,7 +29,10 @@ struct BF_Linear : public virtual BF_Base {
      */
     std::string get_label() const override;
     /** \brief See Function_Base::intercept_columns(). */
-    size_t intercept_columns(const tadah::core::Context &c) const override;
+    std::vector<size_t> intercept_columns(const tadah::core::Context &c) const override;
+
+    /** @brief One weight per descriptor entry: dsize. */
+    std::size_t weights_count(std::size_t dsize) const override;
 
     std::string label = "BF_Linear"; ///< Label identifying the basis function.
 

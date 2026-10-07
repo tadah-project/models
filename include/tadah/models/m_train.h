@@ -92,6 +92,44 @@ public:
     return move_columns_in_place(Phi, indices);
   }
 
+  /**
+ * The intercept columns of the regression after FIXINDEX: the positions j
+ * < n_free of the free columns (move_map[j], their original column, as
+ * prep_train_with_residuals returns it) that are among the function's
+ * intercept columns `intercepts` (original indices). A pinned intercept
+ * leaves the regression with its column; every other free column keeps
+ * the ridge penalty, wherever it moved.
+ */
+  static std::vector<size_t> free_intercept_columns(
+      const std::vector<size_t> &intercepts,
+      const std::vector<size_t> &move_map, size_t n_free) {
+    std::vector<size_t> out;
+    for (size_t j = 0; j < n_free; ++j)
+      for (size_t c : intercepts)
+        if (move_map[j] == c) {
+          out.push_back(j);
+          break;
+        }
+    return out;
+  }
+
+  /**
+ * The covariance of all n weights from that of the n_free solved ones
+ * (OALGO 3: Sigma is n_free x n_free, free weight j at move_map[j]), as
+ * predict --error multiplies it by the full design matrix: a pinned weight
+ * has no variance and no covariance (its row and column are 0).
+ */
+  template <typename M>
+  static void sigma_of_all_weights(M &Sigma, const std::vector<size_t> &move_map,
+                                   size_t n_free, size_t n) {
+    M full(n, n);
+    full.set_zero();
+    for (size_t a = 0; a < n_free; ++a)
+      for (size_t b = 0; b < n_free; ++b)
+        full(move_map[a], move_map[b]) = Sigma(a, b);
+    Sigma = full;
+  }
+
   void setWorkspaceManager(tadah::models::memory::IModelsWorkspaceManager  *workspaceManager) {
     if (workspaceManager_ != nullptr && own_workspace_manager_) {
       delete workspaceManager_;

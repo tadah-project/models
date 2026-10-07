@@ -26,6 +26,14 @@ std::string Kern_Linear::get_label() const
 {
     return label;
 }
+std::size_t Kern_Linear::weights_count(std::size_t dsize) const
+{
+    return dsize;
+}
+std::size_t Kern_Linear::basis_vector_size() const
+{
+    return 0;
+}
 double Kern_Linear::epredict(const tadah::core::t_type &weights, const tadah::core::aed_type& aed) const
 {
     return weights*aed;
@@ -41,9 +49,12 @@ tadah::core::force_type Kern_Linear::fpredict(const tadah::core::t_type &weights
     return -(fdij * weights);
 }
 
-size_t Kern_Linear::intercept_columns(const tadah::core::Context &c) const
+std::vector<size_t> Kern_Linear::intercept_columns(const tadah::core::Context &c) const
 {
-  return tadah::core::n_intercept_columns(c);
+  // the descriptor's intercept columns, 0 .. N-1
+  std::vector<size_t> cols(tadah::core::n_intercept_columns(c));
+  for (size_t k = 0; k < cols.size(); ++k) cols[k] = k;
+  return cols;
 }
 
 } // namespace models

@@ -1024,3 +1024,95 @@ TEST_CASE_METHOD(RefitFixture,
     CHECK(amp_norm(1e-2) < amp_norm(0.0));
   }
 }
+
+namespace {
+// The synthetic fcc table of the MLIP refit tests (a0 3.6 A, rcut 5 A, 400
+// points): rho(r) = (1 - r/rcut)^2, phi(r) = 3 (1 - r/rcut)^3 plus, with
+// `wall`, a steep pair wall 100 exp(-(r - 1.6)/0.05), F(rho) = -2 sqrt(rho)
+// + 0.05 rho on [0, 60].
+void write_window_setfl(const std::string &path, bool wall) {
+  const int nr = 400, nrho = 400;
+  const double rcut = 5.0, dr = rcut / (nr - 1);
+  const double rhomax = 60.0, drho = rhomax / (nrho - 1);
+  std::ofstream os(path);
+  os << "# synthetic fcc setfl (fit windows)\n# 2\n# 3\n1 Cu\n"
+     << nrho << " " << drho << " " << nr << " " << dr << " " << rcut << "\n"
+     << "29 63.55 3.6 fcc\n" << std::setprecision(12);
+  for (int i = 0; i < nrho; ++i)
+    os << (-2.0 * std::sqrt(i * drho) + 0.05 * i * drho) << "\n";
+  for (int i = 0; i < nr; ++i) {
+    const double x = 1.0 - i * dr / rcut;
+    os << (x > 0 ? x * x : 0.0) << "\n";
+  }
+  for (int i = 0; i < nr; ++i) {
+    const double r = i * dr, x = 1.0 - r / rcut;
+    const double phi = (x > 0 ? 3.0 * x * x * x : 0.0) +
+                       (wall ? 100.0 * std::exp(-(r - 1.6) / 0.05) : 0.0);
+    os << phi * r << "\n";
+  }
+}
+}  // namespace
+
+TEST_CASE_METHOD(RefitFixture,
+                 "EAMRefit records the fit windows it used",
+                 "[refit]") {
+  /* Pins: fit_window_r_lo() and fit_window_rho_hi() are 0 before a fit;
+   * after fit() they are the windows it fitted on, phi and rho on
+   * [fit_window_r_lo(), rcut], F on [0, fit_window_rho_hi()]: under
+   * REFIT_PLACEMENT window (the default) on the synthetic fcc table
+   * r_lo() (1 A, no wall) and rho_reach(); with a steep pair wall above
+   * 30x its reachable scale up to r = 1.67 A, 0.8 r_reach() (1.527 A);
+   * with r_lo_frac 0.35, r_lo() = 1.75 A, above 0.8 r_reach() (the samples
+   * and the grid start at r_lo, so the window does); under "uniform" r_lo()
+   * and the table's rhomax. After finalize_injected(lo, hi), the compact
+   * fitter's handoff, they are lo and hi.
+   * Before the fix: the accessors do not exist (the test does not
+   * compile); the window lived in fit()'s local rwin_lo only, and
+   * refit_range_report.dat wrote 0.9 r_reach for it. */
+  ScratchFile f("synth_window");
+  for (const bool wall : {false, true}) {
+    INFO((wall ? "wall" : "no wall"));
+    write_window_setfl(f.path, wall);
+    EAMSetflIO eam;
+    eam.read_setfl(f.path);
+    eam.build_splines();
+    EAMRefitConfig cfg;
+    cfg.n2b = 24; cfg.nrho = 20; cfg.nF = 60;
+    EAMRefit refit(eam, cfg);
+    CHECK(refit.fit_window_r_lo() == 0.0);
+    CHECK(refit.fit_window_rho_hi() == 0.0);
+    refit.fit();
+    REQUIRE(refit.r_reach() == Approx(0.75 * 3.6 / std::sqrt(2.0)));
+    CHECK(refit.fit_window_r_lo() ==
+          Approx(wall ? 0.8 * refit.r_reach() : refit.r_lo()));
+    CHECK(refit.r_lo() == Approx(1.0));
+    CHECK(refit.fit_window_rho_hi() == refit.rho_reach());
+    CHECK(refit.rho_reach() < eam.rhomax());
+    refit.finalize_injected(1.234, 7.5);
+    CHECK(refit.fit_window_r_lo() == 1.234);
+    CHECK(refit.fit_window_rho_hi() == 7.5);
+  }
+  write_window_setfl(f.path, false);
+  EAMSetflIO eam;
+  eam.read_setfl(f.path);
+  eam.build_splines();
+  {
+    EAMRefitConfig cfg;
+    cfg.n2b = 24; cfg.nrho = 20; cfg.nF = 60;
+    cfg.r_lo_frac = 0.35;
+    EAMRefit refit(eam, cfg);
+    refit.fit();
+    CHECK(refit.r_lo() == Approx(1.75));
+    CHECK(0.8 * refit.r_reach() < refit.r_lo());
+    CHECK(refit.fit_window_r_lo() == refit.r_lo());
+  }
+  {
+    EAMRefitConfig cfg;
+    cfg.n2b = 24; cfg.nrho = 20; cfg.nF = 60;
+    cfg.placement = "uniform";
+    EAMRefit refit(eam, cfg);
+    refit.fit();
+    CHECK(refit.fit_window_r_lo() == refit.r_lo());
+    CHECK(refit.fit_window_rho_hi() == eam.rhomax());
+  }
+}

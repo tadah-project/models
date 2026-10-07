@@ -56,7 +56,7 @@ class Kern_Sigmoid : public virtual Kern_Base {
         /** \brief See Function_Base::mparams(). */
         std::vector<MParamSlot> mparams() const override;
         /** \brief See Function_Base::intercept_columns(). */
-        size_t intercept_columns(const tadah::core::Context &c) const override;
+        std::vector<size_t> intercept_columns(const tadah::core::Context &c) const override;
 
 };
 } // namespace models
