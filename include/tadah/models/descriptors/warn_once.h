@@ -11,7 +11,9 @@ namespace models {
  *
  *  For a descriptor's warning about its configuration (a knot past the
  *  cutoff, a bump whose support reaches past a Cut_Dummy cutoff, a
- *  non-compact basis with Cut_Dummy), which every descriptor object built
+ *  non-compact basis with Cut_Dummy, a DM_mEAD or OrbitalWise DM_Poly
+ *  channel function that is not rotationally invariant for L > 0), which
+ *  every descriptor object built
  *  from that configuration would give: tadah hpo builds the descriptors of
  *  every evaluation anew, and train, predict and pair_style tadah build
  *  them more than once. The first call for @p key while the Logger shows
