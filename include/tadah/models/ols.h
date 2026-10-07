@@ -98,6 +98,24 @@ public:
      */
 template <typename V1, typename V2>
 void solveWithPseudoinverse(int m, int n, V1& B, V2& weights, memory::SVDWorkspace& svdWorkspace, double rcond, double lambda);
+
+    /**
+     * @brief The singular-value threshold of solveWithPseudoinverse: a
+     *        direction i with S[i] <= the threshold is left out of the
+     *        solution (its weight component is 0).
+     *
+     * rcond * max(S[0..k-1]) for rcond > 0, else 0 (only exact zeros are
+     * left out). LinearRegressor::get_sigma drops the same directions from
+     * the weight covariance.
+     *
+     * @param S The k = min(m, n) singular values.
+     */
+    static double pseudoinverse_threshold(const double *S, int k, double rcond) {
+      if (k <= 0 || !(rcond > 0.0)) return 0.0;
+      double smax = S[0];
+      for (int i = 1; i < k; ++i) smax = std::max(smax, S[i]);
+      return rcond * smax;
+    }
 template <typename V1, typename V2>
 void solveWithPseudoinverse(int m, int n, V1& B, V2& weights, memory::SVDWorkspace& svdWorkspace);
 

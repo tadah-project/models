@@ -57,25 +57,36 @@ public:
   {}
 
     /**
+     * @brief Trains the model on given feature and target matrices, whose
+     *        observations are rows - cols (a design matrix with its
+     *        ridge-augmentation rows and no rows of weight 0).
+     */
+  void train(tadah::core::phi_type &Phi, tadah::core::t_type &T) {
+    train(Phi, T, LinearRegressor::augmented_observations(Phi));
+  }
+
+    /**
      * @brief Trains the model on given feature and target matrices.
      *
-     * Uses a linear regressor to perform training. A SIGMA in the
-     * context is removed first; an OALGO 3 fit writes its own.
+     * Uses a linear regressor to perform training. The model holds the
+     * weight covariance of this fit (M_Core::Sigma, noise_variance) or
+     * none: OALGO 3 computes it, of every weight (a pinned one with a zero
+     * row and column; with every weight pinned all zeros and the noise
+     * RSS / n_obs of the pinned weights), any other OALGO none. The
+     * covariance of an earlier fit is removed first, whatever this fit
+     * computes. Nothing is written into the Context.
      *
      * @param Phi Feature matrix.
      * @param T Target vector.
+     * @param n_obs The observations: the rows of Phi with a non-zero
+     *        weight, without the ridge-augmentation rows.
      * @throws std::runtime_error if the object is already trained.
      */
-  void train(tadah::core::phi_type &Phi, tadah::core::t_type &T) {
+  void train(tadah::core::phi_type &Phi, tadah::core::t_type &T, size_t n_obs) {
     if (trained) {
       throw std::runtime_error("This object is already trained!");
     }
-    // SIGMA is the covariance of the fit that computed it (OALGO 3,
-    // LinearRegressor::config_add_sigma): a SIGMA in the context is of an
-    // earlier fit, or of a potential used as the configuration, and does
-    // not describe the weights of this fit, whatever OALGO it uses and
-    // also when FIXINDEX pins every weight (no regression below).
-    context.remove("SIGMA");
+    this->clear_covariance("the fit computed no weight covariance");
 
     // The weights FIXWEIGHT pins (core::parse_fixindex: 1-based, in
     // declaration order, checked against the Phi.cols() weights and the
@@ -97,13 +108,16 @@ public:
       Phi.resize(Phi.rows(), Phi.cols() - indices.size());
 
 
+      CovarianceFit fit;
       if (Phi.cols() > 0) {
         // The function's intercept columns among the free ones, at their
         // new positions: the ridge leaves those out and penalises every
-        // other free column.
-        LinearRegressor::train(context, Phi, T_r, weights, Sigma, *workspaceManager_,
+        // other free column. n_obs is that of the full design matrix: the
+        // pinned columns leave Phi, its rows stay.
+        fit = LinearRegressor::train(context, Phi, T_r, weights, Sigma, *workspaceManager_,
                                free_intercept_columns(bf.intercept_columns(context),
-                                                      move_map, Phi.cols()));
+                                                      move_map, Phi.cols()),
+                               n_obs);
       } else {
         // Every column is fixed (FIXINDEX covers all weights): there is nothing
         // left to solve, so skip the regressor entirely and let the fixed
@@ -129,18 +143,36 @@ public:
         w_full[indices[k]] = w_f[k];
       }
       weights = w_full;
-      // OALGO 3 computed the covariance of the free weights: SIGMA of the
-      // potential is that of every weight, a pinned one with none
-      // (config_add_sigma replaces the free weights' SIGMA).
-      if (context.template get<int>("OALGO", 0) == 3 && n_free > 0) {
-        sigma_of_all_weights(Sigma, move_map, n_free, weights.size());
-        LinearRegressor::config_add_sigma(context, Sigma);
+      // OALGO 3 computed the covariance of the free weights; the model's
+      // is that of every weight, a pinned one with none.
+      if (n_free > 0) {
+        if (fit.computed) {
+          sigma_of_all_weights(Sigma, move_map, n_free, weights.size());
+          this->set_covariance(Sigma, fit.noise_variance);
+        } else {
+          this->clear_covariance(fit.why_not);
+        }
+      } else if (context.template get<int>("OALGO", 0) == 3) {
+        double s2 = 0.0;
+        std::string why;
+        if (pinned_covariance(T_r, weights.size(), n_obs, Sigma, s2, why))
+          this->set_covariance(Sigma, s2);
+        else
+          this->clear_covariance(why);
+      } else {
+        this->clear_covariance(fit.why_not.empty()
+            ? LinearRegressor::oalgo_without_covariance(
+                  context.template get<int>("OALGO", 0))
+            : fit.why_not);
       }
       trained = true;
     }
     else {
-      LinearRegressor::train(context, Phi, T, weights, Sigma, *workspaceManager_,
-                             bf.intercept_columns(context));
+      const CovarianceFit fit =
+          LinearRegressor::train(context, Phi, T, weights, Sigma, *workspaceManager_,
+                                 bf.intercept_columns(context), n_obs);
+      if (fit.computed) this->set_covariance(Sigma, fit.noise_variance);
+      else this->clear_covariance(fit.why_not);
       trained = true;
     }
 
