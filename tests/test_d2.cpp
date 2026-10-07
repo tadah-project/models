@@ -206,9 +206,16 @@ TEST_CASE_METHOD(TestFixture, "Testing D2_EAM", "[D2]") {
     std::stringstream ss;
     // std::cout.rdbuf(ss.rdbuf()); // redirect cout
     
+    // The form a configuration file gives: `TYPE2B D2_EAM 0` (the
+    // placeholder parameter; test_d2 adds the element pair H H) and SETFL.
+    // It used to omit the descriptor name and the parameter, so the first
+    // added H stood for both. Before the fix: passes as well (a pin:
+    // D2_EAM read SETFL and dropped its parameter).
     Context c;
     c.remove("INIT2B");
     c.add("INIT2B", "true");
+    c.add("TYPE2B", "D2_EAM");
+    c.add("TYPE2B", 0);
     c.add("SETFL", "tests_data/eam.alloy");
     test_D2<D2_EAM>(c);
 
@@ -216,12 +223,17 @@ TEST_CASE_METHOD(TestFixture, "Testing D2_EAM", "[D2]") {
     REQUIRE(d.size() == 1);
     REQUIRE(d.label() == "D2_EAM");
 
-    // Test throws
+    // Test throws, naming the SETFL path. Before the fix: passes as well (a
+    // pin: D2_EAM has always read SETFL).
     Context c_err;
     c_err.remove("INIT2B");
     c_err.add("INIT2B", "true");
+    c_err.add("TYPE2B", "D2_EAM");
+    c_err.add("TYPE2B", 0);
+    c_err.add("TYPE2B", "H");
+    c_err.add("TYPE2B", "H");
     c_err.add("SETFL", "path/to/nowhere");
-    REQUIRE_THROWS(D2_EAM(c_err));
+    CHECK_THROWS_WITH(D2_EAM(c_err), Catch::Contains("path/to/nowhere"));
     
     // std::cout.rdbuf(orig); // restore
 }
