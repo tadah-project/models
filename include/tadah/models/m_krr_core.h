@@ -24,7 +24,6 @@ namespace models {
 template <class K = Function_Base&>
 class M_KRR_Core : public virtual M_Core {
 public:
-    tadah::core::Matrix Sigma; ///< Covariance matrix.
     tadah::core::Context &context; ///< Configuration reference.
     K kernel; ///< Kernel function.
 
@@ -71,21 +70,6 @@ public:
      */
     double predict(const tadah::core::aed_type &v) const {
         return kernel.epredict(weights, v);
-    }
-
-    /**
-     * @brief Retrieves the uncertainty of weights.
-     * 
-     * Throws an error if LAMBDA is not zero.
-     * 
-     * @return Vector of uncertainties based on the Sigma diagonal.
-     * @throws std::runtime_error if LAMBDA is not zero.
-     */
-    tadah::core::t_type get_weights_uncertainty() const {
-        double lambda = context.template get<double>("LAMBDA");
-        if(lambda == 0) 
-            throw std::runtime_error("Sigma matrix is only computed for LAMBDA != 0");
-        return Sigma.diagonal();
     }
 
 private:

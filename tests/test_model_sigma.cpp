@@ -8,7 +8,9 @@
 // into the Context: the potential gets the covariance from the model
 // (MLIP's get_param_file, keys WCOV and WNOISE). Until WCOV replaced it,
 // the fit wrote it into the Context as SIGMA (config_add_sigma), and
-// read_sigma read it back.
+// read_sigma read it back; the count checks of read_sigma are those of
+// the WCOV reader now (MLIP, test_predict_error.cpp and
+// test_weight_covariance_io.cpp).
 //
 // Also: an M_KRR model built from a Context with WEIGHTS (a potential used
 // as the configuration) can be trained, as an M_BLR model can.
@@ -280,55 +282,6 @@ TEST_CASE("M_KRR implementation 2 (train2) leaves no covariance of an "
       CHECK(msg.find("OALGO 3") != std::string::npos);
     }
   }
-}
-
-/* Pins: read_sigma refuses a SIGMA whose value count is not N*N+1, naming
- * SIGMA, N, the count it needs and the count it has: N = 2 with 3 values
- * after it ("2 1 0 0", 4 of the 5 it needs) and N = 4 with 33 (two
- * appended SIGMAs of a 4-weight model, 34 values); "2 1 0 0 1" is read as
- * the 2x2 identity.
- * Before the fix: "2 1 0 0" was read with a 0 for the missing value, no
- * error; the 34 values were refused by Context::get's size check (CORE),
- * whose message names neither N nor the count SIGMA needs. */
-TEST_CASE("read_sigma refuses a SIGMA whose count is not N*N+1", "[sigma]") {
-  Context c;
-  Matrix S;
-  c.add("SIGMA", "2 1 0 0");
-  std::string msg;
-  try {
-    LinearRegressor::read_sigma(c, S);
-  } catch (const std::exception &e) {
-    msg = e.what();
-  }
-  INFO("message: " << msg);
-  CHECK(msg.find("SIGMA") != std::string::npos);
-  CHECK(msg.find("N = 2") != std::string::npos);
-  CHECK(msg.find("5 values") != std::string::npos);
-  CHECK(msg.find("has 4") != std::string::npos);
-
-  c.remove("SIGMA");
-  c.add("SIGMA", "4");
-  for (int k = 0; k < 33; ++k) c.add("SIGMA", 0.5);
-  msg.clear();
-  try {
-    LinearRegressor::read_sigma(c, S);
-  } catch (const std::exception &e) {
-    msg = e.what();
-  }
-  INFO("message: " << msg);
-  CHECK(msg.find("N = 4") != std::string::npos);
-  CHECK(msg.find("17 values") != std::string::npos);
-  CHECK(msg.find("has 34") != std::string::npos);
-
-  c.remove("SIGMA");
-  c.add("SIGMA", "2 1 0 0 1");
-  REQUIRE_NOTHROW(LinearRegressor::read_sigma(c, S));
-  REQUIRE(S.rows() == 2);
-  REQUIRE(S.cols() == 2);
-  CHECK(S(0, 0) == 1.0);
-  CHECK(S(1, 0) == 0.0);
-  CHECK(S(0, 1) == 0.0);
-  CHECK(S(1, 1) == 1.0);
 }
 
 /* Pins: an M_KRR model built from a Context that has WEIGHTS (a potential

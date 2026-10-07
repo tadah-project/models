@@ -368,11 +368,8 @@ void OLS::solveWithPseudoinverse(int m, int n, V1& B, V2& weights, memory::SVDWo
     int lda = m;
   tadah::core::dgemv_(&trans, &m, &minmn, &alpha, U, &lda, B.ptr(), &incx, &beta, ws->UtB, &incy);
 
-    // Find the maximum singular value
-    double smax = *std::max_element(S, S + minmn);
-
-    // Threshold for singular values
-    double thresh = (rcond > 0.0) ? rcond * smax : 0.0;
+    // Threshold for singular values (shared with LinearRegressor::get_sigma)
+    const double thresh = pseudoinverse_threshold(S, minmn, rcond);
 
     // Compute the pseudoinverse solution
     for (int i = 0; i < minmn; ++i) {
@@ -383,9 +380,10 @@ void OLS::solveWithPseudoinverse(int m, int n, V1& B, V2& weights, memory::SVDWo
         }
     }
 
-    // Compute x = V * (pseudoinverse solution)
+    // Compute x = V * (pseudoinverse solution). V^T is min(m,n) x n with
+    // leading dimension min(m,n) (SVD::compute, dgesdd's ldvt).
     trans = 'T'; // Use V
-    int ldvt = n;
+    int ldvt = minmn;
   tadah::core::dgemv_(&trans, &minmn, &n, &alpha, VT, &ldvt, ws->UtB, &incx, &beta, weights.ptr(), &incy);
 }
 

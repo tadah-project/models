@@ -81,6 +81,8 @@ private:
 
 #include <tadah/core/context.h>
 #include <tadah/models/svd.h>
+#include <stdexcept>
+#include <string>
 #include <tadah/models/ols.h>
 #include <tadah/core/core_types.h>
 #include <tadah/core/lapack.h>
@@ -88,23 +90,42 @@ private:
 namespace tadah {
 namespace models {
 
+/**
+ * @class EA
+ * @brief The evidence approximation of Bayesian linear regression (LAMBDA
+ *        -1): iterates alpha = gamma / |w|^2 and beta = (N - gamma) / RSS
+ *        to their fixed point, lambda = alpha / beta.
+ *
+ * N is the number of observations, @p n_obs of the constructor: the rows
+ * of the design matrix with a non-zero weight, without the
+ * ridge-augmentation rows the design matrix appends (one per column) and
+ * without the rows of weight 0, which are zero rows of the weighted
+ * matrix. gamma = sum_i beta s_i^2 / (beta s_i^2 + alpha) runs over the
+ * directions the solve keeps (s_i above OLS::pseudoinverse_threshold), as
+ * the weights and the weight covariance do. (Before, N was max(rows,
+ * cols), which counted the augmentation rows and the weight-0 rows, and
+ * gamma kept every s_i with beta s_i^2 above the smallest double.)
+ */
 class EA {
   private:
     const tadah::core::Context &context;
     tadah::models::SVD &svd;
     tadah::core::t_type &T;
+    size_t n_obs;
     int verbose;
   public:
-    EA(const tadah::core::Context &c, tadah::models::SVD &svd, tadah::core::t_type &T):
+    EA(const tadah::core::Context &c, tadah::models::SVD &svd, tadah::core::t_type &T,
+       size_t n_obs):
       context(c),
       svd(svd),
       T(T),
+      n_obs(n_obs),
       verbose(c.get<int>("VERBOSE"))
   {}
 
     int run(double &alpha, double &beta) {
       // Phi = USV^T
-      size_t N=std::max(svd.rows(), svd.cols());
+      const size_t N = n_obs;
       size_t sizeS = std::min(svd.rows(), svd.cols());
       size_t maxsteps=40;
       const double EPS2 = 5e-12;
@@ -133,6 +154,8 @@ class EA {
       int n = svd.cols();
       tadah::core::t_type Tpred(m);
     double rcond = context.size("OALGO")==2 ? context.get<double>("OALGO",1) : 1e-8;
+      // the directions the solve keeps (solveWithPseudoinverse)
+      const double thresh = OLS::pseudoinverse_threshold(s, static_cast<int>(sizeS), rcond);
     //
         // Create a workspace manager
         tadah::models::memory::ModelsWorkspaceManager workspaceManager;
@@ -150,7 +173,7 @@ class EA {
 
         double gamma = 0.0;
         for (size_t j=0; j<sizeS; j++) {
-          if (beta*eval[j] > std::numeric_limits<double>::min()) {
+          if (s[j] > thresh) {
             gamma += (beta*eval[j])/(beta*eval[j]+alpha);
           }
         }
@@ -160,6 +183,16 @@ class EA {
         svdMultiplier.compute(m_n.data(), Tpred.data());
         double temp = (T-Tpred)*(T-Tpred);
 
+        if (!(static_cast<double>(N) > gamma)) {
+          delete [] eval;
+          delete [] d;
+          throw std::runtime_error(
+              "LAMBDA -1 (evidence approximation): the fit has " +
+              std::to_string(N) + " observations (rows with a non-zero "
+              "weight) for an effective " + std::to_string(gamma) +
+              " weights; it needs more observations than that to estimate "
+              "the noise. Add data, or set LAMBDA >= 0.");
+        }
         beta = (static_cast<double>(N)-gamma)/temp;
 
         test1 = std::fabs(alpha_old-alpha)/alpha;
