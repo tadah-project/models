@@ -70,6 +70,10 @@ void D2_mJoin::init() {
   keys.push_back("RCUT2B");
   nparams=std::numeric_limits<size_t>::max();
 }
+std::string D2_mJoin::cutoff_fixed_by(std::size_t i) const {
+  return i < ds.size() ? ds[i]->cutoff_fixed_by(0) : std::string();
+}
+
 bool D2_mJoin::reinit(const tadah::core::Context& ctx) {
   // Re-derive per-child sub-contexts from the updated master context.
   // Copy ctx because expand_grids may add default keys to the context.

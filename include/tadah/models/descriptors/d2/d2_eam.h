@@ -89,6 +89,9 @@ public:
   std::string label() const override;
   void init() override;
   std::optional<DescriptorMeta> meta() const override;
+  /** The cutoff of the setfl file, for every value of the cutoff key ("" when
+   *  the descriptor read no file: built with INIT2B/INITMB false). */
+  std::string cutoff_fixed_by(std::size_t i) const override;
 };
 } // namespace models
 } // namespace tadah

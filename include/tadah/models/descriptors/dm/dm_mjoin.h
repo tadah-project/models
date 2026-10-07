@@ -96,6 +96,9 @@ public:
 
   void init() override;
   bool reinit(const tadah::core::Context& ctx) override;
+  /** Value @p i of the cutoff key is the i-th joined descriptor's: its
+   *  answer for its value 0, "" past the last descriptor. */
+  std::string cutoff_fixed_by(std::size_t i) const override;
 
   /** EMBF0 of the joined DM_REAM children (one global key: the children read
    *  copies of the same context); nullopt when no child has an embedding

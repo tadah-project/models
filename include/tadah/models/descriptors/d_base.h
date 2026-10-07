@@ -255,6 +255,20 @@ public:
    */
   virtual bool reinit(const tadah::core::Context& /*ctx*/) { return false; }
 
+  /** \brief What fixes value @p i (0-based) of this descriptor's cutoff key
+   *  (RCUT2B for a two-body, RCUTMB for a many-body descriptor), as a
+   *  clause for a message, or "" when that value is a free parameter.
+   *
+   *  D2_EAM and DM_EAM evaluate the tables of their setfl file, which
+   *  define the cutoff: every value of the key must be the file's cutoff
+   *  (require_setfl_cutoff()), so they answer e.g. "D2_EAM takes the cutoff
+   *  5.58190742024 of its setfl file 'Ta.eam.alloy' (SETFL)", and tadah hpo
+   *  refuses a search over the value at startup. A D2_mJoin or DM_mJoin
+   *  gives value i of the key to its i-th joined descriptor and answers
+   *  with that descriptor's value 0 ("" past the last one). Default "".
+   */
+  virtual std::string cutoff_fixed_by(std::size_t /*i*/) const { return {}; }
+
   virtual bool is_init_for_atoms(int Zi, int Zj) const;
   /** \brief True when this descriptor applies to every pair of elements,
    *  i.e. its TYPE2B/TYPEMB element pairs include `* *`.

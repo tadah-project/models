@@ -141,8 +141,12 @@ void DM_EAM::init() {
   nparams=1;
 }
 
+std::string DM_EAM::cutoff_fixed_by(std::size_t) const {
+  return eam_ ? setfl_cutoff_clause(lab, *eam_) : std::string();
+}
+
 std::optional<DescriptorMeta> DM_EAM::meta() const {
-  return make_closed_form_meta("DM_EAM", "RCUTMB");
+  return make_closed_form_meta("DM_EAM", "RCUTMB", /*cutoff_from_setfl=*/true);
 }
 
 } // namespace models

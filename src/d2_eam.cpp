@@ -101,8 +101,12 @@ void D2_EAM::init() {
   nparams=1;
 }
 
+std::string D2_EAM::cutoff_fixed_by(std::size_t) const {
+  return eam_ ? setfl_cutoff_clause(lab, *eam_) : std::string();
+}
+
 std::optional<DescriptorMeta> D2_EAM::meta() const {
-  return make_closed_form_meta("D2_EAM", "RCUT2B");
+  return make_closed_form_meta("D2_EAM", "RCUT2B", /*cutoff_from_setfl=*/true);
 }
 
 } // namespace models
