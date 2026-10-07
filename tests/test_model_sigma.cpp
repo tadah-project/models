@@ -107,16 +107,23 @@ TEST_CASE("OALGO 3: a second fit on one Context replaces SIGMA", "[sigma]") {
  * the Context carried from an earlier fit (the 17 values of a 4-weight
  * OALGO 3 fit): M_BLR_Train<BF_Linear> and M_KRR_Train<Kern_Linear> with
  * OALGO 1, with no FIXINDEX, with FIXINDEX 2 (one weight pinned) and with
- * FIXINDEX 1-4 (every weight pinned), and M_BLR_Train with OALGO 3 and
- * every weight pinned (the branch that solves nothing); with every weight
- * pinned the weights are the FIXWEIGHT values. An OALGO 3 fit that solves
- * writes one SIGMA of N*N+1 values. (M_KRR_Train with every weight pinned
- * and OALGO 3 solves on zeroed columns, and the covariance of such fits is
- * the subject of another change; it is not run here.)
+ * FIXINDEX 1-4 (every weight pinned), and both with OALGO 3 and every
+ * weight pinned (they solve nothing); with every weight pinned the weights
+ * are the FIXWEIGHT values. An OALGO 3 fit that solves writes one SIGMA of
+ * N*N+1 values with N = 4, the covariance of every weight, also with
+ * FIXINDEX 2 (M_Train::sigma_of_all_weights; test_fixed_weights.cpp checks
+ * its values).
  * Before the fix: every fit that computes no covariance kept the earlier 17
  * values, so the potential paired them with weights they were not computed
  * for (and `predict --error` used them); the OALGO 3 fits that solve
- * appended their SIGMA to the earlier one. */
+ * appended their SIGMA to the earlier one.
+ * Before the merge of fix/hpo-trainer-reuse into fix/multispecies-bias
+ * (which runs M_KRR with OALGO 3 and every weight pinned, and checks N):
+ * on v1-dev that case was not run, as M_KRR_Train kept the zeroed pinned
+ * columns in the regression and so solved and wrote a SIGMA, and with
+ * FIXINDEX 2 M_BLR_Train's SIGMA had N = 3, the free weights'; on
+ * fix/multispecies-bias, where M_KRR_Train solves nothing then, nothing
+ * removed the earlier SIGMA, so its 17 values stayed. */
 TEST_CASE("A fit replaces or removes the SIGMA of an earlier fit",
           "[sigma]") {
   struct Pins {
@@ -131,9 +138,6 @@ TEST_CASE("A fit replaces or removes the SIGMA of an earlier fit",
     for (const Pins &p : pins) {
       for (const char *model : {"M_BLR BF_Linear", "M_KRR Kern_Linear"}) {
         const bool all_pinned = p.fixindex && std::string(p.fixindex) == "1-4";
-        if (all_pinned && std::string(oalgo) == "3" &&
-            std::string(model) == "M_KRR Kern_Linear")
-          continue;
         DYNAMIC_SECTION(model << ", OALGO " << oalgo << ", " << p.name) {
           Context c = make_ctx(oalgo);
           if (p.fixindex) {
@@ -160,10 +164,11 @@ TEST_CASE("A fit replaces or removes the SIGMA of an earlier fit",
             for (size_t i = 0; i < 4; ++i) CHECK(w[i] == p.fixweight[i]);
           const bool computed = std::string(oalgo) == "3" && !all_pinned;
           if (computed) {
-            // The covariance of this fit (its N is the fitted columns', the
-            // dimension under FIXINDEX is another lane's subject).
-            CHECK(c.contains("SIGMA"));
+            // The covariance of this fit, of every weight (a pinned one
+            // with no variance).
+            REQUIRE(c.has_stored("SIGMA"));
             const size_t n = c.get<size_t>("SIGMA");
+            CHECK(n == 4);
             CHECK(c.size("SIGMA") == n * n + 1);
           } else {
             CHECK_FALSE(c.has_stored("SIGMA"));
