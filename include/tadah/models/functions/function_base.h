@@ -4,9 +4,19 @@
 #include <tadah/core/core_types.h>
 #include <tadah/core/context.h>
 
+#include <string>
+#include <vector>
+
 namespace tadah {
 namespace models {
 
+/** \brief One value of \ref MPARAMS that a function reads
+ *  (Function_Base::mparams()). */
+struct MParamSlot {
+  std::string name;       ///< the parameter, e.g. "sigma" (Kern_RBF) or "d"
+  bool integer = false;   ///< read as an integer (an exact integer value)
+  bool positive = false;  ///< a searched value (OPTIM MPARAMS) must be > 0
+};
 
 /** Base class for Kernels and Basis Functions */
 struct Function_Base {
@@ -32,6 +42,20 @@ public:
 
   /** \brief Return label of this object */
   virtual std::string get_label() const=0;
+
+  /** \brief The \ref MPARAMS values this function reads when it is built,
+   *  in order: element i is MPARAMS (i+1).
+   *
+   *  - Kern_RBF: sigma (positive);
+   *  - Kern_Polynomial: d (an integer, positive), gamma, c;
+   *  - Kern_Sigmoid: gamma, c;
+   *  - every other function (Kern_Linear, Kern_Quadratic, Kern_LQ,
+   *    BF_Linear, BF_Polynomial2): none, the default.
+   *
+   *  tadah hpo refuses at startup an OPTIM MPARAMS (i) of a function that
+   *  reads fewer than i values, of an integer value, and a box that is not
+   *  positive for a positive one. */
+  virtual std::vector<MParamSlot> mparams() const { return {}; }
 
   /** \brief The number of leading columns of this function's design
    *  matrix that are intercepts, columns 0 .. n-1.

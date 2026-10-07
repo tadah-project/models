@@ -1,4 +1,8 @@
 #include <tadah/models/functions/kernels/kern_rbf.h>
+
+#include <cmath>
+#include <stdexcept>
+#include <string>
 namespace tadah {
 namespace models {
 
@@ -10,6 +14,15 @@ Kern_RBF::Kern_RBF (const tadah::core::Context &c):
     sigma(c.get<double>("MPARAMS")),
     gamma(1.0/(sigma*sigma))
 {
+    // sigma 0 (or one whose square underflows) has no width: gamma is not
+    // finite, K is 0 off the basis vector and nan on it. A negative sigma
+    // is the kernel of |sigma| (gamma = 1/sigma^2) and is kept.
+    if (!(sigma != 0.0) || !std::isfinite(sigma) || !std::isfinite(gamma))
+        throw std::invalid_argument(
+            "Kern_RBF: MPARAMS (1), the width sigma, is " +
+            c(std::string("MPARAMS"))[0] + ": sigma must be non-zero and "
+            "finite, with 1/sigma^2 finite (K(b, x) = exp(-|b - x|^2 / "
+            "(2 sigma^2))).");
     if (get_verbose()) std::cout << std::endl << label << " | sigma: " << sigma
         << " | gamma: " << gamma << std::endl;
 
@@ -50,6 +63,11 @@ bool Kern_RBF::calc_dKdtheta(
 std::string Kern_RBF::get_label() const
 {
     return label;
+}
+
+std::vector<MParamSlot> Kern_RBF::mparams() const
+{
+    return {{"sigma", false, true}};
 }
 
 // K(b, x) depends on every component of x, whatever b: no column is constant.

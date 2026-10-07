@@ -59,7 +59,8 @@ public:
     /**
      * @brief Trains the model on given feature and target matrices.
      *
-     * Uses a linear regressor to perform training.
+     * Uses a linear regressor to perform training. A SIGMA in the
+     * context is removed first; an OALGO 3 fit writes its own.
      *
      * @param Phi Feature matrix.
      * @param T Target vector.
@@ -69,6 +70,12 @@ public:
     if (trained) {
       throw std::runtime_error("This object is already trained!");
     }
+    // SIGMA is the covariance of the fit that computed it (OALGO 3,
+    // LinearRegressor::config_add_sigma): a SIGMA in the context is of an
+    // earlier fit, or of a potential used as the configuration, and does
+    // not describe the weights of this fit, whatever OALGO it uses and
+    // also when FIXINDEX pins every weight (no regression below).
+    context.remove("SIGMA");
 
     const bool has_fixweight = context.contains("FIXWEIGHT");
     const bool has_fixindex = context.contains("FIXINDEX");

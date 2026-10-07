@@ -51,6 +51,11 @@ bool Kern_Sigmoid::calc_dKdtheta(
     return false;
 }
 
+std::vector<MParamSlot> Kern_Sigmoid::mparams() const
+{
+    return {{"gamma", false, false}, {"c", false, false}};
+}
+
 std::string Kern_Sigmoid::get_label() const
 {
     return label;

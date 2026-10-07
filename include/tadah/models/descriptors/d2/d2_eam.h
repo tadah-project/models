@@ -3,6 +3,8 @@
 #include <tadah/models/descriptors/d2/d2_base.h>
 #include <tadah/models/eam/eam_setfl_io.h>
 
+#include <memory>
+
 namespace tadah {
 namespace models {
 
@@ -51,7 +53,10 @@ namespace models {
  */
 class D2_EAM : public D2_Base {
 private:
-  EAMSetflIO eam_;
+  /** The tables of the SETFL file, shared with every descriptor of the
+   *  process that read the same file (shared_setfl()); null until built
+   *  from a context. */
+  std::shared_ptr<const EAMSetflIO> eam_;
   std::string lab="D2_EAM";
 
 public:

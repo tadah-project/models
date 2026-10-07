@@ -1,13 +1,31 @@
 #include <tadah/models/functions/kernels/kern_polynomial.h>
+
+#include <stdexcept>
+#include <string>
 namespace tadah {
 namespace models {
 
+
+namespace {
+// MPARAMS (1), the degree, read as an integer: an exact integer value in
+// any spelling (2, 2.0); another value is refused (Context's integer read),
+// with the kernel and the parameter named.
+int polynomial_degree(const tadah::core::Context &context) {
+    try {
+        return context.get<int>("MPARAMS",0);
+    } catch (const std::exception &e) {
+        throw std::runtime_error(
+            std::string("Kern_Polynomial: MPARAMS (1), the degree d: ") +
+            e.what());
+    }
+}
+}  // namespace
 
 Kern_Polynomial::Kern_Polynomial () {}
 Kern_Polynomial::Kern_Polynomial (const tadah::core::Context &context):
     Function_Base(context),
     Kern_Base(context),
-    d(context.get<int>("MPARAMS",0)),
+    d(polynomial_degree(context)),
     gamma(context.get<double>("MPARAMS",1)),
     c(context.get<double>("MPARAMS",2))
 {
@@ -49,6 +67,11 @@ bool Kern_Polynomial::calc_dKdtheta(
         return true;
     }
     return false;
+}
+
+std::vector<MParamSlot> Kern_Polynomial::mparams() const
+{
+    return {{"d", true, true}, {"gamma", false, false}, {"c", false, false}};
 }
 
 std::string Kern_Polynomial::get_label() const

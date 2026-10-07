@@ -18,10 +18,10 @@ D2_EAM::D2_EAM(tadah::core::Context &c): D2_Base(c)
   if (!c.get<bool>("INIT2B")) return;
   s=1;
   report_eam_placeholder(c, "TYPE2B", lab);
-  eam_.read_setfl(c("SETFL")[0]);
-  eam_.build_splines();
+  // Parsed and splined once per file contents in the process.
+  eam_ = shared_setfl(c("SETFL")[0]);
 
-  require_setfl_cutoff(c, "RCUT2B", lab, eam_);
+  require_setfl_cutoff(c, "RCUT2B", lab, *eam_);
 
   auto init_atoms = get_init_atoms(c);
   init_for_atoms(init_atoms);
@@ -36,12 +36,12 @@ void D2_EAM::calc_aed(
   const double scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
-  const auto &z2r_spline = eam_.z2r_spline();
+  const auto &z2r_spline = eam_->z2r_spline();
   double r = rij;
   const double recip = 1.0/r;
-  double p = r*eam_.rdr() + 1.0;
+  double p = r*eam_->rdr() + 1.0;
   int m = static_cast<int> (p);
-  m = std::min(m,eam_.nr()-1);
+  m = std::min(m,eam_->nr()-1);
   p -= m;
   p = std::min(p,1.0);
   double z2 = ((z2r_spline[m][3]*p + z2r_spline[m][4])*p + z2r_spline[m][5])*p + z2r_spline[m][6];
@@ -56,12 +56,12 @@ void D2_EAM::calc_dXijdri(
   const double scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
-  const auto &z2r_spline = eam_.z2r_spline();
+  const auto &z2r_spline = eam_->z2r_spline();
   const double r = rij;
   const double recip = 1.0/r;
-  double p = r*eam_.rdr() + 1.0;
+  double p = r*eam_->rdr() + 1.0;
   int m = static_cast<int> (p);
-  m = std::min(m,eam_.nr()-1);
+  m = std::min(m,eam_->nr()-1);
   p -= m;
   p = std::min(p,1.0);
   double z2p = (z2r_spline[m][0]*p + z2r_spline[m][1])*p + z2r_spline[m][2];
@@ -79,12 +79,12 @@ void D2_EAM::calc_all(
   const double scale) const
 {
   if (!is_init_for_atoms(Zi,Zj) || rij > get_rcut()) return;
-  const auto &z2r_spline = eam_.z2r_spline();
+  const auto &z2r_spline = eam_->z2r_spline();
   double r = rij;
   const double recip = 1.0/r;
-  double p = r*eam_.rdr() + 1.0;
+  double p = r*eam_->rdr() + 1.0;
   int m = static_cast<int> (p);
-  m = std::min(m,eam_.nr()-1);
+  m = std::min(m,eam_->nr()-1);
   p -= m;
   p = std::min(p,1.0);
   double z2 = ((z2r_spline[m][3]*p + z2r_spline[m][4])*p + z2r_spline[m][5])*p + z2r_spline[m][6];

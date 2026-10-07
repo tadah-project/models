@@ -92,7 +92,9 @@ private:
     /**
      * @brief Initializes the model based on the configuration.
      * 
-     * Loads weights if available in the configuration and sets the verbose level.
+     * Loads weights if available in the configuration and sets the verbose
+     * level. Loaded weights do not make the model trained (is_trained()):
+     * train() fits it, replacing them.
      *
      * A non-linear kernel (any kernel but Kern_Linear) evaluates its
      * weights against its basis vectors, which it read from SBASIS and
@@ -105,7 +107,8 @@ private:
         if (context.contains("WEIGHTS")) {
             weights.resize(context.size("WEIGHTS"));
             context.get<tadah::core::t_type>("WEIGHTS", weights);
-            trained = true;
+            // Loaded weights predict, but the model is not trained: train()
+            // fits it (a potential used as the configuration), as M_BLR.
             check_basis_of_weights();
         }
         verbose = context.get<int>("VERBOSE");
