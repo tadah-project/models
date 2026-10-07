@@ -30,7 +30,7 @@ std::string Kern_LQ::get_label() const
     return label;
 }
 
-size_t Kern_LQ::intercept_columns(const tadah::core::Context &c) const
+std::vector<size_t> Kern_LQ::intercept_columns(const tadah::core::Context &c) const
 {
   return dot_product_intercept_columns(c);
 }

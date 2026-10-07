@@ -15,6 +15,7 @@
 #include <tadah/core/context.h>
 #include <tadah/core/core_types.h>
 
+#include <algorithm>
 #include <cmath>
 #include <string>
 #include <vector>
@@ -250,4 +251,80 @@ TEST_CASE("KRR linear partial fix places fixed values", "[fixed_weights]") {
   const t_type wref = reference_free_weights(Phi0, T0, {4, 1}, {0.3, -1.1});
   REQUIRE(std::abs(w[1] - wref[0]) < 1e-8);
   REQUIRE(std::abs(w[2] - wref[1]) < 1e-8);
+}
+
+/* Pins: with FIXINDEX 2 / FIXWEIGHT 0.7, OALGO 3 (SVD) and LAMBDA 0.1 on
+ * the 8 x 4 design matrix, M_BLR_Train<BF_Linear> and
+ * M_KRR_Train<Kern_Linear> give the covariance of all 4 weights, as
+ * predict --error multiplies it by the full design matrix: Sigma is 4 x 4,
+ * its free block (rows and columns 1, 3, 4) is the covariance of the same
+ * fit on the free columns alone (1e-12 relative), row and column 2 of the
+ * pinned weight are 0 (no variance), and SIGMA holds 4 then the 16 values.
+ * Before the fix: M_BLR_Train left the 3 x 3 covariance of the free
+ * weights (SIGMA "3 ..." with 10 values); M_KRR_Train zeroed the pinned
+ * column and kept it, so its Sigma was 4 x 4 but not that of the free
+ * weights: its free block differed from the reference by up to 3.3, and
+ * the pinned weight's row and column were not 0 (up to 6.7). */
+TEST_CASE("BLR and KRR with FIXINDEX and OALGO 3: the covariance of every "
+          "weight, zero for a pinned one",
+          "[fixed_weights][sigma]") {
+  const phi_type Phi0 = make_phi();
+  const t_type T0 = make_target(Phi0);
+  auto oalgo3 = [] {
+    Context c;
+    c.add("VERBOSE", "0");
+    c.add("LAMBDA", "0.1");
+    c.add("OALGO", "3");
+    return c;
+  };
+  // The reference: the same fit on the free columns 0, 2, 3.
+  phi_type Phi_r(Phi0.rows(), 3);
+  t_type T_r = T0;
+  const size_t free_cols[3] = {0, 2, 3};
+  for (size_t j = 0; j < 3; ++j)
+    for (size_t i = 0; i < Phi0.rows(); ++i) Phi_r(i, j) = Phi0(i, free_cols[j]);
+  for (size_t i = 0; i < Phi0.rows(); ++i) T_r[i] -= Phi0(i, 1) * 0.7;
+  Context cr = oalgo3();
+  BF_Linear bfr;
+  M_BLR_Train<BF_Linear> ref(bfr, cr);
+  ref.train(Phi_r, T_r);
+  REQUIRE(ref.Sigma.rows() == 3);
+  double smax = 0;
+  for (size_t a = 0; a < 3; ++a)
+    for (size_t b = 0; b < 3; ++b) smax = std::max(smax, std::abs(ref.Sigma(a, b)));
+
+  for (int krr = 0; krr < 2; ++krr) DYNAMIC_SECTION(
+      (krr ? "M_KRR_Train<Kern_Linear>" : "M_BLR_Train<BF_Linear>")) {
+    Context c = oalgo3();
+    c.add("FIXINDEX", "2");
+    c.add("FIXWEIGHT", "0.7");
+    phi_type Phi = Phi0;
+    t_type T = T0;
+    Matrix S;
+    if (krr) {
+      Kern_Linear k;
+      M_KRR_Train<Kern_Linear> m(k, c);
+      m.train(Phi, T);
+      CHECK(m.get_weights()[1] == 0.7);
+      S = m.Sigma;
+    } else {
+      BF_Linear bf;
+      M_BLR_Train<BF_Linear> m(bf, c);
+      m.train(Phi, T);
+      CHECK(m.get_weights()[1] == 0.7);
+      S = m.Sigma;
+    }
+    REQUIRE(S.rows() == 4);
+    REQUIRE(S.cols() == 4);
+    for (size_t a = 0; a < 3; ++a)
+      for (size_t b = 0; b < 3; ++b)
+        CHECK(std::abs(S(free_cols[a], free_cols[b]) - ref.Sigma(a, b)) <
+              1e-12 * smax);
+    for (size_t k = 0; k < 4; ++k) {
+      CHECK(S(1, k) == 0.0);
+      CHECK(S(k, 1) == 0.0);
+    }
+    REQUIRE(c.size("SIGMA") == 17);
+    CHECK(c.get<double>("SIGMA", 0) == 4.0);
+  }
 }

@@ -122,19 +122,42 @@ public:
       tadah::core::t_type T_r;
       auto move_map = prep_train_with_residuals(Phi, T, indices, w_f, T_r);
 
-      reverse_columns(Phi, move_map);
+      // The pinned columns leave the regression, as in M_BLR_Train: the
+      // rightmost columns are the FIXINDEX ones. (They were set to 0 and
+      // kept: an unpenalised zero column, a pinned intercept, made OALGO 2
+      // and 4 singular.)
+      Phi.resize(Phi.rows(), Phi.cols() - indices.size());
 
-      for (const auto &i : indices) {
-        for (size_t j=0; j<Phi.rows(); ++j) {
-          Phi(j,i)=0;
-        }
+      if (Phi.cols() > 0) {
+        // The kernel's intercept columns among the free ones, at their new
+        // positions: the ridge leaves those out and penalises every other
+        // free column.
+        const std::vector<size_t> intercepts = kernel.intercept_columns(context);
+        LinearRegressor::train(context, Phi, T_r, weights, Sigma, *workspaceManager_,
+                               free_intercept_columns(intercepts, move_map,
+                                                      Phi.cols()));
+      } else {
+        // Every weight is pinned: nothing to solve.
+        weights = tadah::core::t_type();
       }
 
-      LinearRegressor::train(context, Phi, T_r, weights, Sigma, *workspaceManager_,
-                             kernel.intercept_columns(context));
-
-      for (size_t i=0; i<indices.size(); ++i) {
-        weights[indices[i]]=w_f[i];
+      // The solved weights back at the original positions of the free
+      // columns, each pinned value at its own index.
+      const size_t n_free = weights.size();
+      tadah::core::t_type w_full(n_free + indices.size());
+      for (size_t j = 0; j < n_free; ++j) {
+        w_full[move_map[j]] = weights[j];
+      }
+      for (size_t k = 0; k < indices.size(); ++k) {
+        w_full[indices[k]] = w_f[k];
+      }
+      weights = w_full;
+      // OALGO 3 computed the covariance of the free weights: SIGMA of the
+      // potential is that of every weight, a pinned one with none
+      // (config_add_sigma replaces the free weights' SIGMA).
+      if (context.template get<int>("OALGO", 0) == 3 && n_free > 0) {
+        sigma_of_all_weights(Sigma, move_map, n_free, weights.size());
+        LinearRegressor::config_add_sigma(context, Sigma);
       }
       trained = true;
     }

@@ -31,7 +31,16 @@ struct BF_Polynomial2 : public virtual BF_Base {
      */
     std::string get_label() const override;
     /** \brief See Function_Base::intercept_columns(). */
-    size_t intercept_columns(const tadah::core::Context &c) const override;
+    std::vector<size_t> intercept_columns(const tadah::core::Context &c) const override;
+
+    /**
+     * @brief One weight per product aed(i)*aed(ii), i <= ii: dsize (dsize + 1) / 2.
+     *
+     * With BIAS true the products of two different intercept columns are
+     * identically zero (an atom has one species), so N (N - 1) / 2 of these
+     * weights have no data: N = 1 has none.
+     */
+    std::size_t weights_count(std::size_t dsize) const override;
 
     /**
      * @brief Predicts energy using the polynomial basis function.

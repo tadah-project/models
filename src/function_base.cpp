@@ -18,6 +18,7 @@ tadah::core::aed_type Function_Base::derivative(const tadah::core::aed_type& , c
 double Function_Base::prime(const tadah::core::aed_type& , const tadah::core::aed_type& ,
                             const tadah::core::aed_type& ) const { return 0.0; }
 void Function_Base::set_basis(const tadah::core::Matrix ) {}
+std::size_t Function_Base::basis_vector_size() const { return 0; }
 
 } // namespace models
 } // namespace tadah

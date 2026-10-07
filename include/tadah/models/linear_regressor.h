@@ -39,11 +39,12 @@ class LinearRegressor {
    * @param weights Vector to store the resultant weights.
    * @param Sigma tadah::core::Matrix to store the covariance matrix.
    * @param workspaceManager Workspace provider.
-   * @param n_intercept The intercept columns of Phi, columns 0 ..
-   *        n_intercept-1 (Function_Base::intercept_columns() of the
-   *        function that built Phi): the LAMBDA ridge penalty leaves them
-   *        out, and OALGO 3, whose ridge penalises every column alike,
-   *        refuses LAMBDA != 0 when there is one.
+   * @param intercepts The intercept columns of Phi, 0-based indices into
+   *        its columns (Function_Base::intercept_columns() of the function
+   *        that built Phi, mapped to Phi's columns when FIXINDEX removed
+   *        some): the LAMBDA ridge penalty leaves them out and penalises
+   *        every other column, and OALGO 3, whose ridge penalises every
+   *        column alike, refuses LAMBDA != 0 when there is one.
    */
 public:
   static void train(tadah::core::Context &context,
@@ -52,7 +53,7 @@ public:
                     tadah::core::t_type &weights,
                     tadah::core::Matrix &Sigma,
                     tadah::models::memory::IModelsWorkspaceManager &workspaceManager,
-                    const size_t n_intercept) {
+                    const std::vector<size_t> &intercepts) {
 
     double lambda = context.get<double>("LAMBDA", 0);
     int oalgo = context.get<int>("OALGO", 0);
@@ -65,18 +66,24 @@ public:
       throw std::runtime_error("LAMBDA -1 requires OALGO 3");
     }
 
-    const size_t n_bias = n_intercept;
+    const size_t n_bias = intercepts.size();
+    for (size_t j : intercepts)
+      if (j >= Phi.cols())
+        throw std::logic_error(
+            "LinearRegressor::train: intercept column " + std::to_string(j) +
+            " of a design matrix of " + std::to_string(Phi.cols()) +
+            " columns");
 
     if (lambda > 0 && oalgo != 3 ) {
-      // Augment the design matrix with the regularization term.
-      // Skip the first n_bias rows of the augmentation block: intercept
-      // columns are unpenalised (standard practice — regularising an intercept
-      // biases the fit toward zero mean).
+      // Augment the design matrix with the regularization term: row
+      // aug_start + j penalises column j, except for the intercept columns,
+      // which stay unpenalised (standard practice: regularising an
+      // intercept biases the fit toward zero mean).
       const size_t aug_start = Phi.rows() - Phi.cols();
-      size_t j = n_bias;
-      for (size_t i = aug_start + n_bias; i < Phi.rows(); ++i) {
-        Phi(i, j++) = std::sqrt(lambda);
-      }
+      std::vector<bool> intercept(Phi.cols(), false);
+      for (size_t j : intercepts) intercept[j] = true;
+      for (size_t j = 0; j < Phi.cols(); ++j)
+        if (!intercept[j]) Phi(aug_start + j, j) = std::sqrt(lambda);
     }
 
     tadah::models::OLS ols(workspaceManager);
@@ -129,16 +136,18 @@ public:
 
   }
   /** @brief train() of a linear model: its intercept columns are the
-   *  bias columns of the descriptor, tadah::core::n_intercept_columns()
-   *  (Function_Base::intercept_columns() of BF_Linear and Kern_Linear). */
+   *  intercept columns of the descriptor, 0 .. N-1 with N =
+   *  tadah::core::n_intercept_columns() (Function_Base::intercept_columns()
+   *  of BF_Linear and Kern_Linear). */
   static void train(tadah::core::Context &context,
                     tadah::core::phi_type &Phi,
                     tadah::core::t_type &T,
                     tadah::core::t_type &weights,
                     tadah::core::Matrix &Sigma,
                     tadah::models::memory::IModelsWorkspaceManager &workspaceManager) {
-    train(context, Phi, T, weights, Sigma, workspaceManager,
-          tadah::core::n_intercept_columns(context));
+    std::vector<size_t> intercepts(tadah::core::n_intercept_columns(context));
+    for (size_t k = 0; k < intercepts.size(); ++k) intercepts[k] = k;
+    train(context, Phi, T, weights, Sigma, workspaceManager, intercepts);
   }
   /** @brief train() of a linear model with a temporary workspace manager. */
   static void train(tadah::core::Context &context, tadah::core::phi_type &Phi, tadah::core::t_type &T, tadah::core::t_type &weights,

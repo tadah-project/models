@@ -34,7 +34,7 @@ std::string Kern_Quadratic::get_label() const
     return label;
 }
 
-size_t Kern_Quadratic::intercept_columns(const tadah::core::Context &c) const
+std::vector<size_t> Kern_Quadratic::intercept_columns(const tadah::core::Context &c) const
 {
   return dot_product_intercept_columns(c);
 }

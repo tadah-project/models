@@ -32,7 +32,7 @@ class Kern_Quadratic : public virtual Kern_Base {
 
         std::string get_label() const override;
         /** \brief See Function_Base::intercept_columns(). */
-        size_t intercept_columns(const tadah::core::Context &c) const override;
+        std::vector<size_t> intercept_columns(const tadah::core::Context &c) const override;
 
 };
 } // namespace models
