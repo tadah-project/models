@@ -45,7 +45,8 @@ struct CovarianceFit {
    *  rank threshold, and the n - min(m, n) directions of a matrix with
    *  fewer rows than columns (OALGO 3). */
   std::size_t n_dropped = 0;
-  /** Why no covariance was computed (empty when it was). */
+  /** Why no covariance was computed and what to change (empty when it
+   *  was). */
   std::string why_not;
 };
 
@@ -131,9 +132,7 @@ public:
 
     CovarianceFit fit;
     fit.n_obs = n_obs;
-    fit.why_not = "OALGO " + std::to_string(oalgo) +
-                  " computes no weight covariance (only OALGO 3, the SVD "
-                  "solve, does)";
+    fit.why_not = oalgo_without_covariance(oalgo);
     Sigma = tadah::core::Matrix();
 
     tadah::models::OLS ols(workspaceManager);
@@ -228,6 +227,15 @@ public:
                     tadah::core::Matrix &Sigma) {
     tadah::models::memory::ModelsWorkspaceManager workspaceManager;
     return train(context, Phi, T, weights, Sigma, workspaceManager);
+  }
+
+  /** @brief Why a fit with @p oalgo (not 3) computes no weight
+   *  covariance, and what to change: "OALGO <oalgo> computes no weight
+   *  covariance (only OALGO 3, the SVD solve, does): fit with OALGO 3". */
+  static std::string oalgo_without_covariance(int oalgo) {
+    return "OALGO " + std::to_string(oalgo) +
+           " computes no weight covariance (only OALGO 3, the SVD solve, "
+           "does): fit with OALGO 3";
   }
 
   /** @brief The observations of a design matrix with its cols
@@ -479,7 +487,9 @@ public:
       fit.why_not = "the fit has " + std::to_string(n_obs) +
                     " observations (rows with a non-zero weight) for an "
                     "effective " + core::to_string(fit.gamma) +
-                    " weights (gamma), so its noise variance is undefined";
+                    " weights (gamma), so its noise variance is undefined: "
+                    "add data with a non-zero weight (it needs more "
+                    "observations than effective weights)";
       return fit;
     }
     fit.noise_variance = fit.rss / dof;

@@ -183,8 +183,8 @@ public:
           this->clear_covariance(why);
       } else {
         this->clear_covariance(fit.why_not.empty()
-            ? "OALGO " + std::to_string(context.template get<int>("OALGO", 0)) +
-              " computes no weight covariance (only OALGO 3, the SVD solve, does)"
+            ? LinearRegressor::oalgo_without_covariance(
+                  context.template get<int>("OALGO", 0))
             : fit.why_not);
       }
       trained = true;

@@ -184,8 +184,8 @@ public:
           this->clear_covariance(why);
       } else {
         this->clear_covariance(fit.why_not.empty()
-            ? "OALGO " + std::to_string(context.template get<int>("OALGO", 0)) +
-              " computes no weight covariance (only OALGO 3, the SVD solve, does)"
+            ? LinearRegressor::oalgo_without_covariance(
+                  context.template get<int>("OALGO", 0))
             : fit.why_not);
       }
       trained = true;
@@ -215,9 +215,7 @@ public:
     void train2(tadah::core::Matrix &B, tadah::core::t_type &T) {
         // This solve computes no covariance: the model keeps none of an
         // earlier fit.
-        this->clear_covariance("M_KRR implementation 2 (MODEL M_KRR <kernel> "
-                               "2) computes no weight covariance; only an "
-                               "OALGO 3 fit of implementation 1 does");
+        this->clear_covariance(krr_implementation2_without_covariance());
         double lambda = context.template get<double>("LAMBDA");
 
         if (lambda < 0)

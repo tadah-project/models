@@ -39,7 +39,9 @@ public:
     /** Whether the last fit computed the covariance Sigma. */
     bool has_covariance() const { return covariance_computed_; }
 
-    /** Why the last fit computed no covariance (empty when it did). */
+    /** Why the last fit computed no covariance, and what to change (empty
+     *  when it did): `tadah train --uncertainty` gives it as its reason and
+     *  remedy. */
     const std::string &covariance_unavailable() const {
       return covariance_unavailable_;
     }
@@ -54,7 +56,7 @@ public:
     }
 
     /** The fit that just ran (or starts) computes no covariance, for the
-     *  reason @p why; an earlier fit's is removed. */
+     *  reason @p why (with what to change); an earlier fit's is removed. */
     void clear_covariance(const std::string &why) {
       Sigma = tadah::core::Matrix();
       noise_variance = 0.0;

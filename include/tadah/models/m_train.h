@@ -137,13 +137,16 @@ public:
  * n weights, OALGO 3): nothing is solved, so no weight has a variance (an
  * n x n zero matrix), and the noise variance is RSS / n_obs of the
  * residual target @p T_r (prep_train_with_residuals; its augmentation and
- * weight-0 rows are zero). Returns false, with @p why, when n_obs is 0.
+ * weight-0 rows are zero). Returns false, with @p why (the reason and what
+ * to change), when n_obs is 0.
  */
   static bool pinned_covariance(const tadah::core::t_type &T_r, size_t n,
                                 size_t n_obs, tadah::core::Matrix &Sigma,
                                 double &s2, std::string &why) {
     if (n_obs == 0) {
-      why = "the fit has no observations (rows with a non-zero weight)";
+      why = "the fit has no observations (rows with a non-zero weight), so "
+            "its noise variance is undefined: add data with a non-zero "
+            "weight";
       return false;
     }
     double rss = 0.0;
