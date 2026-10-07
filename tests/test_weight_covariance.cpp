@@ -30,6 +30,7 @@
 #include <tadah/models/linear_regressor.h>
 #include <tadah/models/m_blr_train.h>
 #include <tadah/models/m_krr_train.h>
+#include <tadah/models/memory/models_workspace_manager.h>
 #include <tadah/models/ols.h>
 #include <tadah/models/svd.h>
 
@@ -703,6 +704,166 @@ TEST_CASE("get_weights_uncertainty: the standard deviations of an OALGO 3 "
         check_model(m, c);
       }
     }
+  }
+}
+
+/* Pins: LAMBDA -1 (the evidence approximation, OALGO 3) refuses a fit
+ * with no more observations than effective weights, before it estimates
+ * the noise: a design matrix of 3 rows of weight 0 (zero rows) and its 2
+ * augmentation rows, n_obs 0, throws std::runtime_error naming LAMBDA -1,
+ * the 0 observations and the remedy (LAMBDA >= 0), with no covariance (Sigma
+ * 0 x 0) and the Context's ALPHA and BETA as they were (1 and 1); through
+ * M_BLR_Train<BF_Linear>::train(Phi, T, 0) the model is not trained and
+ * has no covariance; and through train(Phi, T) on the augmentation rows
+ * alone (rows - cols = 0 observations) the same.
+ * Before the fix: passes as well (a pin of the refusal MODELS 9b2629f
+ * added with n_obs; before that commit EA took N = max(rows, cols), which
+ * counted these rows, and divided by RSS = 0: beta was infinite and there
+ * was no refusal). */
+TEST_CASE("LAMBDA -1 refuses a fit without observations",
+          "[weight_covariance][ea]") {
+  auto zero_phi = [](size_t rows) {
+    phi_type Phi(rows, 2);
+    Phi.set_zero();
+    return Phi;
+  };
+  auto zero_t = [](size_t rows) {
+    t_type t(rows);
+    for (size_t i = 0; i < rows; ++i) t[i] = 0.0;
+    return t;
+  };
+  {
+    Context c = oalgo3_context("-1");
+    c.add("ALPHA", "1");
+    c.add("BETA", "1");
+    phi_type Phi = zero_phi(5);
+    t_type t = zero_t(5);
+    t_type w;
+    Matrix S;
+    tadah::models::memory::ModelsWorkspaceManager wsm;
+    std::string msg = "<no exception>";
+    try {
+      LinearRegressor::train(c, Phi, t, w, S, wsm, {}, 0);
+    } catch (const std::runtime_error &e) {
+      msg = e.what();
+    }
+    INFO(msg);
+    CHECK(msg.find("LAMBDA -1") != std::string::npos);
+    CHECK(msg.find("0 observations") != std::string::npos);
+    CHECK(msg.find("LAMBDA >= 0") != std::string::npos);
+    CHECK(S.rows() == 0);
+    CHECK(c.get<double>("ALPHA") == 1.0);
+    CHECK(c.get<double>("BETA") == 1.0);
+  }
+  for (const bool explicit_n_obs : {true, false}) {
+    DYNAMIC_SECTION("M_BLR_Train<BF_Linear>, "
+                    << (explicit_n_obs ? "n_obs 0" : "rows - cols = 0")) {
+      Context c = oalgo3_context("-1");
+      c.add("ALPHA", "1");
+      c.add("BETA", "1");
+      BF_Linear bf;
+      M_BLR_Train<BF_Linear> m(bf, c);
+      phi_type Phi = zero_phi(explicit_n_obs ? 5 : 2);
+      t_type t = zero_t(explicit_n_obs ? 5 : 2);
+      std::string msg = "<no exception>";
+      try {
+        if (explicit_n_obs)
+          m.train(Phi, t, 0);
+        else
+          m.train(Phi, t);
+      } catch (const std::runtime_error &e) {
+        msg = e.what();
+      }
+      INFO(msg);
+      CHECK(msg.find("LAMBDA -1") != std::string::npos);
+      CHECK(msg.find("0 observations") != std::string::npos);
+      CHECK_FALSE(m.trained);
+      CHECK_FALSE(m.has_covariance());
+      CHECK(m.Sigma.rows() == 0);
+    }
+  }
+}
+
+/* Pins: the reason a fit leaves no weight covariance
+ * (covariance_unavailable(), in get_weights_uncertainty()'s message) says
+ * what to change: after an OALGO 1 fit "fit with OALGO 3"; after M_KRR
+ * implementation 2 (train2) "MODEL M_KRR <kernel> 1"; after an OALGO 3 fit
+ * with 2 observations for 4 weights at LAMBDA 0 (gamma = 2, the noise
+ * variance undefined) "2 observations" and "add data with a non-zero
+ * weight"; with every weight pinned and no observation (FIXINDEX 1-2, n_obs
+ * 0) "no observations" and the same remedy. tadah train --uncertainty
+ * gives the reason as its remedy.
+ * Before the fix: the reasons said why, not what to change ("OALGO 1
+ * computes no weight covariance (only OALGO 3, the SVD solve, does)", "...
+ * so its noise variance is undefined"), and tadah train --uncertainty
+ * appended "Add observations (data with a non-zero weight)" to every one,
+ * M_KRR implementation 2's included. */
+TEST_CASE("A fit without a weight covariance says what to change",
+          "[weight_covariance][uncertainty]") {
+  auto message = [](auto &m) {
+    try {
+      m.get_weights_uncertainty();
+    } catch (const std::exception &e) {
+      return std::string(e.what());
+    }
+    return std::string("<no exception>");
+  };
+  {
+    Context c = oalgo3_context("1e-3");
+    c.remove("OALGO");
+    c.add("OALGO", "1");
+    BF_Linear bf;
+    M_BLR_Train<BF_Linear> m(bf, c);
+    const LMat A = make_A(9, 4, 0.61);
+    phi_type Phi = with_augmentation(A);
+    t_type t = target_with_augmentation(make_T(A), 4);
+    m.train(Phi, t);
+    const std::string msg = message(m);
+    INFO(msg);
+    CHECK(msg.find("fit with OALGO 3") != std::string::npos);
+  }
+  {
+    Context c = oalgo3_context("1e-3");
+    Kern_Linear k;
+    M_KRR_Train<Kern_Linear> m(k, c);
+    Matrix B(4, 3);
+    for (size_t j = 0; j < 3; ++j)
+      for (size_t i = 0; i < 4; ++i) B(i, j) = (i == j ? 2.0 : 0.1 * (i + j));
+    t_type T(3);
+    for (size_t j = 0; j < 3; ++j) T[j] = 0.5 * static_cast<double>(j + 1);
+    m.train2(B, T);
+    const std::string msg = message(m);
+    INFO(msg);
+    CHECK(msg.find("MODEL M_KRR <kernel> 1") != std::string::npos);
+  }
+  {
+    Context c = oalgo3_context("0");
+    BF_Linear bf;
+    M_BLR_Train<BF_Linear> m(bf, c);
+    const LMat A = make_A(2, 4, 0.47);
+    phi_type Phi = with_augmentation(A);
+    t_type t = target_with_augmentation(make_T(A), 4);
+    m.train(Phi, t);
+    const std::string msg = message(m);
+    INFO(msg);
+    CHECK(msg.find("2 observations") != std::string::npos);
+    CHECK(msg.find("add data with a non-zero weight") != std::string::npos);
+  }
+  {
+    Context c = oalgo3_context("0");
+    c.add("FIXINDEX", "1-2");
+    c.add("FIXWEIGHT", "0.1 0.2");
+    BF_Linear bf;
+    M_BLR_Train<BF_Linear> m(bf, c);
+    phi_type Phi(5, 2);
+    Phi.set_zero();
+    t_type t(5);
+    for (size_t i = 0; i < 5; ++i) t[i] = 0.0;
+    m.train(Phi, t, 0);
+    const std::string msg = message(m);
+    INFO(msg);
+    CHECK(msg.find("no observations") != std::string::npos);
+    CHECK(msg.find("add data with a non-zero weight") != std::string::npos);
   }
 }
 
