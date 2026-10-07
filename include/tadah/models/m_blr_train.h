@@ -112,6 +112,11 @@ public:
 
       context.get("FIXWEIGHT", w_f);
 
+      // DesignMatrix's layout of the full matrix: its data rows, then one
+      // ridge row per weight. The ridge rows of the pinned weights stay
+      // (zero rows) when their columns go.
+      const size_t data_rows = LinearRegressor::Layout::of(Phi).data_rows;
+
       tadah::core::t_type T_r;
       auto move_map = prep_train_with_residuals(Phi, T, indices, w_f, T_r);
 
@@ -121,7 +126,9 @@ public:
 
       if (Phi.cols() > 0) {
         LinearRegressor::train(context, Phi, T_r, weights, Sigma, *workspaceManager_,
-                               bf.intercept_columns(context));
+                               bf.intercept_columns(context),
+                               LinearRegressor::Layout::fixed(data_rows, move_map,
+                                                              Phi.cols()));
       } else {
         // Every column is fixed (FIXINDEX covers all weights): there is nothing
         // left to solve, so skip the regressor entirely and let the fixed
@@ -151,7 +158,8 @@ public:
     }
     else {
       LinearRegressor::train(context, Phi, T, weights, Sigma, *workspaceManager_,
-                             bf.intercept_columns(context));
+                             bf.intercept_columns(context),
+                             LinearRegressor::Layout::of(Phi));
       trained = true;
     }
 

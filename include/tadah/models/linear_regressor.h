@@ -1,10 +1,12 @@
 #ifndef LINEAR_REGRESSOR_H
 #define LINEAR_REGRESSOR_H
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <stdexcept>
 #include <string>
 #include <tadah/core/context.h>
 #include <tadah/core/core_types.h>
@@ -30,11 +32,85 @@ namespace models {
  * regression.
  */
 class LinearRegressor {
+public:
+  /**
+   * @brief The rows and columns of a design matrix given to train().
+   *
+   * Rows 0 .. data_rows-1 of Phi hold the data; the rows after them, at
+   * least Phi.cols(), are ridge rows (zero; train() writes the LAMBDA
+   * penalty into the last Phi.cols() of them). Column j of Phi fits weight
+   * column_weight[j] (0-based) of the model's n_weights, or weight j when
+   * column_weight is empty. train()'s checks and messages count these.
+   */
+  struct Layout {
+    size_t data_rows = 0;               ///< rows that hold data
+    size_t n_weights = 0;               ///< the model's weights, pinned ones included
+    std::vector<size_t> column_weight;  ///< the weight of each column; empty: column j is weight j
 
-  /* A design matrix laid out as DesignMatrix lays it out: its data rows,
-   * then one ridge row per column (zero with LAMBDA 0). */
-  static size_t data_rows(const tadah::core::phi_type &Phi) {
-    return Phi.rows() >= Phi.cols() ? Phi.rows() - Phi.cols() : Phi.rows();
+    /** DesignMatrix's layout of @p Phi: its data rows, then one ridge row
+     *  per column (Phi.rows() - Phi.cols() data rows), column j weight j. */
+    static Layout of(const tadah::core::phi_type &Phi) {
+      Layout L;
+      L.data_rows = Phi.rows() >= Phi.cols() ? Phi.rows() - Phi.cols() : 0;
+      L.n_weights = Phi.cols();
+      return L;
+    }
+
+    /** The layout of a design matrix laid out as DesignMatrix lays it out,
+     *  with @p data_rows data rows and move_map.size() weights, after
+     *  M_Train::prep_train_with_residuals moved the FIXINDEX columns to the
+     *  right and they were removed: its first @p n_free columns fit weights
+     *  move_map[0 .. n_free-1], and every ridge row is kept. */
+    static Layout fixed(size_t data_rows, const std::vector<size_t> &move_map,
+                        size_t n_free) {
+      Layout L;
+      L.data_rows = data_rows;
+      L.n_weights = move_map.size();
+      L.column_weight.assign(move_map.begin(),
+                             move_map.begin() +
+                                 static_cast<std::ptrdiff_t>(
+                                     std::min(n_free, move_map.size())));
+      return L;
+    }
+
+    /** The weights FIXINDEX pins: those that have no column. */
+    size_t pinned(size_t cols) const {
+      return n_weights > cols ? n_weights - cols : 0;
+    }
+  };
+
+private:
+  static std::string plural(size_t n, const std::string &word) {
+    return std::to_string(n) + " " + word + (n == 1 ? "" : "s");
+  }
+
+  /* "these 4 weights", or with pinned weights "these 4 free weights
+   * (FIXINDEX pins 1 of the 5 weights)". */
+  static std::string weights_text(size_t cols, const Layout &L) {
+    const size_t k = L.pinned(cols);
+    if (k == 0) return "these " + plural(cols, "weight");
+    return "these " + std::to_string(cols) + " free weights (FIXINDEX pins " +
+           std::to_string(k) + " of the " + plural(L.n_weights, "weight") + ")";
+  }
+
+  /* The weight (1-based) that column `c` (1-based) fits. */
+  static size_t weight_of(size_t c, const Layout &L) {
+    return L.column_weight.empty() || c == 0 || c > L.column_weight.size()
+               ? c
+               : L.column_weight[c - 1] + 1;
+  }
+
+  /* Checks that `L` describes `Phi` (a logic error of the caller). */
+  static void require_layout(const tadah::core::phi_type &Phi, const Layout &L) {
+    if (Phi.rows() < L.data_rows + Phi.cols() ||
+        (!L.column_weight.empty() && L.column_weight.size() != Phi.cols()) ||
+        L.n_weights < Phi.cols())
+      throw std::logic_error(
+          "LinearRegressor::train: a layout of " + plural(L.data_rows, "data row") +
+          ", " + plural(L.column_weight.size(), "column weight") + " and " +
+          plural(L.n_weights, "weight") + " does not describe a design "
+          "matrix of " + std::to_string(Phi.rows()) + " rows and " +
+          std::to_string(Phi.cols()) + " columns");
   }
 
   /* True for a value that is not NaN or +-inf; a test on the bits, which
@@ -49,68 +125,120 @@ class LinearRegressor {
    * naming its row and column, before LAPACK is called: on NaN or inf
    * LAPACK stops with an argument or convergence error (DGELSD info -4,
    * DGELS -5, DGESDD 3), DPOTRF calls the matrix not positive definite, and
-   * an infinite target is fitted without an error. */
+   * an infinite target is fitted without an error. With pinned weights the
+   * target is the residual, less the pinned weights' part. */
   static void require_finite(const tadah::core::phi_type &Phi,
-                             const tadah::core::t_type &T) {
-    const size_t data = data_rows(Phi);
-    const std::string layout =
-        std::to_string(data) + " data rows, then " +
-        std::to_string(Phi.rows() - data) + " ridge rows";
+                             const tadah::core::t_type &T, const Layout &L) {
+    const size_t data = L.data_rows;
+    const bool pins = L.pinned(Phi.cols()) > 0;
+    const std::string rows =
+        plural(data, "data row") + ", then " +
+        plural(Phi.rows() - data, "ridge row");
     for (size_t j = 0; j < Phi.cols(); ++j)
       for (size_t i = 0; i < Phi.rows(); ++i)
         if (!finite_bits(Phi(i, j)))
           throw std::runtime_error(
               "LinearRegressor::train: the design matrix holds a value that "
               "is not finite (nan or inf) at row " + std::to_string(i + 1) +
-              ", column " + std::to_string(j + 1) + " (of " + layout +
-              ", and " + std::to_string(Phi.cols()) +
-              " columns): a descriptor or basis function gave it; no weights "
-              "were fitted");
+              ", column " + std::to_string(j + 1) + " (of " + rows + ", and " +
+              plural(Phi.cols(), "column") +
+              (pins ? ", the free weights'; column " + std::to_string(j + 1) +
+                          " fits weight " +
+                          std::to_string(weight_of(j + 1, L))
+                    : std::string()) +
+              "): a descriptor or basis function gave it; no weights were "
+              "fitted");
     for (size_t i = 0; i < T.size() && i < Phi.rows(); ++i)
       if (!finite_bits(T[i]))
         throw std::runtime_error(
-            "LinearRegressor::train: the target vector holds a value that is "
-            "not finite (nan or inf) at row " + std::to_string(i + 1) +
-            " (of " + layout + "); no weights were fitted");
+            std::string("LinearRegressor::train: the target vector") +
+            (pins ? ", less the part of the FIXINDEX weights," : "") +
+            " holds a value that is not finite (nan or inf) at row " +
+            std::to_string(i + 1) + " (of " + rows +
+            "); no weights were fitted");
   }
 
-  /* The message of a fit OALGO 2 or 4 cannot make: what `e` found, the
-   * fit's data rows, weights and LAMBDA, and the remedies. */
+  static std::string oalgo_name(int oalgo) {
+    return oalgo == 2 ? "OALGO 2 (DGELS, QR)"
+                      : "OALGO 4 (normal equations, Cholesky)";
+  }
+
+  static const char *remedies() {
+    return " Use OALGO 1 (DGELSD) or OALGO 3 (SVD), which give the "
+           "minimum-norm weights, LAMBDA > 0 (a ridge penalty makes every "
+           "column it penalises full rank; it does not penalise the "
+           "intercept columns of BIAS), or more data (structures, FORCE or "
+           "STRESS rows).";
+  }
+
+  /* Refuses, for OALGO 2 and 4, a design matrix whose rows cannot give it
+   * full column rank, before LAPACK runs: its rank is at most the data
+   * rows plus the ridge rows that carry a penalty (LAMBDA > 0: one for
+   * each column but the n_bias intercept columns). LAPACK's own tests
+   * depend on rounding: DGELS stops at an exactly zero diagonal element of
+   * R, DPOTRF at a pivot that is not positive, and the rounded Phi^T Phi
+   * of fewer data rows than weights is often factored. */
+  static void require_enough_rows(int oalgo, const tadah::core::phi_type &Phi,
+                                  const Layout &L, double lambda,
+                                  size_t n_bias) {
+    const size_t n = Phi.cols();
+    const size_t data = L.data_rows;
+    const size_t bias = std::min(n_bias, n);
+    const bool ridge = lambda > 0;
+    if (data + (ridge ? n - bias : 0) >= n) return;
+    std::string msg = oalgo_name(oalgo) + " cannot fit " + weights_text(n, L) +
+                      ": the design matrix has " + plural(data, "data row") +
+                      " for " + plural(n, "weight") + ", LAMBDA " +
+                      tadah::core::format_roundtrip(lambda);
+    if (ridge)
+      msg += ", which does not penalise its " + plural(bias, "intercept column") +
+             ": fewer data rows than intercept columns";
+    else
+      msg += ": fewer data rows than weights";
+    msg += ", so it does not have full column rank and the least-squares "
+           "weights are not unique.";
+    msg += ridge ? " Use OALGO 1 (DGELSD), which gives the minimum-norm "
+                   "weights, or more structures."
+                 : remedies();
+    throw std::runtime_error(msg);
+  }
+
+  /* The message of a fit OALGO 2 or 4 cannot make as LAPACK finds it: what
+   * `e` found, the fit's data rows, weights and LAMBDA, and the remedies. */
   [[noreturn]] static void throw_rank_deficient(int oalgo,
                                                 const RankDeficientError &e,
                                                 const tadah::core::phi_type &Phi,
+                                                const Layout &L,
                                                 double lambda) {
     const size_t n = Phi.cols();
-    const size_t data = data_rows(Phi);
-    const std::string fit = std::to_string(data) + " data rows for " +
-                            std::to_string(n) + " weights, LAMBDA " +
+    const bool pins = L.pinned(n) > 0;
+    const size_t c = static_cast<size_t>(e.column());
+    const std::string fit = plural(L.data_rows, "data row") + " for " +
+                            plural(n, "weight") + ", LAMBDA " +
                             tadah::core::format_roundtrip(lambda);
     std::string msg;
     if (oalgo == 2) {
-      msg = "OALGO 2 (DGELS, QR) cannot fit these " + std::to_string(n) +
-            " weights: the design matrix (" + fit +
+      msg = oalgo_name(2) + " cannot fit " + weights_text(n, L) +
+            ": the design matrix (" + fit +
             ") does not have full column rank: its column " +
-            std::to_string(e.column()) +
-            " is zero or a linear combination of the columns before it" +
-            (data < n ? " (fewer data rows than weights)" : "") +
-            ", so the least-squares weights are not unique.";
+            std::to_string(c) +
+            (pins ? " (weight " + std::to_string(weight_of(c, L)) + ")"
+                  : std::string()) +
+            " is zero or a linear combination of the columns before it, so "
+            "the least-squares weights are not unique.";
     } else {
-      msg = "OALGO 4 (normal equations, Cholesky) cannot fit these " +
-            std::to_string(n) +
-            " weights: the matrix Phi^T Phi of the design matrix (" + fit +
+      msg = oalgo_name(4) + " cannot fit " + weights_text(n, L) +
+            ": the matrix Phi^T Phi of the design matrix (" + fit +
             ") is not positive definite (its leading minor of order " +
-            std::to_string(e.column()) +
-            " is not), so the design matrix does not have full column rank "
-            "or is too ill-conditioned for the normal equations.";
+            std::to_string(c) + " is not" +
+            (pins ? "; column " + std::to_string(c) + " fits weight " +
+                        std::to_string(weight_of(c, L))
+                  : std::string()) +
+            "), so the design matrix does not have full column rank or is "
+            "too ill-conditioned for the normal equations.";
     }
-    throw std::runtime_error(
-        msg +
-        " Use OALGO 1 (DGELSD) or OALGO 3 (SVD), which give the minimum-norm "
-        "weights, LAMBDA > 0 (a ridge penalty makes every column it "
-        "penalises full rank; it does not penalise the intercept columns of "
-        "BIAS), or more data (structures, FORCE or STRESS rows).");
+    throw std::runtime_error(msg + remedies());
   }
-
 
   /**
    * @brief Train the model using the provided configuration and data matrices.
@@ -129,6 +257,19 @@ class LinearRegressor {
    *        function that built Phi): the LAMBDA ridge penalty leaves them
    *        out, and OALGO 3, whose ridge penalises every column alike,
    *        refuses LAMBDA != 0 when there is one.
+   * @param layout Phi's data rows and the weight each column fits
+   *        (Layout::of(Phi) for DesignMatrix's layout, Layout::fixed()
+   *        after FIXINDEX removed columns): the checks and messages count
+   *        them.
+   * @throws std::runtime_error for a value of Phi or T that is not finite
+   *         (every OALGO), and under OALGO 2 and 4 for a design matrix
+   *         whose data rows (and, with LAMBDA > 0, ridge rows) cannot give
+   *         it full column rank, before LAPACK runs, or whose QR or
+   *         Cholesky factorisation LAPACK cannot complete; each names the
+   *         rows, the weights and LAMBDA. A design matrix whose columns are
+   *         dependent but not exactly so in floating point can still be
+   *         fitted by OALGO 2 and 4, with weights as large as the rounding
+   *         makes them.
    */
 public:
   static void train(tadah::core::Context &context,
@@ -137,7 +278,8 @@ public:
                     tadah::core::t_type &weights,
                     tadah::core::Matrix &Sigma,
                     tadah::models::memory::IModelsWorkspaceManager &workspaceManager,
-                    const size_t n_intercept) {
+                    const size_t n_intercept,
+                    const Layout &layout) {
 
     double lambda = context.get<double>("LAMBDA", 0);
     int oalgo = context.get<int>("OALGO", 0);
@@ -166,14 +308,17 @@ public:
 
     tadah::models::OLS ols(workspaceManager);
     // tadah::models::OLS ols;
-    require_finite(Phi, T);
+    require_layout(Phi, layout);
+    require_finite(Phi, T, layout);
+    if (oalgo == 2 || oalgo == 4)
+      require_enough_rows(oalgo, Phi, layout, lambda, n_bias);
     if (oalgo == 1) {
       ols.solve(Phi, T, weights, rcond, tadah::models::Algorithm::GELSD);
     } else if (oalgo == 2) {
       try {
         ols.solve(Phi, T, weights, rcond, tadah::models::Algorithm::GELS);
       } catch (const RankDeficientError &e) {
-        throw_rank_deficient(2, e, Phi, lambda);
+        throw_rank_deficient(2, e, Phi, layout, lambda);
       }
     } else if (oalgo == 3) {
       // SVD path applies a uniform ridge across all singular values; there is
@@ -215,15 +360,16 @@ public:
         ols.solve(Phi, T, weights, rcond,
                   tadah::models::Algorithm::NormalEquations);
       } catch (const RankDeficientError &e) {
-        throw_rank_deficient(4, e, Phi, lambda);
+        throw_rank_deficient(4, e, Phi, layout, lambda);
       }
     } else {
       throw std::runtime_error("Unsupported OALGO: " + std::to_string(oalgo));
     }
 
   }
-  /** @brief train() of a linear model: its intercept columns are the
-   *  bias columns of the descriptor, tadah::core::n_intercept_columns()
+  /** @brief train() of a linear model on a design matrix laid out as
+   *  DesignMatrix lays it out (Layout::of(Phi)): its intercept columns are
+   *  the bias columns of the descriptor, tadah::core::n_intercept_columns()
    *  (Function_Base::intercept_columns() of BF_Linear and Kern_Linear). */
   static void train(tadah::core::Context &context,
                     tadah::core::phi_type &Phi,
@@ -232,7 +378,7 @@ public:
                     tadah::core::Matrix &Sigma,
                     tadah::models::memory::IModelsWorkspaceManager &workspaceManager) {
     train(context, Phi, T, weights, Sigma, workspaceManager,
-          tadah::core::n_intercept_columns(context));
+          tadah::core::n_intercept_columns(context), Layout::of(Phi));
   }
   /** @brief train() of a linear model with a temporary workspace manager. */
   static void train(tadah::core::Context &context, tadah::core::phi_type &Phi, tadah::core::t_type &T, tadah::core::t_type &weights,
@@ -262,6 +408,10 @@ public:
    * @param Sigma       Unused for OALGO=4 but kept for API symmetry.
    * @param factor      Output: receives the cached Cholesky factor.
    * @param workspaceManager  Workspace provider.
+   * @throws std::runtime_error, before the factorisation, for what train()
+   *         refuses under OALGO 4 before LAPACK runs: a value of Phi or T
+   *         that is not finite, and fewer data rows than weights (LAMBDA
+   *         0) or than intercept columns (LAMBDA > 0).
    */
   static void train_with_factor(
       tadah::core::Context &context,
@@ -318,7 +468,9 @@ public:
       }
     }
 
-    require_finite(Phi, T);
+    const Layout layout = Layout::of(Phi);
+    require_finite(Phi, T, layout);
+    require_enough_rows(4, Phi, layout, lambda, n_bias);
     tadah::models::OLS ols(workspaceManager);
     ols.solveAndCacheFactor(Phi, T, weights, factor, n_bias);
   }

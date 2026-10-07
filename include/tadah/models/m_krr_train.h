@@ -130,8 +130,10 @@ public:
         }
       }
 
+      // The pinned columns stay, set to 0: DesignMatrix's layout.
       LinearRegressor::train(context, Phi, T_r, weights, Sigma, *workspaceManager_,
-                             kernel.intercept_columns(context));
+                             kernel.intercept_columns(context),
+                             LinearRegressor::Layout::of(Phi));
 
       for (size_t i=0; i<indices.size(); ++i) {
         weights[indices[i]]=w_f[i];
@@ -140,7 +142,8 @@ public:
     }
     else {
       LinearRegressor::train(context, Phi, T, weights, Sigma, *workspaceManager_,
-                             kernel.intercept_columns(context));
+                             kernel.intercept_columns(context),
+                             LinearRegressor::Layout::of(Phi));
       trained = true;
     }
 
