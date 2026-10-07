@@ -5,8 +5,8 @@
 // (DGELS, QR) and OALGO 4 (normal equations, Cholesky) before LAPACK runs,
 // a rank-deficient design matrix that LAPACK reports, and a design matrix
 // or target with a value that is not finite, under every OALGO; with
-// FIXINDEX (M_BLR_Train), the free weights, the data rows and the weight
-// of each column. The design matrices are laid out as DesignMatrix lays
+// FIXINDEX (M_BLR_Train and M_KRR_Train), the free weights, the data rows
+// and the weight of each column. The design matrices are laid out as DesignMatrix lays
 // them out: the data rows, then one ridge row per column (zero with LAMBDA
 // 0).
 
@@ -15,8 +15,10 @@
 #include <tadah/core/core_types.h>
 #include <tadah/models/factor_handle.h>
 #include <tadah/models/functions/basis_functions/bf_linear.h>
+#include <tadah/models/functions/kernels/kern_linear.h>
 #include <tadah/models/linear_regressor.h>
 #include <tadah/models/m_blr_train.h>
+#include <tadah/models/m_krr_train.h>
 #include <tadah/models/memory/models_workspace_manager.h>
 
 #include <cmath>
@@ -128,6 +130,25 @@ std::string blr_fix_refusal(const std::string &oalgo, const std::string &fixinde
   for (const std::string &w : fixweights) c.add("FIXWEIGHT", w);
   BF_Linear bf;
   M_BLR_Train<BF_Linear> m(bf, c);
+  try {
+    m.train(Phi, T);
+  } catch (const std::exception &e) {
+    return e.what();
+  }
+  return "no exception";
+}
+
+/* The message M_KRR_Train<Kern_Linear>::train throws with FIXINDEX
+ * `fixindex` and FIXWEIGHT `fixweights` under `oalgo`, or "no exception".
+ * With Kern_Linear, column j of Phi is weight j, as for BF_Linear. */
+std::string krr_fix_refusal(const std::string &oalgo, const std::string &fixindex,
+                            const std::vector<std::string> &fixweights,
+                            phi_type Phi, t_type T) {
+  Context c = make_ctx(oalgo);
+  c.add("FIXINDEX", fixindex);
+  for (const std::string &w : fixweights) c.add("FIXWEIGHT", w);
+  Kern_Linear k;
+  M_KRR_Train<Kern_Linear> m(k, c);
   try {
     m.train(Phi, T);
   } catch (const std::exception &e) {
@@ -367,6 +388,93 @@ TEST_CASE("LinearRegressor: with FIXINDEX the messages count the data rows "
   phi_type bad1 = design(6, 5, 5);
   bad1(1, 0) = nan;
   CHECK(blr_fix_refusal("1", "1", {"0.1"}, bad1, target(6, 5)) ==
+        "LinearRegressor::train: the target vector, less the part of the "
+        "FIXINDEX weights, holds a value that is not finite (nan or inf) at "
+        "row 2 (of 6 data rows, then 5 ridge rows); no weights were fitted");
+}
+
+/* Pins: with FIXINDEX, M_KRR_Train (MODEL M_KRR Kern_Linear) removes the
+ * pinned columns as M_BLR_Train does, and its messages count the data rows
+ * of the design matrix (not the ridge rows of the pinned columns), the free
+ * weights and the pinned ones, and name the weight of a column, as the
+ * previous case pins for M_BLR_Train, on the same design matrices and with
+ * the same messages:
+ *  - 2 data rows for 5 weights, FIXINDEX 5 (OALGO 2): "OALGO 2 (DGELS, QR)
+ *    cannot fit these 4 free weights (FIXINDEX pins 1 of the 5 weights):
+ *    the design matrix has 2 data rows for 4 weights, LAMBDA 0: fewer data
+ *    rows than weights, ..." + the remedies; FIXINDEX 1-2, "these 3 free
+ *    weights (FIXINDEX pins 2 of the 5 weights): the design matrix has 2
+ *    data rows for 3 weights, ...";
+ *  - 6 data rows for 5 weights whose weight 2's column is zero, FIXINDEX 1:
+ *    OALGO 2 "... its column 1 (weight 2) is zero or a linear combination
+ *    of the columns before it, ...", and OALGO 4 "... (its leading minor of
+ *    order 1 is not; column 1 fits weight 2), ...";
+ *  - 6 data rows, FIXINDEX 1, OALGO 1: a NaN in weight 5's column at row 2
+ *    "... at row 2, column 4 (of 6 data rows, then 5 ridge rows, and 4
+ *    columns, the free weights'; column 4 fits weight 5): ...", and a NaN
+ *    in the pinned weight 1's column: "LinearRegressor::train: the target
+ *    vector, less the part of the FIXINDEX weights, holds a value that is
+ *    not finite (nan or inf) at row 2 (of 6 data rows, then 5 ridge rows);
+ *    no weights were fitted".
+ * Before the fix: not run before it, since the case is the merge of v1-dev
+ * into fix/input-robustness. On that branch M_KRR_Train kept the pinned
+ * columns, set to 0 (DesignMatrix's layout, Layout::of(Phi)); v1-dev's
+ * M_KRR_Train removes them and its call takes no layout. With
+ * Layout::of(Phi) in the FIXINDEX call, the layout of the matrix without
+ * the pinned columns, it fails as M_BLR_Train did before the fix: "these 4
+ * weights: the design matrix has 3 data rows for 4 weights, ..." for
+ * FIXINDEX 5; "these 3 weights: the design matrix (4 data rows for 3
+ * weights, LAMBDA 0) ... its column 3 is zero or a linear combination of
+ * the columns before it, ..." for FIXINDEX 1-2; "(7 data rows for 4
+ * weights, LAMBDA 0) ... its column 1 is zero ..." and "... (its leading
+ * minor of order 1 is not), ..."; "at row 2, column 4 (of 7 data rows,
+ * then 4 ridge rows, and 4 columns)"; and "the target vector holds a value
+ * that is not finite (nan or inf) at row 2 (of 7 data rows, then 4 ridge
+ * rows)". */
+TEST_CASE("LinearRegressor: with FIXINDEX M_KRR_Train's messages count the "
+          "data rows and name the weights",
+          "[linear_regressor][lapack_messages][fixed_weights][krr]") {
+  CHECK(krr_fix_refusal("2", "5", {"0.1"}, design(2, 5, 5), target(2, 5)) ==
+        "OALGO 2 (DGELS, QR) cannot fit these 4 free weights (FIXINDEX pins 1 "
+        "of the 5 weights): the design matrix has 2 data rows for 4 weights, "
+        "LAMBDA 0: fewer data rows than weights, so it does not have full "
+        "column rank and the least-squares weights are not unique." +
+            std::string(kRemedies));
+  CHECK(krr_fix_refusal("2", "1-2", {"0.1", "0.2"}, design(2, 5, 5),
+                        target(2, 5)) ==
+        "OALGO 2 (DGELS, QR) cannot fit these 3 free weights (FIXINDEX pins 2 "
+        "of the 5 weights): the design matrix has 2 data rows for 3 weights, "
+        "LAMBDA 0: fewer data rows than weights, so it does not have full "
+        "column rank and the least-squares weights are not unique." +
+            std::string(kRemedies));
+
+  phi_type zero2 = design(6, 5, 5);
+  for (size_t i = 0; i < 6; ++i) zero2(i, 1) = 0.0;
+  CHECK(krr_fix_refusal("2", "1", {"0.1"}, zero2, target(6, 5)) ==
+        "OALGO 2 (DGELS, QR) cannot fit these 4 free weights (FIXINDEX pins 1 "
+        "of the 5 weights): the design matrix (6 data rows for 4 weights, "
+        "LAMBDA 0) does not have full column rank: its column 1 (weight 2) is "
+        "zero or a linear combination of the columns before it, so the "
+        "least-squares weights are not unique." + std::string(kRemedies));
+  CHECK(krr_fix_refusal("4", "1", {"0.1"}, zero2, target(6, 5)) ==
+        "OALGO 4 (normal equations, Cholesky) cannot fit these 4 free weights "
+        "(FIXINDEX pins 1 of the 5 weights): the matrix Phi^T Phi of the "
+        "design matrix (6 data rows for 4 weights, LAMBDA 0) is not positive "
+        "definite (its leading minor of order 1 is not; column 1 fits weight "
+        "2), so the design matrix does not have full column rank or is too "
+        "ill-conditioned for the normal equations." + std::string(kRemedies));
+
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  phi_type bad5 = design(6, 5, 5);
+  bad5(1, 4) = nan;
+  CHECK(krr_fix_refusal("1", "1", {"0.1"}, bad5, target(6, 5)) ==
+        "LinearRegressor::train: the design matrix holds a value that is not "
+        "finite (nan or inf) at row 2, column 4 (of 6 data rows, then 5 ridge "
+        "rows, and 4 columns, the free weights'; column 4 fits weight 5): a "
+        "descriptor or basis function gave it; no weights were fitted");
+  phi_type bad1 = design(6, 5, 5);
+  bad1(1, 0) = nan;
+  CHECK(krr_fix_refusal("1", "1", {"0.1"}, bad1, target(6, 5)) ==
         "LinearRegressor::train: the target vector, less the part of the "
         "FIXINDEX weights, holds a value that is not finite (nan or inf) at "
         "row 2 (of 6 data rows, then 5 ridge rows); no weights were fitted");
