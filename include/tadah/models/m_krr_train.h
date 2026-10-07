@@ -6,7 +6,6 @@
 #include <tadah/models/functions/kernels/kern_base.h>
 #include <tadah/models/m_train.h>
 #include <tadah/models/m_krr_core.h>
-#include <tadah/models/ekm.h>
 #include <tadah/core/maths.h>
 #include <tadah/core/context.h>
 #include <tadah/models/memory/imodels_workspace_manager.h>
@@ -22,13 +21,20 @@ namespace models {
  *
  * Extends KRR core and train functionalities with specific implementations.
  *
+ * train() solves for the weights of the design-matrix columns as they
+ * are: for a non-linear kernel, column j holds K(b_j, x) summed over the
+ * atoms (and its derivatives), and weight j belongs to basis vector b_j.
+ * (The columns used to be rotated first by the right singular vectors of
+ * the kernel matrix of the basis, EKM. The rotation was orthogonal, so it
+ * did not change a fit without intercept columns, but with BIAS true it
+ * left rotated column 0 out of the ridge penalty, and the covariance
+ * SIGMA of OALGO 3 was that of the rotated weights.)
+ *
  * @tparam Kern Kernel type, default is Function_Base.
  */
 template <class Kern = Function_Base&>
 class M_KRR_Train : public M_KRR_Core<Kern>, public M_Train {
 public:
-    EKM<Kern> ekm; ///< Extended Kernel tadah::core::Matrix object.
-
     using M_KRR_Core<Kern>::trained;
     using M_KRR_Core<Kern>::context;
     using M_KRR_Core<Kern>::kernel;
@@ -38,31 +44,32 @@ public:
     /**
      * @brief Constructor using a configuration object.
      *
-     * Initializes KRR core and EKM with the given configuration.
+     * Initializes KRR core with the given configuration.
      *
      * @param c Configuration object reference.
      */
-    M_KRR_Train(tadah::core::Context &c) : M_KRR_Core<Kern>(c), ekm(c) {}
+    M_KRR_Train(tadah::core::Context &c) : M_KRR_Core<Kern>(c) {}
 
     /**
      * @brief Constructor using a kernel and configuration object.
      *
-     * Initializes KRR core and EKM with the given kernel and configuration.
+     * Initializes KRR core with the given kernel and configuration.
      *
      * @param kernel Kernel object.
      * @param c Configuration object reference.
      */
-    M_KRR_Train(Kern &kernel, tadah::core::Context &c) : M_KRR_Core<Kern>(kernel, c), ekm(kernel) {}
+    M_KRR_Train(Kern &kernel, tadah::core::Context &c) : M_KRR_Core<Kern>(kernel, c) {}
     M_KRR_Train(Kern &kernel, tadah::core::Context &c, tadah::models::memory::IModelsWorkspaceManager &workspaceManager) :
     M_KRR_Core<Kern>(kernel, c),
-    M_Train(workspaceManager),
-    ekm(kernel)
+    M_Train(workspaceManager)
   {}
 
     /**
      * @brief Trains the model on given feature and target matrices.
      *
-     * Uses EKM and linear regressor to perform training.
+     * Uses the linear regressor on the design-matrix columns as they are;
+     * the kernel's intercept columns (Function_Base::intercept_columns())
+     * are left out of the ridge penalty.
      *
      * @param Phi Feature matrix.
      * @param T Target vector.
@@ -119,13 +126,8 @@ public:
         }
       }
 
-      if (kernel.get_label() != "Kern_Linear") {
-        ekm.project(Phi);
-      }
-      LinearRegressor::train(context, Phi, T_r, weights, Sigma, *workspaceManager_);
-      if (kernel.get_label() != "Kern_Linear") {
-        weights = ekm.EKM_mat * weights;
-      }
+      LinearRegressor::train(context, Phi, T_r, weights, Sigma, *workspaceManager_,
+                             kernel.intercept_columns(context));
 
       for (size_t i=0; i<indices.size(); ++i) {
         weights[indices[i]]=w_f[i];
@@ -133,13 +135,8 @@ public:
       trained = true;
     }
     else {
-      if (kernel.get_label() != "Kern_Linear") {
-        ekm.project(Phi);
-      }
-      LinearRegressor::train(context, Phi, T, weights, Sigma, *workspaceManager_);
-      if (kernel.get_label() != "Kern_Linear") {
-        weights = ekm.EKM_mat * weights;
-      }
+      LinearRegressor::train(context, Phi, T, weights, Sigma, *workspaceManager_,
+                             kernel.intercept_columns(context));
       trained = true;
     }
 

@@ -32,6 +32,8 @@ class Kern_LQ : public virtual Kern_Base {
         double prime(const tadah::core::aed_type& b, const tadah::core::aed_type& af, const tadah::core::aed_type& ff) const override;
 
         std::string get_label() const override;
+        /** \brief See Function_Base::intercept_columns(). */
+        size_t intercept_columns(const tadah::core::Context &c) const override;
 
 };
 } // namespace models

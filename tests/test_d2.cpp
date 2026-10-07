@@ -56,8 +56,11 @@ void test_d2(Context &c, double r) {
   REQUIRE_THAT(fz2, Catch::Matchers::Approx(fz).epsilon(1e-12));
 }
 
+// `rcuts` are the cutoffs the descriptor is tested with (a descriptor whose
+// cutoff is fixed, D2_EAM, passes its own).
 template<typename D>
-void test_D2(Context &c) {
+void test_D2(Context &c,
+             const std::vector<double> &rcuts = {10, 2.1, 2.5, 3.5, 6.7}) {
   // std::streambuf *orig = std::cout.rdbuf();
   std::stringstream ss;
   // std::cout.rdbuf (ss.rdbuf()); // redirect cout
@@ -68,7 +71,6 @@ void test_D2(Context &c) {
   // We cannot test r=rcut as finite difference will fail
   // but we can test r slightly smaller than rcut
   std::vector<double> rs = {2,2.0001,2.0123,5,11};
-  std::vector<double> rcuts {10, 2.1, 2.5, 3.5,6.7};
 
   for (const auto &r: rs) {
     for (const auto &rcut: rcuts) {
@@ -206,22 +208,39 @@ TEST_CASE_METHOD(TestFixture, "Testing D2_EAM", "[D2]") {
     std::stringstream ss;
     // std::cout.rdbuf(ss.rdbuf()); // redirect cout
     
+    // The form a configuration file gives: `TYPE2B D2_EAM 0` (the
+    // placeholder parameter; test_d2 adds the element pair H H) and SETFL.
+    // It used to omit the descriptor name and the parameter, so the first
+    // added H stood for both. Before the fix: passes as well (a pin:
+    // D2_EAM read SETFL and dropped its parameter).
+    // RCUT2B is the setfl file's cutoff, the only one D2_EAM takes (it
+    // refuses another: test_eam_descriptors.cpp). Before the cutoff fix
+    // the harness's five cutoffs were each replaced in the context by the
+    // file's, so all five runs were at 5.58190742024 as this one is.
+    // Before that fix: passes as well (a pin).
     Context c;
     c.remove("INIT2B");
     c.add("INIT2B", "true");
+    c.add("TYPE2B", "D2_EAM");
+    c.add("TYPE2B", 0);
     c.add("SETFL", "tests_data/eam.alloy");
-    test_D2<D2_EAM>(c);
+    test_D2<D2_EAM>(c, {5.58190742024});
 
     D2_EAM d(c);
     REQUIRE(d.size() == 1);
     REQUIRE(d.label() == "D2_EAM");
 
-    // Test throws
+    // Test throws, naming the SETFL path. Before the fix: passes as well (a
+    // pin: D2_EAM has always read SETFL).
     Context c_err;
     c_err.remove("INIT2B");
     c_err.add("INIT2B", "true");
+    c_err.add("TYPE2B", "D2_EAM");
+    c_err.add("TYPE2B", 0);
+    c_err.add("TYPE2B", "H");
+    c_err.add("TYPE2B", "H");
     c_err.add("SETFL", "path/to/nowhere");
-    REQUIRE_THROWS(D2_EAM(c_err));
+    CHECK_THROWS_WITH(D2_EAM(c_err), Catch::Contains("path/to/nowhere"));
     
     // std::cout.rdbuf(orig); // restore
 }

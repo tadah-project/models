@@ -1,4 +1,5 @@
 #include <tadah/models/functions/basis_functions/bf_polynomial2.h>
+#include <tadah/core/intercept_layout.h>
 namespace tadah {
 namespace models {
 
@@ -52,6 +53,12 @@ tadah::core::force_type BF_Polynomial2::fpredict(const tadah::core::t_type &weig
     }
   }
   return v;
+}
+
+size_t BF_Polynomial2::intercept_columns(const tadah::core::Context &c) const
+{
+  // column 0 is aed(0)*aed(0): bias x bias = 1 with a bias intercept
+  return tadah::core::n_intercept_columns(c) > 0 ? 1 : 0;
 }
 
 } // namespace models

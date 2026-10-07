@@ -38,6 +38,12 @@ class LinearRegressor {
    * @param T Target matrix.
    * @param weights Vector to store the resultant weights.
    * @param Sigma tadah::core::Matrix to store the covariance matrix.
+   * @param workspaceManager Workspace provider.
+   * @param n_intercept The intercept columns of Phi, columns 0 ..
+   *        n_intercept-1 (Function_Base::intercept_columns() of the
+   *        function that built Phi): the LAMBDA ridge penalty leaves them
+   *        out, and OALGO 3, whose ridge penalises every column alike,
+   *        refuses LAMBDA != 0 when there is one.
    */
 public:
   static void train(tadah::core::Context &context,
@@ -45,7 +51,8 @@ public:
                     tadah::core::t_type &T,
                     tadah::core::t_type &weights,
                     tadah::core::Matrix &Sigma,
-                    tadah::models::memory::IModelsWorkspaceManager &workspaceManager) {
+                    tadah::models::memory::IModelsWorkspaceManager &workspaceManager,
+                    const size_t n_intercept) {
 
     double lambda = context.get<double>("LAMBDA", 0);
     int oalgo = context.get<int>("OALGO", 0);
@@ -58,7 +65,7 @@ public:
       throw std::runtime_error("LAMBDA -1 requires OALGO 3");
     }
 
-    const size_t n_bias = tadah::core::n_intercept_columns(context);
+    const size_t n_bias = n_intercept;
 
     if (lambda > 0 && oalgo != 3 ) {
       // Augment the design matrix with the regularization term.
@@ -87,8 +94,9 @@ public:
       if (n_bias > 0 && lambda != 0.0) {
         throw std::runtime_error(
             "OALGO=3 (SVD with uniform ridge) does not support intercept "
-            "exclusion from regularisation. With BIAS=true and LAMBDA != 0, "
-            "use OALGO=1 or OALGO=2 instead.");
+            "exclusion from regularisation. The model has " +
+            std::to_string(n_bias) + " intercept column(s) (BIAS=true with "
+            "ATOM) and LAMBDA != 0: use OALGO=1, 2 or 4 instead.");
       }
       tadah::models::SVD svd;
       svd.compute(Phi);
@@ -120,6 +128,19 @@ public:
     }
 
   }
+  /** @brief train() of a linear model: its intercept columns are the
+   *  bias columns of the descriptor, tadah::core::n_intercept_columns()
+   *  (Function_Base::intercept_columns() of BF_Linear and Kern_Linear). */
+  static void train(tadah::core::Context &context,
+                    tadah::core::phi_type &Phi,
+                    tadah::core::t_type &T,
+                    tadah::core::t_type &weights,
+                    tadah::core::Matrix &Sigma,
+                    tadah::models::memory::IModelsWorkspaceManager &workspaceManager) {
+    train(context, Phi, T, weights, Sigma, workspaceManager,
+          tadah::core::n_intercept_columns(context));
+  }
+  /** @brief train() of a linear model with a temporary workspace manager. */
   static void train(tadah::core::Context &context, tadah::core::phi_type &Phi, tadah::core::t_type &T, tadah::core::t_type &weights,
                     tadah::core::Matrix &Sigma) {
     tadah::models::memory::ModelsWorkspaceManager workspaceManager;

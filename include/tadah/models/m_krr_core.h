@@ -7,6 +7,8 @@
 #include <tadah/models/m_core.h>
 
 #include <iostream>
+#include <stdexcept>
+#include <string>
 
 namespace tadah {
 namespace models {
@@ -94,14 +96,41 @@ private:
      * Loaded weights do not make the model trained: a training configuration
      * may carry the WEIGHTS of a potential (`tadah train -c pot.tadah`),
      * which the fit replaces (as M_BLR_Core).
+     *
+     * A non-linear kernel (any kernel but Kern_Linear) evaluates its
+     * weights against its basis vectors, which it read from SBASIS and
+     * BASIS (Kern_Base::read_basis_from_context): with WEIGHTS, the basis
+     * must be there and hold one vector per weight, else this throws
+     * naming the keys (without a basis the model predicted E = 0, and with
+     * fewer vectors than weights it read past the basis).
      */
     void init() {
         if (context.contains("WEIGHTS")) {
             weights.resize(context.size("WEIGHTS"));
             context.get<tadah::core::t_type>("WEIGHTS", weights);
+            check_basis_of_weights();
         }
         verbose = context.get<int>("VERBOSE");
 
+    }
+
+    void check_basis_of_weights() const {
+        if (kernel.get_label() == "Kern_Linear") return;
+        const Kern_Base *kb = dynamic_cast<const Kern_Base*>(&kernel);
+        if (kb == nullptr) return;   // the constructors refuse a non-kernel
+        const size_t nb = kb->get_basis().cols();
+        if (nb == 0)
+            throw std::runtime_error(
+                "M_KRR " + kernel.get_label() + ": the potential has WEIGHTS "
+                "but no basis vectors (SBASIS and BASIS): a non-linear kernel "
+                "evaluates its weights against the basis vectors that "
+                "training wrote with them.");
+        if (nb != weights.size())
+            throw std::runtime_error(
+                "M_KRR " + kernel.get_label() + ": the potential has " +
+                std::to_string(weights.size()) + " WEIGHTS but SBASIS " +
+                std::to_string(nb) + " basis vectors (BASIS): a non-linear "
+                "kernel has one weight per basis vector.");
     }
 };
 

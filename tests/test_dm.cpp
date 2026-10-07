@@ -506,22 +506,33 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_mEAD<F_SQ> 2", "[DM]") {
 //     test_case<DM_EAD, Cut_PolyS>(context, "DM_EAD", 4 * 3);
 // }
 
+// DM_EAM in the form a configuration file gives it: `TYPEMB DM_EAM 0` (the
+// placeholder parameter; test_case adds the element pair H H) and the setfl
+// file named by SETFL.
+// Before the fix: DM_EAM read its setfl path from TYPEMB parameter 1, so
+// these contexts failed with "setfl file does not exist: 0". The tests built
+// DM_EAM from `TYPEMB DM_EAM tests_data/eam.alloy`, which no configuration
+// can hold (the TYPEMB format takes an unsigned integer there).
 TEST_CASE_METHOD(TestFixture, "Testing DM_EAM 1", "[DM]") {
     Context context;
     context.add("RCUTMB", 5.58190742024);
     context.remove("INITMB");
     context.add("INITMB", "true");
     context.add("TYPEMB", "DM_EAM");
-    context.add("TYPEMB", "tests_data/eam.alloy");
+    context.add("TYPEMB", 0);
+    context.add("SETFL", "tests_data/eam.alloy");
     test_case<DM_EAM, Cut_Dummy>(context, "DM_EAM", 1);
 
-    // Throws
+    // Throws, naming the SETFL path (before the fix: the placeholder "0")
     Context c_err;
     c_err.remove("INITMB");
     c_err.add("INITMB", "true");
     c_err.add("TYPEMB", "DM_EAM");
-    c_err.add("TYPEMB", "path/to/nowhere");
-    REQUIRE_THROWS(DM_EAM(c_err));
+    c_err.add("TYPEMB", 0);
+    c_err.add("TYPEMB", "H");
+    c_err.add("TYPEMB", "H");
+    c_err.add("SETFL", "path/to/nowhere");
+    CHECK_THROWS_WITH(DM_EAM(c_err), Catch::Contains("path/to/nowhere"));
 }
 
 TEST_CASE_METHOD(TestFixture, "Testing DM_EAM 2", "[DM]") {
@@ -530,7 +541,8 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_EAM 2", "[DM]") {
     context.remove("INITMB");
     context.add("INITMB", "true");
     context.add("TYPEMB", "DM_EAM");
-    context.add("TYPEMB", "tests_data/eam.alloy");
+    context.add("TYPEMB", 0);
+    context.add("SETFL", "tests_data/eam.alloy");
     test_case<DM_EAM, Cut_Dummy>(context, "DM_EAM", 1);
 }
 
@@ -540,15 +552,21 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_EAM 3", "[DM]") {
     context.remove("INITMB");
     context.add("INITMB", "true");
     context.add("TYPEMB", "DM_EAM");
-    context.add("TYPEMB", "tests_data/eam.alloy");
+    context.add("TYPEMB", 0);
+    context.add("SETFL", "tests_data/eam.alloy");
     test_case<DM_EAM, Cut_Dummy>(context, "DM_EAM", 1);
 
-    // Throws
+    // Throws, naming the SETFL path. Before the fix the context had no
+    // TYPEMB, so it threw for the missing key, not for the file.
     Context c_err;
     c_err.remove("INITMB");
     c_err.add("INITMB", "true");
+    c_err.add("TYPEMB", "DM_EAM");
+    c_err.add("TYPEMB", 0);
+    c_err.add("TYPEMB", "H");
+    c_err.add("TYPEMB", "H");
     c_err.add("SETFL", "path/to/nowhere");
-    REQUIRE_THROWS(DM_EAM(c_err));
+    CHECK_THROWS_WITH(DM_EAM(c_err), Catch::Contains("path/to/nowhere"));
 }
 
 TEST_CASE_METHOD(TestFixture, "Testing DM_Dummy", "[DM]") {
