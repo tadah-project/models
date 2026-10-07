@@ -12,6 +12,10 @@ std::string BF_Polynomial2::get_label() const
 {
   return label;
 }
+std::size_t BF_Polynomial2::weights_count(std::size_t dsize) const
+{
+  return dsize*(dsize+1)/2;
+}
 double BF_Polynomial2::epredict(const tadah::core::t_type &weights, const tadah::core::aed_type& aed) const
 {
   size_t b=0;

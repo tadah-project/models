@@ -84,6 +84,13 @@ class Kern_Base: public virtual Function_Base {
         /** \brief Set basis for calculations */
         virtual void set_basis(const tadah::core::Matrix b);
 
+        /** \brief One weight per basis vector (basis.cols()), whatever
+         *  dsize is; 0 before the kernel has a basis. */
+        std::size_t weights_count(std::size_t dsize) const override;
+
+        /** \brief The length of the basis vectors (basis.rows()). */
+        std::size_t basis_vector_size() const override;
+
         /** \brief Return basis stored by this object */
         virtual const tadah::core::Matrix &get_basis() const;
         /** \brief Return basis stored by this object */

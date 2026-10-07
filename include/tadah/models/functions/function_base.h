@@ -4,6 +4,8 @@
 #include <tadah/core/core_types.h>
 #include <tadah/core/context.h>
 
+#include <cstddef>
+
 namespace tadah {
 namespace models {
 
@@ -38,6 +40,17 @@ public:
 
   virtual tadah::core::force_type fpredict(const tadah::core::t_type &, const tadah::core::fd_type &,
                               const tadah::core::aed_type& ) const=0;
+
+  /** \brief Number of model weights for a descriptor of @p dsize entries:
+   *  the design-matrix width. BF_Linear and Kern_Linear: dsize;
+   *  BF_Polynomial2: dsize (dsize + 1) / 2; a kernel with a basis: the
+   *  number of basis vectors, whatever dsize is (0 before it has a basis). */
+  virtual std::size_t weights_count(std::size_t dsize) const=0;
+
+  /** \brief Number of descriptor entries of each basis vector the weights
+   *  multiply (a kernel's basis.rows()); 0 for a function without a basis
+   *  (the basis functions and Kern_Linear act on the descriptor itself). */
+  virtual std::size_t basis_vector_size() const;
 };
 } // namespace models
 } // namespace tadah

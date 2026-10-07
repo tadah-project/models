@@ -54,6 +54,12 @@ void Kern_Base::read_basis_from_context(const tadah::core::Context &context, tad
     }
   }
 }
+std::size_t Kern_Base::weights_count(std::size_t) const {
+  return basis.cols();
+}
+std::size_t Kern_Base::basis_vector_size() const {
+  return basis.rows();
+}
 const tadah::core::Matrix &Kern_Base::get_basis() const {
   return basis;
 }
