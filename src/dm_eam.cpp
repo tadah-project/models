@@ -1,6 +1,7 @@
 #include "tadah/models/descriptors/dm/dm_base.h"
 #include <tadah/models/descriptors/dm/dm_eam.h>
 #include <tadah/models/descriptors/closed_form_meta.h>
+#include <tadah/models/descriptors/eam_placeholder.h>
 namespace tadah {
 namespace models {
 
@@ -15,7 +16,8 @@ DM_EAM::DM_EAM(core::Context &c): DM_Base(c)
   init();
   if (!c.get<bool>("INITMB")) return;
   s=1;
-  eam_.read_setfl(c.get<std::string>("TYPEMB",1));
+  report_eam_placeholder(c, "TYPEMB", lab);
+  eam_.read_setfl(c("SETFL")[0]);
   eam_.build_splines();
 
   if (std::abs(eam_.rcut() - c.get<double>("RCUTMB")) > std::numeric_limits<double>::min()) {

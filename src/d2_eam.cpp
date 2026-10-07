@@ -1,6 +1,7 @@
 #include "tadah/models/descriptors/d2/d2_base.h"
 #include <tadah/models/descriptors/d2/d2_eam.h>
 #include <tadah/models/descriptors/closed_form_meta.h>
+#include <tadah/models/descriptors/eam_placeholder.h>
 namespace tadah {
 namespace models {
 
@@ -12,9 +13,10 @@ D2_EAM::D2_EAM() {
 }
 D2_EAM::D2_EAM(tadah::core::Context &c): D2_Base(c)
 {
-  if (!c.get<bool>("INIT2B")) return;
   init();
+  if (!c.get<bool>("INIT2B")) return;
   s=1;
+  report_eam_placeholder(c, "TYPE2B", lab);
   eam_.read_setfl(c("SETFL")[0]);
   eam_.build_splines();
 
