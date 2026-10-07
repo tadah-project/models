@@ -288,6 +288,79 @@ TEST_CASE("EAMSetflIO skips '#' comments and blank lines after line 3, as "
   }
 }
 
+TEST_CASE("EAMSetflIO reads a header record that spans lines, as LAMMPS "
+          "joins it",
+          "[eam][setfl_read]") {
+  /* Pins: a header record may span lines, as LAMMPS' next_values joins
+   * lines until they hold the record's words: the grid record written as
+   * '3 0.5 3' and '1.0 2.0', and the element record as '73' and '180.95
+   * 3.304 bcc', read the values of the plain file, value for value.
+   * Before the fix: passes as well (a pin: operator>> read across lines). */
+  EAMSetflIO plain;
+  plain.read_setfl_text(joined(setfl3_lines()), "plain.alloy");
+  std::vector<std::string> l = setfl3_lines();
+  l[4] = "3 0.5 3";
+  l.insert(l.begin() + 5, "1.0 2.0");
+  l[6] = "73";
+  l.insert(l.begin() + 7, "180.95 3.304 bcc");
+  REQUIRE(l.size() == 11);
+  EAMSetflIO io;
+  REQUIRE_NOTHROW(io.read_setfl_text(joined(l), "split.alloy"));
+  CHECK(io.nrho() == plain.nrho());
+  CHECK(io.drho() == plain.drho());
+  CHECK(io.nr() == plain.nr());
+  CHECK(io.dr() == plain.dr());
+  CHECK(io.rcut() == plain.rcut());
+  CHECK(io.atomic_number() == plain.atomic_number());
+  CHECK(io.atomic_mass() == plain.atomic_mass());
+  CHECK(io.lattice_param() == plain.lattice_param());
+  CHECK(io.lattice() == plain.lattice());
+  CHECK(io.element() == plain.element());
+  CHECK(io.frho() == plain.frho());
+  CHECK(io.rhor() == plain.rhor());
+  CHECK(io.z2r() == plain.z2r());
+}
+
+TEST_CASE("EAMSetflIO: a refused file leaves an object that holds a file as "
+          "it was",
+          "[eam][setfl_read]") {
+  /* Pins: read_setfl_text of a refused file into an EAMSetflIO that holds a
+   * file throws and leaves it as it was: after the 3-point Ta file
+   * (ok.alloy), a file of another element and grid (Nb, Z 41, nrho 3 drho
+   * 0.25, nr 3 dr 0.5 rcut 1.0) that ends before its z2r table is refused,
+   * and the object still has ok.alloy's path, element, header and tables,
+   * and splines them.
+   * Before the fix: the refused read had written the path, the element and
+   * the header into the object before it threw ("EAMSetflIO: truncated
+   * tabulated data in: bad.alloy"): path 'bad.alloy', element 'Nb', Z 41,
+   * drho 0.25 and so on, with the tables of ok.alloy. */
+  EAMSetflIO io;
+  io.read_setfl_text(joined(setfl3_lines()), "ok.alloy");
+  std::vector<std::string> bad = setfl3_lines();
+  bad[3] = "1 Nb";
+  bad[4] = "3 0.25 3 0.5 1.0";
+  bad[5] = "41 92.906 3.30 bcc";
+  bad.pop_back();  // no z2r table
+  CHECK_THROWS_AS(io.read_setfl_text(joined(bad), "bad.alloy"),
+                  std::runtime_error);
+  CHECK(io.path() == "ok.alloy");
+  CHECK(io.element() == "Ta");
+  CHECK(io.atomic_number() == 73);
+  CHECK(io.atomic_mass() == 180.95);
+  CHECK(io.lattice_param() == 3.304);
+  CHECK(io.lattice() == "bcc");
+  CHECK(io.nrho() == 3);
+  CHECK(io.drho() == 0.5);
+  CHECK(io.nr() == 3);
+  CHECK(io.dr() == 1.0);
+  CHECK(io.rcut() == 2.0);
+  CHECK(io.frho() == std::vector<double>{0, -1, -1.5});
+  CHECK(io.rhor() == std::vector<double>{1, 0.5, 0});
+  CHECK(io.z2r() == std::vector<double>{2, 1, 0});
+  io.build_splines();
+  CHECK(io.F_tab(0.5) == -1.0);
+}
+
 TEST_CASE("EAMSetflIO refuses a malformed setfl file, naming the file, the "
           "line and the field",
           "[eam][setfl_read]") {
