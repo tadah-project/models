@@ -32,9 +32,13 @@ public:
    *  non-negative integer (D_Base::element_tokens), when a list key that a
    *  SIZE parameter asks values of is not set ('TYPE2B D2_BP takes 2 CGRID2B
    *  values and 2 SGRID2B values, but CGRID2B and SGRID2B are not set:
-   *  TYPE2B D2_BP 2 2 Ta Ta'; a SIZE of 0 needs no key) or has too few
-   *  values, and when RCTYPE or RCUT has fewer values than the line has
-   *  descriptors.
+   *  TYPE2B D2_BP 2 2 Ta Ta'; a SIZE of 0 needs no key) or has fewer
+   *  values left than the SIZE parameter asks for (on a joined line the
+   *  descriptors before it take theirs first: 'TYPE2B D2_BP (descriptor 2
+   *  of 2) takes 2 CGRID2B values, but CGRID2B has 1 value left of 3 (the
+   *  descriptors before it take 2): TYPE2B D2_BP 2 2 Ta Ta'; the values are
+   *  counted after LIN/GEOM expansion), and when RCTYPE or RCUT has fewer
+   *  values than the line has descriptors.
    */
   static std::vector<tadah::core::Context> parse_context(const tadah::core::Context &c, std::string type_str);
 
