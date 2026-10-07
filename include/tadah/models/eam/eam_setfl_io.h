@@ -39,8 +39,25 @@ class EAMSetflIO {
 public:
   EAMSetflIO() = default;
 
-  /** Parse a single-element setfl file. Throws if the file is missing or
-   *  declares more than one element type. */
+  /** Parse a single-element setfl file, as LAMMPS pair eam/alloy reads
+   *  one: lines 1-3 are comments; from line 4 on, '#' starts a comment and
+   *  a line without words is skipped; then the element line '1 <symbol>',
+   *  the grid 'nrho drho nr dr rcut', the element record 'Z mass a lattice'
+   *  (each record exactly these words; one may span lines) and the F(rho),
+   *  rho(r) and z2r(r) tables, each starting on a new line and ending at the
+   *  end of one. Lines after the z2r table are not read.
+   *
+   *  @throws std::runtime_error naming the file (and the line and the field
+   *          where there is one) if the file is missing, declares more than
+   *          one element type or is malformed: nrho or nr not a whole number
+   *          from 3 to 2147483647 (the spline reads a table's third point);
+   *          drho, dr or rcut not a positive finite number; Z not a whole
+   *          number; the mass or the lattice constant not a finite number; a
+   *          record with a word too many or too few; a table value that is
+   *          not a finite decimal number (core::parse_decimal_finite); a
+   *          table shorter than its count, or whose last line holds words
+   *          after its last value. A refused file leaves this object as it
+   *          was. */
   void read_setfl(const std::string &path);
 
   /** Parse the contents @p text of a single-element setfl file, as
@@ -65,7 +82,8 @@ public:
   double atomic_mass()   const { return atomic_mass_; }
   double lattice_param() const { return lattice_param_; }
   /** Ground-state lattice label, normalised to lower case (e.g. "fcc"); the
-   *  setfl field has no fixed case convention. Empty if the header omitted it. */
+   *  setfl field has no fixed case convention. The element record must
+   *  hold it (read_setfl() refuses one without it). */
   const std::string &lattice() const { return lattice_; }
   /** The lattice label exactly as written in the file (original case), for
    *  faithful messages and round-trip output. */
