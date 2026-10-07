@@ -23,6 +23,7 @@
 #include <tadah/models/descriptors/dm/dm_eam.h>
 #include <tadah/models/eam/eam_setfl_io.h>
 
+#include <cstdio>
 #include <iostream>
 #include <memory>
 #include <sstream>
@@ -369,4 +370,70 @@ TEST_CASE("DM_EAM refuses an RCUTMB other than its setfl file's cutoff",
   REQUIRE_NOTHROW(dm = std::make_unique<DM_EAM>(ok));
   CHECK(dm->get_rcut() == kSetflRcut);
   CHECK(ok.get<double>("RCUTMB") == kSetflRcut);
+}
+
+namespace {
+
+/* tests_data/eam.alloy written to @p path with its pair function z2r
+ * multiplied by @p z2r_scale (the other functions and the grid as read). */
+void write_scaled_setfl(const std::string &path, double z2r_scale) {
+  EAMSetflIO src;
+  src.read_setfl(kSetfl);
+  src.build_splines();
+  src.write_setfl(path, src.input_grid(),
+                  [&](double rho) { return src.F_tab(rho); },
+                  [&](double r) { return src.rho_tab(r); },
+                  [&](double r) { return z2r_scale * src.z2_tab(r); });
+}
+
+/* D2_EAM's descriptor of a Ta-Ta pair at r for the context c. */
+double d2_eam_aed(const Context &c, double r) {
+  D2_EAM d(c);
+  Cut_Dummy fc(kSetflRcut);
+  d.set_fcut(&fc, false);
+  tadah::core::aed_type aed(d.size());
+  aed.set_zero();
+  d.calc_aed(kTa, kTa, r, r * r, aed);
+  return aed(0);
+}
+
+}  // namespace
+
+/* Pins: a D2_EAM built after its setfl file was rewritten evaluates the new
+ * file: with SETFL naming one path, rewritten from z2r x 1 to z2r x 1.5,
+ * the descriptor at r = 2.86 A changes, and equals (bit for bit) that of a
+ * D2_EAM built from a second path holding the second file; built again
+ * after the first contents are written back, it equals the first value.
+ * (The parsed setfl tables are shared between descriptors that read the
+ * same file; they must follow its contents.)
+ * Before the fix: passes as well (a pin: every D2_EAM read its file in its
+ * constructor). */
+TEST_CASE("D2_EAM evaluates the setfl file as it is when it is built",
+          "[D2][eam][setfl_cache]") {
+  tadah::core::PeriodicTable::initialize();
+  const std::string one = "tests_data_eam_follow_one.alloy";
+  const std::string two = "tests_data_eam_follow_two.alloy";
+  const double r = 2.86;
+  Context c1 = d2_context("0");
+  c1.remove("SETFL");
+  c1.add("SETFL", one);
+  Context c2 = d2_context("0");
+  c2.remove("SETFL");
+  c2.add("SETFL", two);
+
+  write_scaled_setfl(one, 1.0);
+  const double first = d2_eam_aed(c1, r);
+  write_scaled_setfl(one, 1.5);
+  const double second = d2_eam_aed(c1, r);
+  write_scaled_setfl(two, 1.5);
+  const double other_path = d2_eam_aed(c2, r);
+  write_scaled_setfl(one, 1.0);
+  const double first_again = d2_eam_aed(c1, r);
+  std::remove(one.c_str());
+  std::remove(two.c_str());
+
+  CHECK(second == Approx(1.5 * first).epsilon(1e-9));
+  CHECK(second != first);
+  CHECK(second == other_path);
+  CHECK(first_again == first);
 }
