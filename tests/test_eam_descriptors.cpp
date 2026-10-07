@@ -20,12 +20,14 @@
 #include <tadah/models/cutoffs.h>
 #include <tadah/models/descriptors/d2/d2_bp.h>
 #include <tadah/models/descriptors/d2/d2_eam.h>
+#include <tadah/models/descriptors/d2/d2_lj.h>
 #include <tadah/models/descriptors/d2/d2_mjoin.h>
 #include <tadah/models/descriptors/dm/dm_eam.h>
 #include <tadah/models/descriptors/dm/dm_mjoin.h>
 #include <tadah/models/eam/eam_setfl_io.h>
 
 #include <cstdio>
+#include <optional>
 #include <iostream>
 #include <memory>
 #include <sstream>
@@ -455,6 +457,39 @@ TEST_CASE("D2_EAM and DM_EAM name the setfl file that fixes their cutoff",
   CHECK(dmj.cutoff_fixed_by(0).empty());
   CHECK(dmj.cutoff_fixed_by(1) == dm_text);
   CHECK(dmj.cutoff_fixed_by(2).empty());
+}
+
+/* Pins: the parameter metadata of D2_EAM and DM_EAM (meta(), read by the
+ * pre-flight audit and `tadah analysis suggest_bounds`) lists the cutoff key
+ * (RCUT2B, RCUTMB) as Optional, with no bound suggester: the setfl file
+ * fixes it, so it is not a search target. Its health check (a cutoff that
+ * finds no neighbours) stays. D2_LJ, whose cutoff is free, keeps RCUT2B
+ * Critical with a suggester.
+ * Before the fix: D2_EAM and DM_EAM listed their cutoff as Critical with a
+ * suggester, so the audit told a user to add `OPTIM RCUT2B` from
+ * suggest_bounds, a search whose every candidate but the seed D2_EAM
+ * refuses. */
+TEST_CASE("D2_EAM and DM_EAM do not offer their cutoff as a search target",
+          "[D2][DM][eam][cutoff][meta]") {
+  using tadah::models::Criticality;
+  struct Case { std::optional<tadah::models::DescriptorMeta> meta;
+                const char *key; };
+  for (const auto &c : {Case{D2_EAM().meta(), "RCUT2B"},
+                        Case{DM_EAM().meta(), "RCUTMB"}}) {
+    INFO(c.key);
+    REQUIRE(c.meta.has_value());
+    REQUIRE(c.meta->params.size() == 1);
+    const auto &pm = c.meta->params[0];
+    CHECK(pm.key == c.key);
+    CHECK(pm.crit == Criticality::Optional);
+    CHECK_FALSE(static_cast<bool>(pm.suggest));
+    CHECK(static_cast<bool>(pm.check));
+  }
+  const auto lj = tadah::models::D2_LJ().meta();
+  REQUIRE(lj.has_value());
+  REQUIRE(lj->params.size() == 1);
+  CHECK(lj->params[0].crit == Criticality::Critical);
+  CHECK(static_cast<bool>(lj->params[0].suggest));
 }
 
 namespace {
