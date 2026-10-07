@@ -6,6 +6,9 @@
 // it, a fit that computes none (another OALGO, every weight pinned) leaves
 // none, and read_sigma refuses a SIGMA whose count is not N*N+1.
 //
+// M_KRR_Train::train2 (MODEL M_KRR <kernel> 2) computes no covariance and
+// leaves no SIGMA either.
+//
 // Also: an M_KRR model built from a Context with WEIGHTS (a potential used
 // as the configuration) can be trained, as an M_BLR model can.
 
@@ -14,6 +17,7 @@
 #include <tadah/core/core_types.h>
 #include <tadah/models/functions/basis_functions/bf_linear.h>
 #include <tadah/models/functions/kernels/kern_linear.h>
+#include <tadah/models/functions/kernels/kern_rbf.h>
 #include <tadah/models/linear_regressor.h>
 #include <tadah/models/m_blr_train.h>
 #include <tadah/models/m_krr_train.h>
@@ -166,6 +170,50 @@ TEST_CASE("A fit replaces or removes the SIGMA of an earlier fit",
           }
         }
       }
+    }
+  }
+}
+
+/* Pins: M_KRR_Train::train2, the solve of MODEL M_KRR <kernel> 2 (the
+ * kernel matrix of the basis vectors plus LAMBDA on its diagonal, no
+ * covariance), removes the SIGMA the Context carried from an earlier fit
+ * (the 17 values of a 4-weight OALGO 3 fit), for Kern_Linear and for
+ * Kern_RBF (MPARAMS 1.0); it fits one weight per basis vector (4).
+ * Before the fix: the 17 values were kept beside train2's weights, so the
+ * potential written from the model paired them with weights they were not
+ * computed for (`tadah train` of such a configuration wrote `SIGMA 2 1 0
+ * 0 1` into its potential). */
+TEST_CASE("M_KRR implementation 2 (train2) removes the SIGMA of an earlier "
+          "fit",
+          "[sigma][krr]") {
+  for (const char *kern : {"Kern_Linear", "Kern_RBF"}) {
+    DYNAMIC_SECTION(kern) {
+      Context c = make_ctx("1");
+      c.remove("LAMBDA");
+      c.add("LAMBDA", "1e-3");
+      c.add("MPARAMS", "1.0");
+      add_earlier_sigma(c);
+      REQUIRE(c.size("SIGMA") == 17);
+      // Four basis vectors (the columns of the 8x4 matrix), one target
+      // value each.
+      Matrix B = make_phi();
+      t_type T(B.cols());
+      for (size_t j = 0; j < T.size(); ++j)
+        T[j] = 0.3 * static_cast<double>(j + 1);
+      t_type w;
+      if (std::string(kern) == "Kern_Linear") {
+        Kern_Linear k;
+        M_KRR_Train<Kern_Linear> m(k, c);
+        REQUIRE_NOTHROW(m.train2(B, T));
+        w = m.get_weights();
+      } else {
+        Kern_RBF k(c);
+        M_KRR_Train<Kern_RBF> m(k, c);
+        REQUIRE_NOTHROW(m.train2(B, T));
+        w = m.get_weights();
+      }
+      CHECK(w.size() == 4);
+      CHECK_FALSE(c.has_stored("SIGMA"));
     }
   }
 }
