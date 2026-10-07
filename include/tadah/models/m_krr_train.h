@@ -69,7 +69,8 @@ public:
      *
      * Uses the linear regressor on the design-matrix columns as they are;
      * the kernel's intercept columns (Function_Base::intercept_columns())
-     * are left out of the ridge penalty.
+     * are left out of the ridge penalty. A SIGMA in the context is removed
+     * first; an OALGO 3 fit writes its own.
      *
      * @param Phi Feature matrix.
      * @param T Target vector.
@@ -79,6 +80,9 @@ public:
     if (trained) {
       throw std::runtime_error("This object is already trained!");
     }
+    // SIGMA belongs to the fit that computed it (see M_BLR_Train::train):
+    // one in the context is of an earlier fit or of a potential.
+    context.remove("SIGMA");
 
     const bool has_fixweight = context.contains("FIXWEIGHT");
     const bool has_fixindex = context.contains("FIXINDEX");
@@ -145,13 +149,17 @@ public:
     /**
      * @brief Standard KRR training using covariance matrix computation.
      *
-     * Trains the model on energies using the covariance matrix K.
+     * Trains the model on energies using the covariance matrix K. It
+     * writes no SIGMA, and removes one the context held.
      *
      * @param B Basis matrix.
      * @param T Target vector.
      * @throws std::runtime_error if lambda is negative for evidence approximation.
      */
     void train2(tadah::core::Matrix &B, tadah::core::t_type &T) {
+        // This solve computes no covariance: a SIGMA in the context is of
+        // an earlier fit or of a potential, not of these weights.
+        context.remove("SIGMA");
         double lambda = context.template get<double>("LAMBDA");
 
         if (lambda < 0)

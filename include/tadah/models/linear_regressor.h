@@ -331,15 +331,18 @@ public:
   }
 
   /**
-   * @brief Add the covariance matrix to the configuration.
+   * @brief Store the covariance matrix in the configuration as SIGMA.
    *
-   * Converts the Sigma matrix to a vector and stores it in the configuration.
+   * SIGMA is N, then the N x N matrix in column-major order. It replaces a
+   * SIGMA the configuration held (of an earlier fit, or of a potential used
+   * as the configuration): the key holds the covariance of this fit only.
    *
    * @param context Context object.
    * @param Sigma Covariance matrix to be added.
    */
   static void config_add_sigma(tadah::core::Context &context, tadah::core::Matrix &Sigma) {
     tadah::core::t_type Sigma_as_vector(Sigma.data(), Sigma.cols() * Sigma.rows());
+    context.remove("SIGMA");
     context.add("SIGMA", Sigma.rows());
     context.add<tadah::core::t_type>("SIGMA", Sigma_as_vector);
   }
@@ -347,11 +350,13 @@ public:
   /**
    * @brief Read and reconstruct the covariance matrix from the configuration.
    *
-   * Retrieves the Sigma matrix stored in the configuration.
+   * Retrieves the Sigma matrix stored in the configuration: SIGMA holds N,
+   * then N*N values.
    *
    * @param context Context object.
    * @param Sigma tadah::core::Matrix to store the reconstructed Sigma.
-   * @throws std::runtime_error if Sigma is not computed.
+   * @throws std::runtime_error if Sigma is not computed, or if SIGMA does
+   *         not hold N*N+1 values (the message names N and both counts).
    */
   static void read_sigma(const tadah::core::Context &context, tadah::core::Matrix &Sigma) {
     using V = std::vector<double>;
@@ -362,6 +367,13 @@ public:
       throw std::runtime_error("\nSigma matrix is not computed.\n");
     }
 
+    const size_t stored = context.size("SIGMA");
+    if (stored != N * N + 1)
+      throw std::runtime_error(
+          "SIGMA: N = " + std::to_string(N) + " needs N*N+1 = " +
+          std::to_string(N * N + 1) + " values (N and the N x N matrix), "
+          "but SIGMA has " + std::to_string(stored) + "; retrain the "
+          "potential with OALGO 3 to compute it.");
     V Sigma_as_vector(N * N + 1);
     context.get<V>("SIGMA", Sigma_as_vector);
     Sigma_as_vector.erase(Sigma_as_vector.begin());

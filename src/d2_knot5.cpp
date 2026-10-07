@@ -45,13 +45,12 @@ D2_Knot5::D2_Knot5(const tadah::core::Context &c): D2_Base(c)
 }
 
 void D2_Knot5::warn_if_knots_beyond_rcut() {
-  if (warned_rcut_ || cgrid.empty() || !fcut) return;
+  if (cgrid.empty() || !fcut) return;
   const double mx = *std::max_element(cgrid.begin(), cgrid.end());
   const double rc = get_rcut();
   if (mx > rc + 1e-12) {
-    warned_rcut_ = true;
-    tadah::core::Logger::instance().log(
-        tadah::core::LogLevel::WARNING,
+    log_warning_once(
+        "D2_Knot5: knot past RCUT2B",
         "D2_Knot5: the largest CGRID2B knot (" + std::to_string(mx) +
         ") lies beyond RCUT2B (" + std::to_string(rc) +
         ") — its contribution is silently hard-truncated at the cutoff. "

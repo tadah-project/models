@@ -5,20 +5,44 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <iterator>
 #include <limits>
+#include <map>
+#include <mutex>
 #include <sstream>
 #include <stdexcept>
 
 namespace tadah {
 namespace models {
 
-void EAMSetflIO::read_setfl(const std::string &path) {
-  file_path_ = path;
-  std::ifstream in(path);
+namespace {
+
+/* The bytes of the file @p path; throws the reader's message when it
+ * cannot be opened. */
+std::string setfl_bytes(const std::string &path) {
+  std::ifstream in(path, std::ios::binary);
   if (!in.good())
     throw std::runtime_error("EAMSetflIO: setfl file does not exist: " + path);
+  std::ostringstream bytes;
+  bytes << in.rdbuf();
+  if (in.bad())
+    throw std::runtime_error("EAMSetflIO: cannot read setfl file: " + path);
+  return bytes.str();
+}
+
+}  // namespace
+
+void EAMSetflIO::read_setfl(const std::string &path) {
+  read_setfl_text(setfl_bytes(path), path);
+}
+
+void EAMSetflIO::read_setfl_text(const std::string &text,
+                                 const std::string &path) {
+  file_path_ = path;
+  std::istringstream in(text);
 
   std::string line;
   std::getline(in, line); // comment 1
@@ -276,6 +300,48 @@ void EAMSetflIO::write_setfl(const std::string &path,
   dump(grid.nrho, grid.drho, frho_fn);  // F(rho)
   dump(grid.nr,   grid.dr,   rhor_fn);  // rho(r)
   dump(grid.nr,   grid.dr,   z2r_fn);   // z2r(r) = phi(r)*r
+}
+
+namespace {
+
+struct SharedSetfl {
+  std::string bytes;                          // the contents it was parsed from
+  std::shared_ptr<const EAMSetflIO> table;
+};
+
+std::mutex &shared_setfl_mutex() {
+  static std::mutex m;
+  return m;
+}
+
+std::map<std::string, SharedSetfl> &shared_setfl_tables() {
+  static std::map<std::string, SharedSetfl> tables;
+  return tables;
+}
+
+}  // namespace
+
+std::shared_ptr<const EAMSetflIO> shared_setfl(const std::string &path) {
+  std::string bytes = setfl_bytes(path);
+  // The path as given (path() of the table, and its messages) and the file
+  // it names from this working directory: a relative path names another
+  // file in another directory.
+  std::error_code ec;
+  const std::filesystem::path abs = std::filesystem::absolute(path, ec);
+  if (ec)
+    throw std::runtime_error("EAMSetflIO: cannot resolve the setfl path '" +
+                             path + "': " + ec.message());
+  const std::string key = abs.lexically_normal().string() + '\n' + path;
+
+  std::lock_guard<std::mutex> lock(shared_setfl_mutex());
+  SharedSetfl &entry = shared_setfl_tables()[key];
+  if (entry.table && entry.bytes == bytes) return entry.table;
+  auto table = std::make_shared<EAMSetflIO>();
+  table->read_setfl_text(bytes, path);
+  table->build_splines();
+  entry.bytes = std::move(bytes);
+  entry.table = std::move(table);
+  return entry.table;
 }
 
 } // namespace models

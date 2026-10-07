@@ -37,6 +37,12 @@ void require_setfl_cutoff(const tadah::core::Context &c,
                           const std::string &rcut_key,
                           const std::string &label, const EAMSetflIO &eam);
 
+/** \brief "<label> takes the cutoff <rc> of its setfl file '<path>'
+ *  (SETFL)": what D2_EAM::cutoff_fixed_by() and DM_EAM::cutoff_fixed_by()
+ *  answer, @p rc the file's cutoff as require_setfl_cutoff() writes it. */
+std::string setfl_cutoff_clause(const std::string &label,
+                                const EAMSetflIO &eam);
+
 }  // namespace models
 }  // namespace tadah
 
