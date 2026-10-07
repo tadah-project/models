@@ -87,24 +87,36 @@ public:
   {}
 
     /**
+     * @brief Trains the model on given feature and target matrices, whose
+     *        observations are rows - cols (a design matrix with its
+     *        ridge-augmentation rows and no rows of weight 0).
+     */
+  void train(tadah::core::phi_type &Phi, tadah::core::t_type &T) {
+    train(Phi, T, LinearRegressor::augmented_observations(Phi));
+  }
+
+    /**
      * @brief Trains the model on given feature and target matrices.
      *
      * Uses the linear regressor on the design-matrix columns as they are;
      * the kernel's intercept columns (Function_Base::intercept_columns())
-     * are left out of the ridge penalty. A SIGMA in the context is removed
-     * first; an OALGO 3 fit writes its own.
+     * are left out of the ridge penalty. The model holds the weight
+     * covariance of this fit or none, as M_BLR_Train::train(Phi, T, n_obs)
+     * (for a non-linear kernel the covariance of its weights, one per basis
+     * vector); an earlier fit's is removed first. Nothing is written into
+     * the Context.
      *
      * @param Phi Feature matrix.
      * @param T Target vector.
+     * @param n_obs The observations: the rows of Phi with a non-zero
+     *        weight, without the ridge-augmentation rows.
      * @throws std::runtime_error if the object is already trained.
      */
-  void train(tadah::core::phi_type &Phi, tadah::core::t_type &T) {
+  void train(tadah::core::phi_type &Phi, tadah::core::t_type &T, size_t n_obs) {
     if (trained) {
       throw std::runtime_error("This object is already trained!");
     }
-    // SIGMA belongs to the fit that computed it (see M_BLR_Train::train):
-    // one in the context is of an earlier fit or of a potential.
-    context.remove("SIGMA");
+    this->clear_covariance("the fit computed no weight covariance");
 
     // The weights FIXWEIGHT pins (core::parse_fixindex: 1-based, in
     // declaration order, checked against the Phi.cols() weights and the
@@ -134,14 +146,16 @@ public:
       // and 4 singular.)
       Phi.resize(Phi.rows(), Phi.cols() - indices.size());
 
+      CovarianceFit fit;
       if (Phi.cols() > 0) {
         // The kernel's intercept columns among the free ones, at their new
         // positions: the ridge leaves those out and penalises every other
-        // free column.
+        // free column. n_obs is that of the full design matrix.
         const std::vector<size_t> intercepts = kernel.intercept_columns(context);
-        LinearRegressor::train(context, Phi, T_r, weights, Sigma, *workspaceManager_,
+        fit = LinearRegressor::train(context, Phi, T_r, weights, Sigma, *workspaceManager_,
                                free_intercept_columns(intercepts, move_map,
                                                       Phi.cols()),
+                               n_obs,
                                LinearRegressor::Layout::fixed(data_rows, move_map,
                                                               Phi.cols()));
       } else {
@@ -160,19 +174,37 @@ public:
         w_full[indices[k]] = w_f[k];
       }
       weights = w_full;
-      // OALGO 3 computed the covariance of the free weights: SIGMA of the
-      // potential is that of every weight, a pinned one with none
-      // (config_add_sigma replaces the free weights' SIGMA).
-      if (context.template get<int>("OALGO", 0) == 3 && n_free > 0) {
-        sigma_of_all_weights(Sigma, move_map, n_free, weights.size());
-        LinearRegressor::config_add_sigma(context, Sigma);
+      // OALGO 3 computed the covariance of the free weights; the model's
+      // is that of every weight, a pinned one with none.
+      if (n_free > 0) {
+        if (fit.computed) {
+          sigma_of_all_weights(Sigma, move_map, n_free, weights.size());
+          this->set_covariance(Sigma, fit.noise_variance);
+        } else {
+          this->clear_covariance(fit.why_not);
+        }
+      } else if (context.template get<int>("OALGO", 0) == 3) {
+        double s2 = 0.0;
+        std::string why;
+        if (pinned_covariance(T_r, weights.size(), n_obs, Sigma, s2, why))
+          this->set_covariance(Sigma, s2);
+        else
+          this->clear_covariance(why);
+      } else {
+        this->clear_covariance(fit.why_not.empty()
+            ? LinearRegressor::oalgo_without_covariance(
+                  context.template get<int>("OALGO", 0))
+            : fit.why_not);
       }
       trained = true;
     }
     else {
-      LinearRegressor::train(context, Phi, T, weights, Sigma, *workspaceManager_,
-                             kernel.intercept_columns(context),
-                             LinearRegressor::Layout::of(Phi));
+      const CovarianceFit fit =
+          LinearRegressor::train(context, Phi, T, weights, Sigma, *workspaceManager_,
+                                 kernel.intercept_columns(context), n_obs,
+                                 LinearRegressor::Layout::of(Phi));
+      if (fit.computed) this->set_covariance(Sigma, fit.noise_variance);
+      else this->clear_covariance(fit.why_not);
       trained = true;
     }
 
@@ -182,9 +214,9 @@ public:
      * @brief Standard KRR training using covariance matrix computation.
      *
      * Trains the model on energies using the covariance matrix K. It
-     * writes no SIGMA, and removes one the context held. It pins no
-     * weight: a context with FIXINDEX or FIXWEIGHT is refused
-     * (refuse_fixed_weights_in_train2).
+     * computes no weight covariance, and the model keeps none of an
+     * earlier fit. It pins no weight: a context with FIXINDEX or
+     * FIXWEIGHT is refused (refuse_fixed_weights_in_train2).
      *
      * @param B Basis matrix.
      * @param T Target vector.
@@ -193,9 +225,9 @@ public:
      */
     void train2(tadah::core::Matrix &B, tadah::core::t_type &T) {
         refuse_fixed_weights_in_train2(context, kernel.get_label());
-        // This solve computes no covariance: a SIGMA in the context is of
-        // an earlier fit or of a potential, not of these weights.
-        context.remove("SIGMA");
+        // This solve computes no covariance: the model keeps none of an
+        // earlier fit.
+        this->clear_covariance(krr_implementation2_without_covariance());
         double lambda = context.template get<double>("LAMBDA");
 
         if (lambda < 0)

@@ -13,6 +13,16 @@
 namespace tadah {
 namespace models {
 
+/** Why M_KRR implementation 2 (MODEL M_KRR <kernel> 2, its solve of the
+ *  kernel matrix: M_KRR_Train::train2) leaves no weight covariance, and
+ *  what to change: the reason of its fit (covariance_unavailable()), and
+ *  of tadah train --uncertainty's refusal before training. */
+inline std::string krr_implementation2_without_covariance() {
+  return "M_KRR implementation 2 (MODEL M_KRR <kernel> 2) computes no weight "
+         "covariance; only an OALGO 3 fit of implementation 1 does: use "
+         "MODEL M_KRR <kernel> 1";
+}
+
 /**
  * @class M_KRR_Core
  * @brief Implements core functionality for Kernel Ridge Regression (KRR).
@@ -24,7 +34,6 @@ namespace models {
 template <class K = Function_Base&>
 class M_KRR_Core : public virtual M_Core {
 public:
-    tadah::core::Matrix Sigma; ///< Covariance matrix.
     tadah::core::Context &context; ///< Configuration reference.
     K kernel; ///< Kernel function.
 
@@ -71,21 +80,6 @@ public:
      */
     double predict(const tadah::core::aed_type &v) const {
         return kernel.epredict(weights, v);
-    }
-
-    /**
-     * @brief Retrieves the uncertainty of weights.
-     * 
-     * Throws an error if LAMBDA is not zero.
-     * 
-     * @return Vector of uncertainties based on the Sigma diagonal.
-     * @throws std::runtime_error if LAMBDA is not zero.
-     */
-    tadah::core::t_type get_weights_uncertainty() const {
-        double lambda = context.template get<double>("LAMBDA");
-        if(lambda == 0) 
-            throw std::runtime_error("Sigma matrix is only computed for LAMBDA != 0");
-        return Sigma.diagonal();
     }
 
 private:
