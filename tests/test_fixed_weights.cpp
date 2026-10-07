@@ -11,6 +11,7 @@
 #include <tadah/models/m_krr_train.h>
 #include <tadah/models/functions/basis_functions/bf_linear.h>
 #include <tadah/models/functions/kernels/kern_linear.h>
+#include <tadah/models/functions/kernels/kern_rbf.h>
 #include <tadah/models/ols.h>
 #include <tadah/core/context.h>
 #include <tadah/core/core_types.h>
@@ -333,6 +334,62 @@ TEST_CASE("BLR and KRR FIXINDEX naming a weight twice or a descending range "
                Catch::Contains("FIXINDEX 2,2 names weight 2 twice"));
     CHECK_THAT(refusal_with_fixindex(krr, "3-2", {0.1, 0.2}),
                Catch::Contains("FIXINDEX: index '3-2' is a descending range"));
+  }
+}
+
+/* Pins: M_KRR_Train::train2, the solve of MODEL M_KRR <kernel> 2 ((K +
+ * LAMBDA I) w = t on the basis vectors, every weight at once), refuses a
+ * context with FIXINDEX or FIXWEIGHT, for Kern_Linear and Kern_RBF
+ * (MPARAMS 1.0), on four basis vectors: "MODEL M_KRR Kern_Linear 2 cannot
+ * pin weights: ..." naming implementation 1, for FIXINDEX 1 / FIXWEIGHT 14,
+ * FIXINDEX 2-1 with two values and a lone FIXINDEX 1 alike (the solve pins
+ * nothing, whatever the keys say); without them it fits its 4 weights.
+ * Before the fix: train2 read neither key: it fitted every weight with
+ * the pins ignored (weight 1 was not 14), and '2-1' and a lone FIXINDEX
+ * passed too (tadah train exited 0 and copied FIXINDEX and FIXWEIGHT into
+ * the potential). */
+TEST_CASE("M_KRR implementation 2 (train2) refuses FIXINDEX and FIXWEIGHT",
+          "[fixed_weights][fixindex][krr]") {
+  for (const char *kern : {"Kern_Linear", "Kern_RBF"}) {
+    auto train2 = [&](const std::string &fixindex,
+                      const std::vector<double> &fixweight) {
+      Context c = make_ctx();
+      c.remove("LAMBDA");
+      c.add("LAMBDA", "1e-3");
+      c.add("MPARAMS", "1.0");
+      if (!fixindex.empty()) c.add("FIXINDEX", fixindex);
+      for (double v : fixweight) c.add("FIXWEIGHT", v);
+      // Four basis vectors (the columns of the 8x4 matrix), one target
+      // value each.
+      Matrix B = make_phi();
+      t_type T(B.cols());
+      for (size_t j = 0; j < T.size(); ++j)
+        T[j] = 0.3 * static_cast<double>(j + 1);
+      if (std::string(kern) == "Kern_Linear") {
+        Kern_Linear k;
+        M_KRR_Train<Kern_Linear> m(k, c);
+        m.train2(B, T);
+        return m.get_weights();
+      }
+      Kern_RBF k(c);
+      M_KRR_Train<Kern_RBF> m(k, c);
+      m.train2(B, T);
+      return m.get_weights();
+    };
+    DYNAMIC_SECTION(kern) {
+      const std::string refusal =
+          std::string("MODEL M_KRR ") + kern + " 2 cannot pin weights: "
+          "implementation 2 solves (K + LAMBDA I) w = t for the weights of "
+          "all its basis vectors at once, so FIXINDEX and FIXWEIGHT would be "
+          "ignored. Use implementation 1 (MODEL M_KRR " + kern + " 1), "
+          "which pins them, or remove FIXINDEX and FIXWEIGHT.";
+      t_type w;
+      REQUIRE_NOTHROW(w = train2("", {}));
+      CHECK(w.size() == 4);
+      CHECK_THROWS_WITH(train2("1", {14.0}), refusal);
+      CHECK_THROWS_WITH(train2("2-1", {14.0, 3.0}), refusal);
+      CHECK_THROWS_WITH(train2("1", {}), refusal);
+    }
   }
 }
 
