@@ -310,15 +310,18 @@ TEST_CASE("BLR and KRR FIXINDEX given as separate values pins what the "
 
 /* Pins: M_BLR_Train and M_KRR_Train refuse a FIXINDEX that names a weight
  * twice or holds a descending range, with core::parse_fixindex's message:
- *  - '2,2' with FIXWEIGHT 0.7 0.7: "FIXINDEX 2,2 names weight 2 twice";
- *  - '2,2' with FIXWEIGHT 0.7: "FIXINDEX 2,2 has 2 indices but FIXWEIGHT
- *    has 1 value" (FIXWEIGHT pairs by position);
+ *  - '2,2' with FIXWEIGHT 0.7 0.7, and with FIXWEIGHT 0.7 (one value for
+ *    the one weight, FIXWEIGHT pairing by position): "FIXINDEX 2,2 names
+ *    weight 2 twice";
  *  - '3-2' with FIXWEIGHT 0.1 0.2: "FIXINDEX: index '3-2' is a descending
  *    range".
  * Before the fix: '2,2' was deduplicated to weight 2 with a stderr warning,
  * so with one FIXWEIGHT value the fit ran (weight 2 = 0.7) and with two it
  * threw "FIXWEIGHT and FIXINDEX differ in size: 2 and 1"; '3-2' expanded to
- * nothing ("differ in size: 2 and 0"). */
+ * nothing ("differ in size: 2 and 0"). After core::parse_fixindex first
+ * read FIXINDEX, '2,2' with one value was refused as "FIXINDEX 2,2 has 2
+ * indices but FIXWEIGHT has 1 value" (this case pinned that): it compared
+ * the count before it looked for a repeat. */
 TEST_CASE("BLR and KRR FIXINDEX naming a weight twice or a descending range "
           "is refused",
           "[fixed_weights][fixindex]") {
@@ -327,8 +330,7 @@ TEST_CASE("BLR and KRR FIXINDEX naming a weight twice or a descending range "
     CHECK_THAT(refusal_with_fixindex(krr, "2,2", {0.7, 0.7}),
                Catch::Contains("FIXINDEX 2,2 names weight 2 twice"));
     CHECK_THAT(refusal_with_fixindex(krr, "2,2", {0.7}),
-               Catch::Contains("FIXINDEX 2,2 has 2 indices but FIXWEIGHT has "
-                               "1 value"));
+               Catch::Contains("FIXINDEX 2,2 names weight 2 twice"));
     CHECK_THAT(refusal_with_fixindex(krr, "3-2", {0.1, 0.2}),
                Catch::Contains("FIXINDEX: index '3-2' is a descending range"));
   }
