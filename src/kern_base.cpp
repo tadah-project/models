@@ -79,11 +79,18 @@ std::size_t Kern_Base::weights_count(std::size_t) const {
 std::size_t Kern_Base::basis_vector_size() const {
   return basis.rows();
 }
-size_t Kern_Base::dot_product_intercept_columns(const tadah::core::Context &c) const {
-  if (tadah::core::n_intercept_columns(c) == 0 || basis.cols() == 0) return 0;
-  for (size_t j=1; j<basis.rows(); ++j)
-    if (basis(j,0) != 0.0) return 0;
-  return 1;
+std::vector<size_t> Kern_Base::dot_product_intercept_columns(const tadah::core::Context &c) const {
+  // Column k < N is an intercept when its basis vector has no component
+  // other than k (intercept component k): K(b_k, x) = f(b_kk x_k).
+  const size_t n = tadah::core::n_intercept_columns(c);
+  std::vector<size_t> cols;
+  for (size_t k=0; k<n && k<basis.cols(); ++k) {
+    bool only_k = true;
+    for (size_t j=0; j<basis.rows() && only_k; ++j)
+      if (j != k && basis(j,k) != 0.0) only_k = false;
+    if (only_k) cols.push_back(k);
+  }
+  return cols;
 }
 const tadah::core::Matrix &Kern_Base::get_basis() const {
   return basis;

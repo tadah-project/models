@@ -5,6 +5,7 @@
 #include <tadah/core/context.h>
 
 #include <cstddef>
+#include <vector>
 
 namespace tadah {
 namespace models {
@@ -35,31 +36,37 @@ public:
   /** \brief Return label of this object */
   virtual std::string get_label() const=0;
 
-  /** \brief The number of leading columns of this function's design
-   *  matrix that are intercepts, columns 0 .. n-1.
+  /** \brief The columns of this function's design matrix that are
+   *  intercepts, as 0-based column (weight) indices in ascending order.
    *
-   *  An intercept column is constant over the atoms: every atom adds the
-   *  same value to the energy row, and its force and stress rows are 0.
-   *  The regression leaves these columns out of the LAMBDA ridge penalty
-   *  (LinearRegressor::train), and OALGO 3, which penalises every column
-   *  alike, refuses a model with LAMBDA != 0 that has one.
+   *  An intercept column depends on an atom only through its species:
+   *  every atom of a species adds the same value to the energy row, and
+   *  the force and stress rows are 0. The regression leaves these columns
+   *  out of the LAMBDA ridge penalty (LinearRegressor::train), OALGO 3,
+   *  which penalises every column alike, refuses a model with LAMBDA != 0
+   *  that has one, and BIAS true training refuses data whose compositions
+   *  cannot determine them (MLIP require_intercepts_determined).
    *
-   *  The descriptor has a bias intercept when BIAS is true and ATOM is
-   *  set (tadah::core::n_intercept_columns() > 0); its value is 1 for
-   *  every atom.
-   *  - BF_Linear, Kern_Linear: tadah::core::n_intercept_columns(), the
-   *    bias columns of the descriptor;
-   *  - BF_Polynomial2: 1 with a bias intercept (column 0, bias x bias),
-   *    else 0;
+   *  With BIAS true and ATOM the descriptor starts with N =
+   *  tadah::core::n_intercept_columns() one-hot intercept components, in
+   *  ATOM order (component k is 1 for an atom of species k, 0 otherwise).
+   *  - BF_Linear, Kern_Linear: the descriptor's intercept columns, 0 ..
+   *    N-1;
+   *  - BF_Polynomial2: the product (k,k) of each intercept component with
+   *    itself (1 for species k), k < N, at index k D - k (k - 1) / 2 of
+   *    the products (i,ii), i <= ii, taken row by row (D = DSIZE, which
+   *    the context must hold when N >= 2: std::logic_error otherwise); the
+   *    products of two different intercept components are 0 for every
+   *    atom and are not intercepts;
    *  - Kern_Quadratic, Kern_LQ, Kern_Polynomial, Kern_Sigmoid (functions
-   *    of b . x): 1 with a bias intercept when the basis vector of
-   *    column 0 has no component other than the bias (the vector e0 that
-   *    training puts there): K(b0, x) then depends on x only through the
-   *    bias, which is 1; else 0;
-   *  - Kern_RBF: 0 (K(e0, x) depends on every component of x).
+   *    of b . x): each column k < N whose basis vector has no component
+   *    other than k (the intercept vector e_k that training puts there):
+   *    K(b_k, x) then depends on x only through intercept component k;
+   *  - Kern_RBF: none (K(b, x) depends on every component of x).
+   *  With BIAS false there is none.
    *
    *  Pure, so that a new function states its own. */
-  virtual size_t intercept_columns(const tadah::core::Context &c) const=0;
+  virtual std::vector<size_t> intercept_columns(const tadah::core::Context &c) const=0;
   virtual double epredict(const tadah::core::t_type &, const tadah::core::aed_type& ) const=0;
   virtual double fpredict(const tadah::core::t_type &, const tadah::core::fd_type &,
                           const tadah::core::aed_type&, const size_t ) const=0;

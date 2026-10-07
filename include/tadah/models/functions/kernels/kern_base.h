@@ -117,10 +117,11 @@ class Kern_Base: public virtual Function_Base {
 
     protected:
         /** \brief Function_Base::intercept_columns() of a kernel
-         *  K(b, x) = f(b . x): 1 when the descriptor has a bias intercept
-         *  (tadah::core::n_intercept_columns() > 0) and basis column 0 is
-         *  zero but for its first (bias) component, else 0. */
-        size_t dot_product_intercept_columns(const tadah::core::Context &c) const;
+         *  K(b, x) = f(b . x): each basis column k < N (N =
+         *  tadah::core::n_intercept_columns(), the descriptor's intercept
+         *  components) that is zero but for its component k, so that
+         *  K(b_k, x) depends on x only through intercept component k. */
+        std::vector<size_t> dot_product_intercept_columns(const tadah::core::Context &c) const;
 };
 } // namespace models
 } // namespace tadah

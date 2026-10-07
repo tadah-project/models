@@ -1,5 +1,9 @@
 #include <tadah/models/functions/basis_functions/bf_polynomial2.h>
 #include <tadah/core/intercept_layout.h>
+
+#include <stdexcept>
+#include <string>
+#include <vector>
 namespace tadah {
 namespace models {
 
@@ -55,10 +59,26 @@ tadah::core::force_type BF_Polynomial2::fpredict(const tadah::core::t_type &weig
   return v;
 }
 
-size_t BF_Polynomial2::intercept_columns(const tadah::core::Context &c) const
+std::vector<size_t> BF_Polynomial2::intercept_columns(const tadah::core::Context &c) const
 {
-  // column 0 is aed(0)*aed(0): bias x bias = 1 with a bias intercept
-  return tadah::core::n_intercept_columns(c) > 0 ? 1 : 0;
+  // The product (k,k) of intercept component k with itself is 1 for an
+  // atom of species k and 0 for the others; with the products (i,ii),
+  // i <= ii, taken row by row (epredict), (k,k) is column
+  // k D - k (k - 1) / 2. The product of two different intercept components
+  // is 0 for every atom.
+  const size_t n = tadah::core::n_intercept_columns(c);
+  std::vector<size_t> cols;
+  if (n == 0) return cols;
+  cols.push_back(0);
+  if (n == 1) return cols;
+  const size_t D = c.get<size_t>("DSIZE");
+  if (D < n)
+    throw std::logic_error(
+        "BF_Polynomial2::intercept_columns: the intercept columns of " +
+        std::to_string(n) + " species depend on the descriptor size, but "
+        "DSIZE is " + std::to_string(D) + " (DescriptorsCalc sets it)");
+  for (size_t k = 1; k < n; ++k) cols.push_back(k * D - k * (k - 1) / 2);
+  return cols;
 }
 
 } // namespace models

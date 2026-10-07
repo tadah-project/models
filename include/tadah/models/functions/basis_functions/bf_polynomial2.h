@@ -31,7 +31,7 @@ struct BF_Polynomial2 : public virtual BF_Base {
      */
     std::string get_label() const override;
     /** \brief See Function_Base::intercept_columns(). */
-    size_t intercept_columns(const tadah::core::Context &c) const override;
+    std::vector<size_t> intercept_columns(const tadah::core::Context &c) const override;
 
     /**
      * @brief One weight per product aed(i)*aed(ii), i <= ii: dsize (dsize + 1) / 2.
