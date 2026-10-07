@@ -48,6 +48,8 @@ class Kern_RBF : public virtual Kern_Base {
             double& dK_out) const override;
 
         std::string get_label() const override;
+        /** \brief See Function_Base::intercept_columns(). */
+        size_t intercept_columns(const tadah::core::Context &c) const override;
 
     private:
 

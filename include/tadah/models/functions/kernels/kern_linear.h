@@ -22,6 +22,8 @@ class Kern_Linear :  public virtual Kern_Base {
         Kern_Linear ();
         Kern_Linear (const tadah::core::Context &c);
         std::string get_label() const override;
+        /** \brief See Function_Base::intercept_columns(). */
+        size_t intercept_columns(const tadah::core::Context &c) const override;
 
         /**
          * Label used for this class

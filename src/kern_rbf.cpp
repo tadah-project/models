@@ -52,6 +52,12 @@ std::string Kern_RBF::get_label() const
     return label;
 }
 
+// K(b, x) depends on every component of x, whatever b: no column is constant.
+size_t Kern_RBF::intercept_columns(const tadah::core::Context &) const
+{
+  return 0;
+}
+
 } // namespace models
 } // namespace tadah
 

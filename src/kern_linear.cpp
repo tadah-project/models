@@ -1,4 +1,5 @@
 #include <tadah/models/functions/kernels/kern_linear.h>
+#include <tadah/core/intercept_layout.h>
 namespace tadah {
 namespace models {
 
@@ -38,6 +39,11 @@ tadah::core::force_type Kern_Linear::fpredict(const tadah::core::t_type &weights
         const tadah::core::aed_type& ) const
 {
     return -(fdij * weights);
+}
+
+size_t Kern_Linear::intercept_columns(const tadah::core::Context &c) const
+{
+  return tadah::core::n_intercept_columns(c);
 }
 
 } // namespace models

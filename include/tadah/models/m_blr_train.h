@@ -31,6 +31,7 @@ public:
     using M_BLR_Core<BF>::context;
     using M_BLR_Core<BF>::weights;
     using M_BLR_Core<BF>::Sigma;
+    using M_BLR_Core<BF>::bf;
 
     /**
      * @brief Constructor using a configuration object.
@@ -112,7 +113,8 @@ public:
 
 
       if (Phi.cols() > 0) {
-        LinearRegressor::train(context, Phi, T_r, weights, Sigma,*workspaceManager_);
+        LinearRegressor::train(context, Phi, T_r, weights, Sigma, *workspaceManager_,
+                               bf.intercept_columns(context));
       } else {
         // Every column is fixed (FIXINDEX covers all weights): there is nothing
         // left to solve, so skip the regressor entirely and let the fixed
@@ -141,7 +143,8 @@ public:
       trained = true;
     }
     else {
-      LinearRegressor::train(context, Phi, T, weights, Sigma,*workspaceManager_);
+      LinearRegressor::train(context, Phi, T, weights, Sigma, *workspaceManager_,
+                             bf.intercept_columns(context));
       trained = true;
     }
 

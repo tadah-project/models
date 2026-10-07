@@ -30,6 +30,8 @@ struct BF_Polynomial2 : public virtual BF_Base {
      * @return String label of the basis function.
      */
     std::string get_label() const override;
+    /** \brief See Function_Base::intercept_columns(). */
+    size_t intercept_columns(const tadah::core::Context &c) const override;
 
     /**
      * @brief Predicts energy using the polynomial basis function.

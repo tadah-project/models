@@ -3,88 +3,71 @@
 
 #include <tadah/core/core_types.h>
 #include <tadah/core/lapack.h>
+#include <tadah/models/svd.h>
+
+#include <vector>
 
 namespace tadah {
 namespace models {
 
+/** \brief Empirical kernel map of a set of basis vectors.
+ *
+ *  configure(basis) computes the kernel matrix K(b_i, b_j) of the basis
+ *  vectors (the columns of \p basis), balances it (LAPACK dgebal) and
+ *  stores in EKM_mat the transposed right singular vectors V^T of the
+ *  result: an n x n orthogonal matrix for n basis vectors, whatever the
+ *  rank of K (a basis vector with K(b, b) = 0, such as a zero descriptor
+ *  under a dot-product kernel, keeps its column). The basis is not
+ *  changed, and configure() keeps no other state: calling it again on
+ *  the same basis gives the same EKM_mat.
+ *
+ *  M_KRR_Train does not use this class: it trains on the kernel columns
+ *  as they are.
+ */
 template <typename Kern>
 class EKM {
     private:
         Kern kernel;
-        // TODO add to context? Experiment with value
-        double eps = std::numeric_limits<double>::epsilon()*0;
-        std::vector<size_t> indices;
     public:
         tadah::core::Matrix EKM_mat;
         template <typename T>
             EKM(T &t):
                 kernel(t)
     {}
-        void configure(tadah::core::Matrix &basis) {
+        void configure(const tadah::core::Matrix &basis) {
 
-            // check norm of basis vectors and keep indices
-            for (size_t i=0; i<basis.cols(); i++) {
-                double norm = kernel(basis.col(i),basis.col(i));
-                if (norm > eps) indices.push_back(i);
-            }
-
-            // Copy basis vectors with non zero norm
-            // to new basis b
-            // basis vectors are stored as columns in basis
-            tadah::core::Matrix b(basis.rows(), indices.size());
-            for (const auto &i:indices) {
-                for (size_t j=0; j<basis.rows(); ++j) {
-                    b(j,i) = basis(j,i);
+            const size_t n = basis.cols();
+            tadah::core::Matrix K(n, n);
+            for (size_t i=0; i<n; i++) {
+                for (size_t j=0; j<n; j++) {
+                    K(i,j) = kernel(basis.col(i),basis.col(j));
                 }
             }
-            // Update old basis with new one
-            basis=b;
-
-            tadah::core::Matrix K(b.cols(), b.cols());
-            for (size_t i=0; i<K.cols(); i++) {
-                for (size_t j=0; j<K.cols(); j++) {
-                    K(i,j) = kernel(b.col(i),b.col(j));
-                }
+            if (n == 0) {
+                EKM_mat = tadah::core::Matrix();
+                return;
             }
 
             // tadah::core::Matrix balancing
             double *a = K.ptr();
-            int n = K.cols();
+            int ni = static_cast<int>(n);
             char job='B';
             int ilo; int ihi; int info;
-            double *scale = new double[n];
-    tadah::core::dgebal_(&job, &n, a, &n, &ilo, &ihi, scale, &info);
-            delete [] scale;
-
-            // Find max value in K diagonal
-            // and update eps
-            double max_val=0;
-            for (size_t i=0; i<K.cols(); i++) {
-                if (K(i,i)>max_val) max_val=K(i,i);
-            }
-            eps *= max_val;
+            std::vector<double> scale(n);
+    tadah::core::dgebal_(&job, &ni, a, &ni, &ilo, &ihi, scale.data(), &info);
 
             tadah::models::SVD svd;
             svd.compute(K);
 
-            double *s = svd.getS();
             double *vt = svd.getVT();
-            tadah::core::t_type S(s,svd.cols());
-            tadah::core::Matrix VT(vt,svd.cols(), svd.cols());
+            const tadah::core::Matrix VT(vt,svd.cols(), svd.cols());
 
-            // First count number of non zero singular values, then
-            // filter out corresponding right singular vectors from
-            // the final EKM_mat
-            size_t nonzero_sv=0;
-            for (size_t i=0; i<S.size(); ++i) if (s[i]>eps) nonzero_sv++;
-
-            EKM_mat = tadah::core::Matrix(nonzero_sv, svd.cols());
-
-            for (size_t i=0; i<S.size(); ++i) {
-                if (s[i]>eps) {
-                    for (size_t j=0; j<EKM_mat.cols(); j++) {
-                        EKM_mat(i,j) = VT(i,j); // /s[i];
-                    }
+            // Every right singular vector, also those of zero singular
+            // values: EKM_mat stays square and orthogonal.
+            EKM_mat = tadah::core::Matrix(n, n);
+            for (size_t i=0; i<n; ++i) {
+                for (size_t j=0; j<n; j++) {
+                    EKM_mat(i,j) = VT(i,j); // /s[i];
                 }
             }
 

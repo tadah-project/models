@@ -95,8 +95,25 @@ class Kern_Base: public virtual Function_Base {
         virtual tadah::core::force_type fpredict(const tadah::core::t_type &kweights, const tadah::core::fd_type &fdij,
                 const tadah::core::aed_type &aedi) const;
 
+        /** \brief Read the basis vectors of a potential: SBASIS vectors
+         *  stored column after column in BASIS.
+         *
+         *  Without BASIS nothing is read and \p b is left as it is (a
+         *  training configuration names SBASIS, the number of basis
+         *  vectors to draw, and has no BASIS). A BASIS is refused, naming
+         *  the keys, when SBASIS is missing or 0, or when the number of
+         *  BASIS values is not a multiple of SBASIS. Whether the vectors
+         *  have the descriptor's length is checked where that length is
+         *  known (M_KRR in MLIP, pair_style tadah). */
         virtual void read_basis_from_context(const tadah::core::Context &context,
                 tadah::core::Matrix &b);
+
+    protected:
+        /** \brief Function_Base::intercept_columns() of a kernel
+         *  K(b, x) = f(b . x): 1 when the descriptor has a bias intercept
+         *  (tadah::core::n_intercept_columns() > 0) and basis column 0 is
+         *  zero but for its first (bias) component, else 0. */
+        size_t dot_product_intercept_columns(const tadah::core::Context &c) const;
 };
 } // namespace models
 } // namespace tadah
