@@ -18,3 +18,10 @@ include(Catch)
 catch_discover_tests(test_models
     WORKING_DIRECTORY $<TARGET_FILE_DIR:test_models>
 )
+
+# tadah.models_headers (ctest -L headers): every header of include/
+# compiles on its own and twice in a row (cmake-tools'
+# tadah_add_header_check). Before the fix: fails on
+# descriptors/dm/dm_mEAD.hpp and dm_poly.hpp, which have no include guard
+# ('redefinition of ...').
+tadah_add_header_check(tadah.models)
