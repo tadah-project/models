@@ -3,6 +3,7 @@
 #include <iostream>
 #include <memory>
 #include <set>
+#include <stdexcept>
 #include <string>
 #include <tadah/core/number_format.h>
 #include <tadah/models/descriptors/d_mjoin.h>
@@ -174,54 +175,103 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
     }
   }
 
+  // The descriptors of the line, each with its tokens: its label, its
+  // parameters and its element pairs, up to the next label.
+  std::vector<std::vector<std::string>> lines;
+  for (const auto &t : types) {
+    if (lines.empty() || t.find(prefix) == 0) lines.emplace_back();
+    lines.back().push_back(t);
+  }
+
+  // One RCTYPE and one RCUT value per descriptor, in the order of the lines.
+  for (const std::string &key : {rctypekey, rcutkey}) {
+    const std::size_t have = data_map[key].first->size();
+    if (have >= lines.size()) continue;
+    std::string names;
+    for (std::size_t i = 0; i < lines.size(); ++i)
+      names += (i ? ", " : "") + lines[i][0];
+    throw std::runtime_error(
+        type_str + " names " + std::to_string(lines.size()) +
+        " descriptors (" + names + ") but " + key + " has " +
+        std::to_string(have) + (have == 1 ? " value" : " values") +
+        ": give one " + key + " value per descriptor, in the order of the " +
+        type_str + " lines");
+  }
+
   std::vector<tadah::core::Context> contexts;
-  for (auto it = types.begin(); it != types.end();) {
+  for (const auto &line : lines) {
+    const std::string &token = line[0];
+    std::unique_ptr<D_Base> d(tadah::core::factory<D_Base>(token));
+    // The line has the descriptor's parameters and its SIZE parameters are
+    // integers (else an error naming the line), so they can be read below.
+    const std::vector<std::string> elements = d->element_tokens(type_str, line);
+    std::string text = type_str;
+    for (const auto &t : line) text += " " + t;
+
+    std::vector<std::string> all_list_keys = d->keys;
+    all_list_keys.insert(all_list_keys.end(), d->data_keys.begin(),
+                         d->data_keys.end());
+    const size_t fparam = d->nparams - all_list_keys.size();
+    std::vector<size_t> sizes;
+    for (size_t k = 0; k < all_list_keys.size(); ++k) {
+      const std::string &size_token = line[1 + fparam + k];
+      try {
+        sizes.push_back(std::stoul(size_token));
+      } catch (const std::out_of_range &) {
+        throw std::runtime_error(
+            text + ": parameter " + std::to_string(fparam + k + 1) +
+            ", the number of " + all_list_keys[k] + " values, is too large: " +
+            size_token);
+      }
+    }
+
+    // Every list key whose SIZE asks for values must be set.
+    std::string takes, missing;
+    size_t nmissing = 0;
+    for (size_t k = 0; k < all_list_keys.size(); ++k) {
+      const std::string &key = all_list_keys[k];
+      if (sizes[k] == 0 || data_map.find(key) != data_map.end()) continue;
+      ++nmissing;
+      takes += (takes.empty() ? "" : " and ") + std::to_string(sizes[k]) +
+               " " + key + (sizes[k] == 1 ? " value" : " values");
+      missing += (missing.empty() ? "" : " and ") + key;
+    }
+    if (nmissing) {
+      throw std::runtime_error(
+          type_str + " " + token + " takes " + takes + ", but " + missing +
+          (nmissing == 1 ? " is" : " are") + " not set: " + text);
+    }
+
     tadah::core::Context c1 = c;
     c1.remove(type_str); c1.remove(rctypekey); c1.remove(rcutkey);
     c1.remove(cgridkey); c1.remove(sgridkey);
     c1.remove("CEMBFUNC"); c1.remove("SEMBFUNC");
     c1.remove("AMPGRIDMB");
     c1.remove("KDEG2B"); c1.remove("KDEGMB"); c1.remove("KDEGEMB");
-    const auto token = *it++;
     c1.add(type_str,token);
     c1.add(rctypekey, (*data_map[rctypekey].first)[ data_map[rctypekey].second++ ]);
     c1.add(rcutkey, (*data_map[rcutkey].first)[ data_map[rcutkey].second++ ]);
-    D_Base *d = tadah::core::factory<D_Base>(token);
-    size_t fparam = d->nparams - d->keys.size() - d->data_keys.size();
     for (size_t j=0; j<fparam; ++j) {
-      c1.add(type_str,*it++);
+      c1.add(type_str, line[1 + j]);
     }
-    std::vector<std::string> all_list_keys = d->keys;
-    all_list_keys.insert(all_list_keys.end(), d->data_keys.begin(),
-                         d->data_keys.end());
-    for (const auto& k : all_list_keys) {
-      int n = std::stoi(*it++);
+    for (size_t k = 0; k < all_list_keys.size(); ++k) {
+      const std::string &key = all_list_keys[k];
+      const size_t n = sizes[k];
       // check dimensions: ensure there are at least n remaining tokens
-      if (data_map.find(k) != data_map.end() && data_map[k].second + n > data_map[k].first->size()) {
+      if (n > 0 && data_map[key].second + n > data_map[key].first->size()) {
         throw std::runtime_error(
-            "Error: Not enough data for key '" + k + "' in context. "
-            "Expected " + std::to_string(n) + " but got " + std::to_string(data_map[k].first->size()) +
+            "Error: Not enough data for key '" + key + "' in context. "
+            "Expected " + std::to_string(n) + " but got " + std::to_string(data_map[key].first->size()) +
             ". Token: " + token);
       }
       c1.add(type_str, n);
-      for (int j = 0; j < n; ++j) {
-        c1.add(k, (*data_map[k].first)[ data_map[k].second++ ]);
-      } 
+      for (size_t j = 0; j < n; ++j) {
+        c1.add(key, (*data_map[key].first)[ data_map[key].second++ ]);
+      }
     }
 
-    // read init atoms
-    size_t found_init_atoms=0;
-    while (it != types.end()) {
-      if (it->find(prefix) == 0) {
-        break;
-      }
-      c1.add(type_str,*it++);
-      found_init_atoms++;
-    }
-    // if (it != types.end() && it != types.begin()) {
-    //   --it;
-    // }
-    if (!found_init_atoms) {
+    // the element pairs
+    if (elements.empty()) {
       throw std::runtime_error(
         "Error: No element types specified. "
         "Please provide element types for this calculator. "
@@ -229,16 +279,16 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
         "Token: " + token);
     }
 
-    if (found_init_atoms % 2 != 0) {
+    if (elements.size() % 2 != 0) {
       throw std::runtime_error(
         "Error: Element types must be provided in pairs. "
         "Ensure each element is paired correctly. "
         "For instance, '" + token + " Ti * Nb Zr' means that interactions of Ti with any atom, as well as Nb-Zr, will be computed. "
         "Token: " + token);
     }
+    for (const auto &e : elements) c1.add(type_str, e);
 
     contexts.push_back(c1);
-    delete d;
   }
   return contexts;
 }
