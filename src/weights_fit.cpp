@@ -42,7 +42,7 @@ void require_weights_fit(const tadah::core::Context &c, std::size_t dsize,
                          const Function_Base &f, const TrainedSizes &s) {
   const bool norm = c.contains("NORM") && c.get<bool>("NORM");
   // A linear model predicts with its weights converted to the raw
-  // descriptors (M_BLR/M_KRR convert_to_nweights, pair_style tadah's
+  // descriptors (MLIP to_raw_descriptors after the fit, pair_style tadah's
   // linear path): it never reads NMEAN or NSTDEV. A non-linear one
   // normalises every descriptor with them when it predicts.
   const bool linear = is_linear_function(f);
