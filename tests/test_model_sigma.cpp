@@ -1,13 +1,14 @@
 // test_model_sigma.cpp
 //
-// SIGMA, the weight covariance an OALGO 3 fit writes into the model
-// Context (LinearRegressor::config_add_sigma) and get_param_file() copies
-// into the potential, belongs to the fit that computed it: a fit replaces
-// it, a fit that computes none (another OALGO, every weight pinned) leaves
-// none, and read_sigma refuses a SIGMA whose count is not N*N+1.
-//
-// M_KRR_Train::train2 (MODEL M_KRR <kernel> 2) computes no covariance and
-// leaves no SIGMA either.
+// The weight covariance belongs to the fit that computed it. An OALGO 3 fit
+// (LinearRegressor::train, the SVD solve) returns it, and M_BLR_Train /
+// M_KRR_Train hold it in their Sigma; a fit that computes none (another
+// OALGO, M_KRR implementation 2) leaves the model without one, whatever an
+// earlier fit of the model computed. LinearRegressor::train writes nothing
+// into the Context: the potential gets the covariance from the model
+// (MLIP's get_param_file, keys WCOV and WNOISE). Until WCOV replaced it,
+// the fit wrote it into the Context as SIGMA (config_add_sigma), and
+// read_sigma read it back.
 //
 // Also: an M_KRR model built from a Context with WEIGHTS (a potential used
 // as the configuration) can be trained, as an M_BLR model can.
@@ -60,6 +61,25 @@ t_type make_target(const phi_type &Phi) {
   return T;
 }
 
+/* make_phi() as the DesignMatrix gives it to a fit: its 8 rows, then one
+ * ridge-augmentation row per column (zero for OALGO 3), so that the 8 rows
+ * are the observations. */
+phi_type make_phi_aug() {
+  const phi_type Phi8 = make_phi();
+  phi_type Phi(Phi8.rows() + Phi8.cols(), Phi8.cols());
+  Phi.set_zero();
+  for (size_t j = 0; j < Phi8.cols(); ++j)
+    for (size_t i = 0; i < Phi8.rows(); ++i) Phi(i, j) = Phi8(i, j);
+  return Phi;
+}
+
+t_type make_target_aug() {
+  const t_type T8 = make_target(make_phi());
+  t_type T(T8.size() + 4);
+  for (size_t i = 0; i < T.size(); ++i) T[i] = i < T8.size() ? T8[i] : 0.0;
+  return T;
+}
+
 Context make_ctx(const std::string &oalgo) {
   Context c;
   c.add("VERBOSE", "0");
@@ -77,54 +97,60 @@ void add_earlier_sigma(Context &c) {
 
 }  // namespace
 
-/* Pins: two OALGO 3 fits (LinearRegressor::train) on one Context leave one
- * SIGMA, N*N+1 = 17 values for 4 weights: N = 4, then the 16 values of the
- * covariance the second fit returned, column-major, bit for bit.
- * Before the fix: 34 values (17 + 17): config_add_sigma appended SIGMA to
- * the earlier one (Context::add appends to a multi-value key), so a
- * potential trained from a potential, or HPO's reused trainer, carried
- * every earlier SIGMA. */
-TEST_CASE("OALGO 3: a second fit on one Context replaces SIGMA", "[sigma]") {
+/* Pins: two OALGO 3 fits (LinearRegressor::train) on one Context (that of
+ * a model trained twice, or a potential used as the configuration) write
+ * nothing into it: no SIGMA, no WCOV, no WNOISE; each returns its
+ * covariance in its Sigma out-parameter, the second fit's equal bit for
+ * bit to the first's (4 x 4).
+ * Before the fix (WCOV and WNOISE): each fit wrote SIGMA into the Context,
+ * N = 4 and the 16 values (config_add_sigma replaced the earlier SIGMA;
+ * before fix/hpo-trainer-reuse it appended to it, 34 values after the
+ * second fit). */
+TEST_CASE("OALGO 3: LinearRegressor::train writes no covariance into the "
+          "Context",
+          "[sigma]") {
   Context c = make_ctx("3");
-  const phi_type Phi0 = make_phi();
-  const t_type T0 = make_target(Phi0);
-  Matrix Sigma;
+  const phi_type Phi0 = make_phi_aug();
+  const t_type T0 = make_target_aug();
+  Matrix Sigma[2];
   for (int fit = 0; fit < 2; ++fit) {
     phi_type Phi = Phi0;
     t_type T = T0;
     t_type w;
-    LinearRegressor::train(c, Phi, T, w, Sigma);
+    LinearRegressor::train(c, Phi, T, w, Sigma[fit]);
+    INFO("fit " << fit);
+    CHECK_FALSE(c.has_stored("SIGMA"));
+    CHECK_FALSE(c.has_stored("WCOV"));
+    CHECK_FALSE(c.has_stored("WNOISE"));
   }
-  REQUIRE(c.size("SIGMA") == 17);
-  CHECK(c.get<size_t>("SIGMA") == 4);
+  REQUIRE(Sigma[0].rows() == 4);
+  REQUIRE(Sigma[1].rows() == 4);
+  REQUIRE(Sigma[1].cols() == 4);
   for (size_t col = 0; col < 4; ++col)
     for (size_t row = 0; row < 4; ++row)
-      CHECK(bits(c.get<double>("SIGMA", 1 + 4 * col + row)) ==
-            bits(Sigma(row, col)));
+      CHECK(bits(Sigma[1](row, col)) == bits(Sigma[0](row, col)));
 }
 
-/* Pins: a fit that computes no covariance writes no SIGMA, whatever SIGMA
- * the Context carried from an earlier fit (the 17 values of a 4-weight
- * OALGO 3 fit): M_BLR_Train<BF_Linear> and M_KRR_Train<Kern_Linear> with
- * OALGO 1, with no FIXINDEX, with FIXINDEX 2 (one weight pinned) and with
- * FIXINDEX 1-4 (every weight pinned), and both with OALGO 3 and every
- * weight pinned (they solve nothing); with every weight pinned the weights
- * are the FIXWEIGHT values. An OALGO 3 fit that solves writes one SIGMA of
- * N*N+1 values with N = 4, the covariance of every weight, also with
- * FIXINDEX 2 (M_Train::sigma_of_all_weights; test_fixed_weights.cpp checks
- * its values).
- * Before the fix: every fit that computes no covariance kept the earlier 17
- * values, so the potential paired them with weights they were not computed
- * for (and `predict --error` used them); the OALGO 3 fits that solve
- * appended their SIGMA to the earlier one.
- * Before the merge of fix/hpo-trainer-reuse into fix/multispecies-bias
- * (which runs M_KRR with OALGO 3 and every weight pinned, and checks N):
- * on v1-dev that case was not run, as M_KRR_Train kept the zeroed pinned
- * columns in the regression and so solved and wrote a SIGMA, and with
- * FIXINDEX 2 M_BLR_Train's SIGMA had N = 3, the free weights'; on
- * fix/multispecies-bias, where M_KRR_Train solves nothing then, nothing
- * removed the earlier SIGMA, so its 17 values stayed. */
-TEST_CASE("A fit replaces or removes the SIGMA of an earlier fit",
+/* Pins: M_BLR_Train<BF_Linear> and M_KRR_Train<Kern_Linear> hold the
+ * covariance of the fit that computed it and none otherwise, whatever
+ * SIGMA the Context carried from an earlier fit (the 17 values of a
+ * 4-weight OALGO 3 fit): with OALGO 1 (no FIXINDEX, FIXINDEX 2, FIXINDEX
+ * 1-4) Sigma is empty and get_weights_uncertainty() throws naming OALGO
+ * 3; with OALGO 3 Sigma is the 4 x 4 covariance of every weight and
+ * get_weights_uncertainty() gives 4 standard deviations, also with
+ * FIXINDEX 2 (M_Train::sigma_of_all_weights; test_fixed_weights.cpp and
+ * test_weight_covariance.cpp check the values) and with FIXINDEX 1-4,
+ * every weight pinned and nothing solved (a zero covariance); with every
+ * weight pinned the weights are the FIXWEIGHT values. The Context's SIGMA
+ * is not read.
+ * Before the fix (WCOV and WNOISE): get_weights_uncertainty() tested
+ * LAMBDA (0 here), not the fit: it threw "Sigma matrix is not computed."
+ * after every fit (M_KRR: "Sigma matrix is only computed for LAMBDA !=
+ * 0"), and with every weight pinned an OALGO 3 fit left Sigma empty.
+ * (The fit's covariance was the Context's SIGMA, which a fit replaced or
+ * removed: the expectation of this case, then named "A fit replaces or
+ * removes the SIGMA of an earlier fit", before WCOV.) */
+TEST_CASE("A model holds the covariance of its last fit only",
           "[sigma]") {
   struct Pins {
     const char *name;
@@ -145,33 +171,46 @@ TEST_CASE("A fit replaces or removes the SIGMA of an earlier fit",
             for (double w : p.fixweight) c.add("FIXWEIGHT", w);
           }
           add_earlier_sigma(c);
-          phi_type Phi = make_phi();
-          t_type T = make_target(Phi);
+          phi_type Phi = make_phi_aug();
+          t_type T = make_target_aug();
           t_type w;
+          Matrix S;
+          t_type unc;
+          std::string msg;
+          auto fit = [&](auto &m) {
+            REQUIRE_NOTHROW(m.train(Phi, T));
+            w = m.get_weights();
+            S = m.Sigma;
+            try {
+              unc = m.get_weights_uncertainty();
+            } catch (const std::exception &e) {
+              msg = e.what();
+            }
+          };
           if (std::string(model) == "M_BLR BF_Linear") {
             BF_Linear bf;
             M_BLR_Train<BF_Linear> m(bf, c);
-            REQUIRE_NOTHROW(m.train(Phi, T));
-            w = m.get_weights();
+            fit(m);
           } else {
             Kern_Linear k;
             M_KRR_Train<Kern_Linear> m(k, c);
-            REQUIRE_NOTHROW(m.train(Phi, T));
-            w = m.get_weights();
+            fit(m);
           }
+          INFO("get_weights_uncertainty: " << msg);
           REQUIRE(w.size() == 4);
           if (all_pinned)
             for (size_t i = 0; i < 4; ++i) CHECK(w[i] == p.fixweight[i]);
-          const bool computed = std::string(oalgo) == "3" && !all_pinned;
-          if (computed) {
+          if (std::string(oalgo) == "3") {
             // The covariance of this fit, of every weight (a pinned one
             // with no variance).
-            REQUIRE(c.has_stored("SIGMA"));
-            const size_t n = c.get<size_t>("SIGMA");
-            CHECK(n == 4);
-            CHECK(c.size("SIGMA") == n * n + 1);
+            CHECK(S.rows() == 4);
+            CHECK(S.cols() == 4);
+            CHECK(unc.size() == 4);
+            CHECK(msg.empty());
           } else {
-            CHECK_FALSE(c.has_stored("SIGMA"));
+            CHECK(S.rows() == 0);
+            CHECK(unc.size() == 0);
+            CHECK(msg.find("OALGO 3") != std::string::npos);
           }
         }
       }
@@ -181,24 +220,25 @@ TEST_CASE("A fit replaces or removes the SIGMA of an earlier fit",
 
 /* Pins: M_KRR_Train::train2, the solve of MODEL M_KRR <kernel> 2 (the
  * kernel matrix of the basis vectors plus LAMBDA on its diagonal, no
- * covariance), removes the SIGMA the Context carried from an earlier fit
- * (the 17 values of a 4-weight OALGO 3 fit), for Kern_Linear and for
- * Kern_RBF (MPARAMS 1.0); it fits one weight per basis vector (4).
- * Before the fix: the 17 values were kept beside train2's weights, so the
- * potential written from the model paired them with weights they were not
- * computed for (`tadah train` of such a configuration wrote `SIGMA 2 1 0
- * 0 1` into its potential). */
-TEST_CASE("M_KRR implementation 2 (train2) removes the SIGMA of an earlier "
-          "fit",
+ * covariance), leaves the model without a covariance after an OALGO 3 fit
+ * of the same model computed one (Sigma 4 x 4 after train(), empty after
+ * train2(), and get_weights_uncertainty() throws naming OALGO 3), for
+ * Kern_Linear and for Kern_RBF (MPARAMS 1.0); it fits one weight per basis
+ * vector (4).
+ * Before the fix (WCOV and WNOISE): Sigma kept the 4 x 4 covariance of the
+ * earlier fit beside train2's weights, and get_weights_uncertainty()
+ * returned its diagonal (LAMBDA 1e-3). (train2 removed the Context's
+ * SIGMA: the expectation of this case, then named "M_KRR implementation 2
+ * (train2) removes the SIGMA of an earlier fit", before WCOV.) */
+TEST_CASE("M_KRR implementation 2 (train2) leaves no covariance of an "
+          "earlier fit",
           "[sigma][krr]") {
   for (const char *kern : {"Kern_Linear", "Kern_RBF"}) {
     DYNAMIC_SECTION(kern) {
-      Context c = make_ctx("1");
+      Context c = make_ctx("3");
       c.remove("LAMBDA");
       c.add("LAMBDA", "1e-3");
       c.add("MPARAMS", "1.0");
-      add_earlier_sigma(c);
-      REQUIRE(c.size("SIGMA") == 17);
       // Four basis vectors (the columns of the 8x4 matrix), one target
       // value each.
       Matrix B = make_phi();
@@ -206,19 +246,38 @@ TEST_CASE("M_KRR implementation 2 (train2) removes the SIGMA of an earlier "
       for (size_t j = 0; j < T.size(); ++j)
         T[j] = 0.3 * static_cast<double>(j + 1);
       t_type w;
+      Matrix S_fit, S_train2;
+      t_type unc;
+      std::string msg;
+      auto fit = [&](auto &m) {
+        phi_type Phi = make_phi_aug();
+        t_type Tf = make_target_aug();
+        REQUIRE_NOTHROW(m.train(Phi, Tf));
+        S_fit = m.Sigma;
+        REQUIRE_NOTHROW(m.train2(B, T));
+        w = m.get_weights();
+        S_train2 = m.Sigma;
+        try {
+          unc = m.get_weights_uncertainty();
+        } catch (const std::exception &e) {
+          msg = e.what();
+        }
+      };
       if (std::string(kern) == "Kern_Linear") {
         Kern_Linear k;
         M_KRR_Train<Kern_Linear> m(k, c);
-        REQUIRE_NOTHROW(m.train2(B, T));
-        w = m.get_weights();
+        fit(m);
       } else {
         Kern_RBF k(c);
         M_KRR_Train<Kern_RBF> m(k, c);
-        REQUIRE_NOTHROW(m.train2(B, T));
-        w = m.get_weights();
+        fit(m);
       }
+      INFO("get_weights_uncertainty: " << msg);
       CHECK(w.size() == 4);
-      CHECK_FALSE(c.has_stored("SIGMA"));
+      CHECK(S_fit.rows() == 4);
+      CHECK(S_train2.rows() == 0);
+      CHECK(unc.size() == 0);
+      CHECK(msg.find("OALGO 3") != std::string::npos);
     }
   }
 }

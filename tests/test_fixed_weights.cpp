@@ -254,22 +254,35 @@ TEST_CASE("KRR linear partial fix places fixed values", "[fixed_weights]") {
 }
 
 /* Pins: with FIXINDEX 2 / FIXWEIGHT 0.7, OALGO 3 (SVD) and LAMBDA 0.1 on
- * the 8 x 4 design matrix, M_BLR_Train<BF_Linear> and
+ * the 8 x 4 design matrix (with the 4 ridge-augmentation rows a design
+ * matrix appends, zero for OALGO 3), M_BLR_Train<BF_Linear> and
  * M_KRR_Train<Kern_Linear> give the covariance of all 4 weights, as
  * predict --error multiplies it by the full design matrix: Sigma is 4 x 4,
  * its free block (rows and columns 1, 3, 4) is the covariance of the same
- * fit on the free columns alone (1e-12 relative), row and column 2 of the
- * pinned weight are 0 (no variance), and SIGMA holds 4 then the 16 values.
+ * fit on the free columns alone (the 8 rows and 3 augmentation rows: the
+ * same 8 observations; 1e-12 relative), row and column 2 of the pinned
+ * weight are 0 (no variance), and the Context holds no SIGMA (the model
+ * holds the covariance; the potential gets it as WCOV).
  * Before the fix: M_BLR_Train left the 3 x 3 covariance of the free
  * weights (SIGMA "3 ..." with 10 values); M_KRR_Train zeroed the pinned
  * column and kept it, so its Sigma was 4 x 4 but not that of the free
  * weights: its free block differed from the reference by up to 3.3, and
- * the pinned weight's row and column were not 0 (up to 6.7). */
+ * the pinned weight's row and column were not 0 (up to 6.7).
+ * Before WCOV and WNOISE: the Context held SIGMA, 4 then the 16 values
+ * (this case checked it), and the matrices of 8 rows had no augmentation
+ * rows (their zero rows change no SIGMA). */
 TEST_CASE("BLR and KRR with FIXINDEX and OALGO 3: the covariance of every "
           "weight, zero for a pinned one",
           "[fixed_weights][sigma]") {
-  const phi_type Phi0 = make_phi();
-  const t_type T0 = make_target(Phi0);
+  const phi_type Phi8 = make_phi();
+  const t_type T8 = make_target(Phi8);
+  // The design matrix of a fit: the 8 rows, then 4 augmentation rows.
+  phi_type Phi0(12, 4);
+  Phi0.set_zero();
+  t_type T0(12);
+  for (size_t i = 0; i < 12; ++i) T0[i] = i < 8 ? T8[i] : 0.0;
+  for (size_t j = 0; j < 4; ++j)
+    for (size_t i = 0; i < 8; ++i) Phi0(i, j) = Phi8(i, j);
   auto oalgo3 = [] {
     Context c;
     c.add("VERBOSE", "0");
@@ -277,13 +290,16 @@ TEST_CASE("BLR and KRR with FIXINDEX and OALGO 3: the covariance of every "
     c.add("OALGO", "3");
     return c;
   };
-  // The reference: the same fit on the free columns 0, 2, 3.
-  phi_type Phi_r(Phi0.rows(), 3);
-  t_type T_r = T0;
+  // The reference: the same fit on the free columns 0, 2, 3 (8 rows and 3
+  // augmentation rows).
+  phi_type Phi_r(11, 3);
+  Phi_r.set_zero();
+  t_type T_r(11);
   const size_t free_cols[3] = {0, 2, 3};
   for (size_t j = 0; j < 3; ++j)
-    for (size_t i = 0; i < Phi0.rows(); ++i) Phi_r(i, j) = Phi0(i, free_cols[j]);
-  for (size_t i = 0; i < Phi0.rows(); ++i) T_r[i] -= Phi0(i, 1) * 0.7;
+    for (size_t i = 0; i < 8; ++i) Phi_r(i, j) = Phi8(i, free_cols[j]);
+  for (size_t i = 0; i < 11; ++i)
+    T_r[i] = i < 8 ? T8[i] - Phi8(i, 1) * 0.7 : 0.0;
   Context cr = oalgo3();
   BF_Linear bfr;
   M_BLR_Train<BF_Linear> ref(bfr, cr);
@@ -324,7 +340,6 @@ TEST_CASE("BLR and KRR with FIXINDEX and OALGO 3: the covariance of every "
       CHECK(S(1, k) == 0.0);
       CHECK(S(k, 1) == 0.0);
     }
-    REQUIRE(c.size("SIGMA") == 17);
-    CHECK(c.get<double>("SIGMA", 0) == 4.0);
+    CHECK_FALSE(c.has_stored("SIGMA"));
   }
 }
