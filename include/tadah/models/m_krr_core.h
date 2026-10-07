@@ -93,9 +93,12 @@ private:
      * @brief Initializes the model based on the configuration.
      * 
      * Loads weights if available in the configuration and sets the verbose level.
-     * Loaded weights do not make the model trained: a training configuration
-     * may carry the WEIGHTS of a potential (`tadah train -c pot.tadah`),
-     * which the fit replaces (as M_BLR_Core).
+     * Loaded weights do not make the model trained (as M_BLR_Core), so a
+     * model built from a potential can still be trained; MLIP's Trainer,
+     * which builds the models that tadah train and tadah hpo fit, gives it
+     * a configuration without WEIGHTS and BASIS (a potential used as a
+     * training configuration, `tadah train -c pot.tadah`, may have another
+     * SBASIS than its BASIS: the fit draws a new basis).
      *
      * A non-linear kernel (any kernel but Kern_Linear) evaluates its
      * weights against its basis vectors, which it read from SBASIS and

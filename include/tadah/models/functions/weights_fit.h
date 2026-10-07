@@ -48,13 +48,20 @@ bool is_linear_function(const Function_Base &f);
  *
  *  A linear potential with NORM true and BIAS false is refused whatever
  *  its sizes: tadah no longer trains it, and the conversion that wrote one
- *  took descriptor component 0 for an intercept, so its energies are
- *  wrong.
+ *  had no intercept column for the normalisation's constant. M_KRR
+ *  Kern_Linear (until 1.6.0) and M_BLR BF_Linear (up to 1.2.0) took
+ *  descriptor component 0 for an intercept, so the energies and forces of
+ *  such a potential are wrong; M_BLR BF_Linear from 1.3.0-beta.1 (written
+ *  by tadah hpo and the API; tadah train refused the configuration)
+ *  dropped the mean correction, so the energies are off by the same
+ *  constant for every atom and the forces are right. The message says
+ *  which, for the potential's function.
  *
  *  Called where trained weights are used to predict (MLIP M_BLR / M_KRR
  *  predictions, pair_style tadah when it loads a potential), never where
  *  a model is built for training: a training configuration may carry
- *  stale WEIGHTS, NMEAN and NSTDEV, which the fit replaces.
+ *  stale WEIGHTS, NMEAN and NSTDEV, which the fit replaces (MLIP's Trainer
+ *  builds the model to be fitted without them).
  *
  *  @throws std::runtime_error */
 void require_weights_fit(const tadah::core::Context &c, std::size_t dsize,
