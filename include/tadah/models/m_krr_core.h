@@ -91,12 +91,14 @@ private:
      * @brief Initializes the model based on the configuration.
      * 
      * Loads weights if available in the configuration and sets the verbose level.
+     * Loaded weights do not make the model trained: a training configuration
+     * may carry the WEIGHTS of a potential (`tadah train -c pot.tadah`),
+     * which the fit replaces (as M_BLR_Core).
      */
     void init() {
         if (context.contains("WEIGHTS")) {
             weights.resize(context.size("WEIGHTS"));
             context.get<tadah::core::t_type>("WEIGHTS", weights);
-            trained = true;
         }
         verbose = context.get<int>("VERBOSE");
 
