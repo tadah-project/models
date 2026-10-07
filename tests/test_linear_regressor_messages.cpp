@@ -10,7 +10,9 @@
 #include "catch2/catch.hpp"
 #include <tadah/core/context.h>
 #include <tadah/core/core_types.h>
+#include <tadah/models/factor_handle.h>
 #include <tadah/models/linear_regressor.h>
+#include <tadah/models/memory/models_workspace_manager.h>
 
 #include <cmath>
 #include <cstdint>
@@ -177,4 +179,35 @@ TEST_CASE("LinearRegressor: a design matrix or target that is not finite is "
             "rows); no weights were fitted");
     }
   }
+}
+
+/* Pins: train_with_factor (OALGO 4 with the Cholesky factor cached for
+ * tadah hpo's analytical gradients) refuses a non-finite design matrix as
+ * train() does: "LinearRegressor::train: the design matrix holds a value
+ * that is not finite (nan or inf) at row 2, column 3 (...)".
+ * Before the fix: "OLS::solveAndCacheFactor: DPOTRF failed (matrix is not
+ * positive definite); info = 3. This typically means a rank-deficient
+ * design matrix or LAMBDA=0 with insufficient data; ...". */
+TEST_CASE("LinearRegressor::train_with_factor refuses a design matrix that "
+          "is not finite",
+          "[linear_regressor][lapack_messages]") {
+  Context c = make_ctx("4");
+  phi_type Phi = design(6, 4, 4);
+  Phi(1, 2) = std::numeric_limits<double>::quiet_NaN();
+  t_type T = target(6, 4);
+  t_type w;
+  Matrix Sigma;
+  FactorHandle factor;
+  tadah::models::memory::ModelsWorkspaceManager wm;
+  std::string msg = "no exception";
+  try {
+    LinearRegressor::train_with_factor(c, Phi, T, w, Sigma, factor, wm);
+  } catch (const std::exception &e) {
+    msg = e.what();
+  }
+  CHECK(msg ==
+        "LinearRegressor::train: the design matrix holds a value that is not "
+        "finite (nan or inf) at row 2, column 3 (of 6 data rows, then 4 ridge "
+        "rows, and 4 columns): a descriptor or basis function gave it; no "
+        "weights were fitted");
 }
