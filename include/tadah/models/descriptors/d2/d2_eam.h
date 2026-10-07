@@ -9,15 +9,32 @@ namespace models {
 /** \brief Pair-wise part for the Embedded Atom Method descriptor.
  *
  * \f[
- * V_i = \frac{1}{2} \sum_{j \neq i} \psi(r_{ij})
+ * V_i = \frac{1}{2} \sum_{j \neq i} \phi(r_{ij})
  * \f]
  *
  * This descriptor will load tabulated values for the two-body potential \f$ \phi \f$
- * from the provided \ref SETFL file.
+ * from the setfl file (single element, LAMMPS `eam/alloy` or `eam/fs` layout)
+ * named by the \ref SETFL key.
  *
- * This descriptor is usually used together with the many-body descriptor \ref DM_EAM
+ * The TYPE2B line is `TYPE2B D2_EAM 0 <El El ...>`. The one parameter is a
+ * placeholder, written 0: the line must carry it (a line without it is
+ * refused), and the descriptor does not read it. Another value is ignored and
+ * reported on standard error once per process (report_eam_placeholder()).
+ *
+ * This descriptor is usually used together with the many-body descriptor \ref DM_EAM,
+ * which reads the density and the embedding function from the same SETFL file,
  * although this is not required and user can mix it with any other descriptors
- * or use it on its own.
+ * or use it on its own:
+ *
+ *     INIT2B   true
+ *     TYPE2B   D2_EAM 0 Ta Ta
+ *     RCTYPE2B Cut_Dummy
+ *     RCUT2B   5.58190742024    # the setfl file's cutoff
+ *     INITMB   true
+ *     TYPEMB   DM_EAM 0 Ta Ta
+ *     RCTYPEMB Cut_Dummy
+ *     RCUTMB   5.58190742024
+ *     SETFL    Ta.eam.alloy
  *
  * This descriptor will enforce cutoff distance as specified in a \ref SETFL file.
  * Set \ref RCUT2B to the same value to suppress the warning message.
@@ -26,7 +43,7 @@ namespace models {
  * \ref EAMSetflIO class (also used by \ref DM_EAM and the `tadah refit` machinery).
  *
  * Required tadah::core::Context keys:
- * \ref INIT2B \ref SETFL
+ * \ref INIT2B \ref TYPE2B \ref RCUT2B \ref SETFL
  */
 class D2_EAM : public D2_Base {
 private:

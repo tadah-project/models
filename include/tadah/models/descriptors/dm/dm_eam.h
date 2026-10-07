@@ -13,9 +13,17 @@ namespace models {
  * \f]
  *
  * This descriptor will load tabulated values for the density \f$ \rho \f$
- * and embedded energy \f$ F \f$ from the provided \ref SETFL file.
+ * and embedded energy \f$ F \f$ from the setfl file (single element, LAMMPS
+ * `eam/alloy` or `eam/fs` layout) named by the \ref SETFL key.
  *
- * This descriptor is usually used together with the two-body descriptor \ref D2_EAM
+ * The TYPEMB line is `TYPEMB DM_EAM 0 <El El ...>`. The one parameter is a
+ * placeholder, written 0: the TYPEMB format requires an unsigned integer
+ * there, and the descriptor does not read it. Another value is ignored and
+ * reported on standard error once per process (report_eam_placeholder()).
+ *
+ * This descriptor is usually used together with the two-body descriptor \ref D2_EAM,
+ * which reads the pair function from the same SETFL file (one SETFL key
+ * serves both; see \ref D2_EAM for a configuration),
  * although this is not required and user can mix it with any other descriptors
  * or use it on its own.
  *
@@ -26,7 +34,7 @@ namespace models {
  * \ref EAMSetflIO class (also used by \ref D2_EAM and the `tadah refit` machinery).
  *
  * Required tadah::core::Context keys:
- * \ref INITMB \ref SETFL
+ * \ref INITMB \ref TYPEMB \ref RCUTMB \ref SETFL
  */
 class DM_EAM: public DM_Base {
 private:
