@@ -323,3 +323,71 @@ TEST_CASE("Descriptor list keys: a joined line needs one cutoff value per "
                             Contains(key + " has 1 value"));
   }
 }
+
+/* Pins: a list key with fewer values than a SIZE parameter asks for is
+ * refused naming the line, the key, the values the line takes and the
+ * values there are:
+ *  - TYPE2B D2_BP 3 3 Ta Ta with 2 CGRID2B values: "TYPE2B D2_BP takes 3
+ *    CGRID2B values, but CGRID2B has 2 values: TYPE2B D2_BP 3 3 Ta Ta";
+ *  - a D2_mJoin of two D2_BP 2 2 Ta Ta lines with 3 CGRID2B values (the
+ *    first takes 2): "TYPE2B D2_BP (descriptor 2 of 2) takes 2 CGRID2B
+ *    values, but CGRID2B has 1 value left of 3 (the descriptors before it
+ *    take 2): TYPE2B D2_BP 2 2 Ta Ta";
+ *  - every descriptor with list keys (each SIZE 2), each key in turn with 1
+ *    value: the message names the line and "takes 2 <key> values, but <key>
+ *    has 1 value".
+ * Before the fix: "Error: Not enough data for key 'CGRID2B' in context.
+ * Expected 3 but got 2. Token: D2_BP", naming the label but not the line,
+ * and for the joined line the key's total, not what was left ("Expected 2
+ * but got 3"). */
+TEST_CASE("Descriptor list keys: a list key with too few values is refused "
+          "naming the line",
+          "[D_mJoin][list_keys]") {
+  PeriodicTable::initialize();
+  {
+    Context c;
+    c.add("VERBOSE", 0);
+    c.add("INIT2B", "true");
+    c.add("TYPE2B", "D2_BP 3 3 Ta Ta");
+    c.add("RCTYPE2B", "Cut_Cos");
+    c.add("RCUT2B", 4.5);
+    c.add("CGRID2B", "2.5 3.5");
+    c.add("SGRID2B", "0.5 0.5 0.5");
+    CHECK_THROWS_WITH(D_mJoin::expand_grids(c),
+                      Contains("TYPE2B D2_BP takes 3 CGRID2B values, but CGRID2B has "
+                               "2 values: TYPE2B D2_BP 3 3 Ta Ta"));
+  }
+  {
+    Context c;
+    c.add("VERBOSE", 0);
+    c.add("INIT2B", "true");
+    c.add("TYPE2B", "D2_mJoin");
+    c.add("TYPE2B", "D2_BP 2 2 Ta Ta");
+    c.add("TYPE2B", "D2_BP 2 2 Ta Ta");
+    c.add("RCTYPE2B", "Cut_Cos Cut_Cos");
+    c.add("RCUT2B", "4.5 4.5");
+    c.add("CGRID2B", "2.5 3.5 4.0");
+    c.add("SGRID2B", "0.5 0.5 0.5 0.5");
+    CHECK_THROWS_WITH(D_mJoin::expand_grids(c),
+                      Contains("TYPE2B D2_BP (descriptor 2 of 2) takes 2 CGRID2B "
+                               "values, but CGRID2B has 1 value left of 3 (the "
+                               "descriptors before it take 2): TYPE2B D2_BP 2 2 Ta "
+                               "Ta"));
+  }
+  for (const auto &label : descriptors_with_list_keys()) {
+    const LineSpec s = spec_for(label, 2);
+    for (const auto &key : s.list_keys) {
+      Context c = context_for(s, {key});
+      c.add(key, 3);
+      std::string what;
+      try {
+        D_mJoin::expand_grids(c);
+      } catch (const std::exception &e) {
+        what = e.what();
+      }
+      INFO(s.type_key << " " << s.line << " with 1 " << key << " value: '" << what << "'");
+      CHECK_THAT(what, Contains(s.type_key + " " + s.line));
+      CHECK_THAT(what, Contains("takes 2 " + key + " values, but " + key + " has 1 value"));
+    }
+  }
+}
