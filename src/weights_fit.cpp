@@ -50,18 +50,31 @@ void require_weights_fit(const tadah::core::Context &c, std::size_t dsize,
   const std::string label = f.get_label();
   const std::string D = std::to_string(dsize);
 
-  if (norm && linear && n_int == 0)
+  if (norm && linear && n_int == 0) {
+    // How the conversion of earlier versions went wrong without an
+    // intercept column to take the normalisation's constant.
+    const std::string history =
+        label == "BF_Linear"
+            ? "M_BLR BF_Linear converted the weights fitted to the "
+              "normalised descriptors with descriptor component 0 taken for "
+              "an intercept up to 1.2.0, so the energies and forces of such "
+              "a potential are wrong; from 1.3.0-beta.1, when tadah hpo and "
+              "the API wrote such a potential (tadah train refused the "
+              "configuration), it dropped the mean correction, so the "
+              "energies are off by the same constant for every atom (the "
+              "forces are right)"
+            : "M_KRR Kern_Linear converted the weights fitted to the "
+              "normalised descriptors with descriptor component 0 taken for "
+              "an intercept until this version, so its energies and forces "
+              "are wrong";
     throw std::runtime_error(
         "The potential cannot be used: NORM true with " + label +
         " and BIAS false. tadah no longer trains such a potential (NORM true "
         "with a linear model needs BIAS true), and one written by an earlier "
-        "version is wrong: its weights were converted from the normalised "
-        "descriptors with descriptor component 0 taken for an intercept "
-        "(M_KRR Kern_Linear until this version; M_BLR BF_Linear until "
-        "1.2.0, after which tadah train refused it), so its energies and "
-        "forces are wrong in tadah predict and in pair_style tadah; retrain "
-        "it (tadah train -c <its training configuration, or this potential>) "
-        "with NORM false, or with BIAS true.");
+        "version is wrong in tadah predict and in pair_style tadah: " +
+        history + "; retrain it (tadah train -c <its training configuration, "
+        "or this potential>) with NORM false, or with BIAS true.");
+  }
 
   std::vector<std::string> problems;
   const std::size_t n_w = f.weights_count(dsize);
