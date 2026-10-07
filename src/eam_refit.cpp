@@ -506,8 +506,14 @@ void EAMRefit::fit() {
 
   // ---- RHOFORM NONNEG / MONOTONE: can the form follow the table? ----
   // Checked before any fitting: a table outside the form would otherwise
-  // burn the whole escalation ladder on fits that can never pass.
-  check_rho_table(rwin_lo);
+  // burn the whole escalation ladder on fits that can never pass. On the
+  // fit window, fit_r_lo_: never below r_lo_, since the table below it
+  // (where 0.8 r_reach < r_lo_) is fitted by nothing, so the form need not
+  // follow it there. With a wall (rwin_lo > r_lo_) the samples in
+  // [r_lo_, rwin_lo) are fitted in lsq_fit_windowed's tail block (NNLS
+  // under NONNEG/MONOTONE, so in the form; not in the window's stats) and
+  // are not checked.
+  check_rho_table(fit_r_lo_);
 
   // ---- 1. pair phi(r) -> 2-body linear weights ----
   if (adaptive) make_grid_windowed(r_lo_, rcut_, cfg_.n2b, rwin_lo, rcut_,
@@ -666,13 +672,6 @@ double EAMRefit::F_fit(double rho) const {
   return acc;
 }
 
-// Below r_lo the most faithful tabulation is the ORIGINAL table itself, shifted
-// by the (small, ~fit-error-sized) offset that makes it C0-continuous with the
-// fit at the join. No invented functional form, no hyper-parameters; sentinel
-// walls and deep-core shapes are preserved exactly as the source potential has
-// them. (A C2-matched exp continuation was tried first and ABANDONED: it
-// faithfully extrapolates the blip-edge curvature artefact and collapses to
-// zero — see cycle2 report.)
 void EAMRefit::set_blip_fit(Fn which, const std::vector<double> &mu,
                             const std::vector<double> &eta,
                             const std::vector<double> &c,
@@ -745,6 +744,13 @@ double EAMRefit::F_setfl(double rho) const {
   return eam_.F_tab(rho) + (F_fit(rho_join_) - eam_.F_tab(rho_join_));
 }
 
+// Below r_lo the most faithful tabulation is the ORIGINAL table itself, shifted
+// by the (small, ~fit-error-sized) offset that makes it C0-continuous with the
+// fit at the join (z2_setfl, phi_setfl and rho_setfl). No invented functional
+// form, no hyper-parameters; sentinel walls and deep-core shapes are preserved
+// exactly as the source potential has them. (A C2-matched exp continuation was
+// tried first and ABANDONED: it faithfully extrapolates the blip-edge
+// curvature artefact and collapses to zero — see cycle2 report.)
 double EAMRefit::z2_setfl(double r) const {
   if (r >= r_lo_) return phi_fit(r) * r;
   // original z2r + (C0 offset in phi) * r — finite at r = 0
