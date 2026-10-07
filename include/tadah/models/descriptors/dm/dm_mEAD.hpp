@@ -2,6 +2,7 @@
 #include <tadah/models/descriptors/dm/dm_mEAD.h>
 #include <tadah/models/descriptors/dm/dm_impl_utils.h>
 #include <tadah/models/descriptors/d_basis_functions.h>
+#include <tadah/models/descriptors/warn_once.h>
 
 constexpr std::size_t MAX_GRID = 64;
 static_assert(MAX_GRID >= 1, "MAX_GRID must be > 0");
@@ -76,9 +77,12 @@ template <typename F>
         "DM_mEAD: Lmax > 6 is not supported (requested "
         + std::to_string(Lmax) + ").");
 
+  // Once per process (log_warning_once): tadah hpo builds the descriptors
+  // of every evaluation.
   if constexpr (!F::rotationally_invariant) {
     if (Lmax > 0)
-      core::Logger::instance().log(core::LogLevel::WARNING,
+      log_warning_once(
+        label() + ": channel not rotationally invariant for L>0",
         label() + ": channel function is not F_SQ — descriptor is NOT"
         " rotationally invariant for L>0. Use DM_PS_* descriptors instead.");
   }

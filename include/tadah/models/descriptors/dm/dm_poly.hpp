@@ -1,6 +1,7 @@
 #include <tadah/models/descriptors/dm/dm_func.h>
 #include <tadah/models/descriptors/dm/dm_poly.h>
 #include <tadah/models/descriptors/dm/dm_impl_utils.h>
+#include <tadah/models/descriptors/warn_once.h>
 #include <tadah/models/descriptors/dm/radial_policies.h>
 
 #include <stdexcept>
@@ -42,10 +43,13 @@ DM_Poly<ChannelFn, RadialBasis, AggMode>::DM_Poly(const tadah::core::Context& ct
     throw std::runtime_error("DM_Poly: Lmax > 6 is not supported (requested "
         + std::to_string(Lmax) + ").");
 
-  /* OrbitalWise + F≠F_SQ + L>0 is not rotationally invariant */
+  /* OrbitalWise + F≠F_SQ + L>0 is not rotationally invariant; warned of
+   * once per process (log_warning_once): tadah hpo builds the descriptors
+   * of every evaluation. */
   if constexpr (std::is_same_v<AggMode, OrbitalWise>) {
     if (!ChannelFn::rotationally_invariant && Lmax > 0)
-      core::Logger::instance().log(core::LogLevel::WARNING,
+      log_warning_once(
+        label() + " (OrbitalWise): channel not rotationally invariant for L>0",
         label() + " (OrbitalWise): channel function is not F_SQ — descriptor"
         " is NOT rotationally invariant for L>0. Use PowerSpectrum mode.");
   }
