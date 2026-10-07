@@ -183,7 +183,10 @@ TEST_CASE("A fit replaces or removes the SIGMA of an earlier fit",
  * kernel matrix of the basis vectors plus LAMBDA on its diagonal, no
  * covariance), removes the SIGMA the Context carried from an earlier fit
  * (the 17 values of a 4-weight OALGO 3 fit), for Kern_Linear and for
- * Kern_RBF (MPARAMS 1.0); it fits one weight per basis vector (4).
+ * Kern_RBF (MPARAMS 1.0); Kern_RBF has one weight per basis vector (4),
+ * Kern_Linear one per component of the 8-component basis vectors (the
+ * descriptor weights of its basis vectors; it had the 4 coefficients until
+ * the potential-content fix, test_krr_train2_linear.cpp).
  * Before the fix: the 17 values were kept beside train2's weights, so the
  * potential written from the model paired them with weights they were not
  * computed for (`tadah train` of such a configuration wrote `SIGMA 2 1 0
@@ -217,7 +220,7 @@ TEST_CASE("M_KRR implementation 2 (train2) removes the SIGMA of an earlier "
         REQUIRE_NOTHROW(m.train2(B, T));
         w = m.get_weights();
       }
-      CHECK(w.size() == 4);
+      CHECK(w.size() == (std::string(kern) == "Kern_Linear" ? B.rows() : 4u));
       CHECK_FALSE(c.has_stored("SIGMA"));
     }
   }
