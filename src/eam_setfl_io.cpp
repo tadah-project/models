@@ -1,10 +1,13 @@
 #include <tadah/models/eam/eam_setfl_io.h>
 
+#include <tadah/core/number_format.h>
+
 #include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <fstream>
 #include <iomanip>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 
@@ -208,9 +211,30 @@ double EAMSetflIO::d2F_tab(double rho) const {
 }
 
 EAMGrid EAMSetflIO::scaled_grid(double scale) const {
+  if (!(scale > 0.0) || !(scale <= std::numeric_limits<double>::max()))
+    throw std::invalid_argument(
+        "EAMSetflIO: a grid scale must be a positive finite number, got " +
+        core::format_roundtrip(scale));
+  // The counts in double: n * scale may exceed an int (and a long).
+  const double nr = std::round(nr_ * scale);
+  const double nrho = std::round(nrho_ * scale);
+  // The spline LAMMPS and tadah fit through a table (gen_spline, PairEAM's
+  // interpolate) reads its third point: a table has at least 3.
+  constexpr double kMinPoints = 3.0;
+  constexpr double kMaxPoints = std::numeric_limits<int>::max();
+  if (!(nr >= kMinPoints && nr <= kMaxPoints && nrho >= kMinPoints &&
+        nrho <= kMaxPoints))
+    throw std::invalid_argument(
+        "EAMSetflIO: a grid scale of " + core::format_roundtrip(scale) +
+        " gives nrho = " + core::format_roundtrip(nrho) +
+        " and nr = " + core::format_roundtrip(nr) +
+        " points (the input table has " + std::to_string(nrho_) + " and " +
+        std::to_string(nr_) +
+        "); a setfl table needs 3 to 2147483647 points (the spline that "
+        "LAMMPS and tadah fit through it reads its third point)");
   EAMGrid g;
-  g.nr   = std::max(2, static_cast<int>(std::lround(nr_ * scale)));
-  g.nrho = std::max(2, static_cast<int>(std::lround(nrho_ * scale)));
+  g.nr   = static_cast<int>(nr);
+  g.nrho = static_cast<int>(nrho);
   // Preserve the physical spans (nr-1)*dr and (nrho-1)*drho.
   g.dr   = dr_   * static_cast<double>(nr_ - 1)   / static_cast<double>(g.nr - 1);
   g.drho = drho_ * static_cast<double>(nrho_ - 1) / static_cast<double>(g.nrho - 1);
