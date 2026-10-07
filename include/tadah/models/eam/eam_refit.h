@@ -117,10 +117,11 @@ public:
 
   /** Run the three least-squares fits. Under RHOFORM NONNEG and MONOTONE
    *  the tabulated density is checked on the fit window first (the table
-   *  nodes r_i in [window lo, rcut]): a node value below -tol (NONNEG and
-   *  MONOTONE) or a rise rho_tab(r_{i+1}) - rho_tab(r_i) > tol (MONOTONE)
-   *  throws std::runtime_error naming r, tol = 8 eps max|rho_tab| on the
-   *  window, since no fit in the form can follow such a table. */
+   *  nodes r_i in [fit_window_r_lo(), rcut], the window the fit samples;
+   *  never below r_lo): a node value below -tol (NONNEG and MONOTONE) or a
+   *  rise rho_tab(r_{i+1}) - rho_tab(r_i) > tol (MONOTONE) throws
+   *  std::runtime_error naming r, tol = 8 eps max|rho_tab| on the window,
+   *  since no fit in the form can follow such a table. */
   void fit();
 
   /** Reachability analysis only (fit() also performs it): computes r_reach /

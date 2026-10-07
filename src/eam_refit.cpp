@@ -506,8 +506,11 @@ void EAMRefit::fit() {
 
   // ---- RHOFORM NONNEG / MONOTONE: can the form follow the table? ----
   // Checked before any fitting: a table outside the form would otherwise
-  // burn the whole escalation ladder on fits that can never pass.
-  check_rho_table(rwin_lo);
+  // burn the whole escalation ladder on fits that can never pass. On the
+  // window the fit samples, fit_r_lo_: the table below r_lo_ (where
+  // 0.8 r_reach < r_lo_) is fitted by nothing, so the form need not
+  // follow it there.
+  check_rho_table(fit_r_lo_);
 
   // ---- 1. pair phi(r) -> 2-body linear weights ----
   if (adaptive) make_grid_windowed(r_lo_, rcut_, cfg_.n2b, rwin_lo, rcut_,
