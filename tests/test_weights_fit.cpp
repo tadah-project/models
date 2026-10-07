@@ -360,6 +360,45 @@ TEST_CASE("require_weights_fit refuses a linear potential with NORM true "
         "<accepted>");
 }
 
+// Pins: the refusal of a linear potential with NORM true and BIAS false
+// says how each model's conversion of earlier versions made it wrong:
+// BF_Linear (M_BLR) up to 1.2.0 took descriptor component 0 for an
+// intercept (its energies and forces are wrong), and from 1.3.0-beta.1,
+// when tadah hpo and the API wrote such a potential (tadah train refused
+// the configuration), it dropped the mean correction (its energies are off
+// by the same constant for every atom, its forces are right); Kern_Linear
+// (M_KRR) took descriptor component 0 for an intercept until this version
+// (its energies and forces are wrong).
+// Before the fix: both messages said "descriptor component 0 taken for an
+// intercept (M_KRR Kern_Linear until this version; M_BLR BF_Linear until
+// 1.2.0, after which tadah train refused it), so its energies and forces
+// are wrong", which is false for the M_BLR potentials tadah hpo wrote from
+// 1.3.0-beta.1.
+TEST_CASE("require_weights_fit: the refusal of a linear NORM true BIAS false "
+          "potential gives each model's history",
+          "[weights_fit][norm]") {
+  PeriodicTable::initialize();
+  const Context c = pot(false, {"Ta"}, true, 2, 2, 2);
+  const std::string blr = refusal(c, 2, BF_Linear());
+  INFO(blr);
+  CHECK(blr.find("M_BLR BF_Linear") != std::string::npos);
+  CHECK(blr.find("up to 1.2.0") != std::string::npos);
+  CHECK(blr.find("descriptor component 0") != std::string::npos);
+  CHECK(blr.find("from 1.3.0-beta.1") != std::string::npos);
+  CHECK(blr.find("tadah hpo") != std::string::npos);
+  CHECK(blr.find("dropped the mean correction") != std::string::npos);
+  CHECK(blr.find("off by the same constant for every atom") !=
+        std::string::npos);
+  CHECK(blr.find("forces are right") != std::string::npos);
+  const std::string krr = refusal(c, 2, Kern_Linear());
+  INFO(krr);
+  CHECK(krr.find("M_KRR Kern_Linear") != std::string::npos);
+  CHECK(krr.find("descriptor component 0") != std::string::npos);
+  CHECK(krr.find("energies and forces are wrong") != std::string::npos);
+  CHECK(krr.find("dropped") == std::string::npos);
+  CHECK(krr.find("1.2.0") == std::string::npos);
+}
+
 // Pins: DC_Selector, the descriptor builder of pair_style tadah, gives
 // BIAS true one intercept column per ATOM species (ATOM Nb Ta: bias 2, the
 // two-body block from column 2, DSIZE 2 + its size) and refuses BIAS true
