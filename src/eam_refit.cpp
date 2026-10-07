@@ -499,6 +499,11 @@ void EAMRefit::fit() {
     rwin_lo = std::min(std::max(r_lo_, r_K), 0.8 * r_reach_);
   }
 
+  // The window phi and rho are fitted on: the samples (xr) and the grid
+  // (make_grid_windowed clamps the window to its range) start at r_lo_, so
+  // a wall edge 0.8 r_reach below r_lo_ leaves the window at r_lo_.
+  fit_r_lo_ = std::max(rwin_lo, r_lo_);
+
   // ---- RHOFORM NONNEG / MONOTONE: can the form follow the table? ----
   // Checked before any fitting: a table outside the form would otherwise
   // burn the whole escalation ladder on fits that can never pass.
@@ -530,6 +535,7 @@ void EAMRefit::fit() {
   }
   const double rho_win_hi = (adaptive && rho_reach_ > 0.0) ? rho_reach_
                                                            : rhomax_;
+  fit_rho_hi_ = rho_win_hi;
   if (adaptive) make_grid_windowed(0.0, rhomax_, cfg_.nF, 0.0, rho_win_hi,
                                    cF_, sF_, false);   // F: no r cutoff
   else          make_grid(0.0, rhomax_, cfg_.nF, cF_, sF_, false);
@@ -698,6 +704,9 @@ void EAMRefit::set_blip_fit(Fn which, const std::vector<double> &mu,
 }
 
 void EAMRefit::finalize_injected(double rwin_lo, double rho_win_hi) {
+  // the windows the injected fit was made on (fit_window_r_lo/_rho_hi)
+  fit_r_lo_ = rwin_lo;
+  fit_rho_hi_ = rho_win_hi;
   weights_.clear();
   weights_.reserve(c2b_.size() + cmb_.size());
   for (double v : c2b_) weights_.push_back(v);
