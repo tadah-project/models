@@ -102,9 +102,13 @@ public:
   /** Convenience: the input grid as an EAMGrid (the writer's default). */
   EAMGrid input_grid() const { return EAMGrid{nrho_, drho_, nr_, dr_, rcut_}; }
 
-  /** Build an output grid scaled relative to the input grid. `scale > 1`
-   *  densifies (more points, finer spacing); `scale == 1` reproduces the
-   *  input grid. rcut is preserved. */
+  /** Build an output grid scaled relative to the input grid: nr * scale and
+   *  nrho * scale points, rounded, over the same spans (n - 1) * d. `scale >
+   *  1` densifies (more points, finer spacing); `scale == 1` reproduces the
+   *  input grid. rcut is preserved. Throws std::invalid_argument for a
+   *  scale that is not a positive finite number, or whose counts fall
+   *  below 3 (the spline fitted through a setfl table reads its third
+   *  point) or above 2147483647, naming the scale and both counts. */
   EAMGrid scaled_grid(double scale) const;
 
   /** Write a single-element setfl file. The three callbacks supply the NATIVE
