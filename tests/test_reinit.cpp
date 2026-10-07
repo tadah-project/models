@@ -12,9 +12,11 @@
  * mismatch and catastrophically wrong predictions.
  *
  * Bug 2 (re-train guard): M_Core::trained is set to true after the first
- * training call.  Without an explicit reset, subsequent calls to train() on
- * the same cached Trainer are no-ops, so every reinit() path must call
- * model->reset_trained() before training.
+ * training call.  Without an explicit reset, a later train() of the same
+ * model is refused, so a model retrained in place must call
+ * model->reset_trained() first.  (D_Base::reinit() and DC_Selector::reinit()
+ * remain the in-place update of descriptor parameters; tadah hpo no longer
+ * uses them: it builds a Trainer per evaluation.)
  */
 
 #include "catch2/catch.hpp"
@@ -334,11 +336,11 @@ TEST_CASE_METHOD(ReinitFixture,
  * Bug 2 regression: M_Core::reset_trained() must clear the trained flag
  *
  * M_Core::trained is set to true after the first model::train() call.
- * When a Trainer is reused across HPO iterations via reinit(), the model
- * must be reset before training or the training call is a no-op (the
- * model returns the old weights unchanged).  Trainer::reinit() calls
- * model->reset_trained() for this reason; this test ensures the flag is
- * cleared correctly.
+ * A model trained again in place must be reset before training, or the
+ * training call throws "This object is already trained!".  tadah hpo did
+ * so through Trainer::reinit() (MLIP, removed: every evaluation now builds
+ * its own Trainer); reset_trained() stays the way to retrain a model, and
+ * this test ensures the flag is cleared correctly.
  * ------------------------------------------------------------------ */
 
 namespace {

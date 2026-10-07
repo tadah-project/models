@@ -82,7 +82,9 @@ namespace tadah {
         size_t density_size() const { return rsize; }
 
         /** Update descriptor parameters in-place from context.
-         *  Returns true if descriptor size changed (Trainer must be rebuilt). */
+         *  Returns true if descriptor size changed (Trainer must be rebuilt).
+         *  The descriptors only (D_Base::reinit()): tadah hpo does not call
+         *  it, it builds a Trainer for every evaluation. */
         bool reinit(const tadah::core::Context& ctx) {
           bool changed = false;
           if (d2b) {

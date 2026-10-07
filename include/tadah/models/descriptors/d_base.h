@@ -246,6 +246,12 @@ public:
    * Re-reads all parameters that were baked in at construction time.
    * Returns true if the descriptor's output size changed, requiring a
    * full Trainer rebuild.  Default: no-op (for file-based or fixed descriptors).
+   *
+   * Through DC_Selector::reinit(), an in-place update for library users;
+   * tadah hpo does not call it (it builds a Trainer, and so the
+   * descriptors, for every evaluation). It updates the descriptor only:
+   * a model, basis function or kernel built from the old context keeps
+   * what it read then.
    */
   virtual bool reinit(const tadah::core::Context& /*ctx*/) { return false; }
 
