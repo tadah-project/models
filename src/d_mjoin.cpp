@@ -199,7 +199,8 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
   }
 
   std::vector<tadah::core::Context> contexts;
-  for (const auto &line : lines) {
+  for (size_t li = 0; li < lines.size(); ++li) {
+    const auto &line = lines[li];
     const std::string &token = line[0];
     std::unique_ptr<D_Base> d(tadah::core::factory<D_Base>(token));
     // The line has the descriptor's parameters and its SIZE parameters are
@@ -257,12 +258,27 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
     for (size_t k = 0; k < all_list_keys.size(); ++k) {
       const std::string &key = all_list_keys[k];
       const size_t n = sizes[k];
-      // check dimensions: ensure there are at least n remaining tokens
-      if (n > 0 && data_map[key].second + n > data_map[key].first->size()) {
-        throw std::runtime_error(
-            "Error: Not enough data for key '" + key + "' in context. "
-            "Expected " + std::to_string(n) + " but got " + std::to_string(data_map[key].first->size()) +
-            ". Token: " + token);
+      // The key (set when n > 0, checked above) must hold n more values:
+      // those the descriptors before this one on the line took are theirs.
+      const size_t given = n > 0 ? data_map.at(key).first->size() : 0;
+      const size_t taken = n > 0 ? data_map.at(key).second : 0;
+      if (n > 0 && taken + n > given) {
+        auto values = [](size_t v) {
+          return std::to_string(v) + (v == 1 ? " value" : " values");
+        };
+        std::string where = type_str + " " + token;
+        if (lines.size() > 1)
+          where += " (descriptor " + std::to_string(li + 1) + " of " +
+                   std::to_string(lines.size()) + ")";
+        const std::string has =
+            taken == 0 ? values(given)
+                       : values(given - taken) + " left of " +
+                             std::to_string(given) +
+                             " (the descriptors before it take " +
+                             std::to_string(taken) + ")";
+        throw std::runtime_error(where + " takes " + std::to_string(n) + " " +
+                                 key + (n == 1 ? " value" : " values") +
+                                 ", but " + key + " has " + has + ": " + text);
       }
       c1.add(type_str, n);
       for (size_t j = 0; j < n; ++j) {
