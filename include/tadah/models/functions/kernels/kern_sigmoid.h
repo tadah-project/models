@@ -53,6 +53,8 @@ class Kern_Sigmoid : public virtual Kern_Base {
             double& dK_out) const override;
 
         std::string get_label() const override;
+        /** \brief See Function_Base::mparams(). */
+        std::vector<MParamSlot> mparams() const override;
         /** \brief See Function_Base::intercept_columns(). */
         std::vector<size_t> intercept_columns(const tadah::core::Context &c) const override;
 

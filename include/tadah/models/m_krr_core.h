@@ -92,11 +92,11 @@ private:
     /**
      * @brief Initializes the model based on the configuration.
      * 
-     * Loads weights if available in the configuration and sets the verbose level.
-     * Loaded weights do not make the model trained (as M_BLR_Core), so a
-     * model built from a potential can still be trained; MLIP's Trainer,
-     * which builds the models that tadah train and tadah hpo fit, gives it
-     * a configuration without WEIGHTS and BASIS (a potential used as a
+     * Loads weights if available in the configuration and sets the verbose
+     * level. Loaded weights do not make the model trained (is_trained(), as
+     * M_BLR_Core): train() fits it, replacing them. MLIP's Trainer, which
+     * builds the models that tadah train and tadah hpo fit, gives it a
+     * configuration without WEIGHTS and BASIS (a potential used as a
      * training configuration, `tadah train -c pot.tadah`, may have another
      * SBASIS than its BASIS: the fit draws a new basis).
      *
@@ -111,6 +111,8 @@ private:
         if (context.contains("WEIGHTS")) {
             weights.resize(context.size("WEIGHTS"));
             context.get<tadah::core::t_type>("WEIGHTS", weights);
+            // Loaded weights predict, but the model is not trained: train()
+            // fits it (a potential used as the configuration), as M_BLR.
             check_basis_of_weights();
         }
         verbose = context.get<int>("VERBOSE");

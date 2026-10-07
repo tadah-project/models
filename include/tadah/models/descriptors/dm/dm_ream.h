@@ -166,9 +166,9 @@ private:
                                   tadah::core::v_type &g0a,
                                   tadah::core::v_type &g0e);
 
-  bool warned_rcut_ = false;  ///< one-shot guard for the truncation warning
   /** Last-resort guard (ctor + reinit), knot family only: a density knot
-   *  beyond rcut is silently hard-truncated by Cut_Dummy — warn once. The
+   *  beyond rcut is silently hard-truncated by Cut_Dummy — warn, once per
+   *  process (log_warning_once). The
    *  honest fixes live at the command level (refit/edit/hpo derive RCUTMB
    *  from the largest knot); no auto-raise here because widening fcut
    *  without resizing the caller's neighbour list would not recover the

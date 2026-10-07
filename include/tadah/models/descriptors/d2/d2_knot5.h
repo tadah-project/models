@@ -44,10 +44,9 @@ private:
   std::string lab="D2_Knot5";
   tadah::core::v_type cgrid;
   tadah::core::v_type dgrid;  ///< optional per-atom degree 3|5 (empty = all 5)
-  bool warned_rcut_ = false;  ///< one-shot guard for the truncation warning
-
   /** Last-resort guard (ctor + reinit): a knot beyond rcut is silently
-   *  hard-truncated by Cut_Dummy — warn once. The honest fixes live at the
+   *  hard-truncated by Cut_Dummy — warn, once per process
+   *  (log_warning_once). The honest fixes live at the
    *  command level (refit/edit/hpo derive RCUT2B from the largest knot);
    *  no auto-raise here because widening fcut without resizing the caller's
    *  neighbour list would not recover the missing pairs. */

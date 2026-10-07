@@ -3,6 +3,8 @@
 #include <tadah/models/descriptors/dm/dm_base.h>
 #include <tadah/models/eam/eam_setfl_io.h>
 
+#include <memory>
+
 namespace tadah {
 namespace models {
 
@@ -40,7 +42,10 @@ namespace models {
  */
 class DM_EAM: public DM_Base {
 private:
-  EAMSetflIO eam_;
+  /** The tables of the SETFL file, shared with every descriptor of the
+   *  process that read the same file (shared_setfl()); null until built
+   *  from a context. */
+  std::shared_ptr<const EAMSetflIO> eam_;
   std::string lab="DM_EAM";
 
 public:
@@ -81,6 +86,9 @@ public:
     const double scale=1) const override;
   void init() override;
   std::optional<DescriptorMeta> meta() const override;
+  /** The cutoff of the setfl file, for every value of the cutoff key ("" when
+   *  the descriptor read no file: built with INIT2B/INITMB false). */
+  std::string cutoff_fixed_by(std::size_t i) const override;
 };
 } // namespace models
 } // namespace tadah

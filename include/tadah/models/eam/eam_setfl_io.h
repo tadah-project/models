@@ -2,6 +2,7 @@
 #define TADAH_MODELS_EAM_SETFL_IO_H
 
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -41,6 +42,11 @@ public:
   /** Parse a single-element setfl file. Throws if the file is missing or
    *  declares more than one element type. */
   void read_setfl(const std::string &path);
+
+  /** Parse the contents @p text of a single-element setfl file, as
+   *  read_setfl() parses the file; @p path names it (path() and the
+   *  messages). */
+  void read_setfl_text(const std::string &text, const std::string &path);
 
   /** Build LAMMPS-style cubic splines for all three tabulated functions.
    *  Must be called after read_setfl(). */
@@ -102,9 +108,13 @@ public:
   /** Convenience: the input grid as an EAMGrid (the writer's default). */
   EAMGrid input_grid() const { return EAMGrid{nrho_, drho_, nr_, dr_, rcut_}; }
 
-  /** Build an output grid scaled relative to the input grid. `scale > 1`
-   *  densifies (more points, finer spacing); `scale == 1` reproduces the
-   *  input grid. rcut is preserved. */
+  /** Build an output grid scaled relative to the input grid: nr * scale and
+   *  nrho * scale points, rounded, over the same spans (n - 1) * d. `scale >
+   *  1` densifies (more points, finer spacing); `scale == 1` reproduces the
+   *  input grid. rcut is preserved. Throws std::invalid_argument for a
+   *  scale that is not a positive finite number, or whose counts fall
+   *  below 3 (the spline fitted through a setfl table reads its third
+   *  point) or above 2147483647, naming the scale and both counts. */
   EAMGrid scaled_grid(double scale) const;
 
   /** Write a single-element setfl file. The three callbacks supply the NATIVE
@@ -152,6 +162,23 @@ private:
   std::string lattice_raw_;   // original case, as written in the file
   std::vector<std::vector<double>> frho_spline_, rhor_spline_, z2r_spline_;
 };
+
+/** \brief The setfl file @p path, read and splined (EAMSetflIO::read_setfl
+ *  and build_splines), shared by every caller in the process that reads
+ *  the same file with the same contents.
+ *
+ *  D2_EAM and DM_EAM take their tables from here: one SETFL serves both,
+ *  and tadah hpo, which builds the descriptors of every evaluation anew,
+ *  parses the file once. Each call reads the file; it returns the table it
+ *  parsed earlier for this path (the path as given, in the working
+ *  directory it names) when the file's bytes are the bytes it parsed then,
+ *  and otherwise parses the file again (a table already handed out is not
+ *  changed). So the contents a descriptor is built from are always the
+ *  file's contents at that moment. Thread-safe.
+ *
+ *  @throws std::runtime_error if the file cannot be read or is not a
+ *          single-element setfl file (read_setfl's messages). */
+std::shared_ptr<const EAMSetflIO> shared_setfl(const std::string &path);
 
 } // namespace models
 } // namespace tadah

@@ -11,6 +11,7 @@
 #include <tadah/models/cut_all.h>
 #include <tadah/models/descriptors/param_meta.h>
 #include <tadah/models/descriptors/basis_kind.h>
+#include <tadah/models/descriptors/warn_once.h>
 #include <cmath>
 #include <utility>
 #include <vector>
@@ -245,8 +246,28 @@ public:
    * Re-reads all parameters that were baked in at construction time.
    * Returns true if the descriptor's output size changed, requiring a
    * full Trainer rebuild.  Default: no-op (for file-based or fixed descriptors).
+   *
+   * Through DC_Selector::reinit(), an in-place update for library users;
+   * tadah hpo does not call it (it builds a Trainer, and so the
+   * descriptors, for every evaluation). It updates the descriptor only:
+   * a model, basis function or kernel built from the old context keeps
+   * what it read then.
    */
   virtual bool reinit(const tadah::core::Context& /*ctx*/) { return false; }
+
+  /** \brief What fixes value @p i (0-based) of this descriptor's cutoff key
+   *  (RCUT2B for a two-body, RCUTMB for a many-body descriptor), as a
+   *  clause for a message, or "" when that value is a free parameter.
+   *
+   *  D2_EAM and DM_EAM evaluate the tables of their setfl file, which
+   *  define the cutoff: every value of the key must be the file's cutoff
+   *  (require_setfl_cutoff()), so they answer e.g. "D2_EAM takes the cutoff
+   *  5.58190742024 of its setfl file 'Ta.eam.alloy' (SETFL)", and tadah hpo
+   *  refuses a search over the value at startup. A D2_mJoin or DM_mJoin
+   *  gives value i of the key to its i-th joined descriptor and answers
+   *  with that descriptor's value 0 ("" past the last one). Default "".
+   */
+  virtual std::string cutoff_fixed_by(std::size_t /*i*/) const { return {}; }
 
   virtual bool is_init_for_atoms(int Zi, int Zj) const;
   /** \brief True when this descriptor applies to every pair of elements,
@@ -326,19 +347,20 @@ public:
     return cap;
   }
 
-  /** \brief Emit a one-time warning when a NON-compact basis (e.g. Gaussian) is
-   *  paired with a discontinuous (Cut_Dummy) cutoff: the descriptor's forces
-   *  are then discontinuous at the cutoff and RCUT is not an HPO lever. Makes
-   *  the previously-silent Cut_Dummy(0) install visible. No-op for a
-   *  compact-support basis or a descriptor with no analytic basis. Meant to be
-   *  called once, after construction, from the central builder (DC_Selector),
-   *  when basis_kind()/fcut are settled. */
+  /** \brief Warn when a NON-compact basis (e.g. Gaussian) is paired with a
+   *  discontinuous (Cut_Dummy) cutoff: the descriptor's forces are then
+   *  discontinuous at the cutoff and RCUT is not an HPO lever. Makes the
+   *  previously-silent Cut_Dummy(0) install visible. No-op for a
+   *  compact-support basis or a descriptor with no analytic basis. Called
+   *  after construction from the central builder (DC_Selector), when
+   *  basis_kind()/fcut are settled; logged once per process for each
+   *  descriptor (log_warning_once), however many are built. */
   void warn_if_discontinuous_noncompact() const {
     const auto bk = basis_kind();
     if (!bk || basis_traits(*bk).compact_support) return;
     if (fcut && fcut->kind() == Cut_Base::Kind::Discontinuous) {
-      tadah::core::Logger::instance().log(
-          tadah::core::LogLevel::WARNING,
+      log_warning_once(
+          label() + ": non-compact basis with a Cut_Dummy cutoff",
           "Descriptor " + label() + " uses a non-compact " +
           std::string(basis_name(*bk)) +
           " basis with a discontinuous (Cut_Dummy) cutoff: forces are "
@@ -348,12 +370,10 @@ public:
   }
 
 protected:
-  /** One-shot latch for warn_if_bump_support_beyond_rcut. */
-  bool warned_bump_rcut_ = false;
-
   /** \brief Read-path counterpart of the authoring-time bump-support gate
    *  (the bump analogue of D2_Knot5/DM_REAM::warn_if_knots_beyond_rcut):
-   *  warn ONCE when a bump basis function's support [c - w/eta, c + w/eta]
+   *  warn once per process for each descriptor and cutoff key
+   *  (log_warning_once) when a bump basis function's support [c - w/eta, c + w/eta]
    *  reaches past rcut under a discontinuous (Cut_Dummy) cutoff — the
    *  overhang is hard-truncated there, i.e. an energy/force step whenever a
    *  neighbour crosses the cutoff. Reading stays warn-only: legacy fitted
@@ -367,8 +387,7 @@ protected:
                                         const tadah::core::v_type &cgrid,
                                         const tadah::core::v_type &sgrid,
                                         BasisKind kind) {
-    if (warned_bump_rcut_ || !fcut || cgrid.empty() ||
-        cgrid.size() != sgrid.size())
+    if (!fcut || cgrid.empty() || cgrid.size() != sgrid.size())
       return;
     if (fcut->kind() != Cut_Base::Kind::Discontinuous) return;
     const double w = bump_halfwidth(kind);
@@ -383,9 +402,8 @@ protected:
     }
     const double rc = get_rcut();
     if (reach <= rc + bump_rcut_tol(rc)) return;
-    warned_bump_rcut_ = true;
-    tadah::core::Logger::instance().log(
-        tadah::core::LogLevel::WARNING,
+    log_warning_once(
+        who + ": bump support past a Cut_Dummy " + rkey,
         who + ": bump " + std::to_string(worst + 1) + " of " + ckey +
         " (centre " + std::to_string(cgrid[worst]) + ", eta " +
         std::to_string(sgrid[worst]) + ") has support reaching " +

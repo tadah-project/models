@@ -24,5 +24,12 @@ void require_setfl_cutoff(const tadah::core::Context &c,
   }
 }
 
+std::string setfl_cutoff_clause(const std::string &label,
+                                const EAMSetflIO &eam) {
+  return label + " takes the cutoff " +
+         tadah::core::format_roundtrip(eam.rcut()) + " of its setfl file '" +
+         eam.path() + "' (SETFL)";
+}
+
 }  // namespace models
 }  // namespace tadah

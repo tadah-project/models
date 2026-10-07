@@ -31,6 +31,8 @@ class Kern_Polynomial : public virtual Kern_Base {
          */
         std::string label = "Kern_Polynomial";
         std::string get_label() const override;
+        /** \brief See Function_Base::mparams(). */
+        std::vector<MParamSlot> mparams() const override;
         /** \brief See Function_Base::intercept_columns(). */
         std::vector<size_t> intercept_columns(const tadah::core::Context &c) const override;
         double operator() (const tadah::core::aed_type& b, const tadah::core::aed_type& af) const override;

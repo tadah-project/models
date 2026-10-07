@@ -138,6 +138,10 @@ void DM_mJoin::init() {
   keys.push_back("RCUTMB");
   nparams=std::numeric_limits<size_t>::max();
 }
+std::string DM_mJoin::cutoff_fixed_by(std::size_t i) const {
+  return i < ds.size() ? ds[i]->cutoff_fixed_by(0) : std::string();
+}
+
 bool DM_mJoin::reinit(const tadah::core::Context& ctx) {
   // Re-derive per-child sub-contexts from the updated master context.
   // Copy ctx because expand_grids may add default keys to the context.

@@ -128,14 +128,13 @@ DM_REAM::DM_REAM(const tadah::core::Context& ctx) : DM_Base(ctx) {
 }
 
 void DM_REAM::warn_if_knots_beyond_rcut() {
-  if (warned_rcut_ || basis != BasisKind::Knot5 || dens_.crho.empty() || !fcut)
+  if (basis != BasisKind::Knot5 || dens_.crho.empty() || !fcut)
     return;
   const double mx = *std::max_element(dens_.crho.begin(), dens_.crho.end());
   const double rc = get_rcut();
   if (mx > rc + 1e-12) {
-    warned_rcut_ = true;
-    tadah::core::Logger::instance().log(
-        tadah::core::LogLevel::WARNING,
+    log_warning_once(
+        "DM_REAM: density knot past RCUTMB",
         "DM_REAM: the largest CGRIDMB density knot (" + std::to_string(mx) +
         ") lies beyond RCUTMB (" + std::to_string(rc) +
         ") — its contribution is silently hard-truncated at the cutoff. "

@@ -103,3 +103,63 @@ TEST_CASE("EAMSetflIO rejects missing file", "[eam]") {
   EAMSetflIO io;
   REQUIRE_THROWS(io.read_setfl("tests_data/does_not_exist.alloy"));
 }
+
+// scaled_grid(scale): the output grid of tadah refit's OUTPUT_GRID_SCALE.
+TEST_CASE("EAMSetflIO::scaled_grid refuses a grid a setfl table cannot have",
+          "[eam]") {
+  /* Pins: scaled_grid rounds nr * scale and nrho * scale, computed in
+   * double, to the point counts and keeps the physical spans (n - 1) * d;
+   * the smallest table it gives has 3 points (the spline that LAMMPS and
+   * tadah fit through a setfl table reads its third point). A scale whose
+   * counts fall below 3 or above 2147483647 (an int) throws
+   * std::invalid_argument naming the scale and both counts, and a scale
+   * that is not a positive finite number throws naming it.
+   * Before the fix: each count was std::max(2, int(lround(n * scale))), so
+   * a count below 2 became 2 silently and one above INT_MAX wrapped
+   * negative and became 2 as well (lround is out of range above LONG_MAX):
+   * scaled_grid(1e-4), (1e7) and (1e30) returned a 2-point grid, (0) and
+   * (-1) too, and no exception is thrown. */
+  EAMSetflIO io;
+  io.read_setfl("tests_data/eam.alloy");
+  REQUIRE(io.nr() == 5000);
+  REQUIRE(io.nrho() == 5000);
+
+  const EAMGrid g = io.scaled_grid(2.0);
+  CHECK(g.nr == 10000);
+  CHECK(g.nrho == 10000);
+  CHECK(g.dr * (g.nr - 1) == Approx(io.dr() * (io.nr() - 1)));
+  CHECK(g.drho * (g.nrho - 1) == Approx(io.drho() * (io.nrho() - 1)));
+  CHECK(g.rcut == io.rcut());
+  // 5000 x 0.0005 = 2.5 rounds to 3: the smallest table
+  const EAMGrid g3 = io.scaled_grid(0.0005);
+  CHECK(g3.nr == 3);
+  CHECK(g3.nrho == 3);
+  CHECK(g3.dr * 2 == Approx(io.dr() * (io.nr() - 1)));
+
+  const auto refusal = [&](double scale) -> std::string {
+    try {
+      (void)io.scaled_grid(scale);
+    } catch (const std::invalid_argument &e) {
+      return e.what();
+    }
+    return "";
+  };
+  const std::string needs =
+      " (the input table has 5000 and 5000); a setfl table needs 3 to "
+      "2147483647 points (the spline that LAMMPS and tadah fit through it "
+      "reads its third point)";
+  CHECK(refusal(1e-4) == "EAMSetflIO: a grid scale of 0.0001 gives nrho = 1 "
+                         "and nr = 1 points" + needs);
+  // 5000 x 0.0003 = 1.4999999999999998 rounds to 1
+  CHECK(refusal(0.0003) == "EAMSetflIO: a grid scale of 0.0003 gives nrho = "
+                           "1 and nr = 1 points" + needs);
+  CHECK(refusal(1e7) == "EAMSetflIO: a grid scale of 10000000 gives nrho = "
+                        "50000000000 and nr = 50000000000 points" + needs);
+  CHECK(refusal(1e30).rfind("EAMSetflIO: a grid scale of 1e+30 gives nrho = "
+                            "5", 0) == 0);
+  for (const double bad : {0.0, -1.0}) {
+    INFO(bad);
+    CHECK(refusal(bad).rfind("EAMSetflIO: a grid scale must be a positive "
+                             "finite number, got ", 0) == 0);
+  }
+}
