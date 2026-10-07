@@ -5,6 +5,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **A descriptor line whose list key is not set is refused, naming the line and the keys**, instead of crashing. `D_mJoin::parse_context`, which splits the `TYPE2B`/`TYPEMB` lines for `tadah train` and `tadah hpo` (`expand_grids`), for `D2_mJoin`/`DM_mJoin` and for `tadah analysis bfunc`, read the values of a list key that a SIZE parameter asks for (`CGRID2B`, `SGRID2B`, `KDEG2B`, `CGRIDMB`, `SGRIDMB`, `AMPGRIDMB`, `CEMBFUNC`, `SEMBFUNC`, `KDEGMB`, `KDEGEMB`) without checking that the key was set: `tadah train` with `TYPE2B D2_BP 5 5 * *` and no `CGRID2B`/`SGRID2B` ended in a segmentation fault, and so did every descriptor with list keys. It now stops with `TYPE2B D2_BP takes 5 CGRID2B values and 5 SGRID2B values, but CGRID2B and SGRID2B are not set: TYPE2B D2_BP 5 5 * *` (a SIZE of 0 needs no key). The same function now checks each descriptor's line with `D_Base::element_tokens`, as the descriptor's constructor does, before reading it (`TYPE2B D2_BP` without its parameters was read past its end, a segmentation fault; `TYPE2B D2_BP * *` stopped with `stoi`), and refuses a joined line with fewer `RCTYPE2B`/`RCUT2B` (`RCTYPEMB`/`RCUTMB`) values than descriptors, naming the key and both counts (the values were read past their end: `std::bad_alloc` in `tadah train`, or a crash). Test: `test_descriptor_list_keys.cpp`.
+
 ## [1.6.0] — 2026-09-25
 
 ### Added
