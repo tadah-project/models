@@ -669,13 +669,6 @@ double EAMRefit::F_fit(double rho) const {
   return acc;
 }
 
-// Below r_lo the most faithful tabulation is the ORIGINAL table itself, shifted
-// by the (small, ~fit-error-sized) offset that makes it C0-continuous with the
-// fit at the join. No invented functional form, no hyper-parameters; sentinel
-// walls and deep-core shapes are preserved exactly as the source potential has
-// them. (A C2-matched exp continuation was tried first and ABANDONED: it
-// faithfully extrapolates the blip-edge curvature artefact and collapses to
-// zero — see cycle2 report.)
 void EAMRefit::set_blip_fit(Fn which, const std::vector<double> &mu,
                             const std::vector<double> &eta,
                             const std::vector<double> &c,
@@ -748,6 +741,13 @@ double EAMRefit::F_setfl(double rho) const {
   return eam_.F_tab(rho) + (F_fit(rho_join_) - eam_.F_tab(rho_join_));
 }
 
+// Below r_lo the most faithful tabulation is the ORIGINAL table itself, shifted
+// by the (small, ~fit-error-sized) offset that makes it C0-continuous with the
+// fit at the join (z2_setfl, phi_setfl and rho_setfl). No invented functional
+// form, no hyper-parameters; sentinel walls and deep-core shapes are preserved
+// exactly as the source potential has them. (A C2-matched exp continuation was
+// tried first and ABANDONED: it faithfully extrapolates the blip-edge
+// curvature artefact and collapses to zero — see cycle2 report.)
 double EAMRefit::z2_setfl(double r) const {
   if (r >= r_lo_) return phi_fit(r) * r;
   // original z2r + (C0 offset in phi) * r — finite at r = 0

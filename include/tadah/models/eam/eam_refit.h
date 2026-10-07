@@ -161,18 +161,22 @@ public:
   double rho_fit(double r) const;
   double F_fit(double rho) const;     ///< embedding F(rho) (ZERO: F_fit(0) == 0.0)
 
-  // Tabulation variants for the round-trip setfl: identical to *_fit above the
-  // inner fit bound r_lo; below it a smooth C2-matched exp(A+B*dr+C*dr^2)
-  // REPULSIVE continuation replaces the decaying blip tails (which would
-  // otherwise leave an attractive hole at extreme compression). The native
-  // pot.tadah carries only the blips — its validity domain starts at r_lo.
+  // Tabulation variants for the round-trip setfl: identical to *_fit from
+  // the inner fit bound r_lo up; below it the ORIGINAL table, shifted by the
+  // constant that makes it continuous with the fit at r_lo (C0), replaces
+  // the blip tails, which decay below the fit window and would leave an
+  // attractive hole at extreme compression. The native pot.tadah carries
+  // only the blips — its validity domain starts at r_lo.
+  /** phi_fit from r_lo up; below it phi_tab(r) + (phi_fit - phi_tab)(r_lo)
+   *  (z2_setfl(r) / r; 0 for r <= 1e-12). */
   double phi_setfl(double r) const;
   /** rho_fit above r_lo; below it the original table offset-matched at r_lo,
    *  clamped at 0 under RHOFORM NONNEG/MONOTONE (the tabulated continuation
    *  keeps rho >= 0; the form's guarantees are those of rho_fit, r >= r_lo). */
   double rho_setfl(double r) const;
-  /** z2r(r) = phi_setfl(r)*r for the setfl writer — finite at r=0 (the
-   *  continuation operates on z2r, since phi diverges as z2r(0)/r). */
+  /** z2r(r) = phi_setfl(r)*r for the setfl writer: phi_fit(r) r from r_lo
+   *  up; below it z2_tab(r) + (phi_fit - phi_tab)(r_lo) r, finite at r = 0
+   *  (the offset works on z2r, since phi diverges as z2r(0)/r). */
   double z2_setfl(double r) const;
   /** F for the setfl writer: F_fit inside [0, rho_join], the ORIGINAL table
    *  (offset-matched at the join) beyond it. Dense mode: rho_join = rhomax,
