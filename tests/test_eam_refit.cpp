@@ -41,16 +41,17 @@ struct ScratchFile {
 };
 
 // Minimal single-element setfl (header + tiny tabulated block) with a chosen
-// lattice token and lattice constant. Enough for read_setfl(); do NOT call
-// build_splines() on it (nr=nrho=2 is below the spline stencil).
+// lattice token and lattice constant: 3-point tables, the smallest
+// read_setfl() accepts (the spline reads a table's third point). It wrote
+// 2-point tables (nr = nrho = 2), which read_setfl() now refuses.
 void write_min_setfl(const std::string &path, const std::string &lat,
                      double a0) {
   std::ofstream os(path);
   os << "# minimal setfl for tests\n# comment 2\n# comment 3\n"
      << "1 Cu\n"
-     << "2 0.5 2 0.5 1.0\n"
+     << "3 0.5 3 0.5 1.0\n"
      << "29 63.55 " << a0 << " " << lat << "\n"
-     << "0.0 0.1\n0.2 0.3\n0.4 0.5\n";
+     << "0.0 0.1 0.15\n0.2 0.3 0.35\n0.4 0.5 0.55\n";
 }
 
 // Relative RMS error of f_fit vs f_tab sampled over [a,b], normalised by the
