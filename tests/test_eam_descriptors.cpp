@@ -10,6 +10,7 @@
 //   TYPE2B D2_EAM 0 Ta Ta
 //   TYPEMB DM_EAM 0 Ta Ta
 //   SETFL  tests_data/eam.alloy
+// with RCUT2B / RCUTMB the file's cutoff: the descriptors refuse another.
 
 #include "catch2/catch.hpp"
 
@@ -18,6 +19,7 @@
 #include <tadah/core/periodic_table.h>
 #include <tadah/models/cutoffs.h>
 #include <tadah/models/descriptors/d2/d2_eam.h>
+#include <tadah/models/descriptors/d2/d2_mjoin.h>
 #include <tadah/models/descriptors/dm/dm_eam.h>
 #include <tadah/models/eam/eam_setfl_io.h>
 
@@ -29,6 +31,7 @@
 using tadah::core::Context;
 using tadah::models::Cut_Dummy;
 using tadah::models::D2_EAM;
+using tadah::models::D2_mJoin;
 using tadah::models::DM_EAM;
 using tadah::models::EAMSetflIO;
 
@@ -265,4 +268,105 @@ TEST_CASE("D2_EAM built with INIT2B false takes its one parameter",
   auto dm = std::make_unique<DM_EAM>(off_mb);
   CHECK(dm->size() == 0);
   CHECK(dm->nparams == 1);
+}
+
+/* Pins: D2_EAM refuses an RCUT2B other than the cutoff of its setfl file,
+ * smaller (3) or larger (7), with an error that names the descriptor, the
+ * key and both values, and the file:
+ *   D2_EAM: RCUT2B 3 differs from the cutoff 5.58190742024 of the setfl
+ *   file 'tests_data/eam.alloy' (SETFL); set RCUT2B to the file's cutoff,
+ *   5.58190742024.
+ * The context keeps RCUT2B as it was (3). With the file's cutoff and
+ * RCTYPE2B Cut_Dummy the descriptor builds, evaluates with that cutoff
+ * (get_rcut()) and leaves RCUT2B as given. Inside a D2_mJoin the D2_EAM
+ * child's own RCUT2B is checked (RCUT2B 5.58190742024 3 refused naming 3).
+ * Before the fix: none was refused. D2_EAM replaced RCUT2B in the context
+ * with the file's cutoff and logged a WARNING ("Enforcing SETFL file
+ * cutoff"), after its cutoff function had been built from the configured
+ * value: get_rcut() was 3 while RCUT2B read 5.58190742024, the value a
+ * potential file records, so the saved potential was not the fitted model.
+ * CHECK_THROWS_WITH failed and RCUT2B read 5.58190742024, not 3. */
+TEST_CASE("D2_EAM refuses an RCUT2B other than its setfl file's cutoff",
+          "[D2][eam][cutoff]") {
+  tadah::core::PeriodicTable::initialize();
+  for (const double rc : {3.0, 7.0}) {
+    INFO("RCUT2B " << rc);
+    Context c = d2_context("0");
+    c.remove("RCUT2B");
+    c.add("RCUT2B", rc);
+    c.remove("RCTYPE2B");
+    c.add("RCTYPE2B", "Cut_Dummy");
+    const std::string v = rc == 3.0 ? "3" : "7";
+    CHECK_THROWS_WITH(
+        D2_EAM(c),
+        "D2_EAM: RCUT2B " + v +
+            " differs from the cutoff 5.58190742024 of the setfl file "
+            "'tests_data/eam.alloy' (SETFL); set RCUT2B to the file's "
+            "cutoff, 5.58190742024.");
+    CHECK(c.get<double>("RCUT2B") == rc);
+  }
+
+  Context ok = d2_context("0");
+  ok.remove("RCTYPE2B");
+  ok.add("RCTYPE2B", "Cut_Dummy");
+  std::unique_ptr<D2_EAM> d2;
+  REQUIRE_NOTHROW(d2 = std::make_unique<D2_EAM>(ok));
+  CHECK(d2->get_rcut() == kSetflRcut);
+  CHECK(ok.get<double>("RCUT2B") == kSetflRcut);
+
+  // D2_mJoin of two D2_EAM terms: the second one's RCUT2B is 3
+  Context join;
+  join.add("ATOM", "Ta");
+  join.remove("INIT2B");
+  join.add("INIT2B", "true");
+  for (const char *t : {"D2_mJoin", "D2_EAM", "0", "Ta", "Ta", "D2_EAM", "0",
+                        "Ta", "Ta"})
+    join.add("TYPE2B", t);
+  join.add("RCTYPE2B", "Cut_Dummy");
+  join.add("RCTYPE2B", "Cut_Dummy");
+  join.add("RCUT2B", kSetflRcut);
+  join.add("RCUT2B", 3.0);
+  join.add("SETFL", kSetfl);
+  CHECK_THROWS_WITH(D2_mJoin(join),
+                    Catch::StartsWith("D2_EAM: RCUT2B 3 differs from the "
+                                      "cutoff 5.58190742024 of the setfl "
+                                      "file"));
+}
+
+/* Pins: the same for DM_EAM and RCUTMB:
+ *   DM_EAM: RCUTMB 3 differs from the cutoff 5.58190742024 of the setfl
+ *   file 'tests_data/eam.alloy' (SETFL); set RCUTMB to the file's cutoff,
+ *   5.58190742024.
+ * for 3 and 7; RCUTMB is left as it was; the file's cutoff with RCTYPEMB
+ * Cut_Dummy builds and evaluates with that cutoff.
+ * Before the fix: none was refused; RCUTMB was replaced in the context with
+ * the file's cutoff while get_rcut() kept the configured one, so
+ * CHECK_THROWS_WITH failed and RCUTMB read 5.58190742024. */
+TEST_CASE("DM_EAM refuses an RCUTMB other than its setfl file's cutoff",
+          "[DM][eam][cutoff]") {
+  tadah::core::PeriodicTable::initialize();
+  for (const double rc : {3.0, 7.0}) {
+    INFO("RCUTMB " << rc);
+    Context c = dm_context("0");
+    c.remove("RCUTMB");
+    c.add("RCUTMB", rc);
+    c.remove("RCTYPEMB");
+    c.add("RCTYPEMB", "Cut_Dummy");
+    const std::string v = rc == 3.0 ? "3" : "7";
+    CHECK_THROWS_WITH(
+        DM_EAM(c),
+        "DM_EAM: RCUTMB " + v +
+            " differs from the cutoff 5.58190742024 of the setfl file "
+            "'tests_data/eam.alloy' (SETFL); set RCUTMB to the file's "
+            "cutoff, 5.58190742024.");
+    CHECK(c.get<double>("RCUTMB") == rc);
+  }
+
+  Context ok = dm_context("0");
+  ok.remove("RCTYPEMB");
+  ok.add("RCTYPEMB", "Cut_Dummy");
+  std::unique_ptr<DM_EAM> dm;
+  REQUIRE_NOTHROW(dm = std::make_unique<DM_EAM>(ok));
+  CHECK(dm->get_rcut() == kSetflRcut);
+  CHECK(ok.get<double>("RCUTMB") == kSetflRcut);
 }
