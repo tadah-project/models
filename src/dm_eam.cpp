@@ -1,6 +1,8 @@
 #include "tadah/models/descriptors/dm/dm_base.h"
 #include <tadah/models/descriptors/dm/dm_eam.h>
 #include <tadah/models/descriptors/closed_form_meta.h>
+#include <tadah/models/descriptors/eam_placeholder.h>
+#include <tadah/models/descriptors/eam_setfl_cutoff.h>
 namespace tadah {
 namespace models {
 
@@ -15,21 +17,11 @@ DM_EAM::DM_EAM(core::Context &c): DM_Base(c)
   init();
   if (!c.get<bool>("INITMB")) return;
   s=1;
-  eam_.read_setfl(c.get<std::string>("TYPEMB",1));
+  report_eam_placeholder(c, "TYPEMB", lab);
+  eam_.read_setfl(c("SETFL")[0]);
   eam_.build_splines();
 
-  if (std::abs(eam_.rcut() - c.get<double>("RCUTMB")) > std::numeric_limits<double>::min()) {
-    core::Logger::instance().log(
-        core::LogLevel::WARNING,
-        "tadah::core::Context file cutoff and setfl file cutoff differ: " +
-            std::to_string(c.get<double>("RCUTMB")) + " " +
-            std::to_string(eam_.rcut()));
-    core::Logger::instance().log(
-        core::LogLevel::WARNING,
-        "Enforcing SETFL file cutoff: " + std::to_string(eam_.rcut()));
-    c.remove("RCUTMB");
-    c.add("RCUTMB", eam_.rcut());
-  }
+  require_setfl_cutoff(c, "RCUTMB", lab, eam_);
 
   rhoisize = 1;
 

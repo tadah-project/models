@@ -1,6 +1,8 @@
 #include "tadah/models/descriptors/d2/d2_base.h"
 #include <tadah/models/descriptors/d2/d2_eam.h>
 #include <tadah/models/descriptors/closed_form_meta.h>
+#include <tadah/models/descriptors/eam_placeholder.h>
+#include <tadah/models/descriptors/eam_setfl_cutoff.h>
 namespace tadah {
 namespace models {
 
@@ -12,24 +14,14 @@ D2_EAM::D2_EAM() {
 }
 D2_EAM::D2_EAM(tadah::core::Context &c): D2_Base(c)
 {
-  if (!c.get<bool>("INIT2B")) return;
   init();
+  if (!c.get<bool>("INIT2B")) return;
   s=1;
+  report_eam_placeholder(c, "TYPE2B", lab);
   eam_.read_setfl(c("SETFL")[0]);
   eam_.build_splines();
 
-  if (std::abs(eam_.rcut() - c.get<double>("RCUT2B")) > std::numeric_limits<double>::min()) {
-    core::Logger::instance().log(
-        core::LogLevel::WARNING,
-        "tadah::core::Context file cutoff and setfl file cutoff differ: " +
-            std::to_string(c.get<double>("RCUT2B")) + " " +
-            std::to_string(eam_.rcut()));
-    core::Logger::instance().log(
-        core::LogLevel::WARNING,
-        "Enforcing SETFL file cutoff: " + std::to_string(eam_.rcut()));
-    c.remove("RCUT2B");
-    c.add("RCUT2B", eam_.rcut());
-  }
+  require_setfl_cutoff(c, "RCUT2B", lab, eam_);
 
   auto init_atoms = get_init_atoms(c);
   init_for_atoms(init_atoms);
