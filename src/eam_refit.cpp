@@ -507,9 +507,12 @@ void EAMRefit::fit() {
   // ---- RHOFORM NONNEG / MONOTONE: can the form follow the table? ----
   // Checked before any fitting: a table outside the form would otherwise
   // burn the whole escalation ladder on fits that can never pass. On the
-  // window the fit samples, fit_r_lo_: the table below r_lo_ (where
-  // 0.8 r_reach < r_lo_) is fitted by nothing, so the form need not
-  // follow it there.
+  // fit window, fit_r_lo_: never below r_lo_, since the table below it
+  // (where 0.8 r_reach < r_lo_) is fitted by nothing, so the form need not
+  // follow it there. With a wall (rwin_lo > r_lo_) the samples in
+  // [r_lo_, rwin_lo) are fitted in lsq_fit_windowed's tail block (NNLS
+  // under NONNEG/MONOTONE, so in the form; not in the window's stats) and
+  // are not checked.
   check_rho_table(fit_r_lo_);
 
   // ---- 1. pair phi(r) -> 2-body linear weights ----
