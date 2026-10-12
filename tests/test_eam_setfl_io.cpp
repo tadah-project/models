@@ -321,6 +321,60 @@ TEST_CASE("EAMSetflIO reads a header record that spans lines, as LAMMPS "
   CHECK(io.z2r() == plain.z2r());
 }
 
+TEST_CASE("EAMSetflIO refuses an element record split after its mass, as "
+          "LAMMPS does not read it",
+          "[eam][setfl_read]") {
+  /* Pins: the element record 'Z mass a lattice' ends at the end of the line
+   * that holds its mass, as LAMMPS' pair eam/alloy reads it (next_values(2)
+   * joins lines until they hold Z and the mass; the F(rho) table starts on
+   * the next line): a record split after the mass ('73 180.95' and '3.304
+   * bcc'), after the lattice constant ('73 180.95 3.304' and 'bcc') or
+   * over three lines ('73', '180.95', '3.304 bcc') is refused, naming the
+   * line (or lines) of the record LAMMPS reads and its words:
+   * "EAMSetflIO: setfl file 'bad.alloy', line 6: the element record is 'Z
+   * mass a lattice', it has 2 words: LAMMPS (pair eam/alloy) reads the
+   * record to the end of the line of its mass, and the F(rho) table from
+   * the next line" ("... it has 2 words on lines 6-7: ..." for the third).
+   * A record split before the mass ('73' and '180.95 3.304 bcc', the pin
+   * above) still reads, as it does in LAMMPS. pair eam/alloy of the lane's
+   * LAMMPS library refuses the three split files of a 20-point Ta table
+   * ("Not a valid floating-point number: 'bcc'
+   * (src/MANYBODY/pair_eam_alloy.cpp:174)") and reads the one split before
+   * the mass.
+   * Before the fix: all three were read as the one-line record (the reader
+   * joined lines until it had the record's 4 words). */
+  const std::string at = "EAMSetflIO: setfl file 'bad.alloy', line ";
+  const std::string lammps =
+      ": LAMMPS (pair eam/alloy) reads the record to the end of the line of "
+      "its mass, and the F(rho) table from the next line";
+  struct Case {
+    std::vector<std::string> record;
+    std::string message;
+  };
+  const std::vector<Case> cases = {
+      {{"73 180.95", "3.304 bcc"},
+       at + "6: the element record is 'Z mass a lattice', it has 2 words" +
+           lammps},
+      {{"73 180.95 3.304", "bcc"},
+       at + "6: the element record is 'Z mass a lattice', it has 3 words" +
+           lammps},
+      {{"73", "180.95", "3.304 bcc"},
+       at + "6: the element record is 'Z mass a lattice', it has 2 words on "
+            "lines 6-7" + lammps},
+  };
+  for (const Case &c : cases) {
+    std::vector<std::string> l = setfl3_lines();
+    l.erase(l.begin() + 5);
+    l.insert(l.begin() + 5, c.record.begin(), c.record.end());
+    INFO(joined(l));
+    CHECK(setfl_refusal(joined(l)) == c.message);
+  }
+  std::vector<std::string> l = setfl3_lines();
+  l[5] = "73";
+  l.insert(l.begin() + 6, "180.95 3.304 bcc");
+  CHECK(setfl_refusal(joined(l)) == "no exception");
+}
+
 TEST_CASE("EAMSetflIO: a refused file leaves an object that holds a file as "
           "it was",
           "[eam][setfl_read]") {
@@ -385,7 +439,11 @@ TEST_CASE("EAMSetflIO refuses a malformed setfl file, naming the file, the "
    * tabulated data in: bad.alloy" (a file of 3 lines: "... (line 4 must
    * start with the number of element types)."), naming neither the line
    * nor the field; nr -3 threw std::length_error ("vector::_M_default_append").
-   * A line after the z2r table was not read either (that check passes). */
+   * A line after the z2r table was not read either (that check passes).
+   * The 3-word element record ('73 180.95 3.304') is refused as an element
+   * record that ends at the end of the line of its mass (as LAMMPS reads
+   * it, see the next test); until core hygiene 3 it was joined with the
+   * F(rho) line and refused as "... it has 6 words on lines 6-7". */
   const std::string at = "EAMSetflIO: setfl file 'bad.alloy', line ";
   const std::string spline =
       " (the cubic spline that LAMMPS and tadah fit through a table reads "
@@ -433,8 +491,9 @@ TEST_CASE("EAMSetflIO refuses a malformed setfl file, naming the file, the "
       {5, "3 0.5 3 1.0 2.0 7",
        at + "5: the grid line is 'nrho drho nr dr rcut', it has 6 words"},
       {6, "73 180.95 3.304",
-       at + "6: the element record is 'Z mass a lattice', it has 6 words "
-            "on lines 6-7"},
+       at + "6: the element record is 'Z mass a lattice', it has 3 words: "
+            "LAMMPS (pair eam/alloy) reads the record to the end of the line "
+            "of its mass, and the F(rho) table from the next line"},
       {6, "73 180.95 3.304 bcc 1",
        at + "6: the element record is 'Z mass a lattice', it has 5 words"},
       {6, "73.0 180.95 3.304 bcc",

@@ -23,8 +23,11 @@
 #include <tadah/core/core_types.h>
 #include <tadah/models/descriptors/d_all.h>
 #include <tadah/models/cutoffs.h>
+#include <tadah/models/dc_selector.h>
 #include <tadah/models/m_core.h>
 #include <cmath>
+#include <memory>
+#include <string>
 #include <vector>
 
 using namespace tadah::core;
@@ -330,6 +333,412 @@ TEST_CASE_METHOD(ReinitFixture,
 
     const auto v_reinit = eval_rho(dm);
     REQUIRE_THAT(v_reinit, Catch::Matchers::Approx(v_fresh).margin(1e-12));
+}
+
+/* ------------------------------------------------------------------
+ * DC_Selector::reinit: the many-body block follows the two-body block
+ * ------------------------------------------------------------------ */
+
+// A DC_Selector context: D2_Blip of n2b functions, then DM_Blip (Lmax 0,
+// 2 functions), H only, both cutoffs 5.0 (Cut_Cos), no BIAS.
+static Context make_selector_ctx(int n2b)
+{
+    Context ctx;
+    ctx.add("RCTYPE2B", "Cut_Cos");
+    ctx.add("RCUT2B", 5.0);
+    ctx.remove("INIT2B");
+    ctx.add("INIT2B", "true");
+    ctx.add("TYPE2B", "D2_Blip");
+    ctx.add("TYPE2B", n2b); ctx.add("TYPE2B", n2b);
+    ctx.add("TYPE2B", "H"); ctx.add("TYPE2B", "H");
+    for (int i = 0; i < n2b; ++i) ctx.add("CGRID2B", 0.5 * (i + 1));
+    for (int i = 0; i < n2b; ++i) ctx.add("SGRID2B", 1.0);
+    ctx.add("RCTYPEMB", "Cut_Cos");
+    ctx.add("RCUTMB", 5.0);
+    ctx.remove("INITMB");
+    ctx.add("INITMB", "true");
+    ctx.add("TYPEMB", "DM_Blip");
+    ctx.add("TYPEMB", 0); ctx.add("TYPEMB", 2); ctx.add("TYPEMB", 2);
+    ctx.add("TYPEMB", "H"); ctx.add("TYPEMB", "H");
+    ctx.add("CGRIDMB", 1.0); ctx.add("CGRIDMB", 2.0);
+    ctx.add("SGRIDMB", 1.0); ctx.add("SGRIDMB", 1.0);
+    return ctx;
+}
+
+/* Pins: DC_Selector::reinit that changes the two-body size (D2_Blip of 2
+ * functions to 3) moves the many-body block after it, as init() places it:
+ * dmb's first index is 3 (bias 0 + the 3 two-body values), dsize is 3 + the
+ * many-body size, and the descriptor of an H pair (r = 2.0) that the
+ * selector's descriptors write is the one a DC_Selector built from the new
+ * context writes, value for value.
+ * Before the fix: reinit updated dsize but left dmb's first index at 2 (the
+ * old two-body size), so dmb wrote its 2 values from the third value on:
+ * the first was added onto the third two-body value, and the last value
+ * stayed 0 ({..., 0.4972, 0.4284, 0} for {..., 0.4704, 0.0268, 0.4284}); a
+ * reinit that shrank the two-body block made dmb write past dsize. */
+TEST_CASE_METHOD(ReinitFixture,
+    "DC_Selector::reinit moves the many-body block after a two-body size "
+    "change", "[DC_Selector][reinit]")
+{
+    DC_Selector dc(make_selector_ctx(2));
+    REQUIRE(dc.d2b->size() == 2);
+    REQUIRE(dc.dmb->get_fidx() == 2);
+    const size_t mb = dc.dmb->size();
+    REQUIRE(mb > 0);
+
+    const Context ctx3 = make_selector_ctx(3);
+    CHECK(dc.reinit(ctx3));
+    CHECK(dc.d2b->size() == 3);
+    CHECK(dc.dsize == 3 + mb);
+    CHECK(dc.dmb->get_fidx() == 3);
+
+    DC_Selector fresh(ctx3);
+    REQUIRE(fresh.dsize == 3 + mb);
+    REQUIRE(fresh.dmb->get_fidx() == 3);
+
+    // The descriptor of one H-H pair, as the selector's descriptors write it.
+    const Vec3d del(2.0, 0.0, 0.0);
+    const double rsq = del * del;
+    const double r = std::sqrt(rsq);
+    auto descriptor = [&](DC_Selector &s) {
+        aed_type aed(s.dsize);
+        aed.set_zero();
+        s.d2b->calc_aed(1, 1, r, rsq, aed);
+        rho_type rho;
+        s.dmb->init_rhoi(rho);
+        s.dmb->calc_rho(1, 1, r, rsq, del, rho);
+        s.dmb->calc_aed(rho, aed);
+        return std::vector<double>(aed.data(), aed.data() + s.dsize);
+    };
+    const std::vector<double> expected = descriptor(fresh);
+    REQUIRE(expected.back() != 0.0);
+    CHECK(descriptor(dc) == expected);
+}
+
+// What a selector's descriptors write for one H-H pair (r = 2.0 along x),
+// into buffers longer than any of the sizes compared (n descriptor values,
+// nr density values), so that a value written past the selector's sizes is
+// compared too: the descriptor (aed), the density array after calc_aed
+// (rho_i, then F'(rho_i)) and the force descriptor (fd, x direction).
+struct SelectorValues {
+    std::vector<double> aed, rho, fd;
+    std::size_t init_rhoi_size = 0;  // what init_rhoi gives the array
+};
+static SelectorValues selector_values(DC_Selector &s, std::size_t n,
+                                      std::size_t nr)
+{
+    const Vec3d del(2.0, 0.0, 0.0);
+    const double rsq = del * del;
+    const double r = std::sqrt(rsq);
+    SelectorValues v;
+    rho_type sized;
+    s.dmb->init_rhoi(sized);
+    v.init_rhoi_size = sized.size();
+    aed_type aed(n);
+    aed.set_zero();
+    fd_type fd(n);
+    s.d2b->calc_all(1, 1, r, rsq, aed, fd);
+    rho_type rho(nr);
+    rho.set_zero();
+    s.dmb->calc_rho(1, 1, r, rsq, del, rho);
+    s.dmb->calc_aed(rho, aed);
+    s.dmb->calc_dXijdri(1, 1, r, rsq, del, rho, fd);
+    v.aed.assign(aed.data(), aed.data() + n);
+    v.rho.assign(rho.data(), rho.data() + nr);
+    for (std::size_t i = 0; i < n; ++i) v.fd.push_back(fd(i, 0));
+    return v;
+}
+
+// A DC_Selector context: D2_Blip of 2 functions, then DM_mJoin of two
+// DM_Blip (Lmax 0, n1 and n2 functions), H only, Cut_Cos at 5.0, no BIAS.
+static Context make_selector_dm_mjoin_ctx(int n1, int n2)
+{
+    Context ctx;
+    ctx.add("RCTYPE2B", "Cut_Cos");
+    ctx.add("RCUT2B", 5.0);
+    ctx.remove("INIT2B");
+    ctx.add("INIT2B", "true");
+    ctx.add("TYPE2B", "D2_Blip");
+    ctx.add("TYPE2B", 2); ctx.add("TYPE2B", 2);
+    ctx.add("TYPE2B", "H"); ctx.add("TYPE2B", "H");
+    ctx.add("CGRID2B", 0.5); ctx.add("CGRID2B", 1.0);
+    ctx.add("SGRID2B", 1.0); ctx.add("SGRID2B", 1.0);
+    ctx.add("RCTYPEMB", "Cut_Cos"); ctx.add("RCTYPEMB", "Cut_Cos");
+    ctx.add("RCUTMB", 5.0); ctx.add("RCUTMB", 5.0);
+    ctx.remove("INITMB");
+    ctx.add("INITMB", "true");
+    ctx.add("TYPEMB", "DM_mJoin");
+    for (int n : {n1, n2}) {
+        ctx.add("TYPEMB", "DM_Blip");
+        ctx.add("TYPEMB", 0); ctx.add("TYPEMB", n); ctx.add("TYPEMB", n);
+        ctx.add("TYPEMB", "H"); ctx.add("TYPEMB", "H");
+    }
+    for (int i = 0; i < n1 + n2; ++i) ctx.add("CGRIDMB", 0.5 * (i + 1));
+    for (int i = 0; i < n1 + n2; ++i) ctx.add("SGRIDMB", 1.0);
+    return ctx;
+}
+
+/* Pins: DC_Selector::reinit that grows a child of a DM_mJoin many-body
+ * descriptor (the first DM_Blip from 2 functions to 3) leaves the selector
+ * as a DC_Selector built from the new context: dsize 7 (2 + 5) and rsize
+ * 10, and the descriptor, the density array and the force descriptor of an
+ * H pair are the fresh selector's, value for value, also past dsize and
+ * rsize (none written there); init_rhoi gives the array rsize values.
+ * Before the fix: DM_mJoin::reinit kept its total size (4), its density
+ * sizes and the density offsets of its children, so dsize stayed 6, rsize
+ * and init_rhoi 8, the second child's density overlapped the first's, and
+ * the descriptor was {0.0205, 0.1636, 0.0004, 0.0268, 1.2655, 1.2655,
+ * 0.2213, 0, 0} against the fresh {0.0205, 0.1636, 0.0004, 0.0268, 0.2213,
+ * 0.4284, 0.2213, 0, 0}: its value 6 written past dsize 6; the density
+ * array and the force descriptor differed as well. */
+TEST_CASE_METHOD(ReinitFixture,
+    "DC_Selector::reinit that grows a DM_mJoin child gives the selector a "
+    "fresh one has", "[DC_Selector][reinit][DM]")
+{
+    DC_Selector dc(make_selector_dm_mjoin_ctx(2, 2));
+    REQUIRE(dc.dsize == 6);
+    REQUIRE(dc.rsize == 8);
+
+    const Context ctx3 = make_selector_dm_mjoin_ctx(3, 2);
+    CHECK(dc.reinit(ctx3));
+    DC_Selector fresh(ctx3);
+    REQUIRE(fresh.dsize == 7);
+    REQUIRE(fresh.rsize == 10);
+    CHECK(dc.dsize == fresh.dsize);
+    CHECK(dc.rsize == fresh.rsize);
+
+    const std::size_t n = fresh.dsize + 2, nr = fresh.rsize + 2;
+    const SelectorValues expected = selector_values(fresh, n, nr);
+    REQUIRE(expected.aed[fresh.dsize - 1] != 0.0);
+    REQUIRE(expected.init_rhoi_size == fresh.rsize);
+    const SelectorValues got = selector_values(dc, n, nr);
+    CHECK(got.init_rhoi_size == expected.init_rhoi_size);
+    CHECK(got.aed == expected.aed);
+    CHECK(got.rho == expected.rho);
+    CHECK(got.fd == expected.fd);
+}
+
+// A DC_Selector context: BIAS true, ATOM H, D2_mJoin of two D2_Blip (n1
+// and n2 functions), Cut_Cos at 5.0, then DM_Blip (Lmax 0, 2 functions).
+static Context make_selector_d2_mjoin_ctx(int n1, int n2)
+{
+    Context ctx;
+    ctx.remove("BIAS");
+    ctx.add("BIAS", "true");
+    ctx.add("ATOM", "H");
+    ctx.add("RCTYPE2B", "Cut_Cos"); ctx.add("RCTYPE2B", "Cut_Cos");
+    ctx.add("RCUT2B", 5.0); ctx.add("RCUT2B", 5.0);
+    ctx.remove("INIT2B");
+    ctx.add("INIT2B", "true");
+    ctx.add("TYPE2B", "D2_mJoin");
+    for (int n : {n1, n2}) {
+        ctx.add("TYPE2B", "D2_Blip");
+        ctx.add("TYPE2B", n); ctx.add("TYPE2B", n);
+        ctx.add("TYPE2B", "H"); ctx.add("TYPE2B", "H");
+    }
+    for (int i = 0; i < n1 + n2; ++i) ctx.add("CGRID2B", 0.5 * (i + 1));
+    for (int i = 0; i < n1 + n2; ++i) ctx.add("SGRID2B", 1.0);
+    ctx.add("RCTYPEMB", "Cut_Cos");
+    ctx.add("RCUTMB", 5.0);
+    ctx.remove("INITMB");
+    ctx.add("INITMB", "true");
+    ctx.add("TYPEMB", "DM_Blip");
+    ctx.add("TYPEMB", 0); ctx.add("TYPEMB", 2); ctx.add("TYPEMB", 2);
+    ctx.add("TYPEMB", "H"); ctx.add("TYPEMB", "H");
+    ctx.add("CGRIDMB", 1.0); ctx.add("CGRIDMB", 2.0);
+    ctx.add("SGRIDMB", 1.0); ctx.add("SGRIDMB", 1.0);
+    return ctx;
+}
+
+/* Pins: with BIAS true (ATOM H: one intercept column, 0) a D2_mJoin
+ * two-body descriptor starts at column 1: its first index (get_fidx) is 1
+ * in a new selector and after a reinit that grows its first D2_Blip from 2
+ * functions to 3, and the descriptor, the density array and the force
+ * descriptor of an H pair after that reinit are those of a DC_Selector
+ * built from the new context, value for value (column 0, the intercept,
+ * left 0 by the descriptors).
+ * Before the fix: D2_mJoin::set_fidx placed its children but kept its own
+ * first index 0, so get_fidx() was 0 in both selectors, and its reinit
+ * placed the children again from 0: the two-body values moved onto the
+ * intercept column and the last one stayed 0 ({0.0205, 0.1636, 0.4704,
+ * 0.6545, 0.4704, 0, 0.0268, 0.4284, 0, 0} against {0, 0.0205, 0.1636,
+ * 0.4704, 0.6545, 0.4704, 0.0268, 0.4284, 0, 0}), in the force descriptor
+ * too. */
+TEST_CASE_METHOD(ReinitFixture,
+    "DC_Selector::reinit with BIAS true keeps a D2_mJoin after the "
+    "intercept column", "[DC_Selector][reinit][D2]")
+{
+    DC_Selector dc(make_selector_d2_mjoin_ctx(2, 2));
+    REQUIRE(dc.bias == 1);
+    CHECK(dc.d2b->get_fidx() == 1);
+    CHECK(dc.dmb->get_fidx() == 5);
+
+    const Context ctx3 = make_selector_d2_mjoin_ctx(3, 2);
+    CHECK(dc.reinit(ctx3));
+    DC_Selector fresh(ctx3);
+    REQUIRE(fresh.dsize == 1 + 5 + 2);
+    CHECK(fresh.d2b->get_fidx() == 1);
+    CHECK(dc.dsize == fresh.dsize);
+    CHECK(dc.d2b->get_fidx() == 1);
+    CHECK(dc.dmb->get_fidx() == 6);
+
+    const std::size_t n = fresh.dsize + 2, nr = fresh.rsize + 2;
+    const SelectorValues expected = selector_values(fresh, n, nr);
+    REQUIRE(expected.aed[0] == 0.0);
+    REQUIRE(expected.aed[1] != 0.0);
+    const SelectorValues got = selector_values(dc, n, nr);
+    CHECK(got.aed == expected.aed);
+    CHECK(got.rho == expected.rho);
+    CHECK(got.fd == expected.fd);
+}
+
+// A DC_Selector context: D2_Blip of 2 functions, then DM_Blip (Lmax lmax,
+// n functions), H only, Cut_Cos at 5.0, no BIAS.
+static Context make_selector_dm_blip_ctx(int lmax, int n)
+{
+    Context ctx = make_selector_ctx(2);
+    for (const char *k : {"TYPEMB", "CGRIDMB", "SGRIDMB"}) ctx.remove(k);
+    ctx.add("TYPEMB", "DM_Blip");
+    ctx.add("TYPEMB", lmax); ctx.add("TYPEMB", n); ctx.add("TYPEMB", n);
+    ctx.add("TYPEMB", "H"); ctx.add("TYPEMB", "H");
+    for (int i = 0; i < n; ++i) ctx.add("CGRIDMB", 1.0 + 0.5 * i);
+    for (int i = 0; i < n; ++i) ctx.add("SGRIDMB", 1.0);
+    return ctx;
+}
+
+/* Pins: a reinit to a context whose BIAS changes (ATOM H, false to true,
+ * and true to false; the descriptors unchanged) returns true and gives the
+ * selector the intercept columns of the new context, as a fresh one: bias
+ * 1 and 0, dsize, the first index of the two-body (D2_mJoin) and of the
+ * many-body block, and the descriptor of an H pair.
+ * Before the fix: reinit kept the bias of the context the selector was
+ * built from and returned false (the descriptors' sizes were unchanged):
+ * bias 0 for 1 (dsize 6 for 7, the descriptors from column 0 instead of 1)
+ * and 1 for 0 (dsize 7 for 6, from column 1 instead of 0). */
+TEST_CASE_METHOD(ReinitFixture,
+    "DC_Selector::reinit follows a change of BIAS", "[DC_Selector][reinit]")
+{
+    auto with_bias = [](bool bias) {
+        Context ctx = make_selector_d2_mjoin_ctx(2, 2);
+        ctx.remove("BIAS");
+        ctx.add("BIAS", bias ? "true" : "false");
+        return ctx;
+    };
+    for (bool from : {false, true}) {
+        DYNAMIC_SECTION("BIAS " << from << " to " << !from) {
+            DC_Selector dc(with_bias(from));
+            REQUIRE(dc.bias == (from ? 1 : 0));
+            const Context ctx2 = with_bias(!from);
+            CHECK(dc.reinit(ctx2));
+            DC_Selector fresh(ctx2);
+            CHECK(dc.bias == fresh.bias);
+            CHECK(dc.dsize == fresh.dsize);
+            CHECK(dc.d2b->get_fidx() == static_cast<size_t>(fresh.bias));
+            CHECK(dc.dmb->get_fidx() == fresh.dmb->get_fidx());
+            const std::size_t n = 1 + 4 + 2 + 2, nr = fresh.rsize + 2;
+            const SelectorValues expected = selector_values(fresh, n, nr);
+            const SelectorValues got = selector_values(dc, n, nr);
+            CHECK(got.aed == expected.aed);
+            CHECK(got.fd == expected.fd);
+        }
+    }
+}
+
+/* Pins: a reinit that changes a DM_Blip many-body descriptor of a selector
+ * (Lmax 0: 2 functions to 3 and 3 to 2; Lmax 1 with 2 functions to Lmax 0
+ * with 4, the same 4 descriptor values from 8 density values to 4) returns
+ * true and leaves the selector as a fresh one: dsize, rsize, the first
+ * index of F'(rho_i) (get_drfidx), and the density array (rho_i, then
+ * F'(rho_i) right after it), the descriptor and the force descriptor of
+ * an H pair, value for value, also past dsize and rsize.
+ * Before the fix: DM_Blip::reinit updated its density size but not the
+ * first index of F'(rho_i), which stayed at the old density size, and the
+ * selector updated rsize only when the descriptor size changed. From 2 to 3
+ * functions the index was 2 (fresh 3): F'(rho_i) overwrote the third
+ * density and the last descriptor value was 0.1071 for 0.4284 (the density
+ * array and the force descriptor differed too); from 3 to 2 it was 3
+ * (fresh 2): F'(rho_i) was written at 3 and 4, past rsize 4 (the
+ * descriptor and the force descriptor agreed); from Lmax 1 to Lmax 0
+ * reinit returned false, rsize stayed 16 (fresh 8) and the index 8 (fresh
+ * 4): F'(rho_i) was written at 8 to 11, past rsize 8. */
+TEST_CASE_METHOD(ReinitFixture,
+    "DC_Selector::reinit that resizes a DM_Blip gives the selector a fresh "
+    "one has", "[DC_Selector][reinit][DM]")
+{
+    struct Change { int lmax0, n0, lmax1, n1; };
+    for (const Change &c : {Change{0, 2, 0, 3}, Change{0, 3, 0, 2},
+                            Change{1, 2, 0, 4}}) {
+        DYNAMIC_SECTION("DM_Blip Lmax " << c.lmax0 << ", " << c.n0
+                        << " functions to Lmax " << c.lmax1 << ", " << c.n1
+                        << " functions") {
+            DC_Selector dc(make_selector_dm_blip_ctx(c.lmax0, c.n0));
+            const Context ctx2 = make_selector_dm_blip_ctx(c.lmax1, c.n1);
+            CHECK(dc.reinit(ctx2));
+            DC_Selector fresh(ctx2);
+            REQUIRE(fresh.dmb->get_drfidx() == fresh.dmb->rhoi_size());
+            CHECK(dc.dsize == fresh.dsize);
+            CHECK(dc.rsize == fresh.rsize);
+            CHECK(dc.dmb->get_drfidx() == fresh.dmb->get_drfidx());
+            const std::size_t n = 2 + 4 + 2, nr = 16 + 2;
+            const SelectorValues expected = selector_values(fresh, n, nr);
+            const SelectorValues got = selector_values(dc, n, nr);
+            CHECK(got.aed == expected.aed);
+            CHECK(got.rho == expected.rho);
+            CHECK(got.fd == expected.fd);
+        }
+    }
+}
+
+/* Pins: DM_Blip::reinit and DM_EAD::reinit that change the number of
+ * functions (Lmax 0, 2 to 3) place F'(rho_i) right after the new density,
+ * as the constructor places it: get_drfidx() is rhoi_size() (3), that of a
+ * descriptor built from the new context, and the descriptor of an H pair
+ * equals the fresh one's.
+ * Before the fix: get_drfidx() stayed 2 (the old density size): F'(rho_i)
+ * overwrote the third density, and the descriptor's last value differed
+ * (DM_Blip 0.1071, DM_EAD 0.2319, for 0.4284). */
+TEST_CASE_METHOD(ReinitFixture,
+    "DM_Blip and DM_EAD reinit place F'(rho) after the new density",
+    "[DM][reinit]")
+{
+    for (const std::string name : {"DM_Blip", "DM_EAD"}) {
+        DYNAMIC_SECTION(name) {
+            auto ctx_of = [&](int n) {
+                Context ctx = make_selector_dm_blip_ctx(0, n);
+                ctx.remove("TYPEMB");
+                ctx.add("TYPEMB", name);
+                ctx.add("TYPEMB", 0); ctx.add("TYPEMB", n);
+                ctx.add("TYPEMB", n);
+                ctx.add("TYPEMB", "H"); ctx.add("TYPEMB", "H");
+                return ctx;
+            };
+            std::unique_ptr<DM_Base> dm(
+                tadah::core::factory<DM_Base, const Context &>(name,
+                                                                ctx_of(2)));
+            const Context ctx3 = ctx_of(3);
+            CHECK(dm->reinit(ctx3));
+            std::unique_ptr<DM_Base> fresh(
+                tadah::core::factory<DM_Base, const Context &>(name, ctx3));
+            REQUIRE(fresh->rhoi_size() == 3);
+            REQUIRE(fresh->get_drfidx() == 3);
+            CHECK(dm->rhoi_size() == 3);
+            CHECK(dm->get_drfidx() == fresh->get_drfidx());
+            auto descriptor = [](DM_Base &d) {
+                const Vec3d del(2.0, 0.0, 0.0);
+                const double rsq = del * del;
+                rho_type rho;
+                d.init_rhoi(rho);
+                d.calc_rho(1, 1, std::sqrt(rsq), rsq, del, rho);
+                aed_type aed(d.size());
+                aed.set_zero();
+                d.calc_aed(rho, aed);
+                return std::vector<double>(aed.data(), aed.data() + d.size());
+            };
+            const std::vector<double> expected = descriptor(*fresh);
+            REQUIRE(expected.back() != 0.0);
+            CHECK(descriptor(*dm) == expected);
+        }
+    }
 }
 
 /* ------------------------------------------------------------------

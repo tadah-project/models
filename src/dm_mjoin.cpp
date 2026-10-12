@@ -155,13 +155,25 @@ bool DM_mJoin::reinit(const tadah::core::Context& ctx) {
   bool any_changed = false;
   for (size_t i = 0; i < ds.size(); ++i)
     any_changed |= ds[i]->reinit(contexts[i]);
-  // TODO : why would this be required? I don't see the point.
-  // Recompute aggregated sizes from children (always, not just when changed).
-  // s = 0; rhoisize = 0;
-  // for (auto d : ds) { s += d->size(); rhoisize += d->rhoi_size(); }
-  // Re-propagate rfidx offsets so each child reads from the correct rho slice.
-  // if (any_changed) set_rfidx(rfidx); // TODO this looks wrong its either zero or caller should pass in the correct rfidx initial value.
-  return any_changed;
+  // The sizes are the children's sums, as the constructor adds them: a
+  // child's descriptor or density may have changed size.
+  const size_t old_s = s, old_rhoisize = rhoisize, old_rhoipsize = rhoipsize;
+  s = 0;
+  rhoisize = 0;
+  rhoipsize = 0;
+  for (auto d : ds) {
+    s += d->size();
+    rhoisize += d->rhoi_size();
+    rhoipsize += d->rhoip_size();
+  }
+  // Place the children again from this descriptor's first indices, with
+  // F'(rho) after the whole density, as the constructor places them (a
+  // child's reinit may also have moved its own F'(rho)).
+  set_fidx(fidx);
+  set_rfidx(rfidx);
+  set_drfidx(rfidx + rhoisize);
+  return any_changed || s != old_s || rhoisize != old_rhoisize ||
+         rhoipsize != old_rhoipsize;
 }
 
 
