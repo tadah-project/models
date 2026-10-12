@@ -84,7 +84,18 @@ namespace tadah {
         /** Update descriptor parameters in-place from context.
          *  Returns true if descriptor size changed (Trainer must be rebuilt).
          *  The descriptors only (D_Base::reinit()): tadah hpo does not call
-         *  it, it builds a Trainer for every evaluation. */
+         *  it, it builds a Trainer for every evaluation. After a size change
+         *  the many-body block starts after the two-body block, as init()
+         *  places it (dmb's first index bias + d2b->size()).
+         *
+         *  The objects stay the same (a DescriptorsCalc, such as a
+         *  Trainer's, holds references to them), so the update is in
+         *  place and its exception guarantee is the basic one: nothing
+         *  leaks, but a reinit that throws (a key it cannot read, a
+         *  refused grid or WATOM) may leave d2b, its cutoff or a part of a
+         *  descriptor holding the new values and the rest the old ones.
+         *  Build a new selector (a new Trainer) from a context that reads
+         *  instead of using one whose reinit threw. */
         bool reinit(const tadah::core::Context& ctx) {
           bool changed = false;
           if (d2b) {
@@ -100,6 +111,8 @@ namespace tadah {
               cmb->set_rcut(ctx.get<double>("RCUTMBMAX"));
           }
           if (changed) {
+            // The many-body values follow the two-body ones (init()).
+            if (dmb) dmb->set_fidx(static_cast<size_t>(bias) + d2b->size());
             dsize = static_cast<size_t>(bias) + d2b->size() + dmb->size();
             rsize = dmb->rhoi_size() + dmb->rhoip_size();
           }
