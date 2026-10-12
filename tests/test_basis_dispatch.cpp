@@ -41,6 +41,13 @@ TEST_CASE("basis_kind_from_code round-trips and rejects unknown", "[basis_kind]"
   REQUIRE_THROWS_AS(basis_kind_from_code(-1), std::runtime_error);
 }
 
+/* Pins: the REFIT_BASIS spellings map to their family (aliases included;
+ * BLIP is Blip, as BLIP5 and KNOT5 are theirs), and a spelling of no family
+ * is no basis: basis_kind_from_name gives none, basis_kind_from_string
+ * throws naming it.
+ * Before the fix: an unknown spelling ("nonsense", a typo such as "Blipp")
+ * was Blip ("lenient by design"), so tadah refit fitted Blip while it
+ * warned of the experimental Gaussian basis. */
 TEST_CASE("basis_kind_from_string honours the refit aliases", "[basis_kind]") {
   REQUIRE(basis_kind_from_string("Gaussian") == BasisKind::Gaussian);
   REQUIRE(basis_kind_from_string("D2_BP")    == BasisKind::Gaussian);
@@ -48,7 +55,13 @@ TEST_CASE("basis_kind_from_string honours the refit aliases", "[basis_kind]") {
   REQUIRE(basis_kind_from_string("KnotMix")  == BasisKind::Knot5);   // alias
   REQUIRE(basis_kind_from_string("M6")       == BasisKind::Blip5);   // alias
   REQUIRE(basis_kind_from_string("Blip")     == BasisKind::Blip);
-  REQUIRE(basis_kind_from_string("nonsense") == BasisKind::Blip);    // lenient default
+  REQUIRE(basis_kind_from_string("BLIP")     == BasisKind::Blip);
+  REQUIRE(basis_kind_from_name("BLIP5")      == BasisKind::Blip5);
+  REQUIRE_FALSE(basis_kind_from_name("nonsense").has_value());
+  REQUIRE_FALSE(basis_kind_from_name("Blipp").has_value());
+  REQUIRE_THROWS_WITH(basis_kind_from_string("nonsense"),
+                      "BasisKind: 'nonsense' names no basis (Blip, Blip5, "
+                      "Knot5 and its aliases, Gaussian).");
 }
 
 // ---------------------------------------------------------------------------

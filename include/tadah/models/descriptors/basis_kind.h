@@ -16,6 +16,7 @@
 // that maps a BasisKind to those primitives lives in basis_dispatch.h.
 
 #include <cstdint>
+#include <optional>
 #include <stdexcept>
 #include <string>
 
@@ -105,13 +106,13 @@ inline BasisKind basis_kind_from_code(int code) {
   }
 }
 
-/** \brief Map a user-facing basis string (REFIT_BASIS and its aliases) to a
- *  BasisKind. Lenient by design (unknown -> Blip, matching the historical
- *  `tadah refit` default); the exact wire contract is `basis_kind_from_code`.
- *  Hoisted verbatim from the former EAMRefit ctor string ladder. Note the
- *  Knot3 / KnotMix / Mixed aliases all map to the Knot5 family — the per-atom
- *  KDEG* degree arrays (3|5) then select cubic vs quintic knot atoms. */
-inline BasisKind basis_kind_from_string(const std::string &s) {
+/** \brief The BasisKind a user-facing basis string names (REFIT_BASIS and its
+ *  aliases), or none: the one spelling table of `tadah refit` (MLIP's
+ *  refit_basis_is_* read it). Note the Knot3 / KnotMix / Mixed aliases all
+ *  map to the Knot5 family — the per-atom KDEG* degree arrays (3|5) then
+ *  select cubic vs quintic knot atoms. The exact wire contract is
+ *  `basis_kind_from_code`. */
+inline std::optional<BasisKind> basis_kind_from_name(const std::string &s) {
   if (s == "Gaussian" || s == "gaussian" || s == "BP" || s == "D2_BP")
     return BasisKind::Gaussian;
   if (s == "Knot5" || s == "KNOT5" || s == "knot5" ||
@@ -121,7 +122,19 @@ inline BasisKind basis_kind_from_string(const std::string &s) {
     return BasisKind::Knot5;
   if (s == "Blip5" || s == "BLIP5" || s == "blip5" || s == "M6")
     return BasisKind::Blip5;
-  return BasisKind::Blip;
+  if (s == "Blip" || s == "BLIP" || s == "blip")
+    return BasisKind::Blip;
+  return std::nullopt;
+}
+
+/** \brief Map a user-facing basis string (REFIT_BASIS and its aliases) to a
+ *  BasisKind (basis_kind_from_name). A string that names no basis throws
+ *  std::runtime_error naming it: it was Blip ("lenient by design"), so a
+ *  typo fitted another basis than the one asked for. */
+inline BasisKind basis_kind_from_string(const std::string &s) {
+  if (const auto k = basis_kind_from_name(s)) return *k;
+  throw std::runtime_error("BasisKind: '" + s + "' names no basis (Blip, "
+                           "Blip5, Knot5 and its aliases, Gaussian).");
 }
 
 }  // namespace models
