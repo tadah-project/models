@@ -8,7 +8,7 @@ Kern_LQ::Kern_LQ (const tadah::core::Context &c):
     Function_Base(c),
     Kern_Base(c)
 {
-    print_settings_once(label);
+    print_settings(label);
     read_basis_from_context(c,basis);
 }
 double Kern_LQ::operator() (const tadah::core::aed_type& b, const tadah::core::aed_type& af) const

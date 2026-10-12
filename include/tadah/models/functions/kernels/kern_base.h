@@ -5,6 +5,8 @@
 #include <tadah/models/functions/function_base.h>
 
 #include <iostream>
+#include <string>
+#include <vector>
 
 namespace tadah {
 namespace models {
@@ -125,14 +127,51 @@ class Kern_Base: public virtual Function_Base {
 
         /** \brief Prints the kernel's settings line, "\n" @p label
          *  @p settings "\n" (Kern_RBF: "Kern_RBF | sigma: 1 | gamma: 1"),
-         *  when the kernel is built at VERBOSE > 0, once per process for
-         *  each @p label (print_once(), warn_once.h, the key being the
-         *  label): a model built again from one configuration -- tadah hpo
-         *  builds one per evaluation -- prints it at its first build only,
-         *  with that build's settings. Called by the kernels' constructors;
-         *  @p settings is formatted as std::cout formats numbers. */
-        void print_settings_once(const std::string &label,
-                                 const std::string &settings = "");
+         *  when the kernel is built at VERBOSE > 0: at every build, but
+         *  while a KernelSettingsLineScope is open at the first build of
+         *  each @p label in it only, and while one of Lines::None is open
+         *  not at all. Called by the kernels' constructors; @p settings is
+         *  formatted as std::cout formats numbers. */
+        void print_settings(const std::string &label,
+                            const std::string &settings = "");
+};
+
+/** \brief While an object of this class lives, a kernel built at
+ *  VERBOSE > 0 prints its settings line (Kern_Base::print_settings(),
+ *  "Kern_RBF | sigma: 1 | gamma: 1") at the first build of its kind only,
+ *  or, for Lines::None, not at all.
+ *
+ *  Outside every scope each kernel built at VERBOSE > 0 prints its line:
+ *  tadah train, tadah predict, pair_style tadah and each TASK of a task
+ *  file print the line of every model they build. tadah hpo holds a scope
+ *  for each run (hpo_run()): the run builds the model of every evaluation,
+ *  and the potential each PC_LAMMPS script runs, from one configuration,
+ *  and prints the line of the first model it builds, the -c model's. A
+ *  PC_ISOLATION PROCESS worker, a process of its own that builds the
+ *  potentials of the run's scripts, holds one of Lines::None: the run has
+ *  printed the line.
+ *
+ *  The scopes open at the same time, in any thread, share one record of
+ *  the kernels that printed their line, keyed on the label, not on the
+ *  settings: it starts empty when a scope opens while none is open, so a
+ *  second run in the process prints its own line. A build at VERBOSE 0, or
+ *  one while a Lines::None scope is open, prints nothing and does not use
+ *  up the line.
+ */
+class KernelSettingsLineScope {
+    public:
+        /** \brief What the kernels built while the scope is open print. */
+        enum class Lines {
+            FirstOfEachKernel,  ///< the line of the first build of each kernel
+            None                ///< no line
+        };
+        explicit KernelSettingsLineScope(Lines lines = Lines::FirstOfEachKernel);
+        ~KernelSettingsLineScope();
+        KernelSettingsLineScope(const KernelSettingsLineScope &) = delete;
+        KernelSettingsLineScope &operator=(const KernelSettingsLineScope &) = delete;
+
+    private:
+        Lines lines_;
 };
 } // namespace models
 } // namespace tadah

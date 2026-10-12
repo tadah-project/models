@@ -17,7 +17,7 @@ Kern_Sigmoid::Kern_Sigmoid (const tadah::core::Context &context):
     std::ostringstream settings;
     settings.copyfmt(std::cout);
     settings << " | gamma: " << gamma << " | c: " << c;
-    print_settings_once(label, settings.str());
+    print_settings(label, settings.str());
 
     read_basis_from_context(context,basis);
 }

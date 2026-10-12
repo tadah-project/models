@@ -28,7 +28,7 @@ Kern_RBF::Kern_RBF (const tadah::core::Context &c):
     std::ostringstream settings;
     settings.copyfmt(std::cout);
     settings << " | sigma: " << sigma << " | gamma: " << gamma;
-    print_settings_once(label, settings.str());
+    print_settings(label, settings.str());
 
     read_basis_from_context(c,basis);
 }

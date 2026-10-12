@@ -34,7 +34,7 @@ Kern_Polynomial::Kern_Polynomial (const tadah::core::Context &context):
     std::ostringstream settings;
     settings.copyfmt(std::cout);
     settings << " | degree: " << d << " | gamma: " << gamma << " | c: " << c;
-    print_settings_once(label, settings.str());
+    print_settings(label, settings.str());
     read_basis_from_context(context,basis);
 }
 double Kern_Polynomial::operator() (const tadah::core::aed_type& b, const tadah::core::aed_type& af) const

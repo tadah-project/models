@@ -2,7 +2,6 @@
 
 #include <tadah/core/logger.h>
 
-#include <iostream>
 #include <mutex>
 #include <set>
 
@@ -15,10 +14,6 @@ std::mutex &warned_mutex() {
   return m;
 }
 std::set<std::string> &warned_keys() {
-  static std::set<std::string> keys;
-  return keys;
-}
-std::set<std::string> &printed_keys() {
   static std::set<std::string> keys;
   return keys;
 }
@@ -38,20 +33,6 @@ bool log_warning_once(const std::string &key, const std::string &message) {
 bool warning_logged_once(const std::string &key) {
   std::lock_guard<std::mutex> lock(warned_mutex());
   return warned_keys().count(key) != 0;
-}
-
-bool print_once(const std::string &key, const std::string &text) {
-  {
-    std::lock_guard<std::mutex> lock(warned_mutex());
-    if (!printed_keys().insert(key).second) return false;
-  }
-  std::cout << text << std::flush;
-  return true;
-}
-
-bool printed_once(const std::string &key) {
-  std::lock_guard<std::mutex> lock(warned_mutex());
-  return printed_keys().count(key) != 0;
 }
 
 }  // namespace models
