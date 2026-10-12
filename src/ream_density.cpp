@@ -9,12 +9,25 @@
 #include <stdexcept>
 #include <string>
 
-// Every method of ReamDensity lives in this translation unit, which MODELS
-// compiles -O3 without -march=native or -ffast-math. Do not move any of it
-// into a header: the SIGNED sums are pinned bit for bit to the density
-// before RHOFORM (every tadah before 1.6.0), and
-// a -march=native unit contracts a*b+c into an FMA (measured to change the
-// density bits of 7 of the 9 campaign fixtures).
+// Every method of ReamDensity lives in this translation unit, compiled with
+// MODELS' own flags, as DM_REAM's density loops before RHOFORM were: the
+// SIGNED sums are those loops. In a MODELS compiled without FMA contraction
+// (the presets' flags on x86-64: no -march=native, no -ffast-math; LTO and
+// a -march=native tadah included) they are the density before 1.6.0 bit
+// for bit, and the bitwise relations of ream_density.h hold
+// (test_ream_goldens.cpp, test_ream_density.cpp,
+// tadah.models_ream_goldens_native_link). Do not move any of it into a
+// header: a -march=native unit that includes it contracts a*b+c into an FMA
+// (measured to change the density bits of 7 of the 9 campaign fixtures),
+// and an LTO link may then keep that unit's copy for every caller. A MODELS
+// compiled with FMA contraction (-march=native on an FMA machine; AArch64,
+// whose compilers fuse at default flags) gives these sums and relations to
+// rounding only, and nothing pins this file's flags, deliberately: with
+// -ffp-contract=off here ReamDensity's own relations hold, but its
+// agreement with the density of EAMRefit and potedit, compiled with FMA,
+// breaks, and the goldens fail either way (GCC 15.2, 2026-10-12). Without
+// LTO such a build gives the bits of the earlier version built the same
+// way; with LTO 205 of the 1770 golden points differed (by up to 97 ulp).
 
 namespace tadah {
 namespace models {

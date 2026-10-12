@@ -8,7 +8,7 @@ Kern_Quadratic::Kern_Quadratic (const tadah::core::Context &c):
     Function_Base(c),
     Kern_Base(c)
 {
-    if (get_verbose()) std::cout << std::endl << label << std::endl;
+    print_settings(label);
 
     read_basis_from_context(c,basis);
 }

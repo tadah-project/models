@@ -16,10 +16,13 @@
 #include <tadah/core/context.h>
 #include <tadah/core/core_types.h>
 #include <tadah/core/periodic_table.h>
+#include <tadah/core/registry.h>
+#include <tadah/models/cutoffs.h>
 #include <tadah/models/descriptors/dm/dm_ream.h>
 
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <sstream>
 #include <string>
 
@@ -169,4 +172,63 @@ TEST_CASE_METHOD(GoldenFixture,
     Context c = golden_ctx(gc, "NONNEG");
     REQUIRE_THROWS_AS(DM_REAM(c), DensityFormError);
   }
+}
+
+/* Pins: the density a program gets from ReamDensity is the code of
+ * src/ream_density.cpp, compiled with Tadah.MODELS' flags, also when the
+ * program calls ReamDensity itself (DM_REAM::density()) rather than
+ * through DM_REAM: for every golden case under RHOFORM SIGNED, with f_c and
+ * f_c' of a cutoff of the case's RCTYPEMB (RCUTMB 5.5) built here,
+ * w * value(r, f_c) is calc_rho's golden increment, and value_deriv(r, f_c,
+ * f_c') times w gives eam_density's golden rho and rho', bit for bit
+ * (w = 0.8125, golden_ctx's WATOM). In tadah.models_ream_goldens_native_link
+ * this unit is compiled with -march=native: a ReamDensity method moved into
+ * ream_density.h would be compiled here, with those flags, and fuse its
+ * multiply-adds into FMAs on an FMA machine.
+ * Before the fix: passes as well (a pin). With deg, width, value, deriv
+ * and value_deriv moved into ream_density.h as inline functions it fails in
+ * the native-link program at every golden case (GCC 15.2, LTO), and so do
+ * the other golden cases there: the link keeps one copy of an inline
+ * function, this unit's -march=native one, and DM_REAM's methods call it.
+ * Without this case, whose unit calls the density itself, that move
+ * passed. */
+TEST_CASE_METHOD(GoldenFixture,
+                 "DM_REAM goldens: ReamDensity called by the program gives the "
+                 "density before RHOFORM",
+                 "[ream][rhoform][goldens]") {
+  const double w = 0.8125;
+  std::size_t npts = 0;
+  for (const auto &gc : ream_goldens::kCases) {
+    INFO(gc.family << " " << gc.cutoff
+                   << (gc.nonneg_amps ? " non-negative" : " signed")
+                   << " amplitudes");
+    Context c = golden_ctx(gc, "SIGNED");
+    const DM_REAM dm(c);
+    double rcut = 5.5;
+    const std::unique_ptr<Cut_Base> cut(
+        factory<Cut_Base, double &>(gc.cutoff, rcut));
+    std::size_t bad = 0;
+    std::string first;
+    for (std::size_t k = 0; k < gc.npts; ++k) {
+      const ream_goldens::Point &p = gc.pts[k];
+      const double r = p.r;
+      const double fc = cut->calc(r), fcp = cut->calc_prime(r);
+      double v = 0.0, d = 0.0;
+      dm.density().value_deriv(r, fc, fcp, v, d);
+      const double got[3] = {w * dm.density().value(r, fc), w * v, w * d};
+      const double want[3] = {p.rho, p.eam_rho, p.eam_rhop};
+      const char *what[3] = {"w value", "w value_deriv rho",
+                             "w value_deriv rho'"};
+      for (int q = 0; q < 3; ++q) {
+        if (bits(got[q]) == bits(want[q])) continue;
+        if (bad++ == 0)
+          first = std::string(what[q]) + " at r = " + hex(r) + ": got " +
+                  hex(got[q]) + ", before RHOFORM " + hex(want[q]);
+      }
+    }
+    INFO(first);
+    CHECK(bad == 0);
+    npts += gc.npts;
+  }
+  REQUIRE(npts > 1500);
 }

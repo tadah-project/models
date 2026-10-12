@@ -48,13 +48,20 @@ struct RhoBarScan {
  *  multiplies it outside the sum (rho = W rho_raw).
  *
  *  Every method is defined out of line in MODELS/src/ream_density.cpp,
- *  which is compiled -O3 without -march=native or -ffast-math: FMA
- *  contraction in a -march=native unit changes the bits of the sum, and the
- *  SIGNED form is pinned bit for bit to the density before RHOFORM (every
- *  tadah before 1.6.0).
+ *  compiled with MODELS' own flags, as the density of DM_REAM before
+ *  RHOFORM was: FMA contraction in a -march=native unit that compiled the
+ *  sum would change its bits. In a MODELS compiled without FMA contraction
+ *  (the presets' flags on x86-64: no -march=native, no -ffast-math) the
+ *  SIGNED form is the density of every tadah before 1.6.0 bit for bit (the
+ *  goldens, test_ream_goldens.cpp), and the bitwise relations below hold:
+ *  value_deriv() is value() and deriv(), scan_grid() is value() point by
+ *  point, DM_REAM::pair_density() and eam_density() are calc_rho's
+ *  increment. A MODELS compiled with FMA contraction (-march=native on an
+ *  FMA machine, AArch64 at default flags) gives them to rounding only.
  *
  *  Guarantees, on a density that passed validate():
- *  - SIGNED: none (bitwise the density of every tadah before 1.6.0).
+ *  - SIGNED: none (bitwise the density of every tadah before 1.6.0 in a
+ *    MODELS compiled without FMA contraction).
  *  - NONNEG: rho_raw >= 0 exactly.
  *  - MONOTONE: rho_raw >= 0 exactly and non-increasing in r to rounding
  *    (S_B5 has 1-ulp rises for |x| < ~1.2; Cut_Poly/PolyS rise at the 1e-15
@@ -128,13 +135,15 @@ public:
   double deriv(double r, double fc, double fcp) const;
 
   /** value() and deriv() together, through the fused Blip5 primitives:
-   *  @p v is bitwise equal to value(r, fc) and @p d to deriv(r, fc, fcp). */
+   *  @p v is bitwise equal to value(r, fc) and @p d to deriv(r, fc, fcp)
+   *  (without FMA contraction, see the class). */
   void value_deriv(double r, double fc, double fcp,
                    double &v, double &d) const;
 
   /** rho_raw on the grid of linspace(@p r_lo, @p r_hi, @p n), f_c from
    *  @p fc; calc_rho's rule applies: a point r > fc.get_rcut() is 0.
-   *  Every grid value is bitwise equal to value(r_i, f_c(r_i)): the sum is
+   *  Every grid value is bitwise equal to value(r_i, f_c(r_i)) (without
+   *  FMA contraction, see the class): the sum is
    *  bump-major in ascending n over each term's contiguous grid-index
    *  support (widened by one index on each side); the skipped terms are
    *  exact zeros (MONOTONE adds a_n (1.0 f_c) below a bump's inner edge,

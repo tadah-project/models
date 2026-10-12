@@ -1,6 +1,8 @@
 #include <tadah/models/functions/kernels/kern_rbf.h>
 
 #include <cmath>
+#include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 namespace tadah {
@@ -23,8 +25,10 @@ Kern_RBF::Kern_RBF (const tadah::core::Context &c):
             c(std::string("MPARAMS"))[0] + ": sigma must be non-zero and "
             "finite, with 1/sigma^2 finite (K(b, x) = exp(-|b - x|^2 / "
             "(2 sigma^2))).");
-    if (get_verbose()) std::cout << std::endl << label << " | sigma: " << sigma
-        << " | gamma: " << gamma << std::endl;
+    std::ostringstream settings;
+    settings.copyfmt(std::cout);
+    settings << " | sigma: " << sigma << " | gamma: " << gamma;
+    print_settings(label, settings.str());
 
     read_basis_from_context(c,basis);
 }

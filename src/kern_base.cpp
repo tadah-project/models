@@ -1,16 +1,60 @@
 #include <tadah/models/functions/kernels/kern_base.h>
 #include <tadah/core/intercept_layout.h>
 
+#include <iostream>
+#include <mutex>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <vector>
 namespace tadah {
 namespace models {
 
+namespace {
+/* The record the open KernelSettingsLineScopes share: how many are open,
+ * how many of them are Lines::None, and the labels whose line was printed
+ * since the first of them opened. */
+struct SettingsLineRecord {
+  std::mutex mutex;
+  int open = 0;
+  int none = 0;
+  std::set<std::string> printed;
+};
+SettingsLineRecord &settings_line_record() {
+  static SettingsLineRecord r;
+  return r;
+}
+}  // namespace
+
+KernelSettingsLineScope::KernelSettingsLineScope(Lines lines) : lines_(lines)
+{
+  SettingsLineRecord &r = settings_line_record();
+  std::lock_guard<std::mutex> lock(r.mutex);
+  if (r.open++ == 0) r.printed.clear();
+  if (lines_ == Lines::None) ++r.none;
+}
+KernelSettingsLineScope::~KernelSettingsLineScope()
+{
+  SettingsLineRecord &r = settings_line_record();
+  std::lock_guard<std::mutex> lock(r.mutex);
+  if (lines_ == Lines::None) --r.none;
+  if (--r.open == 0) r.printed.clear();
+}
 
 Kern_Base::Kern_Base() {}
 Kern_Base::Kern_Base(const tadah::core::Context &c): Function_Base(c) {}
 Kern_Base::~Kern_Base() {}
+void Kern_Base::print_settings(const std::string &label,
+                               const std::string &settings)
+{
+  if (get_verbose() <= 0) return;
+  const std::string line = "\n" + label + settings + "\n";
+  SettingsLineRecord &r = settings_line_record();
+  std::lock_guard<std::mutex> lock(r.mutex);
+  if (r.none > 0) return;
+  if (r.open > 0 && !r.printed.insert(label).second) return;
+  std::cout << line << std::flush;
+}
 void Kern_Base::set_basis(const tadah::core::Matrix b)
 {
   basis = b;

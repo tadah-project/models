@@ -5,7 +5,10 @@ file(GLOB tests_src CONFIGURE_DEPENDS "*.cpp")
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/tests_data DESTINATION .)
 
 add_executable(test_models ${tests_src})
-target_link_libraries(test_models PRIVATE Catch2 tadah.models tadah.core)
+# Threads: test_kernel_settings_once.cpp builds kernels in std::threads.
+find_package(Threads REQUIRED)
+target_link_libraries(test_models PRIVATE Catch2 tadah.models tadah.core
+                                          Threads::Threads)
 target_include_directories(test_models PRIVATE ../include)
 
 include(Catch)
@@ -18,6 +21,38 @@ include(Catch)
 catch_discover_tests(test_models
     WORKING_DIRECTORY $<TARGET_FILE_DIR:test_models>
 )
+
+# tadah.models_ream_goldens_native_link. Pins: the DM_REAM goldens (the
+# [ream][rhoform][goldens] cases of test_ream_goldens.cpp) pass in a program
+# compiled and linked with -march=native, under LTO when the build has it
+# (CMAKE_INTERPROCEDURAL_OPTIMIZATION), as the tadah executable is built
+# with TADAH_MARCH_NATIVE: MODELS' objects, compiled with MODELS' flags,
+# keep their code at such a link, and give the program the density before
+# RHOFORM bit for bit when those flags have no FMA contraction (the
+# presets'). Two of the cases reach the density through DM_REAM's
+# out-of-line methods; one calls ReamDensity from this program's own
+# -march=native unit, and fails when a ReamDensity method is compiled here,
+# as an inline function moved into ream_density.h would be (its multiply-
+# adds fused into FMAs on an FMA machine). Not built when the compiler has
+# no -march=native (TADAH_MARCH_NATIVE is ignored then too).
+# Before the fix: passes as well (a pin of the build layout; with value,
+# deriv and value_deriv moved into ream_density.h it fails, GCC 15.2).
+include(CheckCXXCompilerFlag)
+check_cxx_compiler_flag(-march=native TADAH_MODELS_TESTS_HAVE_MARCH_NATIVE)
+if(TADAH_MODELS_TESTS_HAVE_MARCH_NATIVE)
+  add_executable(test_models_ream_native_link
+      test_ream_goldens.cpp test_main.cpp)
+  target_link_libraries(test_models_ream_native_link
+      PRIVATE Catch2 tadah.models tadah.core)
+  target_compile_options(test_models_ream_native_link PRIVATE -march=native)
+  target_link_options(test_models_ream_native_link PRIVATE -march=native)
+  add_test(NAME tadah.models_ream_goldens_native_link
+      COMMAND test_models_ream_native_link "[ream][rhoform][goldens]"
+              --warn NoTests)
+else()
+  message(STATUS "Tadah.MODELS tests: the compiler has no -march=native; "
+                 "tadah.models_ream_goldens_native_link is not built")
+endif()
 
 # tadah.models_headers (ctest -L headers): every header of include/
 # compiles on its own and twice in a row (cmake-tools'
