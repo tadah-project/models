@@ -343,7 +343,11 @@ TEST_CASE("BLR and KRR FIXINDEX naming a weight twice or a descending range "
  * (MPARAMS 1.0), on four basis vectors: "MODEL M_KRR Kern_Linear 2 cannot
  * pin weights: ..." naming implementation 1, for FIXINDEX 1 / FIXWEIGHT 14,
  * FIXINDEX 2-1 with two values and a lone FIXINDEX 1 alike (the solve pins
- * nothing, whatever the keys say); without them it fits its 4 weights.
+ * nothing, whatever the keys say); without them it fits its weights: 4 for
+ * Kern_RBF, one per basis vector, and 8 for Kern_Linear, one per component
+ * of the 8-component basis vectors (the descriptor weights of its basis
+ * vectors; it had the 4 coefficients until the potential-content fix,
+ * test_krr_train2_linear.cpp).
  * Before the fix: train2 read neither key: it fitted every weight with
  * the pins ignored (weight 1 was not 14), and '2-1' and a lone FIXINDEX
  * passed too (tadah train exited 0 and copied FIXINDEX and FIXWEIGHT into
@@ -385,7 +389,7 @@ TEST_CASE("M_KRR implementation 2 (train2) refuses FIXINDEX and FIXWEIGHT",
           "which pins them, or remove FIXINDEX and FIXWEIGHT.";
       t_type w;
       REQUIRE_NOTHROW(w = train2("", {}));
-      CHECK(w.size() == 4);
+      CHECK(w.size() == (std::string(kern) == "Kern_Linear" ? 8u : 4u));
       CHECK_THROWS_WITH(train2("1", {14.0}), refusal);
       CHECK_THROWS_WITH(train2("2-1", {14.0, 3.0}), refusal);
       CHECK_THROWS_WITH(train2("1", {}), refusal);
