@@ -606,6 +606,44 @@ static Context make_selector_dm_blip_ctx(int lmax, int n)
     return ctx;
 }
 
+/* Pins: a reinit to a context whose BIAS changes (ATOM H, false to true,
+ * and true to false; the descriptors unchanged) returns true and gives the
+ * selector the intercept columns of the new context, as a fresh one: bias
+ * 1 and 0, dsize, the first index of the two-body (D2_mJoin) and of the
+ * many-body block, and the descriptor of an H pair.
+ * Before the fix: reinit kept the bias of the context the selector was
+ * built from and returned false (the descriptors' sizes were unchanged):
+ * bias 0 for 1 (dsize 6 for 7, the descriptors from column 0 instead of 1)
+ * and 1 for 0 (dsize 7 for 6, from column 1 instead of 0). */
+TEST_CASE_METHOD(ReinitFixture,
+    "DC_Selector::reinit follows a change of BIAS", "[DC_Selector][reinit]")
+{
+    auto with_bias = [](bool bias) {
+        Context ctx = make_selector_d2_mjoin_ctx(2, 2);
+        ctx.remove("BIAS");
+        ctx.add("BIAS", bias ? "true" : "false");
+        return ctx;
+    };
+    for (bool from : {false, true}) {
+        DYNAMIC_SECTION("BIAS " << from << " to " << !from) {
+            DC_Selector dc(with_bias(from));
+            REQUIRE(dc.bias == (from ? 1 : 0));
+            const Context ctx2 = with_bias(!from);
+            CHECK(dc.reinit(ctx2));
+            DC_Selector fresh(ctx2);
+            CHECK(dc.bias == fresh.bias);
+            CHECK(dc.dsize == fresh.dsize);
+            CHECK(dc.d2b->get_fidx() == static_cast<size_t>(fresh.bias));
+            CHECK(dc.dmb->get_fidx() == fresh.dmb->get_fidx());
+            const std::size_t n = 1 + 4 + 2 + 2, nr = fresh.rsize + 2;
+            const SelectorValues expected = selector_values(fresh, n, nr);
+            const SelectorValues got = selector_values(dc, n, nr);
+            CHECK(got.aed == expected.aed);
+            CHECK(got.fd == expected.fd);
+        }
+    }
+}
+
 /* Pins: a reinit that changes a DM_Blip many-body descriptor of a selector
  * (Lmax 0: 2 functions to 3 and 3 to 2; Lmax 1 with 2 functions to Lmax 0
  * with 4, the same 4 descriptor values from 8 density values to 4) returns
