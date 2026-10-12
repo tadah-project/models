@@ -5,7 +5,10 @@ file(GLOB tests_src CONFIGURE_DEPENDS "*.cpp")
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/tests_data DESTINATION .)
 
 add_executable(test_models ${tests_src})
-target_link_libraries(test_models PRIVATE Catch2 tadah.models tadah.core)
+# Threads: test_kernel_settings_once.cpp builds kernels in std::threads.
+find_package(Threads REQUIRED)
+target_link_libraries(test_models PRIVATE Catch2 tadah.models tadah.core
+                                          Threads::Threads)
 target_include_directories(test_models PRIVATE ../include)
 
 include(Catch)
