@@ -203,30 +203,61 @@ private:
            "STRESS rows).";
   }
 
+  /* The data rows of Phi (its first L.data_rows) that are not zero in
+   * every column. A zero row adds nothing to the rank, so the rank is at
+   * most their number plus the ridge rows that carry a penalty; a row of
+   * weight 0 (EWEIGHT, FWEIGHT or SWEIGHT 0, or a structure's weight 0) is
+   * zero in the design matrix DesignMatrix builds, and so is a row whose
+   * values are all in pinned (removed) columns. Called after
+   * require_finite: every value compares. */
+  static size_t nonzero_data_rows(const tadah::core::phi_type &Phi,
+                                  const Layout &L) {
+    const size_t data = std::min(L.data_rows, Phi.rows());
+    std::vector<char> nonzero(data, 0);
+    size_t count = 0;
+    for (size_t j = 0; j < Phi.cols() && count < data; ++j)
+      for (size_t i = 0; i < data; ++i)
+        if (!nonzero[i] && Phi(i, j) != 0.0) {
+          nonzero[i] = 1;
+          ++count;
+        }
+    return count;
+  }
+
+  /* "6 data rows", or with zero data rows "4 non-zero data rows of 6". */
+  static std::string data_rows_text(size_t nonzero, const Layout &L) {
+    if (nonzero >= L.data_rows) return plural(L.data_rows, "data row");
+    return plural(nonzero, "non-zero data row") + " of " +
+           std::to_string(L.data_rows);
+  }
+
   /* Refuses, for OALGO 2 and 4, a design matrix whose rows cannot give it
-   * full column rank, before LAPACK runs: its rank is at most the data
-   * rows plus the ridge rows that carry a penalty (LAMBDA > 0: one for
-   * each column but the n_bias intercept columns). LAPACK's own tests
-   * depend on rounding: DGELS stops at an exactly zero diagonal element of
-   * R, DPOTRF at a pivot that is not positive, and the rounded Phi^T Phi
-   * of fewer data rows than weights is often factored. */
+   * full column rank, before LAPACK runs: its rank is at most its
+   * `nonzero` non-zero data rows (nonzero_data_rows) plus the ridge rows
+   * that carry a penalty (LAMBDA > 0: one for each column but the n_bias
+   * intercept columns). LAPACK's own tests depend on rounding: DGELS stops
+   * at an exactly zero diagonal element of R, DPOTRF at a pivot that is
+   * not positive, and the rounded Phi^T Phi of fewer data rows than
+   * weights is often factored. */
   static void require_enough_rows(int oalgo, const tadah::core::phi_type &Phi,
                                   const Layout &L, double lambda,
-                                  size_t n_bias) {
+                                  size_t n_bias, size_t nonzero) {
     const size_t n = Phi.cols();
-    const size_t data = L.data_rows;
     const size_t bias = std::min(n_bias, n);
     const bool ridge = lambda > 0;
-    if (data + (ridge ? n - bias : 0) >= n) return;
+    if (nonzero + (ridge ? n - bias : 0) >= n) return;
+    const bool zero_rows = nonzero < L.data_rows;
+    const std::string rows = zero_rows ? "non-zero data rows" : "data rows";
     std::string msg = oalgo_name(oalgo) + " cannot fit " + weights_text(n, L) +
-                      ": the design matrix has " + plural(data, "data row") +
+                      ": the design matrix has " + data_rows_text(nonzero, L) +
+                      (zero_rows ? " (a row of weight 0 is zero)" : "") +
                       " for " + plural(n, "weight") + ", LAMBDA " +
                       tadah::core::format_roundtrip(lambda);
     if (ridge)
       msg += ", which does not penalise its " + plural(bias, "intercept column") +
-             ": fewer data rows than intercept columns";
+             ": fewer " + rows + " than intercept columns";
     else
-      msg += ": fewer data rows than weights";
+      msg += ": fewer " + rows + " than weights";
     msg += ", so it does not have full column rank and the least-squares "
            "weights are not unique.";
     msg += ridge ? " Use OALGO 1 (DGELSD), which gives the minimum-norm "
@@ -236,16 +267,17 @@ private:
   }
 
   /* The message of a fit OALGO 2 or 4 cannot make as LAPACK finds it: what
-   * `e` found, the fit's data rows, weights and LAMBDA, and the remedies. */
+   * `e` found, the fit's data rows (`nonzero` of them not zero), weights
+   * and LAMBDA, and the remedies. */
   [[noreturn]] static void throw_rank_deficient(int oalgo,
                                                 const RankDeficientError &e,
                                                 const tadah::core::phi_type &Phi,
                                                 const Layout &L,
-                                                double lambda) {
+                                                double lambda, size_t nonzero) {
     const size_t n = Phi.cols();
     const bool pins = L.pinned(n) > 0;
     const size_t c = static_cast<size_t>(e.column());
-    const std::string fit = plural(L.data_rows, "data row") + " for " +
+    const std::string fit = data_rows_text(nonzero, L) + " for " +
                             plural(n, "weight") + ", LAMBDA " +
                             tadah::core::format_roundtrip(lambda);
     std::string msg;
@@ -307,10 +339,11 @@ private:
    *         @p context but the ALPHA and BETA of LAMBDA -1.
    * @throws std::runtime_error for a value of Phi or T that is not finite
    *         (every OALGO), and under OALGO 2 and 4 for a design matrix
-   *         whose data rows (and, with LAMBDA > 0, ridge rows) cannot give
-   *         it full column rank, before LAPACK runs, or whose QR or
-   *         Cholesky factorisation LAPACK cannot complete; each names the
-   *         rows, the weights and LAMBDA. A design matrix whose columns are
+   *         whose non-zero data rows (a row of weight 0 is zero) and, with
+   *         LAMBDA > 0, ridge rows cannot give it full column rank, before
+   *         LAPACK runs, or whose QR or Cholesky factorisation LAPACK
+   *         cannot complete; each names the rows (and how many are not
+   *         zero), the weights and LAMBDA. A design matrix whose columns are
    *         dependent but not exactly so in floating point can still be
    *         fitted by OALGO 2 and 4, with weights as large as the rounding
    *         makes them.
@@ -366,15 +399,19 @@ public:
     // tadah::models::OLS ols;
     require_layout(Phi, layout);
     require_finite(Phi, T, layout);
-    if (oalgo == 2 || oalgo == 4)
-      require_enough_rows(oalgo, Phi, layout, lambda, n_bias);
+    // The non-zero data rows, counted before LAPACK overwrites Phi.
+    size_t nonzero = layout.data_rows;
+    if (oalgo == 2 || oalgo == 4) {
+      nonzero = nonzero_data_rows(Phi, layout);
+      require_enough_rows(oalgo, Phi, layout, lambda, n_bias, nonzero);
+    }
     if (oalgo == 1) {
       ols.solve(Phi, T, weights, rcond, tadah::models::Algorithm::GELSD);
     } else if (oalgo == 2) {
       try {
         ols.solve(Phi, T, weights, rcond, tadah::models::Algorithm::GELS);
       } catch (const RankDeficientError &e) {
-        throw_rank_deficient(2, e, Phi, layout, lambda);
+        throw_rank_deficient(2, e, Phi, layout, lambda, nonzero);
       }
     } else if (oalgo == 3) {
       // SVD path applies a uniform ridge across all singular values; there is
@@ -427,7 +464,7 @@ public:
         ols.solve(Phi, T, weights, rcond,
                   tadah::models::Algorithm::NormalEquations);
       } catch (const RankDeficientError &e) {
-        throw_rank_deficient(4, e, Phi, layout, lambda);
+        throw_rank_deficient(4, e, Phi, layout, lambda, nonzero);
       }
     } else {
       throw std::runtime_error("Unsupported OALGO: " + std::to_string(oalgo));
@@ -512,8 +549,8 @@ public:
    * @param workspaceManager  Workspace provider.
    * @throws std::runtime_error, before the factorisation, for what train()
    *         refuses under OALGO 4 before LAPACK runs: a value of Phi or T
-   *         that is not finite, and fewer data rows than weights (LAMBDA
-   *         0) or than intercept columns (LAMBDA > 0).
+   *         that is not finite, and fewer non-zero data rows than weights
+   *         (LAMBDA 0) or than intercept columns (LAMBDA > 0).
    */
   static void train_with_factor(
       tadah::core::Context &context,
@@ -572,7 +609,8 @@ public:
 
     const Layout layout = Layout::of(Phi);
     require_finite(Phi, T, layout);
-    require_enough_rows(4, Phi, layout, lambda, n_bias);
+    require_enough_rows(4, Phi, layout, lambda, n_bias,
+                        nonzero_data_rows(Phi, layout));
     tadah::models::OLS ols(workspaceManager);
     ols.solveAndCacheFactor(Phi, T, weights, factor, n_bias);
   }
