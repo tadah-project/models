@@ -165,7 +165,12 @@ class KernelSettingsLineScope {
             FirstOfEachKernel,  ///< the line of the first build of each kernel
             None                ///< no line
         };
+        /** \brief Opens the scope: from now, until it closes, the kernels
+         *  built print what @p lines says. Starts the record afresh when no
+         *  other scope is open. */
         explicit KernelSettingsLineScope(Lines lines = Lines::FirstOfEachKernel);
+        /** \brief Closes the scope; the record is dropped when it was the
+         *  last one open. */
         ~KernelSettingsLineScope();
         KernelSettingsLineScope(const KernelSettingsLineScope &) = delete;
         KernelSettingsLineScope &operator=(const KernelSettingsLineScope &) = delete;
