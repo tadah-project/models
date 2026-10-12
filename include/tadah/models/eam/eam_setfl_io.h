@@ -42,8 +42,10 @@ public:
   /** Parse a single-element setfl file, as LAMMPS pair eam/alloy reads
    *  one: lines 1-3 are comments; from line 4 on, '#' starts a comment and
    *  a line without words is skipped; then the element line '1 <symbol>',
-   *  the grid 'nrho drho nr dr rcut', the element record 'Z mass a lattice'
-   *  (each record exactly these words; one may span lines) and the F(rho),
+   *  the grid 'nrho drho nr dr rcut' (exactly these words; it may span
+   *  lines), the element record 'Z mass a lattice' (exactly these words; it
+   *  may span lines up to its mass, and a and lattice are on the line of the
+   *  mass: LAMMPS reads the record to the end of that line) and the F(rho),
    *  rho(r) and z2r(r) tables, each starting on a new line and ending at the
    *  end of one. Lines after the z2r table are not read.
    *
@@ -53,7 +55,8 @@ public:
    *          from 3 to 2147483647 (the spline reads a table's third point);
    *          drho, dr or rcut not a positive finite number; Z not a whole
    *          number; the mass or the lattice constant not a finite number; a
-   *          record with a word too many or too few; a table value that is
+   *          record with a word too many or too few; an element record split
+   *          after its mass (a or lattice on a later line); a table value that is
    *          not a finite decimal number (core::parse_decimal_finite); a
    *          table shorter than its count, or whose last line holds words
    *          after its last value. A refused file leaves this object as it
