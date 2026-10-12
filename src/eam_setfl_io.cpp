@@ -92,15 +92,21 @@ public:
     return false;
   }
 
-  /* A header record of exactly n words, read as LAMMPS' next_values(n)
-   * reads one: lines joined until they hold n words or more. */
-  void record(std::size_t n, const std::string &what,
+  /* A header record of exactly n words, read as LAMMPS' next_values(m)
+   * reads one: lines joined until they hold m words or more, the words
+   * LAMMPS reads; the record ends with the line that completes them (LAMMPS
+   * drops the rest of that line, and its next read starts on the next
+   * line). The grid line: m = n = 5. The element record 'Z mass a lattice':
+   * m = 2 (Z and the mass), so a and lattice must be on the mass's line;
+   * `short_reason` says so when the record that ends there is short. */
+  void record(std::size_t n, std::size_t m, const std::string &what,
               const std::string &fields,
-              std::vector<std::string_view> &words) {
+              std::vector<std::string_view> &words,
+              const std::string &short_reason = std::string()) {
     words.clear();
     std::vector<std::string_view> more;
     std::size_t first = 0;
-    while (words.size() < n) {
+    while (words.size() < m) {
       if (!next_words(more)) {
         if (words.empty())
           throw std::runtime_error(file() + ": the file ends before the " +
@@ -113,13 +119,29 @@ public:
       if (words.empty()) first = line_;
       words.insert(words.end(), more.begin(), more.end());
     }
-    if (words.size() != n)
+    if (words.size() == n) return;
+    if (words.size() < n && !more_words_follow())
       throw std::runtime_error(
-          at(first) + "the " + what + " is '" + fields + "', it has " +
-          std::to_string(words.size()) + " words" +
-          (line_ == first ? std::string()
-                          : " on lines " + std::to_string(first) + "-" +
-                                std::to_string(line_)));
+          file() + ": the file ends inside the " + what + " ('" + fields +
+          "'), which has " + std::to_string(words.size()) + " of its " +
+          std::to_string(n) + " words");
+    throw std::runtime_error(
+        at(first) + "the " + what + " is '" + fields + "', it has " +
+        std::to_string(words.size()) + " words" +
+        (line_ == first ? std::string()
+                        : " on lines " + std::to_string(first) + "-" +
+                              std::to_string(line_)) +
+        (words.size() < n ? short_reason : std::string()));
+  }
+
+  /* Whether a line with words follows (the position is kept). */
+  bool more_words_follow() {
+    const std::size_t pos = pos_, line = line_;
+    std::vector<std::string_view> rest;
+    const bool more = next_words(rest);
+    pos_ = pos;
+    line_ = line;
+    return more;
   }
 
   /* A table of n finite values, `name` (`count` = n), from the next line
@@ -244,7 +266,7 @@ void EAMSetflIO::read_setfl_text(const std::string &text,
   t.element_ = std::string(w[1]);
 
   // The grid: nrho drho nr dr rcut.
-  in.record(5, "grid line", "nrho drho nr dr rcut", w);
+  in.record(5, 5, "grid line", "nrho drho nr dr rcut", w);
   const std::string grid_at = in.at(in.line());
   auto count = [&](std::string_view tok, const char *name) {
     int n = 0;
@@ -269,8 +291,12 @@ void EAMSetflIO::read_setfl_text(const std::string &text,
   t.dr_   = positive(w[3], "dr");
   t.rcut_ = positive(w[4], "rcut");
 
-  // The element record: Z mass a lattice.
-  in.record(4, "element record", "Z mass a lattice", w);
+  // The element record: Z mass a lattice, read as LAMMPS' pair eam/alloy
+  // reads it (next_values(2): Z and the mass, then the F(rho) table from
+  // the next line), so a and lattice are on the line of the mass.
+  in.record(4, 2, "element record", "Z mass a lattice", w,
+            ": LAMMPS (pair eam/alloy) reads the record to the end of the "
+            "line of its mass, and the F(rho) table from the next line");
   const std::string record_at = in.at(in.line());
   if (!parse_int_token(w[0], t.atomic_number_))
     throw std::runtime_error(record_at +
