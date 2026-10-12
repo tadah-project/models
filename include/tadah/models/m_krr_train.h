@@ -213,7 +213,13 @@ public:
     /**
      * @brief Standard KRR training using covariance matrix computation.
      *
-     * Trains the model on energies using the covariance matrix K. It
+     * Trains the model on energies using the covariance matrix K: the
+     * coefficients w of the basis vectors b_j (the columns of @p B) solve
+     * (K + LAMBDA I) w = T, K_ij = K(b_i, b_j). A non-linear kernel's
+     * weights are w (it predicts sum_j w_j K(b_j, x)). Kern_Linear's are
+     * the descriptor weights B w = sum_j w_j b_j, one per row of @p B: its
+     * prediction is linear in the descriptor, weights . x (Kern_Linear::
+     * epredict), which is sum_j w_j K(b_j, x) for these weights. It
      * computes no weight covariance, and the model keeps none of an
      * earlier fit. It pins no weight: a context with FIXINDEX or
      * FIXWEIGHT is refused (refuse_fixed_weights_in_train2).
@@ -248,6 +254,18 @@ public:
         //double rcond = context.template size("LAMBDA")==2 ? context.template get<double>("LAMBDA",1) : 1e-8;
         weights = solve_posv(K, T);
         if (M_KRR_Core<Kern>::is_verbose()) std::cout << "Done" << std::endl;
+
+        // Kern_Linear predicts weights . x: its weights are the descriptor
+        // weights the coefficients make, B w.
+        if (kernel.get_label() == "Kern_Linear") {
+            tadah::core::t_type w(B.rows());
+            for (size_t i = 0; i < B.rows(); ++i) {
+                double s = 0;
+                for (size_t j = 0; j < B.cols(); ++j) s += B(i, j) * weights(j);
+                w(i) = s;
+            }
+            weights = w;
+        }
 
 
         trained = true;

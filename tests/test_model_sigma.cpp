@@ -225,8 +225,10 @@ TEST_CASE("A model holds the covariance of its last fit only",
  * covariance), leaves the model without a covariance after an OALGO 3 fit
  * of the same model computed one (Sigma 4 x 4 after train(), empty after
  * train2(), and get_weights_uncertainty() throws naming OALGO 3), for
- * Kern_Linear and for Kern_RBF (MPARAMS 1.0); it fits one weight per basis
- * vector (4).
+ * Kern_Linear and for Kern_RBF (MPARAMS 1.0); Kern_RBF has one weight per
+ * basis vector (4), Kern_Linear one per component of the 8-component basis
+ * vectors (the descriptor weights of its basis vectors; it had the 4
+ * coefficients until the potential-content fix, test_krr_train2_linear.cpp).
  * Before the fix (WCOV and WNOISE): Sigma kept the 4 x 4 covariance of the
  * earlier fit beside train2's weights, and get_weights_uncertainty()
  * returned its diagonal (LAMBDA 1e-3). (train2 removed the Context's
@@ -275,7 +277,7 @@ TEST_CASE("M_KRR implementation 2 (train2) leaves no covariance of an "
         fit(m);
       }
       INFO("get_weights_uncertainty: " << msg);
-      CHECK(w.size() == 4);
+      CHECK(w.size() == (std::string(kern) == "Kern_Linear" ? B.rows() : 4u));
       CHECK(S_fit.rows() == 4);
       CHECK(S_train2.rows() == 0);
       CHECK(unc.size() == 0);
