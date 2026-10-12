@@ -23,6 +23,7 @@
 #include <tadah/core/core_types.h>
 #include <tadah/models/descriptors/d_all.h>
 #include <tadah/models/cutoffs.h>
+#include <tadah/models/dc_selector.h>
 #include <tadah/models/m_core.h>
 #include <cmath>
 #include <vector>
@@ -330,6 +331,86 @@ TEST_CASE_METHOD(ReinitFixture,
 
     const auto v_reinit = eval_rho(dm);
     REQUIRE_THAT(v_reinit, Catch::Matchers::Approx(v_fresh).margin(1e-12));
+}
+
+/* ------------------------------------------------------------------
+ * DC_Selector::reinit: the many-body block follows the two-body block
+ * ------------------------------------------------------------------ */
+
+// A DC_Selector context: D2_Blip of n2b functions, then DM_Blip (Lmax 0,
+// 2 functions), H only, both cutoffs 5.0 (Cut_Cos), no BIAS.
+static Context make_selector_ctx(int n2b)
+{
+    Context ctx;
+    ctx.add("RCTYPE2B", "Cut_Cos");
+    ctx.add("RCUT2B", 5.0);
+    ctx.remove("INIT2B");
+    ctx.add("INIT2B", "true");
+    ctx.add("TYPE2B", "D2_Blip");
+    ctx.add("TYPE2B", n2b); ctx.add("TYPE2B", n2b);
+    ctx.add("TYPE2B", "H"); ctx.add("TYPE2B", "H");
+    for (int i = 0; i < n2b; ++i) ctx.add("CGRID2B", 0.5 * (i + 1));
+    for (int i = 0; i < n2b; ++i) ctx.add("SGRID2B", 1.0);
+    ctx.add("RCTYPEMB", "Cut_Cos");
+    ctx.add("RCUTMB", 5.0);
+    ctx.remove("INITMB");
+    ctx.add("INITMB", "true");
+    ctx.add("TYPEMB", "DM_Blip");
+    ctx.add("TYPEMB", 0); ctx.add("TYPEMB", 2); ctx.add("TYPEMB", 2);
+    ctx.add("TYPEMB", "H"); ctx.add("TYPEMB", "H");
+    ctx.add("CGRIDMB", 1.0); ctx.add("CGRIDMB", 2.0);
+    ctx.add("SGRIDMB", 1.0); ctx.add("SGRIDMB", 1.0);
+    return ctx;
+}
+
+/* Pins: DC_Selector::reinit that changes the two-body size (D2_Blip of 2
+ * functions to 3) moves the many-body block after it, as init() places it:
+ * dmb's first index is 3 (bias 0 + the 3 two-body values), dsize is 3 + the
+ * many-body size, and the descriptor of an H pair (r = 2.0) that the
+ * selector's descriptors write is the one a DC_Selector built from the new
+ * context writes, value for value.
+ * Before the fix: reinit updated dsize but left dmb's first index at 2 (the
+ * old two-body size), so dmb wrote its 2 values from the third value on:
+ * the first was added onto the third two-body value, and the last value
+ * stayed 0 ({..., 0.4972, 0.4284, 0} for {..., 0.4704, 0.0268, 0.4284}); a
+ * reinit that shrank the two-body block made dmb write past dsize. */
+TEST_CASE_METHOD(ReinitFixture,
+    "DC_Selector::reinit moves the many-body block after a two-body size "
+    "change", "[DC_Selector][reinit]")
+{
+    DC_Selector dc(make_selector_ctx(2));
+    REQUIRE(dc.d2b->size() == 2);
+    REQUIRE(dc.dmb->get_fidx() == 2);
+    const size_t mb = dc.dmb->size();
+    REQUIRE(mb > 0);
+
+    const Context ctx3 = make_selector_ctx(3);
+    CHECK(dc.reinit(ctx3));
+    CHECK(dc.d2b->size() == 3);
+    CHECK(dc.dsize == 3 + mb);
+    CHECK(dc.dmb->get_fidx() == 3);
+
+    DC_Selector fresh(ctx3);
+    REQUIRE(fresh.dsize == 3 + mb);
+    REQUIRE(fresh.dmb->get_fidx() == 3);
+
+    // The descriptor of one H-H pair, as the selector's descriptors write it.
+    const Vec3d del(2.0, 0.0, 0.0);
+    const double rsq = del * del;
+    const double r = std::sqrt(rsq);
+    auto descriptor = [&](DC_Selector &s) {
+        aed_type aed(s.dsize);
+        aed.set_zero();
+        s.d2b->calc_aed(1, 1, r, rsq, aed);
+        rho_type rho;
+        s.dmb->init_rhoi(rho);
+        s.dmb->calc_rho(1, 1, r, rsq, del, rho);
+        s.dmb->calc_aed(rho, aed);
+        return std::vector<double>(aed.data(), aed.data() + s.dsize);
+    };
+    const std::vector<double> expected = descriptor(fresh);
+    REQUIRE(expected.back() != 0.0);
+    CHECK(descriptor(dc) == expected);
 }
 
 /* ------------------------------------------------------------------
