@@ -606,6 +606,8 @@ bool DM_EAD::reinit(const tadah::core::Context& ctx) {
   // TODO Probablky we do not need to do that:
   s        = cgrid.size() * static_cast<size_t>(Lmax + 1);
   rhoisize = gen_atomic_orbitals(Lmax) * cgrid.size();
+  // F'(rho) right after the density, as the constructor places it.
+  set_drfidx(rhoisize);
   return s != old_s;
 }
 

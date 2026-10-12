@@ -525,6 +525,8 @@ bool DM_Blip::reinit(const tadah::core::Context& ctx) {
   if (fcut) fcut->set_rcut(rc);
   s        = cgrid.size() * static_cast<size_t>(Lmax + 1);
   rhoisize = gen_atomic_orbitals(Lmax) * cgrid.size();
+  // F'(rho) right after the density, as the constructor places it.
+  set_drfidx(rhoisize);
   return s != old_s;
 }
 

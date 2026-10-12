@@ -56,6 +56,9 @@ std::string D2_mJoin::label() const {
 }
 
 void D2_mJoin::set_fidx(size_t fidx_) {
+  // Its own first index too: reinit() places the children from it again,
+  // and DescriptorsCalc expands the two-body force rows from get_fidx().
+  fidx = fidx_;
   ds[0]->set_fidx(fidx_);
   size_t s = 0;
   for (size_t i = 1; i < ds.size(); ++i) {

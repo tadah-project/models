@@ -53,7 +53,6 @@ namespace tadah {
             double rcut2b = context.get<double>("RCUT2BMAX");
             c2b = tadah::core::factory<Cut_Base,double&>( context.get<std::string>("RCTYPE2B"), rcut2b );
             d2b = tadah::core::factory<D2_Base,const tadah::core::Context&>( context.get<std::string>("TYPE2B"), context );
-            d2b->set_fidx(bias);
             d2b->warn_if_discontinuous_noncompact();
           }
           else {
@@ -65,7 +64,6 @@ namespace tadah {
             double rcutmb = context.get<double>("RCUTMBMAX");
             cmb = tadah::core::factory<Cut_Base,double&>( context.get<std::string>("RCTYPEMB"), rcutmb );
             dmb = tadah::core::factory<DM_Base,const tadah::core::Context&>( context.get<std::string>("TYPEMB"), context );
-            dmb->set_fidx(bias + d2b->size());
             dmb->warn_if_discontinuous_noncompact();
           }
           else {
@@ -73,20 +71,24 @@ namespace tadah {
             dmb = tadah::core::factory<DM_Base,const tadah::core::Context&>( "DM_Dummy", context );
           }
 
-          // Set the size of the descriptor and density arrays
-          dsize = bias + d2b->size() + dmb->size();
-          rsize = dmb->rhoi_size()+ dmb->rhoip_size();
+          // The blocks' first indices, the size of the descriptor and
+          // density arrays
+          place();
         }
 
         size_t descriptor_size() const { return dsize; }
         size_t density_size() const { return rsize; }
 
         /** Update descriptor parameters in-place from context.
-         *  Returns true if descriptor size changed (Trainer must be rebuilt).
+         *  Returns true if the descriptor or the density array changed size
+         *  or a descriptor reports a change (a Trainer must be rebuilt).
          *  The descriptors only (D_Base::reinit()): tadah hpo does not call
-         *  it, it builds a Trainer for every evaluation. After a size change
-         *  the many-body block starts after the two-body block, as init()
-         *  places it (dmb's first index bias + d2b->size()).
+         *  it, it builds a Trainer for every evaluation. Afterwards the
+         *  selector is laid out as init() lays out one built from @p ctx:
+         *  the intercept columns of its BIAS and ATOM, the two-body block
+         *  from the last of them, the many-body block after it, the density
+         *  array with rho_i from 0 and F'(rho_i) right after it, and dsize
+         *  and rsize of those sizes.
          *
          *  The objects stay the same (a DescriptorsCalc, such as a
          *  Trainer's, holds references to them), so the update is in
@@ -110,11 +112,11 @@ namespace tadah {
             if (cmb && ctx.get<bool>("INITMB"))
               cmb->set_rcut(ctx.get<double>("RCUTMBMAX"));
           }
-          if (changed) {
-            // The many-body values follow the two-body ones (init()).
-            if (dmb) dmb->set_fidx(static_cast<size_t>(bias) + d2b->size());
-            dsize = static_cast<size_t>(bias) + d2b->size() + dmb->size();
-            rsize = dmb->rhoi_size() + dmb->rhoip_size();
+          if (d2b && dmb) {
+            const size_t old_dsize = dsize, old_rsize = rsize;
+            bias = static_cast<int>(tadah::core::n_intercept_columns(ctx));
+            place();
+            changed |= dsize != old_dsize || rsize != old_rsize;
           }
           return changed;
         }
@@ -129,6 +131,22 @@ namespace tadah {
             delete cmb;
           if (dmb)
             delete dmb;
+        }
+
+      private:
+        /* The layout of init() and reinit(), for `bias` intercept
+         * columns: the two-body block from column bias, the many-body
+         * block after it, the density array with rho_i from 0 and
+         * F'(rho_i) right after it (where each descriptor's constructor
+         * puts them, and where pair_style tadah exchanges them); dsize and
+         * rsize of those sizes. */
+        void place() {
+          d2b->set_fidx(static_cast<size_t>(bias));
+          dmb->set_fidx(static_cast<size_t>(bias) + d2b->size());
+          dmb->set_rfidx(0);
+          dmb->set_drfidx(dmb->rhoi_size());
+          dsize = static_cast<size_t>(bias) + d2b->size() + dmb->size();
+          rsize = dmb->rhoi_size() + dmb->rhoip_size();
         }
 
     };
