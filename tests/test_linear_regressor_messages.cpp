@@ -26,6 +26,7 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -194,6 +195,28 @@ void zero_row(phi_type &Phi, t_type &T, size_t i) {
   for (size_t j = 0; j < Phi.cols(); ++j) Phi(i, j) = 0.0;
   T[i] = 0.0;
 }
+
+/* `data` rows of N columns, every value 1 (the columns are equal), then N
+ * zero ridge rows. */
+phi_type ones_design(size_t data, size_t n) {
+  phi_type Phi(data + n, n);
+  Phi.set_zero();
+  for (size_t i = 0; i < data; ++i)
+    for (size_t j = 0; j < n; ++j) Phi(i, j) = 1.0;
+  return Phi;
+}
+
+/* What the messages say of the zero data rows (their counts and weights
+ * name them): without FIXINDEX, and with FIXINDEX pinning a weight. */
+const char *const kZeroRows =
+    " (a data row that is zero in every column adds nothing to the rank: a "
+    "row of weight 0, or a row the descriptors make zero, such as the y and "
+    "z force rows of a linear molecule along x)";
+const char *const kZeroRowsFixed =
+    " (a data row that is zero in every column adds nothing to the rank: a "
+    "row of weight 0, a row whose values are all in FIXINDEX columns, or a "
+    "row the descriptors make zero, such as the y and z force rows of a "
+    "linear molecule along x)";
 
 const char *const kRemedies =
     " Use OALGO 1 (DGELSD) or OALGO 3 (SVD), which give the minimum-norm "
@@ -519,23 +542,28 @@ TEST_CASE("LinearRegressor: with FIXINDEX M_KRR_Train's messages count the "
 }
 
 /* Pins: with FIXINDEX and BIAS true over two species (ATOM Ta Nb, intercept
- * columns 1 and 2 of 4 weights) and LAMBDA 0.1, M_BLR_Train and
- * M_KRR_Train (Kern_Linear) count the free intercept columns, at their
- * positions among the free columns, in the OALGO 2 and 4 pre-check, which
- * the ridge leaves unpenalised: 1 data row (sine_design(1, 4)),
+ * columns 1 and 2 of 4 weights) and LAMBDA 0.1, the OALGO 2 and 4
+ * pre-check of M_BLR_Train and M_KRR_Train (Kern_Linear) counts the free
+ * intercept columns, which the ridge leaves unpenalised: 1 data row
+ * (sine_design(1, 4)),
  *  - without FIXINDEX is refused: "... cannot fit these 4 weights: the
  *    design matrix has 1 data row for 4 weights, LAMBDA 0.1, which does not
  *    penalise its 2 intercept columns: fewer data rows than intercept
  *    columns, so it does not have full column rank and the least-squares
  *    weights are not unique. Use OALGO 1 (DGELSD), which gives the
  *    minimum-norm weights, or more structures.";
- *  - with FIXINDEX 1 (Ta's intercept pinned) is fitted: 1 free intercept
- *    column for the 1 data row, the ridge on the 2 descriptor columns;
+ *  - with FIXINDEX 1 (Ta's intercept pinned) is fitted (no exception): 1
+ *    free intercept column for the 1 data row;
  *  - with FIXINDEX 4 (a descriptor weight pinned) is refused: "... cannot
  *    fit these 3 free weights (FIXINDEX pins 1 of the 4 weights): the
  *    design matrix has 1 data row for 3 weights, LAMBDA 0.1, which does not
  *    penalise its 2 intercept columns: fewer data rows than intercept
  *    columns, ...".
+ * Only the number of free intercept columns is asserted here: the
+ * pre-check reads their number, and the fit of FIXINDEX 1 is made whichever
+ * free column the ridge leaves out. Their positions among the free columns
+ * and the ridge on the others: test_intercept_ridge.cpp ("M_BLR_Train and
+ * M_KRR_Train with FIXINDEX pinning an intercept ...").
  * Before the fix: passes as well (a pin of the merge of v1-dev into
  * fix/input-robustness: v1-dev's free_intercept_columns() gives train() the
  * free intercept columns, the branch's Layout counts the data rows and
@@ -589,14 +617,16 @@ TEST_CASE("LinearRegressor: with FIXINDEX and BIAS the OALGO 2 and 4 "
  *  - 3 data rows of sine values for 3 weights, row 3 zero, LAMBDA 0: OALGO
  *    4 in train() and train_with_factor(), and OALGO 2, refuse before
  *    LAPACK: "OALGO 4 (normal equations, Cholesky) cannot fit these 3
- *    weights: the design matrix has 2 non-zero data rows of 3 (a row of
- *    weight 0 is zero) for 3 weights, LAMBDA 0: fewer non-zero data rows
- *    than weights, so it does not have full column rank and the
- *    least-squares weights are not unique." + the remedies (OALGO 2 the
- *    same with "OALGO 2 (DGELS, QR)");
+ *    weights: the design matrix has 2 non-zero data rows of 3 (a data row
+ *    that is zero in every column adds nothing to the rank: a row of
+ *    weight 0, or a row the descriptors make zero, such as the y and z
+ *    force rows of a linear molecule along x) for 3 weights, LAMBDA 0:
+ *    fewer non-zero data rows than weights, so it does not have full
+ *    column rank and the least-squares weights are not unique." + the
+ *    remedies (OALGO 2 the same with "OALGO 2 (DGELS, QR)");
  *  - LAMBDA 0.1, BIAS true with ATOM Ta Nb (2 intercept columns), 2 data
  *    rows for 4 weights, row 2 zero, OALGO 2 and 4: "... the design matrix
- *    has 1 non-zero data row of 2 (a row of weight 0 is zero) for 4
+ *    has 1 non-zero data row of 2 (a data row that is zero ...) for 4
  *    weights, LAMBDA 0.1, which does not penalise its 2 intercept columns:
  *    fewer non-zero data rows than intercept columns, so ... Use OALGO 1
  *    (DGELSD), which gives the minimum-norm weights, or more structures.";
@@ -610,9 +640,15 @@ TEST_CASE("LinearRegressor: with FIXINDEX and BIAS the OALGO 2 and 4 "
  *  - FIXINDEX 5 (M_BLR_Train and M_KRR_Train), OALGO 2, 4 data rows for 5
  *    weights, rows 3 and 4 zero: "OALGO 2 (DGELS, QR) cannot fit these 4
  *    free weights (FIXINDEX pins 1 of the 5 weights): the design matrix
- *    has 2 non-zero data rows of 4 (a row of weight 0 is zero) for 4
- *    weights, LAMBDA 0: fewer non-zero data rows than weights, ...".
- * Without a zero data row the messages are those of the cases above.
+ *    has 2 non-zero data rows of 4 (a data row that is zero in every
+ *    column adds nothing to the rank: a row of weight 0, a row whose
+ *    values are all in FIXINDEX columns, or a row the descriptors make
+ *    zero, ...) for 4 weights, LAMBDA 0: fewer non-zero data rows than
+ *    weights, ...".
+ * Without a zero data row the messages are those of the cases above. Rows
+ * that are zero for another reason than weight 0: the next case. (Until
+ * the zero-row wording fix the parenthesis was "(a row of weight 0 is
+ * zero)", whatever made the rows zero.)
  * Before the fix: the pre-check counted every data row, a zero one too, so
  * whether the fit was refused depended on the rounding again: OALGO 4
  * fitted the 2 non-zero sine rows for 3 weights without an error, in
@@ -637,9 +673,9 @@ TEST_CASE("LinearRegressor: OALGO 2 and 4 count the non-zero data rows, "
   zero_row(sine3, t3, 2);
   const std::string two_of_three =
       " cannot fit these 3 weights: the design matrix has 2 non-zero data "
-      "rows of 3 (a row of weight 0 is zero) for 3 weights, LAMBDA 0: fewer "
-      "non-zero data rows than weights, so it does not have full column rank "
-      "and the least-squares weights are not unique." +
+      "rows of 3" + std::string(kZeroRows) + " for 3 weights, LAMBDA 0: "
+      "fewer non-zero data rows than weights, so it does not have full column "
+      "rank and the least-squares weights are not unique." +
       std::string(kRemedies);
   CHECK(fit_refusal("4", sine3, t3) ==
         "OALGO 4 (normal equations, Cholesky)" + two_of_three);
@@ -656,7 +692,7 @@ TEST_CASE("LinearRegressor: OALGO 2 and 4 count the non-zero data rows, "
           std::string(oalgo[0] == '2' ? "OALGO 2 (DGELS, QR)"
                                       : "OALGO 4 (normal equations, Cholesky)") +
               " cannot fit these 4 weights: the design matrix has 1 non-zero "
-              "data row of 2 (a row of weight 0 is zero) for 4 weights, LAMBDA "
+              "data row of 2" + kZeroRows + " for 4 weights, LAMBDA "
               "0.1, which does not penalise its 2 intercept columns: fewer "
               "non-zero data rows than intercept columns, so it does not have "
               "full column rank and the least-squares weights are not unique. "
@@ -688,12 +724,208 @@ TEST_CASE("LinearRegressor: OALGO 2 and 4 count the non-zero data rows, "
   zero_row(fix4, tf, 3);
   const std::string fixed =
       "OALGO 2 (DGELS, QR) cannot fit these 4 free weights (FIXINDEX pins 1 "
-      "of the 5 weights): the design matrix has 2 non-zero data rows of 4 (a "
-      "row of weight 0 is zero) for 4 weights, LAMBDA 0: fewer non-zero data "
-      "rows than weights, so it does not have full column rank and the "
-      "least-squares weights are not unique." + std::string(kRemedies);
+      "of the 5 weights): the design matrix has 2 non-zero data rows of 4" +
+      std::string(kZeroRowsFixed) + " for 4 weights, LAMBDA 0: fewer "
+      "non-zero data rows than weights, so it does not have full column rank "
+      "and the least-squares weights are not unique." + std::string(kRemedies);
   CHECK(blr_fix_refusal("2", "5", {"0.1"}, fix4, tf) == fixed);
   CHECK(krr_fix_refusal("2", "5", {"0.1"}, fix4, tf) == fixed);
+}
+
+/* Pins: a data row that is zero for another reason than weight 0 is
+ * counted as zero too, and the message does not blame weight 0: with
+ * FIXINDEX 1 of 3 weights (M_BLR_Train and M_KRR_Train, OALGO 2 and 4,
+ * LAMBDA 0), 2 data rows of which the second has a value in the pinned
+ * column 1 only, so it is zero in the 2 free columns: "OALGO 2 (DGELS, QR)
+ * cannot fit these 2 free weights (FIXINDEX pins 1 of the 3 weights): the
+ * design matrix has 1 non-zero data row of 2 (a data row that is zero in
+ * every column adds nothing to the rank: a row of weight 0, a row whose
+ * values are all in FIXINDEX columns, or a row the descriptors make zero,
+ * such as the y and z force rows of a linear molecule along x) for 2
+ * weights, LAMBDA 0: fewer non-zero data rows than weights, so it does not
+ * have full column rank and the least-squares weights are not unique." +
+ * the remedies. (Tadah.MLIP's CLI tests: a dimer's y and z force rows and
+ * an isolated atom's energy, of weight 1.)
+ * Before the fix: the rows were counted alike, but the message said "the
+ * design matrix has 1 non-zero data row of 2 (a row of weight 0 is zero)
+ * for 2 weights, ...", whatever made the row zero. */
+TEST_CASE("LinearRegressor: OALGO 2 and 4 count a zero data row of a "
+          "non-zero weight, not blaming weight 0",
+          "[linear_regressor][lapack_messages][weight_zero][fixed_weights]") {
+  phi_type Phi = design(2, 3, 3);
+  Phi(1, 1) = 0.0;
+  Phi(1, 2) = 0.0;
+  const t_type T = target(2, 3);
+  for (const bool krr : {false, true}) {
+    for (const char *oalgo : {"2", "4"}) {
+      INFO((krr ? "M_KRR_Train" : "M_BLR_Train") << ", OALGO " << oalgo);
+      const std::string expected =
+          std::string(oalgo[0] == '2' ? "OALGO 2 (DGELS, QR)"
+                                      : "OALGO 4 (normal equations, Cholesky)") +
+          " cannot fit these 2 free weights (FIXINDEX pins 1 of the 3 "
+          "weights): the design matrix has 1 non-zero data row of 2" +
+          kZeroRowsFixed + " for 2 weights, LAMBDA 0: fewer non-zero data "
+          "rows than weights, so it does not have full column rank and the "
+          "least-squares weights are not unique." + kRemedies;
+      CHECK((krr ? krr_fix_refusal(oalgo, "1", {"0.1"}, Phi, T)
+                 : blr_fix_refusal(oalgo, "1", {"0.1"}, Phi, T)) == expected);
+    }
+  }
+}
+
+/* Pins: with LAMBDA > 0 the message of a fit LAPACK cannot make names the
+ * remedies that apply to it: 4 data rows for 2 equal columns (every value
+ * 1), LAMBDA 1e-20, whose ridge 1e-20 vanishes against Phi^T Phi's 4, so
+ * DPOTRF meets the pivot 4 - 2 * 2 = 0 at order 2:
+ *  - BIAS false, OALGO 4: "OALGO 4 (normal equations, Cholesky) cannot
+ *    fit these 2 weights: the matrix Phi^T Phi of the design matrix (4
+ *    data rows for 2 weights, LAMBDA 1e-20) is not positive definite (its
+ *    leading minor of order 2 is not), so the design matrix does not have
+ *    full column rank or is too ill-conditioned for the normal equations.
+ *    Use OALGO 1 (DGELSD), 2 (QR) or 3 (SVD), which do not form Phi^T Phi,
+ *    a larger LAMBDA (the ridge penalty makes every column it penalises
+ *    full rank and better conditioned), or more data (structures, FORCE or
+ *    STRESS rows)."; OALGO 1, 2 and 3 fit it (pins);
+ *  - BIAS true with ATOM Ta (intercept column 1 of 3 equal columns), OALGO
+ *    4: "... cannot fit these 3 weights: ... (4 data rows for 3 weights,
+ *    LAMBDA 1e-20) is not positive definite (its leading minor of order 2
+ *    is not), ... Use OALGO 1 (DGELSD) or 2 (QR), which do not form Phi^T
+ *    Phi, a larger LAMBDA (the ridge penalty makes every column it
+ *    penalises full rank and better conditioned; it does not penalise the
+ *    1 intercept column of BIAS), or more data (structures, FORCE or
+ *    STRESS rows)." (OALGO 3 is not named: it refuses the intercept
+ *    columns with LAMBDA != 0, a pin); OALGO 1 and 2 fit it (pins).
+ * With LAMBDA 0 the remedies are those of the cases above.
+ * Before the fix: both messages ended in the LAMBDA 0 remedies, " Use
+ * OALGO 1 (DGELSD) or OALGO 3 (SVD), which give the minimum-norm weights,
+ * LAMBDA > 0 (...), or more data (...)", which name OALGO 3 with BIAS and
+ * LAMBDA > 0 with LAMBDA already 1e-20. */
+TEST_CASE("LinearRegressor: with LAMBDA > 0 the OALGO 4 message names the "
+          "remedies that apply",
+          "[linear_regressor][lapack_messages][bias]") {
+  auto ctx = [](const char *oalgo, bool bias) {
+    Context c = make_ctx(oalgo);
+    c.remove("LAMBDA");
+    c.add("LAMBDA", "1e-20");
+    if (bias) {
+      c.add("BIAS", "true");
+      c.add("ATOM", "Ta");
+    }
+    return c;
+  };
+  const std::string head =
+      "OALGO 4 (normal equations, Cholesky) cannot fit these ";
+  const std::string not_pd =
+      " is not positive definite (its leading minor of order 2 is not), so "
+      "the design matrix does not have full column rank or is too "
+      "ill-conditioned for the normal equations.";
+
+  CHECK(fit_refusal(ctx("4", false), ones_design(4, 2), target(4, 2)) ==
+        head + "2 weights: the matrix Phi^T Phi of the design matrix (4 data "
+               "rows for 2 weights, LAMBDA 1e-20)" + not_pd +
+            " Use OALGO 1 (DGELSD), 2 (QR) or 3 (SVD), which do not form "
+            "Phi^T Phi, a larger LAMBDA (the ridge penalty makes every column "
+            "it penalises full rank and better conditioned), or more data "
+            "(structures, FORCE or STRESS rows).");
+  for (const char *oalgo : {"1", "2", "3"}) {
+    INFO("BIAS false, OALGO " << oalgo);
+    CHECK(fit_refusal(ctx(oalgo, false), ones_design(4, 2), target(4, 2)) ==
+          "no exception");
+  }
+
+  CHECK(fit_refusal(ctx("4", true), ones_design(4, 3), target(4, 3)) ==
+        head + "3 weights: the matrix Phi^T Phi of the design matrix (4 data "
+               "rows for 3 weights, LAMBDA 1e-20)" + not_pd +
+            " Use OALGO 1 (DGELSD) or 2 (QR), which do not form Phi^T Phi, a "
+            "larger LAMBDA (the ridge penalty makes every column it penalises "
+            "full rank and better conditioned; it does not penalise the 1 "
+            "intercept column of BIAS), or more data (structures, FORCE or "
+            "STRESS rows).");
+  for (const char *oalgo : {"1", "2"}) {
+    INFO("BIAS true, OALGO " << oalgo);
+    CHECK(fit_refusal(ctx(oalgo, true), ones_design(4, 3), target(4, 3)) ==
+          "no exception");
+  }
+  CHECK(fit_refusal(ctx("3", true), ones_design(4, 3), target(4, 3)) ==
+        "OALGO=3 (SVD with uniform ridge) does not support intercept "
+        "exclusion from regularisation. The model has 1 intercept column(s) "
+        "(BIAS=true with ATOM) and LAMBDA != 0: use OALGO=1, 2 or 4 instead.");
+}
+
+/* Pins: a layout that does not describe the design matrix (a logic error
+ * of the C++ caller) is refused before train() or train_with_factor()
+ * writes anything into it: a design matrix of 2 rows and 4 columns, which
+ * has no room for the 4 ridge rows, with LAMBDA 0.1, under OALGO 1, 2 and
+ * 4 (train(), Layout::of(Phi): 0 data rows) and train_with_factor() with
+ * BIAS true over ATOM Ta Nb: std::logic_error "LinearRegressor::train: a
+ * layout of 0 data rows, 0 column weights and 4 weights does not describe a
+ * design matrix of 2 rows and 4 columns", and the matrix is as it was.
+ * Before the fix: train() wrote the ridge before it checked the layout, at
+ * row Phi.rows() - Phi.cols() + j, which wraps: column 1's at element -2
+ * of the storage, before it (AddressSanitizer: heap-buffer-overflow, WRITE
+ * of size 8), the others into the data rows (Phi(2, 1), Phi(1, 3) and
+ * Phi(2, 4) became 0.316227766, sqrt(0.1)), and only then threw the
+ * logic_error; the test process then aborted in malloc ("malloc():
+ * mismatching next->prev_size (unsorted)"). train_with_factor() checked no
+ * layout: it wrote sqrt(0.1) into Phi(1, 3) and Phi(2, 4) and threw the
+ * pre-check's runtime_error ("... the design matrix has 0 data rows for 4
+ * weights, LAMBDA 0.1, which does not penalise its 2 intercept columns:
+ * ..."). */
+TEST_CASE("LinearRegressor: a layout that does not describe the design "
+          "matrix is refused before the ridge rows are written",
+          "[linear_regressor][lapack_messages]") {
+  phi_type Phi0(2, 4);
+  for (size_t i = 0; i < 2; ++i)
+    for (size_t j = 0; j < 4; ++j)
+      Phi0(i, j) = 1.0 + static_cast<double>(i + 2 * j);
+  t_type T(2);
+  T[0] = 0.5;
+  T[1] = 1.5;
+  const std::string refusal =
+      "LinearRegressor::train: a layout of 0 data rows, 0 column weights and "
+      "4 weights does not describe a design matrix of 2 rows and 4 columns";
+  auto unchanged = [&](const phi_type &Phi) {
+    for (size_t i = 0; i < 2; ++i)
+      for (size_t j = 0; j < 4; ++j) {
+        INFO("Phi(" << i + 1 << ", " << j + 1 << ")");
+        CHECK(Phi(i, j) == Phi0(i, j));
+      }
+  };
+  for (const char *oalgo : {"1", "2", "4"}) {
+    INFO("OALGO " << oalgo);
+    Context c = make_ctx(oalgo);
+    c.remove("LAMBDA");
+    c.add("LAMBDA", "0.1");
+    phi_type Phi = Phi0;
+    t_type T1 = T;
+    t_type w;
+    Matrix Sigma;
+    std::string msg = "no exception";
+    try {
+      LinearRegressor::train(c, Phi, T1, w, Sigma);
+    } catch (const std::logic_error &e) {
+      msg = e.what();
+    }
+    CHECK(msg == refusal);
+    unchanged(Phi);
+  }
+  Context c = with_two_species_bias(make_ctx("4"));
+  phi_type Phi = Phi0;
+  t_type T1 = T;
+  t_type w;
+  Matrix Sigma;
+  FactorHandle factor;
+  tadah::models::memory::ModelsWorkspaceManager wm;
+  std::string msg = "no exception";
+  try {
+    LinearRegressor::train_with_factor(c, Phi, T1, w, Sigma, factor, wm);
+  } catch (const std::logic_error &e) {
+    msg = e.what();
+  } catch (const std::exception &e) {
+    msg = std::string("not a logic_error: ") + e.what();
+  }
+  CHECK(msg == refusal);
+  unchanged(Phi);
 }
 
 /* Pins: a design matrix or a target that holds a value that is not finite
