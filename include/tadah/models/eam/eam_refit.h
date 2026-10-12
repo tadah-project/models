@@ -241,13 +241,6 @@ private:
                           double win_lo, double win_hi,
                           tadah::core::v_type &centers,
                           tadah::core::v_type &widths, bool radial) const;
-  FitStats lsq_fit(const std::vector<double> &xs,
-                   const std::vector<double> &ys,
-                   const std::vector<double> &wts,  // empty => unweighted
-                   const tadah::core::v_type &centers,
-                   const tadah::core::v_type &widths,
-                   bool apply_cutoff,
-                   tadah::core::v_type &coeffs) const;
   /** Two-stage block solve: stage A fits the samples inside [win_lo,win_hi]
    *  with the blips supported there (unweighted — full quality); stage B fits
    *  the remaining samples with the remaining blips, stage-A contribution

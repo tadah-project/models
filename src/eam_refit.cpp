@@ -169,64 +169,6 @@ void EAMRefit::make_grid_windowed(double lo, double hi, int n,
   }
 }
 
-FitStats EAMRefit::lsq_fit(const std::vector<double> &xs,
-                           const std::vector<double> &ys,
-                           const std::vector<double> &wts,
-                           const tadah::core::v_type &centers,
-                           const tadah::core::v_type &widths,
-                           bool apply_cutoff,
-                           tadah::core::v_type &coeffs) const {
-  const std::size_t Nd = xs.size();
-  const std::size_t Nb = centers.size();
-
-  // Allocate Nd + Nb rows: the extra Nb rows stay zero for LAMBDA=0 (OLS) and
-  // receive the sqrt(lambda) ridge augmentation when LAMBDA>0 (see
-  // LinearRegressor::train).
-  tadah::core::phi_type Phi(Nd + Nb, Nb);
-  Phi.set_zero();
-  tadah::core::t_type T(Nd + Nb);
-  for (std::size_t i = 0; i < Nd; ++i) {
-    const double fc = apply_cutoff ? cutoff(xs[i]) : 1.0;
-    const double sw = wts.empty() ? 1.0 : std::sqrt(wts[i]);
-    T(i) = ys[i] * sw;
-    for (std::size_t k = 0; k < Nb; ++k)
-      Phi(i, k) = basisval(xs[i], centers[k], widths[k]) * fc * sw;
-  }
-
-  tadah::core::Context lc;
-  lc.add("OALGO", 2);                 // GELS, default rcond 1e-8
-  lc.add("LAMBDA", cfg_.lambda);
-  tadah::core::t_type w;
-  tadah::core::Matrix Sigma;
-  LinearRegressor::train(lc, Phi, T, w, Sigma);
-
-  coeffs.assign(Nb, 0.0);
-  for (std::size_t k = 0; k < Nb; ++k) coeffs[k] = w(k);
-
-  // Stats over the RELEVANT window (rows with weight >= 0.5): out-of-window
-  // regions are deliberately fit crudely and would drown the meaningful
-  // numbers. Falls back to all rows when unweighted.
-  FitStats st;
-  double se = 0.0, ae = 0.0, mx = 0.0;
-  std::size_t nrel = 0;
-  for (std::size_t i = 0; i < Nd; ++i) {
-    if (!wts.empty() && wts[i] < 0.5) continue;
-    const double fc = apply_cutoff ? cutoff(xs[i]) : 1.0;
-    double pred = 0.0;
-    for (std::size_t k = 0; k < Nb; ++k)
-      pred += coeffs[k] * basisval(xs[i], centers[k], widths[k]) * fc;
-    const double res = pred - ys[i];
-    se += res * res;
-    ae += std::fabs(res);
-    mx = std::max(mx, std::fabs(res));
-    ++nrel;
-  }
-  st.n = nrel;
-  if (nrel > 0) { st.rmse = std::sqrt(se / nrel); st.mae = ae / nrel; }
-  st.maxabs = mx;
-  return st;
-}
-
 FitStats EAMRefit::lsq_fit_windowed(const std::vector<double> &xs,
                                     const std::vector<double> &ys,
                                     double win_lo, double win_hi,
