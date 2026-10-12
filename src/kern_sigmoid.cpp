@@ -1,4 +1,8 @@
 #include <tadah/models/functions/kernels/kern_sigmoid.h>
+
+#include <iostream>
+#include <sstream>
+
 namespace tadah {
 namespace models {
 
@@ -10,8 +14,10 @@ Kern_Sigmoid::Kern_Sigmoid (const tadah::core::Context &context):
     gamma(context.get<double>("MPARAMS",0)),
     c(context.get<double>("MPARAMS",1))
 {
-    if (get_verbose()) std::cout << std::endl << label << " | gamma: " << gamma
-        << " | c: " << c << std::endl;
+    std::ostringstream settings;
+    settings.copyfmt(std::cout);
+    settings << " | gamma: " << gamma << " | c: " << c;
+    print_settings_once(label, settings.str());
 
     read_basis_from_context(context,basis);
 }

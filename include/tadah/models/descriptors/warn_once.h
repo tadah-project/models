@@ -31,6 +31,24 @@ bool log_warning_once(const std::string &key, const std::string &message);
  *  this process. */
 bool warning_logged_once(const std::string &key);
 
+/** \brief Writes @p text to standard output (std::cout, then flushed) at
+ *  most once per process for @p key.
+ *
+ *  For an informational line that every object built from one
+ *  configuration would print, such as the settings line a kernel prints
+ *  when it is built at VERBOSE > 0 (Kern_Base::print_settings_once()): the
+ *  first call for @p key writes @p text and returns true; every later call
+ *  for the same @p key (any thread, any text) writes nothing and returns
+ *  false. The keys are not those of log_warning_once(). The caller decides
+ *  whether the line is due (VERBOSE): a call not made does not use up the
+ *  key.
+ */
+bool print_once(const std::string &key, const std::string &text);
+
+/** \brief Whether print_once() has written the text of @p key in this
+ *  process. */
+bool printed_once(const std::string &key);
+
 }  // namespace models
 }  // namespace tadah
 

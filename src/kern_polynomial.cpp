@@ -1,5 +1,7 @@
 #include <tadah/models/functions/kernels/kern_polynomial.h>
 
+#include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 namespace tadah {
@@ -29,8 +31,10 @@ Kern_Polynomial::Kern_Polynomial (const tadah::core::Context &context):
     gamma(context.get<double>("MPARAMS",1)),
     c(context.get<double>("MPARAMS",2))
 {
-    if (get_verbose()) std::cout << std::endl << label << " | degree: " << d
-        <<" | gamma: " << gamma << " | c: " << c << std::endl;
+    std::ostringstream settings;
+    settings.copyfmt(std::cout);
+    settings << " | degree: " << d << " | gamma: " << gamma << " | c: " << c;
+    print_settings_once(label, settings.str());
     read_basis_from_context(context,basis);
 }
 double Kern_Polynomial::operator() (const tadah::core::aed_type& b, const tadah::core::aed_type& af) const

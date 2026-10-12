@@ -122,6 +122,17 @@ class Kern_Base: public virtual Function_Base {
          *  components) that is zero but for its component k, so that
          *  K(b_k, x) depends on x only through intercept component k. */
         std::vector<size_t> dot_product_intercept_columns(const tadah::core::Context &c) const;
+
+        /** \brief Prints the kernel's settings line, "\n" @p label
+         *  @p settings "\n" (Kern_RBF: "Kern_RBF | sigma: 1 | gamma: 1"),
+         *  when the kernel is built at VERBOSE > 0, once per process for
+         *  each @p label (print_once(), warn_once.h, the key being the
+         *  label): a model built again from one configuration -- tadah hpo
+         *  builds one per evaluation -- prints it at its first build only,
+         *  with that build's settings. Called by the kernels' constructors;
+         *  @p settings is formatted as std::cout formats numbers. */
+        void print_settings_once(const std::string &label,
+                                 const std::string &settings = "");
 };
 } // namespace models
 } // namespace tadah

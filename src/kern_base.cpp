@@ -1,5 +1,6 @@
 #include <tadah/models/functions/kernels/kern_base.h>
 #include <tadah/core/intercept_layout.h>
+#include <tadah/models/descriptors/warn_once.h>
 
 #include <stdexcept>
 #include <string>
@@ -11,6 +12,11 @@ namespace models {
 Kern_Base::Kern_Base() {}
 Kern_Base::Kern_Base(const tadah::core::Context &c): Function_Base(c) {}
 Kern_Base::~Kern_Base() {}
+void Kern_Base::print_settings_once(const std::string &label,
+                                    const std::string &settings)
+{
+  if (get_verbose() > 0) print_once(label, "\n" + label + settings + "\n");
+}
 void Kern_Base::set_basis(const tadah::core::Matrix b)
 {
   basis = b;
