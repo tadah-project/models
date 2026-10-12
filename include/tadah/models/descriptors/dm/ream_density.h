@@ -48,13 +48,15 @@ struct RhoBarScan {
  *  multiplies it outside the sum (rho = W rho_raw).
  *
  *  Every method is defined out of line in MODELS/src/ream_density.cpp,
- *  which is compiled -O3 without -march=native or -ffast-math: FMA
- *  contraction in a -march=native unit changes the bits of the sum, and the
- *  SIGNED form is pinned bit for bit to the density before RHOFORM (every
- *  tadah before 1.6.0).
+ *  compiled with MODELS' own flags, as the density of DM_REAM before
+ *  RHOFORM was: FMA contraction in a -march=native unit that compiled the
+ *  sum would change its bits, and the SIGNED form is the density of every
+ *  tadah before 1.6.0 built with the same flags, bit for bit (the goldens,
+ *  test_ream_goldens.cpp, check the presets' flags).
  *
  *  Guarantees, on a density that passed validate():
- *  - SIGNED: none (bitwise the density of every tadah before 1.6.0).
+ *  - SIGNED: none (bitwise the density of every tadah before 1.6.0 built
+ *    with the same flags).
  *  - NONNEG: rho_raw >= 0 exactly.
  *  - MONOTONE: rho_raw >= 0 exactly and non-increasing in r to rounding
  *    (S_B5 has 1-ulp rises for |x| < ~1.2; Cut_Poly/PolyS rise at the 1e-15

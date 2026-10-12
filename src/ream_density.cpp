@@ -9,12 +9,21 @@
 #include <stdexcept>
 #include <string>
 
-// Every method of ReamDensity lives in this translation unit, which MODELS
-// compiles -O3 without -march=native or -ffast-math. Do not move any of it
-// into a header: the SIGNED sums are pinned bit for bit to the density
-// before RHOFORM (every tadah before 1.6.0), and
-// a -march=native unit contracts a*b+c into an FMA (measured to change the
-// density bits of 7 of the 9 campaign fixtures).
+// Every method of ReamDensity lives in this translation unit, compiled with
+// MODELS' own flags, as DM_REAM's density loops before RHOFORM were: the
+// SIGNED sums are those loops, so a build gives the density of every tadah
+// before 1.6.0 built with the same flags, bit for bit. The goldens check it
+// for the presets' flags (no -march=native, no -ffast-math):
+// test_ream_goldens.cpp, and tadah.models_ream_goldens_native_link for a
+// -march=native program under LTO, as tadah is built with
+// TADAH_MARCH_NATIVE. Do not move any of it into a header: a -march=native
+// unit that includes it contracts a*b+c into an FMA (measured to change the
+// density bits of 7 of the 9 campaign fixtures). Nothing pins this file's
+// own flags, deliberately: a MODELS compiled with -march=native contracts
+// these sums as it contracted the loops before 1.6.0 (the same bits at all
+// 1770 golden points without LTO; with LTO 205 points differed, by up to
+// 97 ulp, GCC 15.2), and -ffp-contract=off here would make that build
+// differ from its own earlier version at 1057 points (2026-10-12).
 
 namespace tadah {
 namespace models {
