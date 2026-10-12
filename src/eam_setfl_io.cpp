@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <charconv>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -14,6 +15,9 @@
 #include <mutex>
 #include <sstream>
 #include <stdexcept>
+#include <string_view>
+#include <system_error>
+#include <vector>
 
 namespace tadah {
 namespace models {
@@ -39,71 +43,270 @@ void EAMSetflIO::read_setfl(const std::string &path) {
   read_setfl_text(setfl_bytes(path), path);
 }
 
-void EAMSetflIO::read_setfl_text(const std::string &text,
-                                 const std::string &path) {
-  file_path_ = path;
-  std::istringstream in(text);
+namespace {
 
-  std::string line;
-  std::getline(in, line); // comment 1
-  std::getline(in, line); // comment 2
-  std::getline(in, line); // comment 3
-  std::string line2 = line;  // (setfl: comment; funcfl: "nrho drho nr dr rcut")
-  std::getline(in, line); // line 4: <ntypes> <El1> [<El2> ...]
-  {
-    std::istringstream iss(line);
-    int ntypes = 0;
-    if (!(iss >> ntypes) || ntypes <= 0) {
-      // DYNAMO funcfl heuristic: its line 3 is "nrho drho nr dr rcut"
-      // (int double int double double) where setfl has a comment.
-      std::istringstream f3(line2);
-      int fn1 = 0, fn2 = 0; double fd1 = 0, fd2 = 0, fd3 = 0;
-      if (f3 >> fn1 >> fd1 >> fn2 >> fd2 >> fd3)
-        throw std::runtime_error(
-            "EAMSetflIO: '" + path + "' looks like a DYNAMO funcfl file "
-            "(pair_style eam). Only setfl files (eam/alloy or eam/fs) are "
-            "supported in this version; convert the potential to setfl or "
-            "obtain the setfl distribution.");
-      throw std::runtime_error(
-          "EAMSetflIO: malformed setfl header in '" + path +
-          "' (line 4 must start with the number of element types).");
-    }
-    if (ntypes != 1)
-      throw std::runtime_error(
-          "EAMSetflIO: only single-element setfl (eam/alloy or eam/fs) is "
-          "supported in this version; '" + path + "' declares " +
-          std::to_string(ntypes) + " element types. Multi-element refit is a "
-          "planned extension.");
-    iss >> element_;
+// The smallest table a setfl file may have: the cubic spline that LAMMPS
+// (PairEAM::interpolate) and tadah (gen_spline) fit through a table reads
+// its third point. scaled_grid() keeps the same floor.
+constexpr int kMinSetflPoints = 3;
+const char *const kSplineReason =
+    " (the cubic spline that LAMMPS and tadah fit through a table reads its "
+    "third point)";
+
+/* The lines of a setfl text, read as LAMMPS pair eam/alloy reads them
+ * (TextFileReader): lines 1-3 whole, every later line with its '#' comment
+ * cut and split into words at whitespace ('\r' included), a line without
+ * words skipped. Errors name the file and the line. */
+class SetflLines {
+public:
+  SetflLines(const std::string &text, const std::string &path)
+      : text_(text), path_(path) {}
+
+  /* The next line, whole; false at the end of the text. */
+  bool raw_line(std::string_view &out) {
+    if (pos_ >= text_.size()) return false;
+    const std::size_t nl = text_.find('\n', pos_);
+    const std::size_t stop = nl == std::string::npos ? text_.size() : nl;
+    out = std::string_view(text_).substr(pos_, stop - pos_);
+    pos_ = nl == std::string::npos ? text_.size() : nl + 1;
+    ++line_;
+    return true;
   }
 
-  in >> nrho_ >> drho_ >> nr_ >> dr_ >> rcut_;
-  in >> atomic_number_ >> atomic_mass_ >> lattice_param_ >> lattice_;
-  if (!in.good())
-    throw std::runtime_error("EAMSetflIO: malformed setfl header in: " + path);
+  /* The words of the next line that has any; false at the end. */
+  bool next_words(std::vector<std::string_view> &words) {
+    std::string_view l;
+    while (raw_line(l)) {
+      const std::size_t hash = l.find('#');
+      if (hash != std::string_view::npos) l = l.substr(0, hash);
+      words.clear();
+      std::size_t i = 0;
+      while (i < l.size()) {
+        while (i < l.size() && is_blank(l[i])) ++i;
+        const std::size_t b = i;
+        while (i < l.size() && !is_blank(l[i])) ++i;
+        if (i > b) words.push_back(l.substr(b, i - b));
+      }
+      if (!words.empty()) return true;
+    }
+    return false;
+  }
+
+  /* A header record of exactly n words, read as LAMMPS' next_values(n)
+   * reads one: lines joined until they hold n words or more. */
+  void record(std::size_t n, const std::string &what,
+              const std::string &fields,
+              std::vector<std::string_view> &words) {
+    words.clear();
+    std::vector<std::string_view> more;
+    std::size_t first = 0;
+    while (words.size() < n) {
+      if (!next_words(more)) {
+        if (words.empty())
+          throw std::runtime_error(file() + ": the file ends before the " +
+                                   what + " ('" + fields + "')");
+        throw std::runtime_error(
+            file() + ": the file ends inside the " + what + " ('" + fields +
+            "'), which has " + std::to_string(words.size()) + " of its " +
+            std::to_string(n) + " words");
+      }
+      if (words.empty()) first = line_;
+      words.insert(words.end(), more.begin(), more.end());
+    }
+    if (words.size() != n)
+      throw std::runtime_error(
+          at(first) + "the " + what + " is '" + fields + "', it has " +
+          std::to_string(words.size()) + " words" +
+          (line_ == first ? std::string()
+                          : " on lines " + std::to_string(first) + "-" +
+                                std::to_string(line_)));
+  }
+
+  /* A table of n finite values, `name` (`count` = n), from the next line
+   * with words on: it ends at the end of a line (LAMMPS' next_dvector reads
+   * a table's last line and drops the words after its last value, so a
+   * table that ends inside a line would be another potential in LAMMPS). */
+  std::vector<double> table(int n, const std::string &name,
+                            const std::string &count) {
+    std::vector<double> values;
+    // Each value takes two characters or more: an absurd n is not
+    // allocated before the text runs out.
+    values.reserve(std::min<std::size_t>(static_cast<std::size_t>(n),
+                                         text_.size() / 2 + 1));
+    std::vector<std::string_view> words;
+    while (values.size() < static_cast<std::size_t>(n)) {
+      if (!next_words(words))
+        throw std::runtime_error(
+            file() + ": the file ends inside the " + name + " table, after " +
+            std::to_string(values.size()) + " of its " + count + " = " +
+            std::to_string(n) + " values");
+      for (std::size_t k = 0; k < words.size(); ++k) {
+        if (values.size() == static_cast<std::size_t>(n))
+          throw std::runtime_error(
+              at(line_) + "the " + name + " table of " + count + " = " +
+              std::to_string(n) + " values ends with word " +
+              std::to_string(k) + " of this line, which has " +
+              std::to_string(words.size()) +
+              ": each table starts on a new line (LAMMPS drops the rest of "
+              "a table's last line)");
+        double v = 0.0;
+        if (!core::parse_decimal_finite(words[k], v))
+          throw std::runtime_error(
+              at(line_) + "value " + std::to_string(values.size() + 1) +
+              " of the " + name + " table, '" + std::string(words[k]) +
+              "', is not a finite number");
+        values.push_back(v);
+      }
+    }
+    return values;
+  }
+
+  std::size_t line() const { return line_; }
+  std::string file() const {
+    return "EAMSetflIO: setfl file '" + path_ + "'";
+  }
+  std::string at(std::size_t line) const {
+    return file() + ", line " + std::to_string(line) + ": ";
+  }
+
+private:
+  static bool is_blank(char c) {
+    return c == ' ' || c == '\t' || c == '\r' || c == '\v' || c == '\f';
+  }
+
+  const std::string &text_;
+  const std::string &path_;
+  std::size_t pos_ = 0;
+  std::size_t line_ = 0;
+};
+
+/* The whole token as an int ([+-]digits in the range of int). */
+bool parse_int_token(std::string_view tok, int &out) {
+  if (!core::is_integer_literal(tok)) return false;
+  if (!tok.empty() && tok.front() == '+') tok.remove_prefix(1);
+  int v = 0;
+  const auto r = std::from_chars(tok.data(), tok.data() + tok.size(), v);
+  if (r.ec != std::errc() || r.ptr != tok.data() + tok.size()) return false;
+  out = v;
+  return true;
+}
+
+}  // namespace
+
+void EAMSetflIO::read_setfl_text(const std::string &text,
+                                 const std::string &path) {
+  // Parsed into a fresh table: a refused file leaves this one as it was.
+  EAMSetflIO t;
+  t.file_path_ = path;
+  SetflLines in(text, path);
+  std::vector<std::string_view> w;
+
+  // Lines 1-3: comments, whatever they hold.
+  std::string_view line3;
+  for (int i = 0; i < 3; ++i)
+    if (!in.raw_line(line3)) line3 = std::string_view();
+
+  // The element line: <ntypes> <El1> [<El2> ...].
+  if (!in.next_words(w))
+    throw std::runtime_error(in.file() +
+                             ": the file ends before the element line (the "
+                             "number of element types and their names)");
+  const std::size_t element_line = in.line();
+  int ntypes = 0;
+  if (!parse_int_token(w[0], ntypes) || ntypes <= 0) {
+    // DYNAMO funcfl heuristic: its line 3 is "nrho drho nr dr rcut"
+    // (int double int double double) where setfl has a comment.
+    std::istringstream f3{std::string(line3)};
+    int fn1 = 0, fn2 = 0; double fd1 = 0, fd2 = 0, fd3 = 0;
+    if (f3 >> fn1 >> fd1 >> fn2 >> fd2 >> fd3)
+      throw std::runtime_error(
+          "EAMSetflIO: '" + path + "' looks like a DYNAMO funcfl file "
+          "(pair_style eam). Only setfl files (eam/alloy or eam/fs) are "
+          "supported in this version; convert the potential to setfl or "
+          "obtain the setfl distribution.");
+    throw std::runtime_error(in.at(element_line) +
+                             "the element line must start with the number "
+                             "of element types, got '" +
+                             std::string(w[0]) + "'");
+  }
+  if (ntypes != 1)
+    throw std::runtime_error(
+        "EAMSetflIO: only single-element setfl (eam/alloy or eam/fs) is "
+        "supported in this version; '" + path + "' declares " +
+        std::to_string(ntypes) + " element types. Multi-element refit is a "
+        "planned extension.");
+  if (w.size() != 2)
+    throw std::runtime_error(
+        in.at(element_line) +
+        "the element line of a file of 1 element type is '1 <symbol>', it "
+        "has " + std::to_string(w.size()) +
+        (w.size() == 1 ? " word" : " words"));
+  t.element_ = std::string(w[1]);
+
+  // The grid: nrho drho nr dr rcut.
+  in.record(5, "grid line", "nrho drho nr dr rcut", w);
+  const std::string grid_at = in.at(in.line());
+  auto count = [&](std::string_view tok, const char *name) {
+    int n = 0;
+    if (!parse_int_token(tok, n) || n < kMinSetflPoints)
+      throw std::runtime_error(grid_at + name +
+                               " must be a whole number from 3 to "
+                               "2147483647" + kSplineReason + ", got '" +
+                               std::string(tok) + "'");
+    return n;
+  };
+  auto positive = [&](std::string_view tok, const char *name) {
+    double v = 0.0;
+    if (!core::parse_decimal_finite(tok, v) || !(v > 0.0))
+      throw std::runtime_error(grid_at + name +
+                               " must be a positive finite number, got '" +
+                               std::string(tok) + "'");
+    return v;
+  };
+  t.nrho_ = count(w[0], "nrho");
+  t.drho_ = positive(w[1], "drho");
+  t.nr_   = count(w[2], "nr");
+  t.dr_   = positive(w[3], "dr");
+  t.rcut_ = positive(w[4], "rcut");
+
+  // The element record: Z mass a lattice.
+  in.record(4, "element record", "Z mass a lattice", w);
+  const std::string record_at = in.at(in.line());
+  if (!parse_int_token(w[0], t.atomic_number_))
+    throw std::runtime_error(record_at +
+                             "the atomic number must be a whole number, "
+                             "got '" + std::string(w[0]) + "'");
+  auto finite = [&](std::string_view tok, const char *name) {
+    double v = 0.0;
+    if (!core::parse_decimal_finite(tok, v))
+      throw std::runtime_error(record_at + name +
+                               " must be a finite number, got '" +
+                               std::string(tok) + "'");
+    return v;
+  };
+  t.atomic_mass_   = finite(w[1], "the mass");
+  t.lattice_param_ = finite(w[2], "the lattice constant");
+  t.lattice_       = std::string(w[3]);
 
   // The setfl lattice label is an informational field with no fixed case
   // convention — real files use both "fcc" and "FCC". Keep the raw token for
   // faithful messages / round-trip output, and normalise to lower case so the
   // crystal routines (eam_lattice::supported / crystal_epa) recognise it.
-  lattice_raw_ = lattice_;
-  for (auto &ch : lattice_)
+  t.lattice_raw_ = t.lattice_;
+  for (auto &ch : t.lattice_)
     ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
 
-  rdr_   = 1.0 / dr_;
-  rdrho_ = 1.0 / drho_;
+  // The tables; the lines after the z2r table are not read (nor are they
+  // by LAMMPS).
+  t.frho_ = in.table(t.nrho_, "F(rho)", "nrho");
+  t.rhor_ = in.table(t.nr_, "rho(r)", "nr");
+  t.z2r_  = in.table(t.nr_, "z2r(r)", "nr");
 
-  frho_.resize(nrho_);
-  rhor_.resize(nr_);
-  z2r_.resize(nr_);
-  for (int i = 0; i < nrho_; ++i) in >> frho_[i];
-  for (int i = 0; i < nr_; ++i)   in >> rhor_[i];
-  for (int i = 0; i < nr_; ++i)   in >> z2r_[i];
-  if (in.fail())
-    throw std::runtime_error("EAMSetflIO: truncated tabulated data in: " + path);
-
+  t.rdr_   = 1.0 / t.dr_;
+  t.rdrho_ = 1.0 / t.drho_;
   // LAMMPS convention: the embedding spline is valid up to (nrho-1)*drho.
-  rhomax_ = (nrho_ - 1) * drho_;
+  t.rhomax_ = (t.nrho_ - 1) * t.drho_;
+  *this = std::move(t);
 }
 
 // Natural cubic spline, identical to the former D2_EAM/DM_EAM gen_splines.
@@ -244,7 +447,7 @@ EAMGrid EAMSetflIO::scaled_grid(double scale) const {
   const double nrho = std::round(nrho_ * scale);
   // The spline LAMMPS and tadah fit through a table (gen_spline, PairEAM's
   // interpolate) reads its third point: a table has at least 3.
-  constexpr double kMinPoints = 3.0;
+  constexpr double kMinPoints = kMinSetflPoints;
   constexpr double kMaxPoints = std::numeric_limits<int>::max();
   if (!(nr >= kMinPoints && nr <= kMaxPoints && nrho >= kMinPoints &&
         nrho <= kMaxPoints))

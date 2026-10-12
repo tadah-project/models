@@ -40,6 +40,12 @@ void test_d2(Context &c, double r) {
                           fda[2].data()+fda[2].size());
 
   REQUIRE_THAT(fxa, Catch::Matchers::Approx(fx).margin(1e-5));
+  // D2_Base::calc_fd_approx writes into its fd_type: fda(i, 0), the
+  // storage the fd_type's other readers use, is its column 0. Before the
+  // fix the assignment 'fd(0) = ...' gave the column a buffer of its own
+  // and fda(i, 0) stayed 0.
+  for (size_t i = 0; i < fxa.size(); ++i) REQUIRE(fda(i, 0) == fxa[i]);
+  REQUIRE(fda[0].data() == fda.ptr());
   // y and z should be zero
   REQUIRE_THAT(fya, Catch::Matchers::Approx(fy));
   REQUIRE_THAT(fza, Catch::Matchers::Approx(fz));

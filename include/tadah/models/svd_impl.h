@@ -43,8 +43,15 @@ void SVD::compute(M& A) {
   tadah::core::dgesdd_(&jobz, &m, &n, A.ptr(), &lda, svdWorkspace_->S, svdWorkspace_->U, &ldu,
               svdWorkspace_->VT, &ldvt, svdWorkspace_->work, &svdWorkspace_->lwork, svdWorkspace_->iwork, &info);
 
-    if (info != 0) {
-        throw std::runtime_error("Error in DGESDD during SVD computation: info = " + std::to_string(info));
+    if (info > 0) {
+        throw std::runtime_error(
+            "DGESDD: the singular value decomposition of the design matrix (" +
+            std::to_string(m) + " rows, " + std::to_string(n) +
+            " columns) did not converge (info = " + std::to_string(info) + ")");
+    }
+    if (info < 0) {
+        throw std::logic_error("DGESDD: argument " + std::to_string(-info) +
+                               " had an illegal value (info = " + std::to_string(info) + "; with a finite design matrix, an internal error)");
     }
 }
 

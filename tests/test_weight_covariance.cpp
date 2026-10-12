@@ -743,7 +743,8 @@ TEST_CASE("LAMBDA -1 refuses a fit without observations",
     tadah::models::memory::ModelsWorkspaceManager wsm;
     std::string msg = "<no exception>";
     try {
-      LinearRegressor::train(c, Phi, t, w, S, wsm, {}, 0);
+      LinearRegressor::train(c, Phi, t, w, S, wsm, {}, 0,
+                             LinearRegressor::Layout::of(Phi));
     } catch (const std::runtime_error &e) {
       msg = e.what();
     }

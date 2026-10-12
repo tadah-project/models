@@ -6,12 +6,34 @@
 #include <tadah/models/memory/imodels_workspace_manager.h>
 #include <cmath>
 #include <stdexcept>
+#include <string>
 #include <cstdlib>
 #include <algorithm>
 #include <iostream>
 
 namespace tadah {
 namespace models {
+
+/**
+ * @brief OLS found the design matrix rank-deficient: DGELS (Algorithm::GELS)
+ * stopped at a zero diagonal element of R, or DPOTRF
+ * (Algorithm::NormalEquations) at a leading minor of A^T A that is not
+ * positive definite.
+ *
+ * column() is that column (1-based), the order of that minor; what() says
+ * what it means. LinearRegressor::train adds the fit's numbers and the
+ * remedies.
+ */
+class RankDeficientError : public std::runtime_error {
+public:
+  RankDeficientError(const std::string &what, int column)
+      : std::runtime_error(what), column_(column) {}
+  /// The column of the zero diagonal element of R / the order of the minor.
+  int column() const noexcept { return column_; }
+
+private:
+  int column_;
+};
 
 /**
  * @class OLS
