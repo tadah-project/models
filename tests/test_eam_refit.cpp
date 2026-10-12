@@ -783,9 +783,12 @@ std::uint64_t ulp_distance(double a, double b) {
 }
 
 // A smooth single-element fcc setfl (rcut 5, a0 3.6) with the density table
-// rho(r): phi(r) = 3 (1 - r/rcut)^3, F(rho) = -2 sqrt(rho) + 0.05 rho.
+// rho(r): phi(r) = 3 (1 - r/rcut)^3, F(rho) = -2 sqrt(rho) + 0.05 rho; with
+// `wall`, phi also has the steep wall of the window tests,
+// 100 exp(-(r - 1.6) / 0.05) (write_window_setfl).
 void write_rho_setfl(const std::string &path,
-                     const std::function<double(double)> &rho) {
+                     const std::function<double(double)> &rho,
+                     bool wall = false) {
   const int nr = 400, nrho = 400;
   const double rcut = 5.0, dr = rcut / (nr - 1);
   const double rhomax = 60.0, drho = rhomax / (nrho - 1);
@@ -803,7 +806,9 @@ void write_rho_setfl(const std::string &path,
   os << "\n";
   for (int i = 0; i < nr; ++i) {
     const double r = i * dr, x = 1.0 - r / rcut;
-    os << (x > 0 ? 3.0 * x * x * x * r : 0.0) << ((i % 5 == 4) ? "\n" : " ");
+    const double phi = (x > 0 ? 3.0 * x * x * x : 0.0) +
+                       (wall ? 100.0 * std::exp(-(r - 1.6) / 0.05) : 0.0);
+    os << phi * r << ((i % 5 == 4) ? "\n" : " ");
   }
   os << "\n";
 }
@@ -1115,4 +1120,136 @@ TEST_CASE_METHOD(RefitFixture,
     CHECK(refit.fit_window_r_lo() == refit.r_lo());
     CHECK(refit.fit_window_rho_hi() == eam.rhomax());
   }
+}
+
+TEST_CASE_METHOD(RefitFixture,
+                 "EAMRefit RHOFORM: the table pre-check reads the fit window "
+                 "only, not the table below r_lo",
+                 "[refit][rhoform]") {
+  /* Pins: fit()'s NONNEG/MONOTONE table pre-check reads the table nodes of
+   * the fit window, [fit_window_r_lo(), rcut], never below r_lo (with a
+   * wall the window starts above r_lo: the next test case). On the synthetic
+   * fcc table (a0 3.6 A, rcut 5 A) with r_lo_frac 0.35, r_lo() = 1.75 A
+   * lies above 0.8 r_reach() = 1.527 A (window placement), and the samples
+   * and the grid start at r_lo: a density with a narrow bump at 1.64 A,
+   * which rises only below r_lo, fits under MONOTONE, and one with a
+   * negative dip at 1.64 A fits under NONNEG and MONOTONE, each with
+   * fit_window_r_lo() == r_lo() and every amplitude >= 0; a bump at 2.2 A,
+   * inside the window, is still refused, the message naming the window
+   * "[1.750000, 5.000000] A".
+   * Before the fix: the pre-check read the nodes from 0.8 r_reach, so the
+   * bump below r_lo was refused ("RHOFORM MONOTONE cannot fit this table:
+   * the tabulated density rises from rho = 0.468... at r = 1.591475 A to
+   * 0.473... at r = 1.604006 A, inside the fit window [1.527351, 5.000000]
+   * A"), and so was the dip under NONNEG and MONOTONE ("... rho =
+   * -0.0709... < 0 at r = 1.629069 A, inside the fit window [1.527351,
+   * 5.000000] A"); the message for the bump at 2.2 A named the window
+   * [1.527351, 5.000000] A. */
+  const auto config = [](RhoForm form) {
+    EAMRefitConfig cfg = coarse_config("Blip", form);
+    cfg.r_lo_frac = 0.35;
+    return cfg;
+  };
+  const auto bump = [](double centre, double height) {
+    return [=](double r) {
+      const double x = 1.0 - r / 5.0, g = (r - centre) / 0.03;
+      return x * x + height * std::exp(-g * g);
+    };
+  };
+  struct Case {
+    const char *what;
+    std::function<double(double)> rho;
+    std::vector<RhoForm> forms;
+  };
+  const std::vector<Case> fits = {
+      {"a rise below r_lo", bump(1.64, 0.05), {RhoForm::Monotone}},
+      {"a negative dip below r_lo", bump(1.64, -0.6),
+       {RhoForm::NonNeg, RhoForm::Monotone}}};
+  for (const Case &cs : fits) {
+    const ScratchFile f("tmp_rhoform_below_rlo");
+    write_rho_setfl(f.path, cs.rho);
+    EAMSetflIO eam;
+    eam.read_setfl(f.path);
+    eam.build_splines();
+    for (RhoForm form : cs.forms) {
+      INFO(cs.what << ", RHOFORM " << rhoform_name(form));
+      EAMRefit refit(eam, config(form));
+      bool fitted = false;
+      CHECK_NOTHROW((refit.fit(), fitted = true));
+      if (!fitted) continue;
+      REQUIRE(refit.r_lo() == Approx(1.75));
+      REQUIRE(0.8 * refit.r_reach() < refit.r_lo());
+      CHECK(refit.fit_window_r_lo() == refit.r_lo());
+      const tadah::core::Context pot = refit.build_pot_context();
+      for (std::size_t n = 0; n < pot.size("AMPGRIDMB"); ++n)
+        CHECK(pot.get<double>("AMPGRIDMB", n) >= 0.0);
+    }
+  }
+  const ScratchFile f("tmp_rhoform_in_window");
+  write_rho_setfl(f.path, bump(2.2, 0.05));
+  EAMSetflIO eam;
+  eam.read_setfl(f.path);
+  eam.build_splines();
+  EAMRefit mono(eam, config(RhoForm::Monotone));
+  CHECK_THROWS_WITH(
+      mono.fit(),
+      Catch::Contains("RHOFORM MONOTONE cannot fit this table: the tabulated "
+                      "density rises") &&
+          Catch::Contains("inside the fit window [1.750000, 5.000000] A"));
+}
+
+TEST_CASE_METHOD(RefitFixture,
+                 "EAMRefit RHOFORM: with a pair wall the table pre-check reads "
+                 "the fit window, which starts above r_lo",
+                 "[refit][rhoform]") {
+  /* Pins: with the steep pair wall of the window tests (100 exp(-(r -
+   * 1.6 A) / 0.05 A) added to phi) on the synthetic fcc table (a0 3.6 A,
+   * rcut 5 A, r_lo() = 1 A), fit() fits on the window from
+   * fit_window_r_lo() = 0.8 r_reach() = 1.527 A while its samples and grid
+   * start at r_lo: the samples in [r_lo, fit_window_r_lo()) are fitted in
+   * the tail block of the two-stage solve, and the NONNEG/MONOTONE table
+   * pre-check reads the fit window only. A density with a negative dip at
+   * 1.25 A, below the window, fits under NONNEG, every amplitude >= 0 and
+   * rho_fit(1.25 A) >= 0 (the tail block is solved in the form too); a
+   * negative dip at 2.2 A, inside the window, is refused, the message
+   * naming the window "[1.527351, 5.000000] A".
+   * Before the fix: passes as well (a pin of the window the corrected
+   * comments of fit() describe: with a wall the pre-check started at the
+   * window's edge, above r_lo, before this branch too). */
+  const auto dip = [](double centre) {
+    return [=](double r) {
+      const double x = 1.0 - r / 5.0, g = (r - centre) / 0.03;
+      return x * x - 0.6 * std::exp(-g * g);
+    };
+  };
+  {
+    const ScratchFile f("tmp_rhoform_wall_tail");
+    write_rho_setfl(f.path, dip(1.25), true);
+    EAMSetflIO eam;
+    eam.read_setfl(f.path);
+    eam.build_splines();
+    REQUIRE(eam.rho_tab(1.25) < 0.0);
+    EAMRefit refit(eam, coarse_config("Blip", RhoForm::NonNeg));
+    bool fitted = false;
+    CHECK_NOTHROW((refit.fit(), fitted = true));
+    if (fitted) {
+      CHECK(refit.r_lo() == Approx(1.0));
+      CHECK(refit.fit_window_r_lo() == Approx(0.8 * refit.r_reach()));
+      CHECK(refit.fit_window_r_lo() > 1.25);
+      const tadah::core::Context pot = refit.build_pot_context();
+      for (std::size_t n = 0; n < pot.size("AMPGRIDMB"); ++n)
+        CHECK(pot.get<double>("AMPGRIDMB", n) >= 0.0);
+      CHECK(refit.rho_fit(1.25) >= 0.0);
+    }
+  }
+  const ScratchFile f("tmp_rhoform_wall_window");
+  write_rho_setfl(f.path, dip(2.2), true);
+  EAMSetflIO eam;
+  eam.read_setfl(f.path);
+  eam.build_splines();
+  EAMRefit nonneg(eam, coarse_config("Blip", RhoForm::NonNeg));
+  CHECK_THROWS_WITH(
+      nonneg.fit(),
+      Catch::Contains("RHOFORM NONNEG cannot fit this table") &&
+          Catch::Contains("inside the fit window [1.527351, 5.000000] A"));
 }
