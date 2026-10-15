@@ -841,10 +841,11 @@ RemoveReport remove_basis(CurveView &c, double centre_request, bool radial) {
     if (hi > lo) {
       // ---- stacked value/1st/2nd rows on a dense sample of [lo, hi] ----
       constexpr std::size_t N = 512;
-      auto bf = [&](std::size_t k, int order, double x) {
-        // zero_ref: the value order is g_k(x) - g_k(0) (exactly 0 at x == 0);
-        // the derivatives are the same in both embedding references.
-        if (order == 0 && c.zero_ref) return basis_value(c, k, x) - g0[k];
+      // Basis function k of the curve as evaluated (CurveView::value and
+      // its derivatives): under a spatial cutoff f_c (a radial curve), the
+      // tapered f_c g_k and its product-rule derivatives, so the
+      // compensation minimises the residual of the tapered curve.
+      auto bare = [&](std::size_t k, int order, double x) {
         if (c.form == RhoForm::Monotone) {  // the integrated bumps S_k
           if (order == 0) return radial_step_value_bare (c.family, x, c.width(k), c.mu[k]);
           if (order == 1) return radial_step_deriv_bare (c.family, x, c.width(k), c.mu[k]);
@@ -858,6 +859,20 @@ RemoveReport remove_basis(CurveView &c, double centre_request, bool radial) {
         if (order == 0) return radial_value_bare (c.family, x, c.width(k), c.mu[k], c.degree(k));
         if (order == 1) return radial_deriv_bare (c.family, x, c.width(k), c.mu[k], c.degree(k));
         return radial_deriv2_bare(c.family, x, c.width(k), c.mu[k], c.degree(k));
+      };
+      auto bf = [&](std::size_t k, int order, double x) {
+        // zero_ref: the value order is g_k(x) - g_k(0) (exactly 0 at x == 0);
+        // the derivatives are the same in both embedding references. F has
+        // no spatial cutoff, so this is the whole zero-referenced basis.
+        if (order == 0 && c.zero_ref) return basis_value(c, k, x) - g0[k];
+        if (!c.spatial_cutoff) return bare(k, order, x);
+        Cut_Base &fc = *c.spatial_cutoff;  // Cut_Base evaluates non-const
+        if (order == 0) return fc.calc(x) * bare(k, 0, x);
+        if (order == 1)
+          return fc.calc(x) * bare(k, 1, x) + fc.calc_prime(x) * bare(k, 0, x);
+        return fc.calc(x) * bare(k, 2, x) +
+               2.0 * fc.calc_prime(x) * bare(k, 1, x) +
+               fc.calc_double_prime(x) * bare(k, 0, x);
       };
 
       const std::size_t nj = J.size();
