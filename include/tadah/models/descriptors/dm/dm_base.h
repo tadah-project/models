@@ -168,6 +168,14 @@ public:
   virtual std::size_t component_basis_size(const std::string &) const { return 0; }
   virtual bool component_basis_curve(const std::string &,std::size_t,double,
                                      bool,double &,double &) const { return false; }
+  /** The spatial cutoff f_c(q) and f_c'(q) the functions of a component
+   *  channel ("DENSITY") are tapered with, as component_basis_curve()
+   *  applies it with its cutoff flag (0 beyond the cutoff radius). False:
+   *  the channel has no spatial cutoff (an embedding, whose argument is a
+   *  density) or the descriptor no component channels; fc and dfc are then
+   *  untouched. `tadah analysis bfunc --type MB Y` prints it. */
+  virtual bool component_cutoff(const std::string &,double,double &,
+                                double &) const { return false; }
   virtual void eam_density(const int /*Zi*/, const int /*Zj*/,
                            const double /*rij*/,
                            double &rho, double &rhop) const {

@@ -56,6 +56,13 @@ bool DM_REAM::component_basis_curve(const std::string &channel,std::size_t i,dou
   } else return false;
   return true;
 }
+bool DM_REAM::component_cutoff(const std::string &channel,double q,double &fc,double &dfc) const {
+  if(core::to_upper(channel)!="DENSITY")return false;
+  // the taper of component_basis_curve: RCTYPEMB at RCUTMB, 0 beyond it
+  if(q>get_rcut()) {fc=dfc=0;return true;}
+  fc=fcut->calc(q);dfc=fcut->calc_prime(q);
+  return true;
+}
 
 
 void DM_REAM::validate_embedding(BasisKind b, const tadah::core::v_type &ce,

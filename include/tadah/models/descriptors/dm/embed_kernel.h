@@ -54,6 +54,9 @@ public:
   EmbedJet density_atom(std::size_t index, double q) const {
     return density_kernel_(density_.at(index), q);
   }
+  /** The spatial cutoff the density is tapered with: f_c(q) and f_c'(q)
+   * (CUTOFF TYPE at RADIUS; NONE is 1 inside RADIUS), 0 from RADIUS on. */
+  EmbedJet spatial_cutoff(double q) const;
   EmbedJet embedding(std::size_t, double q, char field = ' ',
                      std::size_t index = 0) const;
   /** Weight-collapsed embedding value and first derivative. The family is
