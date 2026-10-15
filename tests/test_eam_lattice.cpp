@@ -5,6 +5,7 @@
 #include <cmath>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 using namespace tadah::models;
 
@@ -191,25 +192,30 @@ TEST_CASE("eam_lattice require_crystal_on_grid: the crystal's nearest "
 /* Pins: require_crystal_on_grid(lattice, a0, reach_smin, dr, rcut), the
  * crystal gate of `tadah refit`, refuses a crystal whose nearest
  * neighbours at a0 are at or beyond the table's cutoff rcut, where LAMMPS
- * and tadah count no pair (a pair counts below rcut): the crystal of the
- * header has no interaction, the refit's self-test would compare crystals
- * without neighbours and the compact fit's window would start above rcut.
- * The fcc lattice of a0 = 361 (a lattice constant of copper in
- * picometres) at rcut 5 is refused with exactly "tadah refit: the lattice
- * constant of the EAM header, a0 = 361 A, puts the nearest neighbours of
- * the fcc crystal 255.26554800834364 A apart, at or beyond the table's
- * cutoff, rcut = 5 A: the crystal has no pair within the cutoff. Edit the
- * element line of the setfl file (`<Z> <mass> <a0> <lattice>`): set the
- * equilibrium lattice constant, in Angstrom (a value in picometres is 100
- * times the value in Angstrom)." -- before the dr rule, which it passes
- * (its distance at REFIT_REACH_SMIN is 191 A); the boundary is exact: hcp
- * (whose distance is a0) is refused at a0 = rcut and passes one ulp below
- * it, and bcc likewise at a0 = rcut / (sqrt(3)/2). A crystal whose
- * neighbours lie below rcut at a0 but beyond it at the scan's a/a0 = 1.10
- * passes (a real expanded crystal), and so do the crystals of real tables.
- * Before the fix: the gate took no cutoff (the test does not compile);
- * the 1.5.0 gate and v1-dev's passed a0 = 361, and the refit wrote a
- * potential whose self-test was 0.000 meV/atom (tmp/rg_probe/a0pm). */
+ * counts no pair (pair_style eam/alloy counts a pair below rcut only): the
+ * crystal of the header has no interaction in LAMMPS, the refit's
+ * self-test would compare crystals without neighbours (at most a shell at
+ * exactly rcut, which tadah's enumeration keeps: neighbour_distances("hcp",
+ * 5, 5) holds the 12 nearest neighbours at 5) and the compact fit's
+ * window would start at or above rcut. The fcc lattice of a0 = 361 (a
+ * lattice constant of copper in picometres) at rcut 5 is refused with
+ * exactly "tadah refit: the lattice constant of the EAM header, a0 = 361
+ * A, puts the nearest neighbours of the fcc crystal 255.26554800834364 A
+ * apart, at or beyond the table's cutoff, rcut = 5 A, and LAMMPS
+ * (pair_style eam/alloy) counts a pair only below rcut: the crystal has no
+ * interaction in LAMMPS. Edit the element line of the setfl file (`<Z>
+ * <mass> <a0> <lattice>`): set the equilibrium lattice constant, in
+ * Angstrom (a value in picometres is 100 times the value in Angstrom)." --
+ * before the dr rule, which it passes (its distance at REFIT_REACH_SMIN is
+ * 191 A); the boundary is exact: hcp (whose distance is a0) is refused at
+ * a0 = rcut, with the same sentence, and passes one ulp below it, and bcc
+ * likewise at a0 = rcut / (sqrt(3)/2). A crystal whose neighbours lie
+ * below rcut at a0 but beyond it at the scan's a/a0 = 1.10 passes (a real
+ * expanded crystal), and so do the crystals of real tables.
+ * Before the fix: the refusal said "...: the crystal has no pair within
+ * the cutoff." (false for tadah, which counts the hcp shell at exactly
+ * rcut), so the two exact-text checks fail; the neighbour_distances pin
+ * passes as well (a pin of why the text names LAMMPS). */
 TEST_CASE("eam_lattice require_crystal_on_grid: the crystal's nearest "
           "neighbours at a0 below the table's cutoff",
           "[eam_lattice]") {
@@ -218,18 +224,29 @@ TEST_CASE("eam_lattice require_crystal_on_grid: the crystal's nearest "
                                            5.0),
       "tadah refit: the lattice constant of the EAM header, a0 = 361 A, "
       "puts the nearest neighbours of the fcc crystal 255.26554800834364 A "
-      "apart, at or beyond the table's cutoff, rcut = 5 A: the crystal has "
-      "no pair within the cutoff. Edit the element line of the setfl file "
+      "apart, at or beyond the table's cutoff, rcut = 5 A, and LAMMPS "
+      "(pair_style eam/alloy) counts a pair only below rcut: the crystal has "
+      "no interaction in LAMMPS. Edit the element line of the setfl file "
       "(`<Z> <mass> <a0> <lattice>`): set the equilibrium lattice constant, "
       "in Angstrom (a value in picometres is 100 times the value in "
       "Angstrom).");
 
-  // the boundary: hcp, whose nearest-neighbour distance is a0 itself
+  // the boundary: hcp, whose nearest-neighbour distance is a0 itself;
+  // tadah's enumeration counts its shell at exactly rcut, LAMMPS does not
   const double rcut = 5.0;
   CHECK_THROWS_WITH(
       eam_lattice::require_crystal_on_grid("HCP", rcut, 0.75, 0.01, rcut),
       Catch::Contains("puts the nearest neighbours of the hcp crystal 5 A "
-                      "apart, at or beyond the table's cutoff, rcut = 5 A"));
+                      "apart, at or beyond the table's cutoff, rcut = 5 A, "
+                      "and LAMMPS (pair_style eam/alloy) counts a pair only "
+                      "below rcut: the crystal has no interaction in "
+                      "LAMMPS."));
+  {
+    const std::vector<double> shell =
+        eam_lattice::neighbour_distances("hcp", rcut, rcut);
+    CHECK(shell.size() == 12);
+    for (const double d : shell) CHECK(d == Approx(rcut));
+  }
   CHECK_NOTHROW(eam_lattice::require_crystal_on_grid(
       "hcp", std::nextafter(rcut, 0.0), 0.75, 0.01, rcut));
   // bcc at the a0 whose distance is rcut, and one ulp of a0 below it

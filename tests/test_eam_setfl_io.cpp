@@ -720,3 +720,50 @@ TEST_CASE("EAMSetflIO::scaled_grid keeps the cutoff within one step of its "
     std::remove(out.c_str());
   }
 }
+
+TEST_CASE("EAMSetflIO::scaled_grid reproduces the input grid when the "
+          "point counts do not change",
+          "[eam][setfl_read]") {
+  /* Pins: a scale whose rounded counts are the input's (1, and 1.1 for 3
+   * points) gives the input grid itself, bit for bit (input_grid()): the
+   * same count over the same span is the same step. For a grid that the
+   * reader accepts within its 1e-4 of rcut ("3 0.5 3 1.0 3.0003", nr x dr
+   * = 3 below rcut 3.0003) dr stays 1; for "4 0.7 4 0.1 0.4", where
+   * 0.1 x 3 / 3 and 0.7 x 3 / 3 are not 0.1 and 0.7 in double, dr and drho
+   * stay 0.1 and 0.7.
+   * Before the fix: scaled_grid recomputed the step from the span,
+   * d x (n - 1) / (n - 1), and moved the r grid's end to rcut whenever
+   * nr x dr fell below rcut: the first grid came back with dr = 1.0001
+   * (rcut / nr), the second with dr = 0.10000000000000002 and drho =
+   * 0.6999999999999998, so the dr and drho checks fail. */
+  const auto same_grid = [](const EAMGrid &a, const EAMGrid &b) {
+    CHECK(a.nrho == b.nrho);
+    CHECK(a.drho == b.drho);
+    CHECK(a.nr == b.nr);
+    CHECK(a.dr == b.dr);
+    CHECK(a.rcut == b.rcut);
+  };
+  {
+    std::vector<std::string> lines = setfl3_lines();
+    lines[4] = "3 0.5 3 1.0 3.0003";
+    EAMSetflIO io;
+    io.read_setfl_text(joined(lines), "tolerated.alloy");
+    REQUIRE(io.nr() * io.dr() < io.rcut());
+    for (const double scale : {1.0, 1.1}) {
+      INFO("scale " << scale);
+      const EAMGrid g = io.scaled_grid(scale);
+      same_grid(g, io.input_grid());
+      CHECK(g.dr == 1.0);
+    }
+  }
+  {
+    REQUIRE(0.1 * 3 / 3 != 0.1);
+    REQUIRE(0.7 * 3 / 3 != 0.7);
+    EAMSetflIO io;
+    io.read_setfl_text(zero_setfl("4 0.7 4 0.1 0.4", 4, 4), "steps.alloy");
+    const EAMGrid g = io.scaled_grid(1.0);
+    same_grid(g, io.input_grid());
+    CHECK(g.dr == 0.1);
+    CHECK(g.drho == 0.7);
+  }
+}
