@@ -1,6 +1,9 @@
 #include "catch2/catch.hpp"
+#include <cmath>
 #include <limits>
+#include <memory>
 #include <stdexcept>
+#include <tadah/core/registry.h>
 #include <tadah/models/cutoffs.h>
 #include <string>
 
@@ -249,4 +252,31 @@ TEST_CASE( "Testing Cutoffs: Cut_PT", "[Cut_PT]" ) {
   REQUIRE_THAT(c2b->calc_prime(3.0),
                Catch::Matchers::WithinAbs(-0.0122699895740221, 1e-10));
     delete c2b;
+}
+
+/* Pins: f(0) and f(r_cut) of every cutoff are the values of the
+ * documentation's cutoff table (Tadah.MLIP docs, cutoffs.rst): 1 and 0 for
+ * the spatial tapers, tanh(1)^3 (about 0.442) and 0 for Cut_Tanh (the
+ * normalisation the UDM-006 correction documents), 1 and 0 for the
+ * normalised Cut_PT, and 0 and 1 for the inverse envelope Cut_SinInv. The
+ * correction changed the documentation, not the code: this pins the code to
+ * it (no test checked f(0) before). */
+TEST_CASE("Cutoff values at the origin and the radius are those of the "
+          "cutoff table",
+          "[cutoffs][unified-dm]") {
+  const double rc = 5.0;
+  const double tanh3 = std::pow(std::tanh(1.0), 3);
+  const struct { const char *name; double f0, frc; } table[] = {
+      {"Cut_Cos", 1, 0},   {"Cut_CosS", 1, 0}, {"Cut_Poly", 1, 0},
+      {"Cut_PolyS", 1, 0}, {"Cut_PT", 1, 0},   {"Cut_Tanh", tanh3, 0},
+      {"Cut_Dummy", 1, 0}, {"Cut_SinInv", 0, 1}};
+  for (const auto &row : table) {
+    CAPTURE(row.name);
+    double r = rc;
+    std::unique_ptr<Cut_Base> c(
+        tadah::core::factory<Cut_Base, double &>(row.name, r));
+    REQUIRE(c);
+    CHECK(c->calc(0.0) == Approx(row.f0).margin(1e-14));
+    CHECK(c->calc(rc) == Approx(row.frc).margin(1e-14));
+  }
 }

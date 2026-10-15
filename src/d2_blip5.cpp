@@ -328,13 +328,13 @@ std::optional<DescriptorMeta> D2_Blip5::meta() const {
   };
   dm.params.push_back(std::move(p_rcut));
 
-  // CGRID2B — vector: centre of i-th radial Gaussian.
+  // CGRID2B — vector: centre of the i-th radial blip.
   ParamMeta p_cgrid;
   p_cgrid.key      = "CGRID2B";
   p_cgrid.arg_pos  = 0;
   p_cgrid.scale    = Scale::Distance;
   p_cgrid.units    = "Å";
-  p_cgrid.role     = "Centre of the i-th radial Gaussian (CGRID2B[i]).";
+  p_cgrid.role     = "Centre of the i-th radial blip (CGRID2B[i]).";
   p_cgrid.hard.lo  = 0.0;
   p_cgrid.crit     = Criticality::Recommended;
   p_cgrid.scope    = PairScope::PerElementPair;
@@ -346,13 +346,14 @@ std::optional<DescriptorMeta> D2_Blip5::meta() const {
   };
   dm.params.push_back(std::move(p_cgrid));
 
-  // SGRID2B — vector: inverse Gaussian width.
+  // SGRID2B — vector: inverse width eta of the i-th blip, b(eta (r - c)).
   ParamMeta p_sgrid;
   p_sgrid.key      = "SGRID2B";
   p_sgrid.arg_pos  = 0;
   p_sgrid.scale    = Scale::InverseDistance;
   p_sgrid.units    = "Å^-1";
-  p_sgrid.role     = "Inverse Gaussian width of the i-th radial.";
+  p_sgrid.role     = "Inverse width eta of the i-th radial blip b(eta (r - c)), "
+                     "whose support is |r - c| < 2/eta.";
   // hard: SGRID2B = 0 makes the existing init() throw.
   p_sgrid.hard.lo  = 1.0e-6;
   p_sgrid.crit     = Criticality::Recommended;
@@ -362,11 +363,10 @@ std::optional<DescriptorMeta> D2_Blip5::meta() const {
     const auto& pp = d.per_pair[0];
     const double spread = pp.r_percentiles[I_P90] - pp.r_percentiles[I_P10];
     if (spread <= 0.0) return std::make_pair(0.1, 1.0);
-    // η ∈ [0.25 / spread^2 , 25 / spread^2] — the spread^2 anchor
-    // covers Gaussians from "broad enough to cover r_ij p10..p90" to
-    // "thermal-scale narrow".
-    return std::make_pair(0.25 / (spread * spread),
-                          25.0 / (spread * spread));
+    // eta in [1 / spread, 10 / spread] (inverse distance): the blip's
+    // support half-width 2/eta runs from 2 spread (broad enough to cover
+    // r_ij p10..p90) down to spread/5 (narrow).
+    return std::make_pair(1.0 / spread, 10.0 / spread);
   };
   dm.params.push_back(std::move(p_sgrid));
 

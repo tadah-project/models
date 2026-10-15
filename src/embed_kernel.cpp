@@ -299,6 +299,14 @@ EmbedJet EmbedEvaluator::envelope(double q) const {
   return out;
 }
 
+EmbedJet EmbedEvaluator::spatial_cutoff(double q) const {
+  EmbedJet out;
+  if (q >= spec_.radius)
+    return out;
+  out.value = cutoff_->calc(q);
+  out.deriv = cutoff_->calc_prime(q);
+  return out;
+}
 EmbedJet EmbedEvaluator::density(double q, char field,
                                  std::size_t index) const {
   return (this->*density_component_kernel_)(q, field, index);

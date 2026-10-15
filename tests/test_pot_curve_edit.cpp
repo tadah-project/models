@@ -1450,3 +1450,83 @@ TEST_CASE_METHOD(EditFixture,"Legacy curve edit evaluates configured smooth cuto
     }
   }
 }
+
+namespace {
+// The stacked residual remove_basis minimises and reports (resid_comp):
+// the value, first and second derivative of `after - before` on N = 512
+// points of the removed function's region [lo, hi], each order weighted by
+// the inverse RMS of the removed contribution `before - plain` in that
+// order, sqrt(sum / 3N). Here it is measured on the curves as evaluated
+// (CurveView::value/deriv/deriv2, which include the spatial cutoff).
+double stacked_residual(const CurveView &before, const CurveView &plain,
+                        const CurveView &after, double lo, double hi) {
+  constexpr int N = 512;
+  auto order = [](const CurveView &c, int m, double x) {
+    return m == 0 ? c.value(x) : m == 1 ? c.deriv(x) : c.deriv2(x);
+  };
+  double total = 0.0;
+  for (int m = 0; m < 3; ++m) {
+    double lost = 0.0, miss = 0.0;
+    for (int i = 0; i < N; ++i) {
+      const double x = lo + (hi - lo) * i / (N - 1);
+      const double t = order(before, m, x) - order(plain, m, x);
+      const double d = order(after, m, x) - order(before, m, x);
+      lost += t * t;
+      miss += d * d;
+    }
+    total += miss / (lost / N);
+  }
+  return std::sqrt(total / (3.0 * N));
+}
+}  // namespace
+
+/* Pins: under a smooth spatial cutoff (Cut_Poly) the removal compensation
+ * of a legacy pair or density curve minimises the residual of the tapered
+ * curve, f_c(r) sum c_k g_k(r), in value and both derivatives (product
+ * rule): its reported residual is that of the edited curve as evaluated,
+ * and it is smaller than the residual of the compensation solved for the
+ * untapered basis and then evaluated with the taper. Before the fix the
+ * compensation rows were the untapered g_k, g_k', g_k'': both solutions
+ * were the same and the reported residual was the untapered one. */
+TEST_CASE_METHOD(EditFixture,
+                 "Legacy curve removal compensates the tapered curve under a "
+                 "smooth cutoff",
+                 "[unified-dm][edit][cutoff]") {
+  auto c = make_blip_pot();
+  c.remove("RCTYPE2B");
+  c.remove("RCTYPEMB");
+  c.add("RCTYPE2B", "Cut_Poly");
+  c.add("RCTYPEMB", "Cut_Poly");
+  const PotEAMView view = parse_pot_view(c);
+  struct Case { const CurveView *curve; double centre; };
+  for (const Case &k : {Case{&view.phi, 4.2}, Case{&view.rho, 2.5}}) {
+    CAPTURE(k.centre);
+    const CurveView before = *k.curve;
+    REQUIRE(before.spatial_cutoff);
+    std::size_t r = 0;
+    while (before.mu[r] != k.centre) ++r;
+    CurveView plain = before;
+    plain.mu.erase(plain.mu.begin() + r);
+    plain.coeff.erase(plain.coeff.begin() + r);
+    plain.eta.erase(plain.eta.begin() + r);
+    const auto s = before.support(r);
+    const double lo = std::max(s.first, kCompensationRLoFrac * before.rcut);
+    const double hi = std::min(s.second, before.rcut);
+
+    CurveView tapered = before;
+    const RemoveReport rep = remove_basis(tapered, k.centre, true);
+    REQUIRE(rep.compensated);
+
+    CurveView untapered = before;
+    untapered.spatial_cutoff.reset();
+    REQUIRE(remove_basis(untapered, k.centre, true).compensated);
+    CurveView transplanted = tapered;
+    transplanted.coeff = untapered.coeff;
+
+    const double own = stacked_residual(before, plain, tapered, lo, hi);
+    const double other = stacked_residual(before, plain, transplanted, lo, hi);
+    CAPTURE(own, other, rep.resid_comp);
+    REQUIRE(rep.resid_comp == Approx(own).epsilon(1e-9));
+    REQUIRE(own < (1.0 - 1e-6) * other);
+  }
+}

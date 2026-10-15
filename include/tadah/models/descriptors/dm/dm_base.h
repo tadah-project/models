@@ -168,6 +168,14 @@ public:
   virtual std::size_t component_basis_size(const std::string &) const { return 0; }
   virtual bool component_basis_curve(const std::string &,std::size_t,double,
                                      bool,double &,double &) const { return false; }
+  /** The spatial cutoff f_c(q) and f_c'(q) the functions of a component
+   *  channel ("DENSITY") are tapered with, as component_basis_curve()
+   *  applies it with its cutoff flag (0 beyond the cutoff radius). False:
+   *  the channel has no spatial cutoff (an embedding, whose argument is a
+   *  density) or the descriptor no component channels; fc and dfc are then
+   *  untouched. `tadah analysis bfunc --type MB Y` prints it. */
+  virtual bool component_cutoff(const std::string &,double,double &,
+                                double &) const { return false; }
   virtual void eam_density(const int /*Zi*/, const int /*Zj*/,
                            const double /*rij*/,
                            double &rho, double &rhop) const {
@@ -243,9 +251,11 @@ public:
     return false;
   }
 
-  /** Back-compat string-keyed shim. Decodes once and dispatches to the
-   *  enum-keyed virtual above. NOT virtual — derived classes override
-   *  the enum form. Layer-1 tests still call this signature. */
+  /** String-keyed form, the one the dPhi/dtheta walker calls. Decodes the
+   *  legacy key once and dispatches to the enum-keyed virtual above, which
+   *  the legacy descriptors override. A descriptor whose parameters are
+   *  named component paths (DM_Embed) or that routes them to its children
+   *  (DM_mJoin) overrides this form. */
   virtual bool calc_drhoi_dtheta(
       const std::string& theta_name,
       int                arg_pos,
@@ -291,7 +301,8 @@ public:
     return false;
   }
 
-  /** Back-compat string-keyed shim — decodes once, calls enum virtual. */
+  /** String-keyed form (see calc_drhoi_dtheta): decodes once, calls the
+   *  enum virtual. */
   virtual bool calc_daed_dtheta(
       const std::string& theta_name,
       int                arg_pos,
@@ -357,7 +368,8 @@ public:
     return false;
   }
 
-  /** Back-compat string-keyed shim — decodes once, calls enum virtual. */
+  /** String-keyed form (see calc_drhoi_dtheta): decodes once, calls the
+   *  enum virtual. */
   virtual bool calc_dXijdri_dtheta(
       const std::string& theta_name,
       int                arg_pos,

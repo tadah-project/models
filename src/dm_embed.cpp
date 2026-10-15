@@ -74,6 +74,15 @@ bool DM_Embed::component_basis_curve(const std::string &channel, std::size_t i,
   deriv = j.deriv;
   return true;
 }
+bool DM_Embed::component_cutoff(const std::string &channel, double q,
+                                double &fc, double &dfc) const {
+  if (core::to_upper(channel) != "DENSITY")
+    return false;
+  const auto j = evaluator_->spatial_cutoff(q);
+  fc = j.value;
+  dfc = j.deriv;
+  return true;
+}
 void DM_Embed::init_rhoi(core::rho_type &rho) {
   rho.resize(rhoisize + rhoipsize);
   rho.set_zero();

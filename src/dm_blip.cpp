@@ -563,13 +563,13 @@ std::optional<DescriptorMeta> DM_Blip::meta() const {
   };
   dm.params.push_back(std::move(p_rcut));
 
-  // CGRIDMB — vector: i-th radial Gaussian centre.
+  // CGRIDMB — vector: centre of the i-th radial blip.
   ParamMeta p_cgrid;
   p_cgrid.key      = "CGRIDMB";
   p_cgrid.arg_pos  = 0;
   p_cgrid.scale    = Scale::Distance;
   p_cgrid.units    = "Å";
-  p_cgrid.role     = "Centre of the i-th MB radial Gaussian. "
+  p_cgrid.role     = "Centre of the i-th MB radial blip. "
                      "Must lie within the dataset r_ij range or ρ collapses.";
   p_cgrid.hard.lo  = 0.0;
   p_cgrid.crit     = Criticality::Critical;
@@ -602,13 +602,14 @@ std::optional<DescriptorMeta> DM_Blip::meta() const {
   };
   dm.params.push_back(std::move(p_cgrid));
 
-  // SGRIDMB — vector: inverse Gaussian width.
+  // SGRIDMB — vector: inverse width eta of the i-th blip, b(eta (r - c)).
   ParamMeta p_sgrid;
   p_sgrid.key      = "SGRIDMB";
   p_sgrid.arg_pos  = 0;
   p_sgrid.scale    = Scale::InverseDistance;
   p_sgrid.units    = "Å^-1";
-  p_sgrid.role     = "Inverse width of the i-th MB radial Gaussian.";
+  p_sgrid.role     = "Inverse width eta of the i-th MB radial blip "
+                     "b(eta (r - c)), whose support is |r - c| < 2/eta.";
   p_sgrid.hard.lo  = 1.0e-6;
   p_sgrid.crit     = Criticality::Critical;
   p_sgrid.scope    = PairScope::Global;
@@ -618,8 +619,9 @@ std::optional<DescriptorMeta> DM_Blip::meta() const {
     double w = pp.r_percentiles[I_P90] - pp.r_percentiles[I_P10];
     if (!pp.r_peaks.empty()) w = pp.r_peaks[0].fwhm;
     if (!(w > 0.0)) return std::make_pair(0.1, 1.0);
-    return std::make_pair(0.25 / (w * w),
-                          9.0  / (w * w));
+    // eta in [1 / w, 6 / w] (inverse distance): the blip's support
+    // half-width 2/eta runs from 2 w down to w/3 of the first peak's width.
+    return std::make_pair(1.0 / w, 6.0 / w);
   };
   dm.params.push_back(std::move(p_sgrid));
 

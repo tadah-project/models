@@ -34,6 +34,8 @@ public:
   std::size_t component_basis_size(const std::string &) const override;
   bool component_basis_curve(const std::string &, std::size_t, double, bool,
                              double &, double &) const override;
+  bool component_cutoff(const std::string &, double, double &,
+                        double &) const override;
   void eam_density(int, int, double, double &, double &) const override;
   void eam_embed(const core::t_type &, double, double &,
                  double &) const override;
