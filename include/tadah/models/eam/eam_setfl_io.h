@@ -136,13 +136,15 @@ public:
   EAMGrid input_grid() const { return EAMGrid{nrho_, drho_, nr_, dr_, rcut_}; }
 
   /** Build an output grid scaled relative to the input grid: nr * scale and
-   *  nrho * scale points, rounded, over the same spans (n - 1) * d -- the r
-   *  span unless that leaves rcut more than one of the new steps past the
-   *  new last point (an input whose cutoff is one step past its last point,
-   *  rcut = nr * dr, scaled up): then dr = rcut / nr, so the grid reaches
-   *  the cutoff as read_setfl() requires. `scale > 1` densifies (more
-   *  points, finer spacing); `scale == 1` reproduces the input grid. rcut is
-   *  preserved. Throws std::invalid_argument for a
+   *  nrho * scale points, rounded, over the same spans (n - 1) * d. A count
+   *  equal to the input's keeps the input's step, so `scale == 1`, and any
+   *  scale whose counts round to the input's, reproduces the input grid bit
+   *  for bit (input_grid()). A new r count keeps the r span unless that
+   *  leaves rcut more than one of the new steps past the new last point (an
+   *  input whose cutoff is one step past its last point, rcut = nr * dr,
+   *  scaled up): then dr = rcut / nr, so the grid reaches the cutoff as
+   *  read_setfl() requires. `scale > 1` densifies (more points, finer
+   *  spacing). rcut is preserved. Throws std::invalid_argument for a
    *  scale that is not a positive finite number, or whose counts fall
    *  below 3 (the spline fitted through a setfl table reads its third
    *  point) or above 2147483647, naming the scale and both counts. */

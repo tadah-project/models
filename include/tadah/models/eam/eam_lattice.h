@@ -70,10 +70,12 @@ inline double reach_distance(const std::string &lattice, double a0,
 
 /** The crystal gate of `tadah refit`: require_crystal(); the crystal of
  *  the header, at a0, must have its nearest neighbours below the table's
- *  cutoff \p rcut (nn_distance() < rcut: LAMMPS and tadah count a pair
- *  only below rcut, so a crystal whose nearest neighbours are at or beyond
- *  it has no interaction -- a lattice constant written in picometres
- *  rather than Angstrom, for one); and the crystal at the strongest
+ *  cutoff \p rcut (nn_distance() < rcut: LAMMPS, pair_style eam/alloy,
+ *  counts a pair only below rcut, so in LAMMPS a crystal whose nearest
+ *  neighbours are at or beyond it has no interaction -- a lattice constant
+ *  written in picometres rather than Angstrom, for one; tadah's own
+ *  neighbour_distances() and D2_EAM/DM_EAM keep a pair at exactly rcut);
+ *  and the crystal at the strongest
  *  compression the refit tests, a/a0 = \p reach_smin (REFIT_REACH_SMIN:
  *  the self-test's E-V scan and the reachability sweep start there), must
  *  have its nearest neighbours at least the step \p dr of the table's
@@ -98,7 +100,8 @@ inline void require_crystal_on_grid(const std::string &lattice, double a0,
         core::format_roundtrip(a0) + " A, puts the nearest neighbours of the " +
         l + " crystal " + core::format_roundtrip(nn) + " A apart, at or "
         "beyond the table's cutoff, rcut = " + core::format_roundtrip(rcut) +
-        " A: the crystal has no pair within the cutoff. Edit the element "
+        " A, and LAMMPS (pair_style eam/alloy) counts a pair only below "
+        "rcut: the crystal has no interaction in LAMMPS. Edit the element "
         "line of the setfl file (`<Z> <mass> <a0> <lattice>`): set the "
         "equilibrium lattice constant, in Angstrom (a value in picometres "
         "is 100 times the value in Angstrom).");
@@ -116,8 +119,10 @@ inline void require_crystal_on_grid(const std::string &lattice, double a0,
       "equilibrium lattice constant, in Angstrom.");
 }
 
-/** All neighbour distances (one central atom) within \p rcut for lattice
- *  constant \p a. Unknown lattice falls back to bcc (caller should report).
+/** All neighbour distances (one central atom) up to \p rcut, d <= rcut (a
+ *  shell at exactly rcut included, as D2_EAM and DM_EAM count it), for
+ *  lattice constant \p a. Unknown lattice falls back to bcc (caller should
+ *  report).
  *  The lattice points of a cube of ceil(rcut / e) + 1 cells each way (e the
  *  cell's shortest edge: a for bcc and fcc) are visited with an int index:
  *  rcut / e must be finite and at most 2147483645 (INT_MAX - 2), else

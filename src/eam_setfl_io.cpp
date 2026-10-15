@@ -527,16 +527,26 @@ EAMGrid EAMSetflIO::scaled_grid(double scale) const {
   EAMGrid g;
   g.nr   = static_cast<int>(nr);
   g.nrho = static_cast<int>(nrho);
-  // Preserve the physical spans (nr-1)*dr and (nrho-1)*drho -- the r span
-  // unless that leaves rcut more than one of the new steps past the new
-  // last point (an input whose cutoff is one step past its last point,
-  // rcut = nr x dr, on a finer grid): then the cutoff is one step past it,
-  // as in the input, dr = rcut / nr, so the written table reaches the cutoff
-  // as read_setfl_text requires.
-  g.dr   = dr_   * static_cast<double>(nr_ - 1)   / static_cast<double>(g.nr - 1);
-  if (static_cast<double>(g.nr) * g.dr < rcut_)
-    g.dr = rcut_ / static_cast<double>(g.nr);
-  g.drho = drho_ * static_cast<double>(nrho_ - 1) / static_cast<double>(g.nrho - 1);
+  // Preserve the physical spans (nr-1)*dr and (nrho-1)*drho. A count equal
+  // to the input's keeps the input's step itself (d * (n-1) / (n-1) need
+  // not be d in double), so a scale whose counts round to the input's gives
+  // the input grid. A new r count keeps the span unless that leaves rcut
+  // more than one of the new steps past the new last point (an input whose
+  // cutoff is one step past its last point, rcut = nr x dr, on a finer
+  // grid): then the cutoff is one step past it, as in the input, dr =
+  // rcut / nr, so the written table reaches the cutoff as read_setfl_text
+  // requires.
+  if (g.nr == nr_) {
+    g.dr = dr_;
+  } else {
+    g.dr = dr_ * static_cast<double>(nr_ - 1) / static_cast<double>(g.nr - 1);
+    if (static_cast<double>(g.nr) * g.dr < rcut_)
+      g.dr = rcut_ / static_cast<double>(g.nr);
+  }
+  g.drho = g.nrho == nrho_
+               ? drho_
+               : drho_ * static_cast<double>(nrho_ - 1) /
+                     static_cast<double>(g.nrho - 1);
   g.rcut = rcut_;
   return g;
 }
