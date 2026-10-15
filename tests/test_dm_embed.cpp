@@ -117,8 +117,10 @@ TEST_CASE("DM_Embed Wendland values derivatives and integrated tails have indepe
 TEST_CASE("DM_Embed named derivatives include width Jacobians zero references and force chains",
           "[unified-dm][derivatives]") {
   for(const auto &family:{"Blip","Blip5","Gaussian","Knot5","WendlandC2","WendlandC4"})
-    for(const auto &env:{"OFF","SinInv","Smoothstep2","Smoothstep4"}) {
-      auto c=embed_config(family,family,"NONNEG","Cut_Poly",env,true);
+    for(const auto &env:{"OFF","SinInv","Smoothstep2","Smoothstep4"})
+    for(const auto &form:{"NONNEG","MONOTONE"}) {
+      if(std::string(family)=="Knot5" && std::string(form)=="MONOTONE")continue;
+      auto c=embed_config(family,family,form,"Cut_Poly",env,true);
       DC_Selector s(c); const double r=1.37,h=2e-6;
       for(const auto &binding:embed_bindings(c)) {
         CAPTURE(family,env,binding.path);
