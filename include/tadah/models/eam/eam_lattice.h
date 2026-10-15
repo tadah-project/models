@@ -73,10 +73,10 @@ inline double reach_distance(const std::string &lattice, double a0,
  *  start there), must have its nearest neighbours at least the step \p dr
  *  of the table's radial grid apart (reach_distance() >= dr). Closer, the
  *  table, tabulated at r = 0, dr, 2 dr, ..., describes no pair distance of
- *  that crystal: a lattice constant in the wrong unit or a subnormal one
- *  (whose distance underflows to 0, and whose neighbour count does not fit
- *  the enumeration's int). So EAMRefit::r_reach() >= dr > 0 for every
- *  table it passes. Case-insensitive like require_crystal; throws
+ *  that crystal: a lattice constant written in metres rather than
+ *  Angstrom, or a subnormal one (whose distance underflows to 0, and whose
+ *  neighbour count does not fit the enumeration's int). So
+ *  EAMRefit::r_reach() >= dr > 0 for every table it passes. Case-insensitive like require_crystal; throws
  *  std::runtime_error naming a0, the lattice, the distance,
  *  REFIT_REACH_SMIN and dr (each as the shortest text that reads back to
  *  it). */
