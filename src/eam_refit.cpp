@@ -376,8 +376,7 @@ void EAMRefit::analyze_reachability() {
   const double a0 = eam_.lattice_param();
   r_reach_ = 0.0; rho_reach_ = 0.0;
   if (a0 > 0.0) {
-    const double r1nn = eam_lattice::nn_distance(lat, a0);
-    r_reach_ = cfg_.reach_smin * r1nn;
+    r_reach_ = eam_lattice::reach_distance(lat, a0, cfg_.reach_smin);
     // densest reachable embedding density over the compression sweep
     const auto dists = eam_lattice::neighbour_distances(
         lat, a0, rcut_ / std::max(cfg_.reach_smin, 0.1));
