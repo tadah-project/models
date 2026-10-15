@@ -2,8 +2,10 @@
 #include <tadah/models/eam/eam_setfl_io.h>
 #include <cmath>
 #include <cstdio>
+#include <sstream>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -568,4 +570,200 @@ TEST_CASE("EAMSetflIO refuses a malformed setfl file, naming the file, the "
   lines = setfl3_lines();
   lines.push_back("this line is not read");
   CHECK(setfl_refusal(joined(lines)) == "no exception");
+}
+
+// ---- the r tables reach the cutoff -----------------------------------------
+
+namespace {
+
+// A single-element setfl text with the grid line `grid` (nrho drho nr dr
+// rcut) and tables of nrho and nr zeros, one value per line.
+std::string zero_setfl(const std::string &grid, int nrho, int nr) {
+  std::ostringstream os;
+  os << "comment 1\ncomment 2\ncomment 3\n1 Ta\n" << grid
+     << "\n73 180.95 3.304 bcc\n";
+  for (int i = 0; i < nrho; ++i) os << "0\n";
+  for (int t = 0; t < 2; ++t)
+    for (int i = 0; i < nr; ++i) os << "0\n";
+  return os.str();
+}
+
+}  // namespace
+
+TEST_CASE("EAMSetflIO refuses a grid whose r tables end more than one step "
+          "before the cutoff, or whose index at the cutoff is no int",
+          "[eam][setfl_read]") {
+  /* Pins: LAMMPS (pair_style eam/alloy, PairEAM::compute) and tadah
+   * (EAMSetflIO::eval_value, D2_EAM, DM_EAM) evaluate a distance r below
+   * rcut at the spline index p = r / dr + 1, converted to int and clamped
+   * to the table's last interval: a table holds r = 0, dr, ...,
+   * (nr - 1) dr, and every r past its last point takes its last value.
+   * read_setfl_text refuses, at the grid line and before the tables:
+   *  - r tables whose last point is more than one step before rcut,
+   *    nr x dr < rcut x (1 - 1e-4) (the setfl files that put the cutoff
+   *    one step past the last point, rcut = nr x dr, are read; 1e-4 of
+   *    rcut absorbs the rounding of the decimals): "... line 5: the r
+   *    tables do not reach the cutoff: nr = 3 points dr = 0.5 apart end at
+   *    r = (nr - 1) x dr = 1, and rcut = 2 lies more than one step past
+   *    their last point (nr x dr = 1.5); LAMMPS (pair_style eam/alloy) and
+   *    tadah would take each table's last value for every r from 1 to 2.
+   *    Correct nr, dr or rcut on the grid line ('nrho drho nr dr rcut')."
+   *    -- dr = 1e-300 with rcut 2 likewise;
+   *  - rcut / dr above 2147483647, where p is past an int for r near rcut
+   *    (a grid that passes the first rule only with nr near INT_MAX).
+   * Pins of files that are read: the cutoff one step past the last point
+   * (rcut = nr x dr), at the end of the tables, before it (the tables
+   * reach past rcut), within 1e-4 of rcut past the one step (3.0003 for
+   * nr x dr = 3; 3.0004 is refused), and the grids of real potentials: a
+   * Mendelev eam.fs (10000 x 5.3e-4, rcut 5.3), Zhou's Al (10001 points,
+   * rcut = nr x dr in the decimals), NiO.eam.fs, whose nr x dr is 8.9e-16
+   * below rcut in double.
+   * Before the fix: every one of these files was read, so the refusals
+   * fail ("no exception"): the dr = 1e-300 file then evaluated every r > 0
+   * at an index past int (undefined; tadah refit of it wrote a potential,
+   * tmp/rg_probe/drtiny). */
+  const std::string at = "EAMSetflIO: setfl file 'bad.alloy', line 5: ";
+  const auto with_grid = [](const std::string &grid) {
+    std::vector<std::string> lines = setfl3_lines();
+    lines[4] = grid;
+    return joined(lines);
+  };
+  CHECK(setfl_refusal(with_grid("3 0.5 3 0.5 2.0")) ==
+        at + "the r tables do not reach the cutoff: nr = 3 points dr = 0.5 "
+             "apart end at r = (nr - 1) x dr = 1, and rcut = 2 lies more "
+             "than one step past their last point (nr x dr = 1.5); LAMMPS "
+             "(pair_style eam/alloy) and tadah would take each table's last "
+             "value for every r from 1 to 2. Correct nr, dr or rcut on the "
+             "grid line ('nrho drho nr dr rcut').");
+  CHECK(setfl_refusal(with_grid("3 0.5 3 1e-300 2.0")) ==
+        at + "the r tables do not reach the cutoff: nr = 3 points dr = "
+             "1e-300 apart end at r = (nr - 1) x dr = 2e-300, and rcut = 2 "
+             "lies more than one step past their last point (nr x dr = "
+             "3e-300); LAMMPS (pair_style eam/alloy) and tadah would take "
+             "each table's last value for every r from 2e-300 to 2. Correct "
+             "nr, dr or rcut on the grid line ('nrho drho nr dr rcut').");
+  CHECK(setfl_refusal(with_grid("3 0.5 3 1.0 3.0004")) ==
+        at + "the r tables do not reach the cutoff: nr = 3 points dr = 1 "
+             "apart end at r = (nr - 1) x dr = 2, and rcut = 3.0004 lies "
+             "more than one step past their last point (nr x dr = 3); "
+             "LAMMPS (pair_style eam/alloy) and tadah would take each "
+             "table's last value for every r from 2 to 3.0004. Correct nr, "
+             "dr or rcut on the grid line ('nrho drho nr dr rcut').");
+  CHECK(setfl_refusal(with_grid("3 0.5 2147483647 1.0 2147483647.5")) ==
+        at + "rcut / dr = 2.1474836475e+09 is above 2147483647: the spline "
+             "index of a distance r below rcut, r / dr + 1, which LAMMPS "
+             "(pair_style eam/alloy) and tadah compute as an int, would not "
+             "fit one. Correct nr, dr or rcut on the grid line ('nrho drho "
+             "nr dr rcut').");
+
+  // read: the cutoff one step past the last point, at it, before it
+  for (const std::string grid :
+       {"3 0.5 3 1.0 3.0", "3 0.5 3 1.0 2.0", "3 0.5 3 1.0 1.5",
+        "3 0.5 3 1.0 3.0003"}) {
+    INFO("grid " << grid);
+    CHECK(setfl_refusal(with_grid(grid)) == "no exception");
+  }
+  // the grids of real potentials
+  REQUIRE(10000 * 6e-4 < 6.0);
+  for (const auto &[grid, nrho, nr] :
+       std::vector<std::tuple<std::string, int, int>>{
+           {"10000 3.00000000000000E-0002 10000 5.30000000000000E-0004 "
+            "5.30000000000000E+0000", 10000, 10000},
+           {"10001 0.00559521603477821424 10001 0.00101014898510148996 "
+            "10.10250000000000092371", 10001, 10001},
+           {"10000 2.00000000000000E-0002 10000 6.00000000000000E-0004 "
+            "6.00000000000000E+0000", 10000, 10000}}) {
+    INFO("grid " << grid);
+    EAMSetflIO io;
+    CHECK_NOTHROW(io.read_setfl_text(zero_setfl(grid, nrho, nr), "real"));
+  }
+}
+
+TEST_CASE("EAMSetflIO::scaled_grid keeps the cutoff within one step of its "
+          "last point",
+          "[eam][setfl_read]") {
+  /* Pins: scaled_grid (tadah refit's OUTPUT_GRID_SCALE grid) keeps the
+   * span (nr - 1) x dr unless that leaves rcut more than one of the new
+   * steps past the last point; then its dr is rcut / nr, the cutoff one
+   * step past the last point, as in the input. For a table whose cutoff is
+   * one step past its last point (nr 5000, dr 1e-3, rcut 5 = nr x dr):
+   * scale 4 gives nr 20000 and dr 5 / 20000, scale 0.5 keeps the span
+   * (dr = 4.999 / 2499, whose nr x dr is past rcut); the refit.eam of
+   * either grid is read back. A table that reaches rcut keeps its span at
+   * every scale (the fixture of the test above it).
+   * Before the fix: the span was kept at every scale, so at scale 4 the
+   * new table ended 4 of its steps before rcut (nr x dr = 4.99925): the
+   * dr and nr x dr checks fail, and the refit.eam of that grid is one the
+   * setfl reader refuses. */
+  EAMSetflIO io;
+  io.read_setfl_text(zero_setfl("5000 0.01 5000 0.001 5.0", 5000, 5000),
+                     "onestep.alloy");
+  REQUIRE(io.nr() * io.dr() >= io.rcut());
+  io.build_splines();
+
+  const EAMGrid g4 = io.scaled_grid(4.0);
+  CHECK(g4.nr == 20000);
+  CHECK(g4.dr == 5.0 / 20000);
+  CHECK(g4.nr * g4.dr >= g4.rcut * (1.0 - 1e-4));
+  CHECK(g4.rcut == 5.0);
+  const EAMGrid g05 = io.scaled_grid(0.5);
+  CHECK(g05.nr == 2500);
+  CHECK(g05.dr == io.dr() * (io.nr() - 1) / (g05.nr - 1));
+
+  for (const EAMGrid &g : {g4, g05}) {
+    INFO("nr " << g.nr);
+    const std::string out = "tests_data_eam_scaled_onestep.alloy";
+    io.write_setfl(out, g, [](double) { return 0.0; },
+                   [](double) { return 0.0; }, [](double) { return 0.0; });
+    EAMSetflIO back;
+    CHECK_NOTHROW(back.read_setfl(out));
+    std::remove(out.c_str());
+  }
+}
+
+TEST_CASE("EAMSetflIO::scaled_grid reproduces the input grid when the "
+          "point counts do not change",
+          "[eam][setfl_read]") {
+  /* Pins: a scale whose rounded counts are the input's (1, and 1.1 for 3
+   * points) gives the input grid itself, bit for bit (input_grid()): the
+   * same count over the same span is the same step. For a grid that the
+   * reader accepts within its 1e-4 of rcut ("3 0.5 3 1.0 3.0003", nr x dr
+   * = 3 below rcut 3.0003) dr stays 1; for "4 0.7 4 0.1 0.4", where
+   * 0.1 x 3 / 3 and 0.7 x 3 / 3 are not 0.1 and 0.7 in double, dr and drho
+   * stay 0.1 and 0.7.
+   * Before the fix: scaled_grid recomputed the step from the span,
+   * d x (n - 1) / (n - 1), and moved the r grid's end to rcut whenever
+   * nr x dr fell below rcut: the first grid came back with dr = 1.0001
+   * (rcut / nr), the second with dr = 0.10000000000000002 and drho =
+   * 0.6999999999999998, so the dr and drho checks fail. */
+  const auto same_grid = [](const EAMGrid &a, const EAMGrid &b) {
+    CHECK(a.nrho == b.nrho);
+    CHECK(a.drho == b.drho);
+    CHECK(a.nr == b.nr);
+    CHECK(a.dr == b.dr);
+    CHECK(a.rcut == b.rcut);
+  };
+  {
+    std::vector<std::string> lines = setfl3_lines();
+    lines[4] = "3 0.5 3 1.0 3.0003";
+    EAMSetflIO io;
+    io.read_setfl_text(joined(lines), "tolerated.alloy");
+    REQUIRE(io.nr() * io.dr() < io.rcut());
+    for (const double scale : {1.0, 1.1}) {
+      INFO("scale " << scale);
+      const EAMGrid g = io.scaled_grid(scale);
+      same_grid(g, io.input_grid());
+      CHECK(g.dr == 1.0);
+    }
+  }
+  {
+    REQUIRE(0.1 * 3 / 3 != 0.1);
+    REQUIRE(0.7 * 3 / 3 != 0.7);
+    EAMSetflIO io;
+    io.read_setfl_text(zero_setfl("4 0.7 4 0.1 0.4", 4, 4), "steps.alloy");
+    const EAMGrid g = io.scaled_grid(1.0);
+    same_grid(g, io.input_grid());
+    CHECK(g.dr == 0.1);
+    CHECK(g.drho == 0.7);
+  }
 }
