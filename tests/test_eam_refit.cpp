@@ -7,6 +7,7 @@
 #include <tadah/models/descriptors/dm/dm_ream.h>
 #include <tadah/models/descriptors/dm/embf0.h>
 #include <tadah/models/descriptors/dm/rhoform.h>
+#include <tadah/models/dc_selector.h>
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -24,6 +25,17 @@
 #include <unistd.h>
 
 using namespace tadah::models;
+
+TEST_CASE("Refit evaluator agrees with saved smooth cutoff density", "[unified-dm][refit][cutoff]") {
+  tadah::core::PeriodicTable::initialize();
+  EAMSetflIO eam;eam.read_setfl("tests_data/eam.alloy");eam.build_splines();
+  EAMRefitConfig cfg;cfg.rctype="Cut_Cos";cfg.n2b=8;cfg.nrho=8;cfg.nF=12;
+  EAMRefit fit(eam,cfg);fit.fit();auto c=fit.build_pot_context();DC_Selector selector(c);
+  for(double r:{1.4,2.7,4.2}) {
+    double rho,d;selector.dmb->eam_density(73,73,r,rho,d);
+    REQUIRE(rho==Approx(fit.rho_fit(r)).margin(1e-13));
+  }
+}
 
 namespace {
 struct RefitFixture { RefitFixture() { tadah::core::PeriodicTable::initialize(); } };

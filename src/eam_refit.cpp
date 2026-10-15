@@ -25,9 +25,15 @@ EAMRefit::EAMRefit(const EAMSetflIO &eam, const EAMRefitConfig &cfg)
   // Knot3/KnotMix/Mixed/M6 aliases). The Knot5 family's per-atom degree arrays
   // then select cubic vs quintic knot atoms.
   family_ = basis_kind_from_string(cfg.basis);
+  if(cfg_.component) {
+    cfg_.rho_form=cfg_.component->form;
+    cfg_.embf0_zero=cfg_.component->reference==EmbF0Mode::Zero;
+    component_evaluator_=std::make_unique<EmbedEvaluator>(*cfg_.component);
+  }
   rcut_   = eam_.rcut();
   r_lo_   = std::max(cfg_.r_lo_frac * rcut_, eam_.dr());
   rhomax_ = eam_.rhomax();
+  spatial_cutoff_.reset(core::factory<Cut_Base,double&>(cfg_.rctype,rcut_));
   rho_join_ = rhomax_;  // dense default: F_setfl == F_fit on the table range
   if (cfg_.embf0_zero) {
     // EMBF0 ZERO: the table's F(0), removed from every absolute use of the
@@ -38,7 +44,7 @@ EAMRefit::EAMRefit(const EAMSetflIO &eam, const EAMRefitConfig &cfg)
           "EAMSetflIO::build_splines() before constructing EAMRefit.");
     F0tab_ = eam_.F_tab(0.0);
   }
-  if (cfg_.rho_form == RhoForm::Monotone) {
+  if (!cfg_.component && cfg_.rho_form == RhoForm::Monotone) {
     // MONOTONE fits integrated-bump steps: the bump families only, under a
     // cutoff that keeps rho non-increasing (the checks DM_REAM applies when
     // it loads the written potential, made before any fitting work).
@@ -63,7 +69,7 @@ double EAMRefit::F_ref(double rho) const {
 // Hard cutoff (Cut_Dummy): f_c=1 inside r_cut, 0 beyond — matches LAMMPS
 // eam/alloy so the native fit reproduces the original tabulated potential.
 double EAMRefit::cutoff(double r) const {
-  return (r <= rcut_) ? 1.0 : 0.0;
+  return r<=rcut_?spatial_cutoff_->calc(r):0;
 }
 
 double EAMRefit::basisval(double x, double center, double width,
@@ -463,6 +469,8 @@ void EAMRefit::fit() {
   phi_stats_ = lsq_fit_windowed(xr, yphi, rwin_lo, rcut_, cgrid2b_, sgrid2b_,
                                 true, c2b_, false, 0.0, 0.0);
 
+  if(cfg_.component) { fit_components(rwin_lo); return; }
+
   // ---- 2. density rho(r) -> baked coefficients ----
   if (adaptive) make_grid_windowed(r_lo_, rcut_, cfg_.nrho, rwin_lo, rcut_,
                                    crho_, srho_, true);
@@ -541,6 +549,7 @@ double EAMRefit::rho_term(double r, std::size_t n) const {
 // outside the sum): for r < rcut, where both cutoffs are 1, this is the pair
 // density of the written potential, including under MONOTONE.
 double EAMRefit::rho_fit(double r) const {
+  if(component_evaluator_) return component_evaluator_->density(r).value;
   const double fc = cutoff(r);
   if (fc == 0.0) return 0.0;
   double acc = 0.0;
@@ -596,6 +605,11 @@ void EAMRefit::check_rho_table(double win_lo) const {
 }
 
 double EAMRefit::F_fit(double rho) const {
+  if(component_evaluator_) {
+    double out=0;
+    for(std::size_t i=0;i<cmb_.size();++i) out+=cmb_[i]*component_evaluator_->embedding(i,rho).value;
+    return out;
+  }
   if (cfg_.embf0_zero) {
     // EMBF0 ZERO: F(rho) = sum_m c_m (g_m(rho) - g_m(0)), as DM_REAM; exactly
     // 0.0 at rho == 0 whatever the FP contraction.
@@ -826,7 +840,86 @@ tadah::core::Context EAMRefit::build_pot_context() const {
     for (double v : weights_) c.add("FIXWEIGHT", v);
   }
 
+  if(cfg_.component || cfg_.unified_output) {
+    EmbedSpec spec;
+    if(cfg_.component) spec=*cfg_.component;
+    else {
+      spec.id="eam"; spec.pairs={el,el};
+      spec.density.basis=embed_basis_from_name(basis_name(family_));
+      spec.embedding.basis=spec.density.basis;
+      spec.density.centres=crho_; spec.density.scales=srho_;
+      spec.density.amplitudes=arho_; spec.density.degrees=degrho_;
+      spec.embedding.centres=cF_; spec.embedding.scales=sF_; spec.embedding.degrees=degF_;
+      if(family_==BasisKind::Knot5) {
+        spec.density.scales.clear();spec.embedding.scales.clear();
+        if(spec.density.degrees.empty()) spec.density.degrees.assign(crho_.size(),5);
+        if(spec.embedding.degrees.empty()) spec.embedding.degrees.assign(cF_.size(),5);
+      }
+      spec.form=cfg_.rho_form; spec.reference=cfg_.embf0_zero?EmbF0Mode::Zero:EmbF0Mode::Free;
+      spec.cutoff=cfg_.rctype=="Cut_Dummy"?"NONE":cfg_.rctype;
+      spec.radius=c.get<double>("RCUTMB");
+    }
+    for(const char *key:{"TYPEMB","RCUTMB","RCTYPEMB","CGRIDMB","SGRIDMB","AMPGRIDMB","CEMBFUNC","SEMBFUNC","KDEGMB","KDEGEMB","RHOFORM","EMBF0"}) c.remove(key);
+    c.append_block(embed_block(spec)); resolve_embed_blocks(c);
+  }
   return c;
+}
+
+void EAMRefit::fit_components(double rwin_lo) {
+  auto spec=*cfg_.component;
+  const auto nr=static_cast<std::size_t>(std::max(2048,cfg_.oversample*static_cast<int>(spec.density.centres.size())));
+  const auto nf=static_cast<std::size_t>(std::max(2048,cfg_.oversample*static_cast<int>(spec.embedding.centres.size())));
+  auto solve=[&](std::size_t rows,std::size_t cols,auto column,auto target,bool positive,double lo,double hi,core::v_type &coef) {
+    core::phi_type phi(rows+cols,cols);phi.set_zero();
+    core::t_type y(rows+cols);y.set_zero();
+    std::vector<double> a(rows*cols),b(rows);
+    for(std::size_t i=0;i<rows;++i) {
+      double q=lo+(hi-lo)*i/(rows-1); y(i)=b[i]=target(q);
+      for(std::size_t j=0;j<cols;++j) phi(i,j)=a[j*rows+i]=column(j,q);
+    }
+    coef.assign(cols,0);
+    if(positive) {
+      auto result=nnls(a.data(),rows,cols,b.data(),coef.data(),nullptr,nullptr,cfg_.lambda);
+      if(!result.converged) core::Logger::instance().log(core::LogLevel::WARNING,
+        "DM_Embed density NNLS: ",nnls_stop_text(result.stop),"; fit statistics report the resulting residual");
+    } else {
+      core::Context context;context.add("OALGO",1);context.add("LAMBDA",cfg_.lambda);
+      core::t_type w;core::Matrix sigma;LinearRegressor::train(context,phi,y,w,sigma);
+      for(std::size_t j=0;j<cols;++j) coef[j]=w(j);
+    }
+    FitStats st;double sum=0,abs=0;
+    for(std::size_t i=0;i<rows;++i) { double err=-b[i];
+      for(std::size_t j=0;j<cols;++j) err+=coef[j]*a[j*rows+i];
+      sum+=err*err;abs+=std::fabs(err);st.maxabs=std::max(st.maxabs,std::fabs(err));
+    }
+    st.n=rows;st.rmse=std::sqrt(sum/rows);st.mae=abs/rows;return st;
+  };
+  if(cfg_.fit_density_amplitudes) {
+    check_rho_table(rwin_lo);
+    rho_stats_=solve(nr,spec.density.centres.size(),
+      [&](std::size_t i,double q){return component_evaluator_->density(q,'a',i).value;},
+      [&](double q){return eam_.rho_tab(q);},rhoform_is_positive(spec.form),rwin_lo,spec.radius,spec.density.amplitudes);
+  }
+  cfg_.component=spec;
+  component_evaluator_=std::make_unique<EmbedEvaluator>(spec);
+  if(!cfg_.fit_density_amplitudes) {
+    double square=0,absolute=0;
+    for(std::size_t i=0;i<nr;++i) {
+      double q=rwin_lo+(spec.radius-rwin_lo)*i/(nr-1);
+      double error=component_evaluator_->density(q).value-eam_.rho_tab(q);
+      square+=error*error;absolute+=std::abs(error);rho_stats_.maxabs=std::max(rho_stats_.maxabs,std::abs(error));
+    }
+    rho_stats_.n=nr;rho_stats_.rmse=std::sqrt(square/nr);rho_stats_.mae=absolute/nr;
+  }
+  F_stats_=solve(nf,spec.embedding.centres.size(),
+    [&](std::size_t i,double q){return component_evaluator_->embedding(i,q).value;},
+    [&](double q){return F_ref(q);},false,0,rhomax_,cmb_);
+  crho_=spec.density.centres;arho_=spec.density.amplitudes;
+  srho_.clear();for(std::size_t i=0;i<crho_.size();++i) srho_.push_back(embed_eta(spec.density,i));
+  cF_=spec.embedding.centres;sF_.clear();for(std::size_t i=0;i<cF_.size();++i) sF_.push_back(embed_eta(spec.embedding,i));
+  degrho_=spec.density.degrees;degF_=spec.embedding.degrees;
+  fit_r_lo_=rwin_lo;fit_rho_hi_=rhomax_;
+  weights_=c2b_;weights_.insert(weights_.end(),cmb_.begin(),cmb_.end());
 }
 
 } // namespace models

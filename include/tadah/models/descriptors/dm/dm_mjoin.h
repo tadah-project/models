@@ -51,7 +51,11 @@ private:
   std::vector<DM_Base*> ds;
   std::vector<tadah::core::Context> contexts;
   std::string lab = "DM_mJoin";
+  void build_children(tadah::core::Context &);
 public:
+  using DM_Base::calc_drhoi_dtheta;
+  using DM_Base::calc_daed_dtheta;
+  using DM_Base::calc_dXijdri_dtheta;
   DM_mJoin();
   ~DM_mJoin();
   DM_mJoin(tadah::core::Context &c);
@@ -108,6 +112,26 @@ public:
    *  nullopt when no child reports one. */
   std::optional<double>
   raw_embedding_f0(const tadah::core::t_type &w_full) const override;
+
+  bool calc_drhoi_dtheta(const std::string &name,int pos,int zi,int zj,double r,double rsq,
+      const core::Vec3d &v,core::rho_type &rho,double scale=1) const override {
+    bool owned=false;
+    for(auto *d:ds) owned=d->calc_drhoi_dtheta(name,pos,zi,zj,r,rsq,v,rho,scale)||owned;
+    return owned;
+  }
+  bool calc_daed_dtheta(const std::string &name,int pos,const core::rho_type &rho,
+      const core::rho_type &drho,core::aed_type &aed,double scale=1) const override {
+    bool owned=false;
+    for(auto *d:ds) owned=d->calc_daed_dtheta(name,pos,rho,drho,aed,scale)||owned;
+    return owned;
+  }
+  bool calc_dXijdri_dtheta(const std::string &name,int pos,int zi,int zj,double r,double rsq,
+      const core::Vec3d &v,const core::rho_type &rho,const core::rho_type &drho,
+      core::fd_type &fd,double scale=1) const override {
+    bool owned=false;
+    for(auto *d:ds) owned=d->calc_dXijdri_dtheta(name,pos,zi,zj,r,rsq,v,rho,drho,fd,scale)||owned;
+    return owned;
+  }
 };
 
 } // namespace models
