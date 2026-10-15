@@ -60,3 +60,12 @@ endif()
 # descriptors/dm/dm_mEAD.hpp and dm_poly.hpp, which have no include guard
 # ('redefinition of ...').
 tadah_add_header_check(tadah.models)
+
+# tadah.models_text (ctest -L text): no line of the repository's text files
+# carries a person's initials, a reference to co-workers, a decision
+# attributed to the code's owner, the name of an AI tool, a note kept
+# outside the repository or filler wording (cmake-tools'
+# tadah_add_text_check). Before the fix: fails, 13 lines: 7 with a person's
+# initials, 4 decision notes, a workspace note and .gitignore's entry for an
+# AI tool's state directory.
+tadah_add_text_check(tadah.models)
