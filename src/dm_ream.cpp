@@ -33,6 +33,30 @@ void notice_missing_embf0(const tadah::core::Context &ctx) {
 }  // namespace
 
 DM_REAM::DM_REAM() { init(); }
+std::size_t DM_REAM::component_basis_size(const std::string &channel) const {
+  if(core::to_upper(channel)=="DENSITY")return dens_.crho.size();
+  if(core::to_upper(channel)=="EMBEDDING")return cemb.size();
+  return 0;
+}
+bool DM_REAM::component_basis_curve(const std::string &channel,std::size_t i,double q,bool cutoff,double &v,double &d) const {
+  const auto name=core::to_upper(channel);
+  if(name=="DENSITY") {
+    if(i>=dens_.crho.size())throw std::out_of_range("DM_REAM density basis index");
+    double c=dens_.crho[i],eta=dens_.width(i);int degree=dens_.deg(i);
+    if(dens_.form==RhoForm::Monotone) {
+      v=radial_step_value_bare(basis,q,eta,c);d=radial_step_deriv_bare(basis,q,eta,c);
+    } else {v=radial_value_bare(basis,q,eta,c,degree);d=radial_deriv_bare(basis,q,eta,c,degree);}
+    if(cutoff) {if(q>get_rcut()) {v=d=0;return true;}
+      d=d*fcut->calc(q)+v*fcut->calc_prime(q);v*=fcut->calc(q);}
+  } else if(name=="EMBEDDING") {
+    if(i>=cemb.size())throw std::out_of_range("DM_REAM embedding basis index");
+    double eta=semb.empty()?1:semb[i];int degree=demb_deg.empty()?5:static_cast<int>(demb_deg[i]);
+    v=embedding_value(basis,q,eta,cemb[i],degree);d=embedding_deriv(basis,q,eta,cemb[i],degree);
+    if(embf0_==EmbF0Mode::Zero)v-=embedding_value(basis,0,eta,cemb[i],degree);
+  } else return false;
+  return true;
+}
+
 
 void DM_REAM::validate_embedding(BasisKind b, const tadah::core::v_type &ce,
                                  const tadah::core::v_type &se,
@@ -413,7 +437,7 @@ std::optional<DescriptorMeta> DM_REAM::meta() const {
           "Centre (knot families: knot position) of the i-th density radial "
           "basis function. Optimizable (OPTIM CGRIDMB).", 0.0,
           Criticality::Recommended);
-  add_vec("SGRIDMB", Scale::InverseDistanceSq, "Å^-2",
+  add_vec("SGRIDMB", basis==BasisKind::Gaussian?Scale::InverseDistanceSq:Scale::InverseDistance, basis==BasisKind::Gaussian?"Å^-2":"Å^-1",
           "Inverse width of the i-th density radial basis function — bump "
           "families only; ABSENT for knot families (eta is a pure gauge). "
           "Optimizable where present.", 1.0e-6, Criticality::Recommended);
@@ -428,7 +452,7 @@ std::optional<DescriptorMeta> DM_REAM::meta() const {
           "Centre (in rho-space) of the i-th embedding basis function. "
           "Optimizable (OPTIM CEMBFUNC).", -1.0e30,
           Criticality::Recommended);
-  add_vec("SEMBFUNC", Scale::InverseDensity, "rho^-1",
+  add_vec("SEMBFUNC", basis==BasisKind::Gaussian?Scale::InverseDensitySq:Scale::InverseDensity, basis==BasisKind::Gaussian?"rho^-2":"rho^-1",
           "Inverse width (in rho-space) of the i-th embedding basis "
           "function — bump families only; ABSENT for knot families. "
           "Optimizable where present.", 1.0e-6, Criticality::Recommended);

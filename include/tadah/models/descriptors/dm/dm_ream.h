@@ -214,6 +214,8 @@ public:
   bool reinit(const tadah::core::Context& ctx) override;
   std::optional<DescriptorMeta> meta() const override;
   std::optional<BasisKind> basis_kind() const override { return basis; }
+  std::size_t component_basis_size(const std::string &) const override;
+  bool component_basis_curve(const std::string &,std::size_t,double,bool,double &,double &) const override;
 
   /* EAM collapse (see DM_Base): V_i = F(rho_i) exactly, so expose the scalar
    * density rho(r) (amp-baked, cutoff- and WATOM-weighted) and the

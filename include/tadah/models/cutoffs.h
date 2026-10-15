@@ -150,7 +150,8 @@ class Cut_Cos : public Cut_Base {
  * \end{cases}
  * \f]
  *
- * This function smoothly transitions from 1 to 0 over the interval \f$ 0 \leq r \leq r_c \f$, with the transition shape controlled by the cubic power of the hyperbolic tangent.
+ * This function transitions from \f$\tanh^3(1)\f$ at zero to 0 at the cutoff,
+ * with C2 matching to zero. It is not peak-normalized to 1.
  *
  * **Reference:**
  *
@@ -325,17 +326,18 @@ class Cut_CosS : public Cut_Base {
  *
  * This class implements a smooth cutoff function defined by:
  * \f[
- * f(r) = \dfrac{1}{2} + \dfrac{1}{2} \tanh\left( \dfrac{1}{2} \left( \dfrac{r_c}{r + \dfrac{r_c}{2}} + \dfrac{r_c}{r - r_c} \right) \right)
+ * f(r) = N\left[\dfrac{1}{2} + \dfrac{1}{2} \tanh\left( \dfrac{1}{2} \left( \dfrac{r_c}{r + \dfrac{r_c}{2}} + \dfrac{r_c}{r - r_c} \right) \right)\right],\qquad N=\dfrac{2}{1+\tanh(1/2)}
  * \f]
  * and its derivative:
  * \f[
- * f'(r) = -\dfrac{r_c}{4} \left( \dfrac{1}{\cosh\left( \dfrac{r_c}{2} \left( \dfrac{1}{r + \dfrac{r_c}{2}} + \dfrac{1}{r - r_c} \right) \right)} \right)^2 \left( \dfrac{1}{\left( r + \dfrac{r_c}{2} \right)^2} + \dfrac{1}{\left( r - r_c \right)^2} \right)
+ * f'(r) = -N\dfrac{r_c}{4} \left( \dfrac{1}{\cosh\left( \dfrac{r_c}{2} \left( \dfrac{1}{r + \dfrac{r_c}{2}} + \dfrac{1}{r - r_c} \right) \right)} \right)^2 \left( \dfrac{1}{\left( r + \dfrac{r_c}{2} \right)^2} + \dfrac{1}{\left( r - r_c \right)^2} \right)
  * \f]
  * where:
  * - \f$ r \f$ is the radial distance.
  * - \f$ r_c \f$ is the cutoff radius.
  *
- * The cutoff function smoothly transitions from 1 to 0 between \f$ r = -\dfrac{r_c}{2} \f$ and \f$ r = r_c \f$.
+ * On the physical interval it transitions from f(0)=1 to zero at r_c.
+ * The expression's asymptote at -r_c/2 lies outside that interval.
  *
  */
 class Cut_PT : public Cut_Base {

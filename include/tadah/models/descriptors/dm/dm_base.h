@@ -165,6 +165,9 @@ public:
    *
    *  Default: not EAM-form. */
   virtual bool eam_form() const { return false; }
+  virtual std::size_t component_basis_size(const std::string &) const { return 0; }
+  virtual bool component_basis_curve(const std::string &,std::size_t,double,
+                                     bool,double &,double &) const { return false; }
   virtual void eam_density(const int /*Zi*/, const int /*Zj*/,
                            const double /*rij*/,
                            double &rho, double &rhop) const {
@@ -243,7 +246,7 @@ public:
   /** Back-compat string-keyed shim. Decodes once and dispatches to the
    *  enum-keyed virtual above. NOT virtual — derived classes override
    *  the enum form. Layer-1 tests still call this signature. */
-  bool calc_drhoi_dtheta(
+  virtual bool calc_drhoi_dtheta(
       const std::string& theta_name,
       int                arg_pos,
       const int          Zi,
@@ -289,7 +292,7 @@ public:
   }
 
   /** Back-compat string-keyed shim — decodes once, calls enum virtual. */
-  bool calc_daed_dtheta(
+  virtual bool calc_daed_dtheta(
       const std::string& theta_name,
       int                arg_pos,
       const tadah::core::rho_type& rhoi,
@@ -355,7 +358,7 @@ public:
   }
 
   /** Back-compat string-keyed shim — decodes once, calls enum virtual. */
-  bool calc_dXijdri_dtheta(
+  virtual bool calc_dXijdri_dtheta(
       const std::string& theta_name,
       int                arg_pos,
       const int          Zi,

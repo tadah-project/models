@@ -1431,3 +1431,22 @@ TEST_CASE_METHOD(EditFixture,
     REQUIRE(se_comp < se_plain);
   }
 }
+
+TEST_CASE_METHOD(EditFixture,"Legacy curve edit evaluates configured smooth cutoff derivatives", "[unified-dm][edit][cutoff]") {
+  auto c=make_blip_pot();c.remove("RCTYPE2B");c.remove("RCTYPEMB");c.add("RCTYPE2B","Cut_Poly");c.add("RCTYPEMB","Cut_Poly");
+  auto view=parse_pot_view(c);
+  for(auto *curve:{&view.phi,&view.rho}) {
+    double radius=curve->rcut;Cut_Poly cutoff(radius);
+    for(double x:{2.3,3.1,4.2}) {
+      double v=0,d=0,dd=0;
+      for(std::size_t k=0;k<curve->n();++k) {
+        v+=curve->coeff[k]*radial_value_bare(curve->family,x,curve->width(k),curve->mu[k]);
+        d+=curve->coeff[k]*radial_deriv_bare(curve->family,x,curve->width(k),curve->mu[k]);
+        dd+=curve->coeff[k]*radial_deriv2_bare(curve->family,x,curve->width(k),curve->mu[k]);
+      }
+      REQUIRE(curve->value(x)==Approx(v*cutoff.calc(x)).margin(1e-12));
+      REQUIRE(curve->deriv(x)==Approx(d*cutoff.calc(x)+v*cutoff.calc_prime(x)).margin(1e-12));
+      REQUIRE(curve->deriv2(x)==Approx(dd*cutoff.calc(x)+2*d*cutoff.calc_prime(x)+v*cutoff.calc_double_prime(x)).margin(1e-11));
+    }
+  }
+}

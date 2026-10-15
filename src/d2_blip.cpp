@@ -361,8 +361,8 @@ std::optional<DescriptorMeta> D2_Blip::meta() const {
   ParamMeta p_sgrid;
   p_sgrid.key      = "SGRID2B";
   p_sgrid.arg_pos  = 0;
-  p_sgrid.scale    = Scale::InverseDistanceSq;
-  p_sgrid.units    = "Å^-2";
+  p_sgrid.scale    = Scale::InverseDistance;
+  p_sgrid.units    = "Å^-1";
   p_sgrid.role     = "Inverse Gaussian width of the i-th radial.";
   // hard: SGRID2B = 0 makes the existing init() throw.
   p_sgrid.hard.lo  = 1.0e-6;

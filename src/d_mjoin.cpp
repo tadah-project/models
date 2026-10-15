@@ -8,6 +8,7 @@
 #include <tadah/core/number_format.h>
 #include <tadah/models/descriptors/d_mjoin.h>
 #include <tadah/models/descriptors/d_base.h>
+#include <tadah/models/descriptors/dm/embed_spec.h>
 #include <vector>
 namespace tadah {
 namespace models {
@@ -20,6 +21,7 @@ namespace {
 // handled (their sub-descriptors are standard). Keyless descriptors (D2_EAM,
 // DM_EAM) are trivially handled.
 bool mjoin_can_handle(const tadah::core::Context &c, const std::string &type_str) {
+  if(type_str=="TYPEMB" && !c.blocks("DESCRIPTOR").empty()) return true;
   if (!c.contains(type_str) || c.size(type_str) == 0) return false;
   const std::string label = c.get<std::string>(type_str, 0);
   if (label.find("mJoin") != std::string::npos) return true;
@@ -57,6 +59,7 @@ std::vector<std::string> convert_to_strings(const tadah::core::v_type& vec) {
 }
 
 void D_mJoin::expand_grids(tadah::core::Context &c) {
+  resolve_embed_blocks(c);
   if (mjoin_can_handle(c, "TYPE2B")) {
     std::vector<tadah::core::Context> contexts1 = parse_context(c, "TYPE2B");
     expand_grids(c,contexts1,"TYPE2B");
@@ -104,8 +107,10 @@ void D_mJoin::expand_grids(tadah::core::Context &c, std::vector<tadah::core::Con
   else {
     std::cerr << "Cannot expand context grid: wrong keyword: " << type_str << std::endl;
   }
+  if(type_str=="TYPEMB") resolve_embed_blocks(c);
 }
 std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Context &c, std::string type_str) {
+  if(type_str=="TYPEMB" && !c.blocks("DESCRIPTOR").empty()) return embed_contexts(c);
   std::string prefix = type_str=="TYPE2B" ? "D2_" : "DM_";
   std::string rctypekey = "RC" + type_str;
   std::string rcutkey = "RCUT" + type_str.substr(type_str.size() - 2);

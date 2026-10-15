@@ -34,6 +34,8 @@
 
 #include <cstddef>
 #include <optional>
+#include <memory>
+#include <tadah/models/cutoffs.h>
 #include <string>
 #include <utility>
 #include <vector>
@@ -78,6 +80,7 @@ struct CurveView {
   std::vector<double> coeff;
   std::vector<int> deg;       ///< empty = all quintic
   double rcut = 0.0;          ///< RCUT2B/RCUTMB; 0 for F (no r cutoff)
+  std::shared_ptr<Cut_Base> spatial_cutoff; ///< immutable parsed radial taper
 
   std::size_t n() const { return mu.size(); }
   int degree(std::size_t k) const {
@@ -88,7 +91,7 @@ struct CurveView {
   }
 
   /// Curve value/derivatives at x: sum_k coeff_k g_k(x). Radial channels
-  /// apply the hard Cut_Dummy semantics (0 beyond rcut), matching runtime.
+  /// apply the configured spatial taper and its product derivatives.
   /// With zero_ref the value is sum_k coeff_k (g_k(x) - g_k(0)), term by
   /// term as DM_REAM::calc_aed forms it, and exactly 0 at x == 0; the
   /// derivatives are the same in both embedding references.

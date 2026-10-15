@@ -24,6 +24,7 @@
 #include <vector>
 
 #include <tadah/core/context.h>
+#include <tadah/models/descriptors/dm/embed_spec.h>
 #include <tadah/core/stats/data_stats.h>
 
 namespace tadah {
@@ -35,8 +36,10 @@ namespace models {
 enum class Scale {
   Distance,           // Å (e.g. RCUT, CGRIDxB)
   InverseDistanceSq,  // Å^-2 (e.g. SGRIDxB — Gaussian inverse width)
+  InverseDistance,    // Å^-1 (compact bump eta)
   Density,            // ρ (rho-units; e.g. CEMBFUNC, RCUTENV)
   InverseDensity,     // ρ^-1 (e.g. SEMBFUNC)
+  InverseDensitySq,   // ρ^-2 (Gaussian embedding eta)
   Dimensionless,      // unitless (e.g. exponents)
   Energy,             // eV
   Force,              // eV/Å
@@ -110,30 +113,41 @@ class SeedView {
 
   template <typename T>
   T get(const std::string& key) const {
+    if(key.find('.')!=std::string::npos) return get<T>(key,0);
     return ctx_->get<T>(key);
   }
 
   template <typename T>
   T get(const std::string& key, std::size_t arg_pos) const {
+    if(key.find('.')!=std::string::npos) {
+      double v=embed_binding(*ctx_,key).values.at(arg_pos);
+      if constexpr(std::is_arithmetic_v<T>) return static_cast<T>(v);
+      else if constexpr(std::is_same_v<T,std::string>) return core::format_roundtrip(v);
+    }
     return ctx_->get<T>(key, arg_pos);
   }
 
   std::size_t size(const std::string& key) const {
+    if(key.find('.')!=std::string::npos) return embed_binding(*ctx_,key).values.size();
     return ctx_->size(key);
   }
 
   bool contains(const std::string& key) const {
+    if(key.find('.')!=std::string::npos) {
+      for(const auto &b:embed_bindings(*ctx_)) if(b.path==core::to_upper(key)) return true;
+      return false;
+    }
     return ctx_->contains(key);
   }
 
   /** Read a v_type / vector<double> in one shot. */
   std::vector<double> vec(const std::string& key) const {
     std::vector<double> out;
-    if (!ctx_->contains(key)) return out;
-    const std::size_t n = ctx_->size(key);
+    if (!contains(key)) return out;
+    const std::size_t n = size(key);
     out.reserve(n);
     for (std::size_t i = 0; i < n; ++i) {
-      out.push_back(ctx_->get<double>(key, i));
+      out.push_back(get<double>(key, i));
     }
     return out;
   }

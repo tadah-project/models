@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- `DM_Embed`: independent scalar density and embedding policies for Blip, Blip5, Gaussian, degree-3/5 knots, WendlandC2 and WendlandC4; local density forms, references, smooth cutoffs and optional envelopes.
+- Strict component specifications, resolved block persistence, exact physical-width coordinates, named parameter bindings, analytical energy/force parameter derivatives and transactional component reinitialization.
+- Shared component evaluation for EAM refitting, curve editing and analysis, with scalar EAM acceleration capability.
+
+### Fixed
+- Keep mixed ZERO/FREE reference reporting and metadata column counts local to their owners; refuse unowned analytical paths and invalid vector indices. Dispatch complete density and scalar embedding sums once per component.
+- Apply the configured spatial cutoff in EAM refit diagnostics and legacy curve editing, including product derivatives and removal compensation.
+- Report compact-bump inverse scales in inverse-distance units; Gaussian inverse scales retain squared units.
+
 ## [1.6.0] — unreleased
 
 ### Added
