@@ -1334,3 +1334,45 @@ TEST_CASE_METHOD(RefitFixture,
   REQUIRE(0.8 * fit.r_reach() < fit.r_lo());
   REQUIRE(fit.fit_window_r_lo() == fit.r_lo());
 }
+
+/* Pins: a component refit (DM_Embed density FORM NONNEG with amplitudes to
+ * fit) of a table whose density is negative inside the fit window is
+ * refused naming the component's FORM and the remedy in its block, FORM
+ * SIGNED: a configuration with DESCRIPTOR blocks refuses the RHOFORM key.
+ * Before the fix the refusal named the DM_REAM key ("RHOFORM NONNEG cannot
+ * fit this table ... Use RHOFORM SIGNED"), whose advice a component
+ * configuration cannot follow. */
+TEST_CASE_METHOD(RefitFixture,
+                 "Component refit form refusal names the component FORM",
+                 "[unified-dm][refit][rhoform]") {
+  const ScratchFile f("tmp_component_form_refusal");
+  write_rho_setfl(f.path, [](double r) {
+    const double x = 1.0 - r / 5.0, g = (r - 3.0) / 0.03;
+    return x * x - 0.6 * std::exp(-g * g);
+  });
+  EAMSetflIO eam;
+  eam.read_setfl(f.path);
+  eam.build_splines();
+  std::istringstream in(
+      "DESCRIPTOR cu DM_Embed\nPAIRS Cu Cu\nDENSITY\nBASIS Blip5\n"
+      "FORM NONNEG\nCENTRES 1.2 1.9 2.6 3.3 4.0\nETA 1.4 1.4 1.4 1.4 1.4\n"
+      "AMPLITUDES 0 0 0 0 0\nCUTOFF\nTYPE Cut_Poly\nRADIUS 5\nENDCUTOFF\n"
+      "ENDDENSITY\nEMBEDDING\nBASIS Gaussian\nCENTRES 0 0.5 1 1.5 2 2.5 3 "
+      "3.5 4\nETA 4 4 4 4 4 4 4 4 4\nREFERENCE ZERO\nENDEMBEDDING\n"
+      "ENDDESCRIPTOR\n");
+  const auto ctx = tadah::core::CoreUserConfigParser().parse(in);
+  EAMRefitConfig cfg;
+  cfg.component = embed_specs(ctx).at(0);
+  cfg.fit_density_amplitudes = true;
+  cfg.unified_output = true;
+  cfg.basis = "Blip5";
+  cfg.rho_form = RhoForm::NonNeg;
+  cfg.n2b = 12;
+  EAMRefit fit(eam, cfg);
+  REQUIRE_THROWS_WITH(
+      fit.fit(),
+      Catch::Contains("the density component CU's FORM NONNEG cannot fit "
+                      "this table") &&
+          Catch::Contains("Use FORM SIGNED in its DENSITY block") &&
+          !Catch::Contains("RHOFORM"));
+}
