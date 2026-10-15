@@ -148,3 +148,72 @@ TEST_CASE("DM_Embed named derivatives include width Jacobians zero references an
       }
     }
 }
+
+TEST_CASE("DM_Embed rejects inactive fields and unsafe supports without numerical heuristics",
+          "[unified-dm][validation]") {
+  auto good=embed_config();
+  for(const auto &replacement:{
+      "ETA 2 2\nWIDTHS 0.5 0.5", "ETA 2 2\nETA 2 2", "ETA 0 2",
+      "ETA nan 2", "ETA 2", "BASIS Blip5\nBASIS Blip", "UNKNOWN 1"}) {
+    auto c=good; auto b=c.blocks();
+    for(auto &line:b[0].lines) if(line=="ETA 2 2") {line=replacement;break;}
+    // Inserted lines must remain separate structured records, as a parser
+    // would capture them.
+    std::ostringstream text;
+    for(const auto &line:b[0].lines) text<<line<<'\n';
+    std::istringstream input(text.str());
+    auto bad=CoreUserConfigParser().parse(input);
+    REQUIRE_THROWS(DC_Selector(bad));
+  }
+  auto g=embed_config("Gaussian","Blip","NONNEG","NONE");
+  REQUIRE_THROWS(DC_Selector(g));
+  auto b=embed_config("Blip5","Blip","NONNEG","NONE");
+  auto blocks=b.blocks();
+  for(auto &line:blocks[0].lines) if(line=="CENTRES 1 2") line="CENTRES 6 7";
+  b.replace_blocks(blocks); REQUIRE_THROWS(DC_Selector(b));
+  auto signed_env=embed_config("Blip","Blip","SIGNED","Cut_Poly","Smoothstep2");
+  DC_Selector s(signed_env);
+  rho_type rho; s.dmb->init_rhoi(rho); rho(0)=-0.1;
+  aed_type a(3);a.set_zero(); REQUIRE_THROWS(s.dmb->calc_aed(rho,a));
+}
+
+TEST_CASE("DM_Embed widths round trip exactly at every NUMERIC precision",
+          "[unified-dm][persistence]") {
+  auto c=embed_config("Gaussian","Gaussian","NONNEG","Cut_Poly","OFF",true);
+  auto binding=embed_binding(c,"ta.embedding.widths");
+  const double w=std::nextafter(0.12345678901234567,1.0);
+  binding.write(c,0,w); DC_Selector original(c);
+  for(int precision:{3,12,17,18}) {
+    std::ostringstream text; c.write_potential(text,precision);
+    std::istringstream in(text.str()); auto copy=CoreUserConfigParser().parse(in);
+    REQUIRE(embed_binding(copy,"ta.embedding.widths").values[0]==w);
+    DC_Selector loaded(copy);
+    REQUIRE(energy(*original.dmb,1.27)==energy(*loaded.dmb,1.27));
+  }
+}
+
+TEST_CASE("DM_Embed blocks compose in declaration order and require unique references",
+          "[unified-dm][composition]") {
+  auto a=embed_config("Gaussian","Blip5");
+  auto b=embed_config("WendlandC2","Gaussian");
+  auto second=embed_specs(b).at(0); second.id="tb";
+  a.append_block(embed_block(second));
+  DC_Selector combined(a);
+  REQUIRE(combined.dmb->size()==6);
+  rho_type rho; combined.dmb->init_rhoi(rho);
+  REQUIRE(rho.size()==8);
+  combined.dmb->calc_rho(73,73,1.37,1.37*1.37,Vec3d(1.37,0,0),rho);
+  aed_type all(6);all.set_zero();combined.dmb->calc_aed(rho,all);
+  for(std::size_t i=0;i<2;++i) {
+    auto one=a; auto spec=embed_specs(a)[i]; one.replace_blocks({embed_block(spec)});
+    one.remove("TYPEMB"); DC_Selector single(one);
+    rho_type r;single.dmb->init_rhoi(r);
+    single.dmb->calc_rho(73,73,1.37,1.37*1.37,Vec3d(1.37,0,0),r);
+    aed_type e(3);e.set_zero();single.dmb->calc_aed(r,e);
+    for(std::size_t m=0;m<3;++m) REQUIRE(all(3*i+m)==e(m));
+  }
+  for(const auto &refs:{"@ta", "@ta @ta", "@ta @missing", "@tb @ta @tb"}) {
+    auto bad=a;bad.remove("TYPEMB");bad.add("TYPEMB",refs);
+    REQUIRE_THROWS(DC_Selector(bad));
+  }
+}
