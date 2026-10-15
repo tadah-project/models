@@ -72,6 +72,10 @@ TEST_CASE("DM_Embed independently selects density embedding cutoff and envelope"
         s.dmb->calc_dXijdri(73,73,r,r*r,Vec3d(r,0,0),rho,f);
         double value=0; for(std::size_t m=0;m<3;++m) value+=(m+1)*f(m,0);
         REQUIRE(value == Approx(fd).margin(2e-7));
+        t_type weights(3);double expected=0,expected_prime=0;
+        for(std::size_t m=0;m<3;++m) {weights(m)=m+1;expected+=(m+1)*a(m);expected_prime+=(m+1)*rho(1+m);}
+        double collapsed,prime;s.dmb->eam_embed(weights,rho(0),collapsed,prime);
+        REQUIRE(collapsed==Approx(expected).margin(1e-13));REQUIRE(prime==Approx(expected_prime).margin(1e-13));
       }
 }
 
