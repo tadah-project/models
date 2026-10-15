@@ -60,7 +60,7 @@ struct CovarianceFit {
  * @class LinearRegressor
  * @brief Performs linear regression using Singular Value Decomposition (SVD).
  *
- * Utilizes SVD for training, supporting both ordinary least squares and ridge
+ * Uses SVD for training, supporting both ordinary least squares and ridge
  * regression.
  */
 class LinearRegressor {
@@ -584,7 +584,7 @@ public:
    * factorisation through @p factor for HPO analytical/hybrid
    * gradients to consume via @ref backsolve. Restricted to OALGO=4
    * (NormalEquations) with LAMBDA >= 0 — the supported configuration
-   * for Phase-2A IFT.
+   * for IFT.
    *
    * The forward path of @ref train is byte-identical and unaffected by
    * this overload; HPO callers that want analytical gradients must
@@ -633,9 +633,9 @@ public:
     if (std::abs(lambda + 1) < std::numeric_limits<double>::min()) {
       throw std::runtime_error(
           "LinearRegressor::train_with_factor: LAMBDA=-1 (BLR/EA) is "
-          "not supported under analytical gradients in Phase 2A. The "
+          "not supported under analytical gradients. The "
           "α/β co-optimisation nests inside the solve and changes the "
-          "IFT chain rule; revisit in Phase 2C if needed. Use a fixed "
+          "IFT chain rule. Use a fixed "
           "LAMBDA >= 0, or GRAD_STRATEGY=NUMERICAL.");
     }
     if (lambda < 0) {
@@ -712,7 +712,7 @@ public:
     if (f.algo != tadah::models::Algorithm::NormalEquations) {
       throw std::runtime_error(
           "LinearRegressor::backsolve: only NormalEquations factors are "
-          "supported in Phase 2A; got algo " +
+          "supported; got algo " +
           tadah::models::to_string_algorithm(f.algo));
     }
     if (rhs.size() != static_cast<std::size_t>(f.n)) {

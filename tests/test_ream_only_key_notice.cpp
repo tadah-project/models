@@ -165,7 +165,7 @@ TEST_CASE("A task EMBF0 or RHOFORM over a potential without a DM_REAM block "
 TEST_CASE("A potential with a deprecated key and EMBF0 without DM_REAM, read "
           "twice: each notice once per process",
           "[embf0][key_notice][deprecated]") {
-  /* Owner decision (2026-09-29): one rule for every ignored key, deprecated
+  /* One rule for every ignored key, deprecated
    * (MBLOCK) or without effect (EMBF0 without DM_REAM): one stderr notice
    * per key and process. */
   tadah::core::PeriodicTable::initialize();

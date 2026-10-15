@@ -362,7 +362,7 @@ TEST_CASE_METHOD(TestFixture,
 }
 
 // ----------------------------------------------------------------------
-// WATOM parity (Phase 2C-WATOM). The per-pair contribution is
+// WATOM parity. The per-pair contribution is
 // weights[Zj] * G; its WATOM derivative drops the weights[Zj] factor
 // and only fires when Zj matches the species at arg_pos in the ATOM list.
 // ----------------------------------------------------------------------

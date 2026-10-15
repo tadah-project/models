@@ -380,8 +380,8 @@ TEST_CASE("OALGO 3, LAMBDA 0, rank deficient: the covariance of the "
 
 /* Pins: with OALGO 3 and LAMBDA 1e-6 > 0, a direction the solve drops
  * (singular values 10, 3, 1 and 1e-10 of a 9 x 4 A = U S V^T, so s_4 is
- * below rcond 1e-8 x s_max) is dropped from the covariance too (owner
- * decision D4: one truncation rule for every lambda, the solve's):
+ * below rcond 1e-8 x s_max) is dropped from the covariance too (one
+ * truncation rule for every lambda, the solve's):
  * Sigma = s^2 sum_{i<3} v_i v_i^T / (s_i^2 + lambda), s^2 = RSS/(9 -
  * gamma), gamma = sum_{i<3} s_i^2/(s_i^2 + lambda), to 1e-9 relative; the
  * weights have no component along v_4 (1e-12 of their norm); a WARNING

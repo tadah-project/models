@@ -227,7 +227,7 @@ public:
  * Note: The implementation of the descriptor should not rely on these initial values,
  * allowing for greater flexibility in how the tadah::core::Context file is parsed.
  *
- * The keys and parameters are utilized by other classes inheriting from this implementation,
+ * The keys and parameters are used by other classes inheriting from this implementation,
  * such as meta-descriptors.
  *
  */

@@ -1,6 +1,6 @@
 // test_d2_mie_dtheta.cpp
 //
-// Layer-1 parity tests for D2_MIE::calc_dDdtheta added in Phase 2B.
+// Layer-1 parity tests for D2_MIE::calc_dDdtheta.
 // Surface: RCUT2B + the two TYPE2B-positional Mie exponents
 //   arg_pos == 2 -> n  (config index 1, default LJ-like 12)
 //   arg_pos == 3 -> m  (config index 2, default LJ-like 6)
@@ -219,7 +219,7 @@ TEST_CASE_METHOD(TestFixture,
 }
 
 // ----------------------------------------------------------------------
-// Force-descriptor θ-derivative parity (Phase 2C C-step).
+// Force-descriptor θ-derivative parity.
 // ----------------------------------------------------------------------
 
 TEST_CASE_METHOD(TestFixture,

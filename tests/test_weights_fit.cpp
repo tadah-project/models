@@ -158,7 +158,7 @@ TEST_CASE("require_weights_fit accepts weights that fit the descriptor",
 // species ("since 1.3.0-beta.1").
 // Before the fix: require_weights_fit did not exist (run with a stub that
 // throws std::logic_error: every check fails on the stub's message). Before
-// the one-guard rewording (review): it said "WEIGHTS has <n> values" and
+// the one-guard rewording: it said "WEIGHTS has <n> values" and
 // "DSIZE <d>", and the hint said that pair_style tadah used one column per
 // species with every earlier version, so those CHECKs failed.
 TEST_CASE("require_weights_fit refuses WEIGHTS that do not fit the "
@@ -240,7 +240,7 @@ TEST_CASE("require_weights_fit refuses WEIGHTS that do not fit the "
 // WEIGHTS" and "needs 5 weights, one per basis vector".
 // Before the fix: require_weights_fit did not exist (run with a stub that
 // throws std::logic_error: every check fails on the stub's message). Before
-// the one-guard rewording (review): the NMEAN and NSTDEV checks were run
+// the one-guard rewording: the NMEAN and NSTDEV checks were run
 // with BF_Linear (the 8-value section was refused without the appended
 // hint), and the messages said "DSIZE 4" and "the BASIS vectors (SBASIS 5)
 // have 3 entries each" and "WEIGHTS has 4 values", so those CHECKs failed.

@@ -18,8 +18,8 @@ namespace models {
  * V_i = \sum_{j \neq i} \frac{C_{12}}{r_{ij}^{12}} - \frac{C_6}{r_{ij}^6} f_c(r_{ij})
  * \f]
  *
- * Note that machined learned coefficients \f$C_6\f$ and \f$C_{12}\f$
- * corresponds to \f$\sigma\f$ and \f$\epsilon\f$ through the following relation:
+ * The machine-learned coefficients \f$C_6\f$ and \f$C_{12}\f$
+ * correspond to \f$\sigma\f$ and \f$\epsilon\f$ through the following relation:
  *
  * \f[ \sigma = \Big(\frac{C_{12}}{C_6}\Big)^{1/6} \f]
  * \f[ \epsilon = \frac{1}{4} \frac{C_6^2}{C_{12}} w(Z) \f]

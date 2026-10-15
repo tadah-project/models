@@ -1,7 +1,7 @@
 // test_d2_zbl_dtheta_typeb.cpp
 //
 // Layer-1 parity tests for the D2_ZBL TYPE2B HPO surface
-// (a0 / s0 / p0 / p1) added in Phase 2B (A2). The RCUT2B parity test
+// (a0 / s0 / p0 / p1). The RCUT2B parity test
 // already lives in test_d2_zbl_dtheta.cpp; this file covers the four
 // screening-length parameters baked into TYPE2B positions 1..4.
 //
@@ -236,7 +236,7 @@ TEST_CASE_METHOD(TestFixture,
 }
 
 // ----------------------------------------------------------------------
-// Force-descriptor θ-derivative parity (Phase 2C C-step).
+// Force-descriptor θ-derivative parity.
 // Reference: central FD on the radial column of calc_dXijdri.
 // ----------------------------------------------------------------------
 

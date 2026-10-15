@@ -338,7 +338,7 @@ TEST_CASE("EAMSetflIO refuses an element record split after its mass, as "
    * record to the end of the line of its mass, and the F(rho) table from
    * the next line" ("... it has 2 words on lines 6-7: ..." for the third).
    * A record split before the mass ('73' and '180.95 3.304 bcc', the pin
-   * above) still reads, as it does in LAMMPS. pair eam/alloy of the lane's
+   * above) still reads, as it does in LAMMPS. pair eam/alloy of the
    * LAMMPS library refuses the three split files of a 20-point Ta table
    * ("Not a valid floating-point number: 'bcc'
    * (src/MANYBODY/pair_eam_alloy.cpp:174)") and reads the one split before
@@ -620,8 +620,8 @@ TEST_CASE("EAMSetflIO refuses a grid whose r tables end more than one step "
    * below rcut in double.
    * Before the fix: every one of these files was read, so the refusals
    * fail ("no exception"): the dr = 1e-300 file then evaluated every r > 0
-   * at an index past int (undefined; tadah refit of it wrote a potential,
-   * tmp/rg_probe/drtiny). */
+   * at an index past int (undefined; tadah refit of it wrote a
+   * potential). */
   const std::string at = "EAMSetflIO: setfl file 'bad.alloy', line 5: ";
   const auto with_grid = [](const std::string &grid) {
     std::vector<std::string> lines = setfl3_lines();
