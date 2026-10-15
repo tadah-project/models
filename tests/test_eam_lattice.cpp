@@ -3,6 +3,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <stdexcept>
+#include <string>
 
 using namespace tadah::models;
 
@@ -99,4 +101,85 @@ TEST_CASE("eam_lattice require_crystal", "[eam_lattice]") {
   REQUIRE_THROWS(eam_lattice::require_crystal("", 3.6));
   REQUIRE_THROWS(eam_lattice::require_crystal("dia", 5.0));
   REQUIRE_THROWS(eam_lattice::require_crystal("fcc", 0.0));
+}
+
+/* Pins: reach_distance(lattice, a0, s) is s x nn_distance(lattice, a0)
+ * (the nearest-neighbour distance of the crystal compressed to a/a0 = s,
+ * EAMRefit's r_reach), bit for bit. require_crystal_on_grid(lattice, a0,
+ * reach_smin, dr) applies require_crystal's rules (its message for NONE,
+ * an unknown lattice, a0 <= 0) and then refuses a crystal whose nearest
+ * neighbours, at a/a0 = reach_smin, are less than the table's step dr
+ * apart: hcp with reach_smin 1 (the distance is a0) passes at a0 = dr
+ * exactly and is refused one ulp below it; the fcc lattice of a0 = 1e-323
+ * (a subnormal) with reach_smin 0.1, whose distance underflows to 0, is
+ * refused with "tadah refit: the lattice constant of the EAM header,
+ * a0 = 1e-323 A, puts the nearest neighbours of the fcc crystal 0 A apart
+ * at the strongest compression the refit tests (a/a0 = REFIT_REACH_SMIN
+ * 0.1), less than the step of the table's radial grid, dr = 0.0125313 A:
+ * the table describes no pair distance of that crystal. Edit the element
+ * line of the setfl file (`<Z> <mass> <a0> <lattice>`): set the
+ * equilibrium lattice constant, in Angstrom."; real crystals (Cu, Fe, Ti
+ * at REFIT_REACH_SMIN 0.1 to 1) pass.
+ * Before the fix: neither function exists (the crystal gate was
+ * require_crystal alone, a known lattice and a0 > 0): the test does not
+ * compile. */
+TEST_CASE("eam_lattice require_crystal_on_grid: the crystal's nearest "
+          "neighbours at REFIT_REACH_SMIN at least the table's dr apart",
+          "[eam_lattice]") {
+  CHECK(eam_lattice::reach_distance("fcc", 3.6, 0.75) ==
+        0.75 * (3.6 / std::sqrt(2.0)));
+  CHECK(eam_lattice::reach_distance("bcc", 2.87, 0.1) ==
+        0.1 * (2.87 * std::sqrt(3.0) / 2.0));
+  CHECK(eam_lattice::reach_distance("hcp", 2.95, 1.0) == 2.95);
+
+  // real crystals pass, at the ends of REFIT_REACH_SMIN's range too
+  for (const double s : {0.1, 0.75, 1.0}) {
+    INFO("reach_smin " << s);
+    CHECK_NOTHROW(eam_lattice::require_crystal_on_grid("fcc", 3.615, s,
+                                                       0.0125313));
+    CHECK_NOTHROW(eam_lattice::require_crystal_on_grid("BCC", 2.8665, s,
+                                                       0.005));
+    CHECK_NOTHROW(eam_lattice::require_crystal_on_grid("hcp", 2.95, s,
+                                                       0.006));
+  }
+
+  // require_crystal's rules first, with its message
+  for (const auto &bad : {std::make_pair(std::string("NONE"), 0.0),
+                          std::make_pair(std::string("dia"), 5.0),
+                          std::make_pair(std::string("fcc"), 0.0)}) {
+    INFO("lattice " << bad.first << ", a0 " << bad.second);
+    CHECK_THROWS_WITH(eam_lattice::require_crystal_on_grid(
+                          bad.first, bad.second, 0.75, 0.01),
+                      Catch::Contains("crystal usable for the faithfulness "
+                                      "self-test"));
+  }
+
+  // the boundary: hcp at reach_smin 1, whose distance is a0 itself
+  const double dr = 0.0125;
+  CHECK_NOTHROW(eam_lattice::require_crystal_on_grid("hcp", dr, 1.0, dr));
+  const double below = std::nextafter(dr, 0.0);
+  CHECK_THROWS_WITH(
+      eam_lattice::require_crystal_on_grid("HCP", below, 1.0, dr),
+      "tadah refit: the lattice constant of the EAM header, a0 = "
+      "0.012499999999999999 A, puts the nearest neighbours of the hcp "
+      "crystal 0.012499999999999999 A apart at the strongest compression "
+      "the refit tests (a/a0 = REFIT_REACH_SMIN 1), less than the step of "
+      "the table's radial grid, dr = 0.0125 A: the table describes no pair "
+      "distance of that crystal. Edit the element line of the setfl file "
+      "(`<Z> <mass> <a0> <lattice>`): set the equilibrium lattice "
+      "constant, in Angstrom.");
+
+  // a subnormal a0: the distance underflows to 0
+  const double tiny = 1e-323;
+  REQUIRE(tiny > 0.0);
+  REQUIRE(eam_lattice::reach_distance("fcc", tiny, 0.1) == 0.0);
+  CHECK_THROWS_WITH(
+      eam_lattice::require_crystal_on_grid("fcc", tiny, 0.1, 0.0125313),
+      "tadah refit: the lattice constant of the EAM header, a0 = 1e-323 A, "
+      "puts the nearest neighbours of the fcc crystal 0 A apart at the "
+      "strongest compression the refit tests (a/a0 = REFIT_REACH_SMIN "
+      "0.1), less than the step of the table's radial grid, dr = "
+      "0.0125313 A: the table describes no pair distance of that crystal. "
+      "Edit the element line of the setfl file (`<Z> <mass> <a0> "
+      "<lattice>`): set the equilibrium lattice constant, in Angstrom.");
 }
