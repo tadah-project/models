@@ -8,6 +8,7 @@
 #include <cctype>
 #include <cmath>
 #include <functional>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -67,24 +68,40 @@ inline double reach_distance(const std::string &lattice, double a0,
   return reach_smin * nn_distance(lattice, a0);
 }
 
-/** The crystal gate of `tadah refit`: require_crystal(), and the crystal at
- *  the strongest compression the refit tests, a/a0 = \p reach_smin
- *  (REFIT_REACH_SMIN: the self-test's E-V scan and the reachability sweep
- *  start there), must have its nearest neighbours at least the step \p dr
- *  of the table's radial grid apart (reach_distance() >= dr). Closer, the
- *  table, tabulated at r = 0, dr, 2 dr, ..., describes no pair distance of
- *  that crystal: a lattice constant written in metres rather than
- *  Angstrom, or a subnormal one (whose distance underflows to 0, and whose
- *  neighbour count does not fit the enumeration's int). So
- *  EAMRefit::r_reach() >= dr > 0 for every table it passes. Case-insensitive like require_crystal; throws
- *  std::runtime_error naming a0, the lattice, the distance,
- *  REFIT_REACH_SMIN and dr (each as the shortest text that reads back to
- *  it). */
+/** The crystal gate of `tadah refit`: require_crystal(); the crystal of
+ *  the header, at a0, must have its nearest neighbours below the table's
+ *  cutoff \p rcut (nn_distance() < rcut: LAMMPS and tadah count a pair
+ *  only below rcut, so a crystal whose nearest neighbours are at or beyond
+ *  it has no interaction -- a lattice constant written in picometres
+ *  rather than Angstrom, for one); and the crystal at the strongest
+ *  compression the refit tests, a/a0 = \p reach_smin (REFIT_REACH_SMIN:
+ *  the self-test's E-V scan and the reachability sweep start there), must
+ *  have its nearest neighbours at least the step \p dr of the table's
+ *  radial grid apart (reach_distance() >= dr). Closer, the table,
+ *  tabulated at r = 0, dr, 2 dr, ..., describes no pair distance of that
+ *  crystal: a lattice constant written in metres rather than Angstrom, or
+ *  a subnormal one (whose distance underflows to 0). So dr <=
+ *  EAMRefit::r_reach() < rcut for every table it passes. Case-insensitive
+ *  like require_crystal; throws std::runtime_error naming a0, the lattice,
+ *  the distance and rcut, or REFIT_REACH_SMIN and dr (each as the shortest
+ *  text that reads back to it). */
 inline void require_crystal_on_grid(const std::string &lattice, double a0,
-                                    double reach_smin, double dr) {
+                                    double reach_smin, double dr,
+                                    double rcut) {
   require_crystal(lattice, a0);
   std::string l = lattice;
   for (auto &ch : l) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+  const double nn = nn_distance(l, a0);
+  if (!(nn < rcut))
+    throw std::runtime_error(
+        "tadah refit: the lattice constant of the EAM header, a0 = " +
+        core::format_roundtrip(a0) + " A, puts the nearest neighbours of the " +
+        l + " crystal " + core::format_roundtrip(nn) + " A apart, at or "
+        "beyond the table's cutoff, rcut = " + core::format_roundtrip(rcut) +
+        " A: the crystal has no pair within the cutoff. Edit the element "
+        "line of the setfl file (`<Z> <mass> <a0> <lattice>`): set the "
+        "equilibrium lattice constant, in Angstrom (a value in picometres "
+        "is 100 times the value in Angstrom).");
   const double r = reach_distance(l, a0, reach_smin);
   if (r >= dr) return;
   throw std::runtime_error(
@@ -100,7 +117,14 @@ inline void require_crystal_on_grid(const std::string &lattice, double a0,
 }
 
 /** All neighbour distances (one central atom) within \p rcut for lattice
- *  constant \p a. Unknown lattice falls back to bcc (caller should report). */
+ *  constant \p a. Unknown lattice falls back to bcc (caller should report).
+ *  The lattice points of a cube of ceil(rcut / e) + 1 cells each way (e the
+ *  cell's shortest edge: a for bcc and fcc) are visited with an int index:
+ *  rcut / e must be finite and at most 2147483645 (INT_MAX - 2), else
+ *  std::invalid_argument naming the lattice, a, rcut and rcut / e (the cost
+ *  grows as (rcut / e)^3: the crystal gate of `tadah refit`,
+ *  require_crystal_on_grid, and the setfl reader's grid rules bound it for
+ *  the refit's crystals). */
 inline std::vector<double> neighbour_distances(const std::string &lattice,
                                                double a, double rcut) {
   // lattice vectors (rows) and fractional basis
@@ -125,7 +149,19 @@ inline std::vector<double> neighbour_distances(const std::string &lattice,
   }
   const double amin = std::min({std::fabs(A[0][0]), std::fabs(A[1][1]),
                                 std::fabs(A[2][2])});
-  const int N = static_cast<int>(std::ceil(rcut / amin)) + 1;
+  // The cube's half-width, ceil(rcut / amin) + 1, and the loops' ++i past
+  // it must fit an int.
+  constexpr double kMaxSpan = std::numeric_limits<int>::max() - 2.0;
+  const double span = rcut / amin;
+  if (!(span <= kMaxSpan))
+    throw std::invalid_argument(
+        "eam_lattice::neighbour_distances: the neighbours of the " + lattice +
+        " lattice of lattice constant a = " + core::format_roundtrip(a) +
+        " within r = " + core::format_roundtrip(rcut) + " lie up to " +
+        core::format_roundtrip(span) + " lattice vectors away, more than "
+        "the enumeration's int index reaches (" +
+        core::format_roundtrip(kMaxSpan) + ")");
+  const int N = static_cast<int>(std::ceil(span)) + 1;
   std::vector<double> out;
   for (int i = -N; i <= N; ++i)
     for (int j = -N; j <= N; ++j)

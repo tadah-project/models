@@ -53,7 +53,13 @@ public:
    *          where there is one) if the file is missing, declares more than
    *          one element type or is malformed: nrho or nr not a whole number
    *          from 3 to 2147483647 (the spline reads a table's third point);
-   *          drho, dr or rcut not a positive finite number; Z not a whole
+   *          drho, dr or rcut not a positive finite number; r tables that
+   *          end more than one step before rcut (nr x dr below rcut by more
+   *          than 1e-4 of it: LAMMPS and tadah take a table's last value at
+   *          every r past its last point, (nr - 1) x dr; a cutoff at the last
+   *          point, before it or one step past it, rcut = nr x dr, is read)
+   *          or an rcut / dr above 2147483647 (the spline index of a distance
+   *          below rcut is an int); Z not a whole
    *          number; the mass or the lattice constant not a finite number; a
    *          record with a word too many or too few; an element record split
    *          after its mass (a or lattice on a later line); a table value that is
@@ -130,9 +136,13 @@ public:
   EAMGrid input_grid() const { return EAMGrid{nrho_, drho_, nr_, dr_, rcut_}; }
 
   /** Build an output grid scaled relative to the input grid: nr * scale and
-   *  nrho * scale points, rounded, over the same spans (n - 1) * d. `scale >
-   *  1` densifies (more points, finer spacing); `scale == 1` reproduces the
-   *  input grid. rcut is preserved. Throws std::invalid_argument for a
+   *  nrho * scale points, rounded, over the same spans (n - 1) * d -- the r
+   *  span unless that leaves rcut more than one of the new steps past the
+   *  new last point (an input whose cutoff is one step past its last point,
+   *  rcut = nr * dr, scaled up): then dr = rcut / nr, so the grid reaches
+   *  the cutoff as read_setfl() requires. `scale > 1` densifies (more
+   *  points, finer spacing); `scale == 1` reproduces the input grid. rcut is
+   *  preserved. Throws std::invalid_argument for a
    *  scale that is not a positive finite number, or whose counts fall
    *  below 3 (the spline fitted through a setfl table reads its third
    *  point) or above 2147483647, naming the scale and both counts. */
