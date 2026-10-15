@@ -1433,7 +1433,7 @@ TEST_CASE_METHOD(EditFixture,
 }
 
 TEST_CASE_METHOD(EditFixture,"Legacy curve edit evaluates configured smooth cutoff derivatives", "[unified-dm][edit][cutoff]") {
-  auto c=make_blip_pot();c.add("RCTYPE2B","Cut_Poly");c.add("RCTYPEMB","Cut_Poly");
+  auto c=make_blip_pot();c.remove("RCTYPE2B");c.remove("RCTYPEMB");c.add("RCTYPE2B","Cut_Poly");c.add("RCTYPEMB","Cut_Poly");
   auto view=parse_pot_view(c);
   for(auto *curve:{&view.phi,&view.rho}) {
     double radius=curve->rcut;Cut_Poly cutoff(radius);
