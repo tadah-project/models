@@ -264,3 +264,10 @@ TEST_CASE("DM_Embed component metadata counts only its owned embedding columns",
     REQUIRE(meta->expected_columns(seed)==descriptor->size());
   }
 }
+
+TEST_CASE("DM_Embed analytical routing refuses unknown components and zero vector indices", "[unified-dm][derivatives]") {
+  auto c=embed_config();DC_Selector selector(c);rho_type derivative;selector.dmb->init_rhoi(derivative);
+  for(const auto &path:{"ta.other.centres","ta.other.eta"})
+    REQUIRE_FALSE(selector.dmb->calc_drhoi_dtheta(path,1,73,73,1.3,1.69,Vec3d(1.3,0,0),derivative));
+  REQUIRE_FALSE(selector.dmb->calc_drhoi_dtheta("ta.density.centres",0,73,73,1.3,1.69,Vec3d(1.3,0,0),derivative));
+}
