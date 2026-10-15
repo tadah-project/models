@@ -53,6 +53,18 @@ const char *const kSplineReason =
     " (the cubic spline that LAMMPS and tadah fit through a table reads its "
     "third point)";
 
+// LAMMPS (pair_style eam/alloy, PairEAM::compute) and tadah (eval_value,
+// D2_EAM, DM_EAM) evaluate a distance r below rcut at the spline index
+// p = r / dr + 1, converted to int and clamped to the last interval of the
+// table, whose points are r = 0, dr, ..., (nr - 1) dr: every r past the
+// last point takes the table's last value. Setfl files put the cutoff at
+// the last point, before it (the tables reach past rcut) or one step past
+// it (rcut = nr x dr, the functions zero there); a cutoff further past the
+// last point leaves the tables short of it. nr x dr may fall below rcut by
+// this fraction of rcut: the rounding of decimals printed to 6 significant
+// digits (C's %g rounds dr and rcut by up to 5e-6 each, relative) and more.
+constexpr double kSetflCutoffTolerance = 1e-4;
+
 /* The lines of a setfl text, read as LAMMPS pair eam/alloy reads them
  * (TextFileReader): lines 1-3 whole, every later line with its '#' comment
  * cut and split into words at whitespace ('\r' included), a line without
@@ -291,6 +303,33 @@ void EAMSetflIO::read_setfl_text(const std::string &text,
   t.dr_   = positive(w[3], "dr");
   t.rcut_ = positive(w[4], "rcut");
 
+  // The r tables must reach the cutoff (kSetflCutoffTolerance), and the
+  // spline index of a distance below rcut must be an int: what LAMMPS reads
+  // otherwise is not the potential (the tables' last values up to rcut; an
+  // undefined conversion).
+  using core::format_roundtrip;
+  const std::string fix =
+      " Correct nr, dr or rcut on the grid line ('nrho drho nr dr rcut').";
+  const double last = static_cast<double>(t.nr_ - 1) * t.dr_;
+  const double reach = static_cast<double>(t.nr_) * t.dr_;
+  if (!(reach >= t.rcut_ * (1.0 - kSetflCutoffTolerance)))
+    throw std::runtime_error(
+        grid_at + "the r tables do not reach the cutoff: nr = " +
+        std::to_string(t.nr_) + " points dr = " + format_roundtrip(t.dr_) +
+        " apart end at r = (nr - 1) x dr = " + format_roundtrip(last) +
+        ", and rcut = " + format_roundtrip(t.rcut_) + " lies more than one "
+        "step past their last point (nr x dr = " + format_roundtrip(reach) +
+        "); LAMMPS (pair_style eam/alloy) and tadah would take each table's "
+        "last value for every r from " + format_roundtrip(last) + " to " +
+        format_roundtrip(t.rcut_) + "." + fix);
+  const double index = t.rcut_ / t.dr_;
+  if (!(index <= static_cast<double>(std::numeric_limits<int>::max())))
+    throw std::runtime_error(
+        grid_at + "rcut / dr = " + format_roundtrip(index) + " is above " +
+        std::to_string(std::numeric_limits<int>::max()) + ": the spline index "
+        "of a distance r below rcut, r / dr + 1, which LAMMPS (pair_style "
+        "eam/alloy) and tadah compute as an int, would not fit one." + fix);
+
   // The element record: Z mass a lattice, read as LAMMPS' pair eam/alloy
   // reads it (next_values(2): Z and the mass, then the F(rho) table from
   // the next line), so a and lattice are on the line of the mass.
@@ -488,9 +527,26 @@ EAMGrid EAMSetflIO::scaled_grid(double scale) const {
   EAMGrid g;
   g.nr   = static_cast<int>(nr);
   g.nrho = static_cast<int>(nrho);
-  // Preserve the physical spans (nr-1)*dr and (nrho-1)*drho.
-  g.dr   = dr_   * static_cast<double>(nr_ - 1)   / static_cast<double>(g.nr - 1);
-  g.drho = drho_ * static_cast<double>(nrho_ - 1) / static_cast<double>(g.nrho - 1);
+  // Preserve the physical spans (nr-1)*dr and (nrho-1)*drho. A count equal
+  // to the input's keeps the input's step itself (d * (n-1) / (n-1) need
+  // not be d in double), so a scale whose counts round to the input's gives
+  // the input grid. A new r count keeps the span unless that leaves rcut
+  // more than one of the new steps past the new last point (an input whose
+  // cutoff is one step past its last point, rcut = nr x dr, on a finer
+  // grid): then the cutoff is one step past it, as in the input, dr =
+  // rcut / nr, so the written table reaches the cutoff as read_setfl_text
+  // requires.
+  if (g.nr == nr_) {
+    g.dr = dr_;
+  } else {
+    g.dr = dr_ * static_cast<double>(nr_ - 1) / static_cast<double>(g.nr - 1);
+    if (static_cast<double>(g.nr) * g.dr < rcut_)
+      g.dr = rcut_ / static_cast<double>(g.nr);
+  }
+  g.drho = g.nrho == nrho_
+               ? drho_
+               : drho_ * static_cast<double>(nrho_ - 1) /
+                     static_cast<double>(g.nrho - 1);
   g.rcut = rcut_;
   return g;
 }
