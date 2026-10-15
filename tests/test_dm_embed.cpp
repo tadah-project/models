@@ -217,3 +217,15 @@ TEST_CASE("DM_Embed blocks compose in declaration order and require unique refer
     REQUIRE_THROWS(DC_Selector(bad));
   }
 }
+
+TEST_CASE("Compact basis metadata uses inverse distance units", "[unified-dm][metadata]") {
+  for(const auto &label:{"D2_Blip","D2_Blip5","DM_Blip","DM_REAM"}) {
+    std::unique_ptr<D_Base> d(factory<D_Base>(label));
+    auto meta=d->meta();REQUIRE(meta.has_value());
+    bool checked=false;
+    for(const auto &p:meta->params)if(p.key=="SGRID2B" || p.key=="SGRIDMB") {
+      CAPTURE(label,p.key);REQUIRE(p.units=="Å^-1");checked=true;
+    }
+    REQUIRE(checked);
+  }
+}
