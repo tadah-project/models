@@ -232,3 +232,25 @@ TEST_CASE("Compact basis metadata uses inverse distance units", "[unified-dm][me
     REQUIRE(checked);
   }
 }
+
+TEST_CASE("DM_Embed composes with legacy terms in explicit order and preserves failed reinit", "[unified-dm][composition]") {
+  auto fresh=embed_config("Gaussian","Blip5");auto spec=embed_specs(fresh).at(0);
+  auto legacy=fresh;legacy.replace_blocks({});legacy.set_component_cutoffs({});legacy.remove("TYPEMB");
+  legacy.add("TYPEMB","DM_REAM 0 1 1 1 2 2 0 0 Ta Ta");legacy.add("RHOFORM","SIGNED");legacy.add("EMBF0","FREE");
+  legacy.add("CGRIDMB",2);legacy.add("SGRIDMB",2);legacy.add("AMPGRIDMB",0.3);
+  legacy.add("CEMBFUNC","0 1");legacy.add("SEMBFUNC","2 2");legacy.add("RCUTMB",5);legacy.add("RCTYPEMB","Cut_Poly");
+  DC_Selector old(legacy),modern(fresh);
+  auto values=[](DM_Base &d) {rho_type r;d.init_rhoi(r);d.calc_rho(73,73,1.37,1.37*1.37,Vec3d(1.37,0,0),r);aed_type v(d.size());v.set_zero();d.calc_aed(r,v);return v;};
+  auto a=values(*modern.dmb),b=values(*old.dmb);
+  for(bool reverse:{false,true}) {
+    auto joined=legacy;joined.append_block(embed_block(spec));joined.remove("TYPEMB");
+    joined.add("TYPEMB",reverse?"DM_REAM 0 1 1 1 2 2 0 0 Ta Ta @ta":"@ta DM_REAM 0 1 1 1 2 2 0 0 Ta Ta");
+    DC_Selector combined(joined);auto all=values(*combined.dmb);REQUIRE(all.size()==5);
+    for(std::size_t i=0;i<a.size();++i)REQUIRE(all(i+(reverse?2:0))==a(i));
+    for(std::size_t i=0;i<b.size();++i)REQUIRE(all(i+(reverse?0:3))==b(i));
+    REQUIRE_FALSE(combined.dmb->embf0_mode().has_value());
+    auto bad=joined;auto broken=spec;broken.density.amplitudes[0]=-1;bad.replace_blocks({embed_block(broken)});
+    const double before=energy(*combined.dmb,1.37);REQUIRE_THROWS(combined.dmb->reinit(bad));
+    REQUIRE(energy(*combined.dmb,1.37)==before);
+  }
+}
