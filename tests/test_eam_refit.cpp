@@ -1,10 +1,12 @@
 #include "catch2/catch.hpp"
+#include <tadah/core/core_user_config_parser.h>
 #include <tadah/core/periodic_table.h>
 #include <tadah/models/eam/eam_setfl_io.h>
 #include <tadah/models/eam/eam_refit.h>
 #include <tadah/models/eam/eam_lattice.h>
 #include <tadah/models/descriptors/d_basis_functions.h>
 #include <tadah/models/descriptors/dm/dm_ream.h>
+#include <tadah/models/descriptors/dm/embed_spec.h>
 #include <tadah/models/descriptors/dm/embf0.h>
 #include <tadah/models/descriptors/dm/rhoform.h>
 #include <tadah/models/dc_selector.h>
@@ -1264,4 +1266,71 @@ TEST_CASE_METHOD(RefitFixture,
       nonneg.fit(),
       Catch::Contains("RHOFORM NONNEG cannot fit this table") &&
           Catch::Contains("inside the fit window [1.527351, 5.000000] A"));
+}
+
+namespace {
+// A smooth single-element setfl on a compressed bcc lattice (a0 = 1.5 A, so
+// 0.8 r_reach = 0.78 A lies below r_lo = 0.2 rcut = 1.0 A), whose density
+// table is slightly negative on r in [0.80, 0.90] A: below r_lo, where no
+// fit samples the table.
+void write_compressed_setfl(const std::string &path) {
+  const int nr = 501, nrho = 501;
+  const double dr = 0.01, drho = 0.008, rc = 5.0;
+  std::ofstream os(path);
+  os << std::setprecision(17)
+     << "# compressed bcc test table\n# negative density below r_lo\n#\n"
+     << "1 Cu\n" << nrho << " " << drho << " " << nr << " " << dr << " "
+     << rc << "\n29 63.546 1.5 bcc\n";
+  for (int i = 0; i < nrho; ++i) {
+    const double q = i * drho;
+    os << -std::sqrt(q + 0.25) + 0.5 + 0.05 * q * q << "\n";
+  }
+  for (int i = 0; i < nr; ++i) {
+    const double r = i * dr, x = 1.0 - r / rc;
+    const bool dip = r > 0.795 && r < 0.905;
+    os << (dip ? -1e-4 : std::exp(-(r - 1.0)) * x * x * x) << "\n";
+  }
+  for (int i = 0; i < nr; ++i) {
+    const double r = i * dr, x = 1.0 - r / rc;
+    os << r * (2.0 * std::exp(-2.0 * (r - 1.0)) - 0.5) * x * x * x << "\n";
+  }
+}
+}  // namespace
+
+/* Pins: a component refit (DM_Embed density FORM NONNEG with amplitudes to
+ * fit) of a table whose lattice puts 0.8 r_reach below r_lo fits on
+ * [r_lo, rcut], as the legacy fit does: fit_window_r_lo() is r_lo, and a
+ * negative density node below r_lo, which no fit samples, is not refused.
+ * Before the fix the component fit used the unclamped wall-detection edge
+ * min(max(r_lo, r_K), 0.8 r_reach) = 0.78 A, sampled the table from there,
+ * refused it ("rho = -0.0001 < 0 at r = 0.800000 A, inside the fit window
+ * [0.779423, 5.000000] A") and reported that window. */
+TEST_CASE_METHOD(RefitFixture,
+                 "Component refit fit window is never below r_lo",
+                 "[unified-dm][refit][window]") {
+  ScratchFile file("compressed_component");
+  write_compressed_setfl(file.path);
+  EAMSetflIO eam;
+  eam.read_setfl(file.path);
+  eam.build_splines();
+  std::istringstream in(
+      "DESCRIPTOR cu DM_Embed\nPAIRS Cu Cu\nDENSITY\nBASIS Blip5\n"
+      "FORM NONNEG\nCENTRES 1.2 1.9 2.6 3.3 4.0\nETA 1.4 1.4 1.4 1.4 1.4\n"
+      "AMPLITUDES 0 0 0 0 0\nCUTOFF\nTYPE Cut_Poly\nRADIUS 5\nENDCUTOFF\n"
+      "ENDDENSITY\nEMBEDDING\nBASIS Gaussian\nCENTRES 0 0.5 1 1.5 2 2.5 3 "
+      "3.5 4\nETA 4 4 4 4 4 4 4 4 4\nREFERENCE ZERO\nENDEMBEDDING\n"
+      "ENDDESCRIPTOR\n");
+  const auto ctx = tadah::core::CoreUserConfigParser().parse(in);
+  EAMRefitConfig cfg;
+  cfg.component = embed_specs(ctx).at(0);
+  cfg.fit_density_amplitudes = true;
+  cfg.unified_output = true;
+  cfg.basis = "Blip5";
+  cfg.rho_form = RhoForm::NonNeg;
+  cfg.n2b = 12;
+  EAMRefit fit(eam, cfg);
+  REQUIRE_NOTHROW(fit.fit());
+  REQUIRE(fit.r_lo() == Approx(1.0));
+  REQUIRE(0.8 * fit.r_reach() < fit.r_lo());
+  REQUIRE(fit.fit_window_r_lo() == fit.r_lo());
 }

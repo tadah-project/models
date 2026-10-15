@@ -22,6 +22,8 @@
 #include <tadah/core/stats/data_stats.h>
 
 #include <algorithm>
+#include <cmath>
+#include <memory>
 
 using namespace tadah::models;
 using tadah::core::Context;
@@ -284,4 +286,66 @@ TEST_CASE("descriptor coverage: every registered descriptor has meta()") {
 
   CAPTURE(missing);
   REQUIRE(missing.empty());
+}
+
+// ----------------------------------------------------------------
+// Width bounds follow the units of the width coordinate. The compact
+// bump families (D2_Blip, D2_Blip5, DM_Blip) evaluate b(eta (r - c)) with
+// support |eta (r - c)| < 2: eta is an inverse distance (Å^-1), so the
+// suggested bounds scale as 1/length when every distance in the data is
+// scaled. The Gaussian families (D2_BP, DM_EAD) evaluate exp(-eta (r -
+// c)^2): eta is an inverse squared distance (Å^-2), scaling as 1/length^2.
+// ----------------------------------------------------------------
+
+namespace {
+DataStats scaled_stats(const DataStats &d, double s) {
+  DataStats out = d;
+  for (auto &pp : out.per_pair) {
+    pp.r_min *= s;
+    pp.r_max *= s;
+    for (auto &v : pp.r_percentiles) v *= s;
+    for (auto &peak : pp.r_peaks) {
+      peak.position *= s;
+      peak.fwhm *= s;
+    }
+  }
+  return out;
+}
+}  // namespace
+
+/* Pins: for each family the suggested SGRID2B/SGRIDMB bounds of data whose
+ * distances are doubled are the bounds of the original data divided by 2
+ * (bump families, Å^-1) or by 4 (Gaussian families, Å^-2), matching the
+ * units the metadata declares. Before the fix the bump families declared
+ * Å^-1 but returned 0.25/s^2 .. 25/s^2 (D2) and 0.25/w^2 .. 9/w^2 (DM), so
+ * doubling the distances divided their bounds by 4. */
+TEST_CASE("Suggested width bounds scale with the units of the width coordinate",
+          "[unified-dm][metadata]") {
+  const DataStats base = make_ta_like_stats();
+  const DataStats twice = scaled_stats(base, 2.0);
+  Context ctx = make_context_with_optim_keys();
+  SeedView sv(ctx);
+  struct Family { const char *label; const char *key; const char *units; int power; };
+  for (const Family &f : {Family{"D2_Blip", "SGRID2B", "Å^-1", 1},
+                          Family{"D2_Blip5", "SGRID2B", "Å^-1", 1},
+                          Family{"DM_Blip", "SGRIDMB", "Å^-1", 1},
+                          Family{"D2_BP", "SGRID2B", "Å^-2", 2},
+                          Family{"DM_EAD", "SGRIDMB", "Å^-2", 2}}) {
+    CAPTURE(f.label);
+    std::unique_ptr<D_Base> d(tadah::core::factory<D_Base>(f.label));
+    auto meta = d->meta();
+    REQUIRE(meta.has_value());
+    const ParamMeta *width = nullptr;
+    for (const auto &p : meta->params)
+      if (p.key == f.key) width = &p;
+    REQUIRE(width != nullptr);
+    REQUIRE(width->units == f.units);
+    const auto b1 = width->suggest(base, sv, 0);
+    const auto b2 = width->suggest(twice, sv, 0);
+    REQUIRE(b1.first > 0.0);
+    REQUIRE(b1.second > b1.first);
+    const double factor = std::pow(2.0, f.power);
+    REQUIRE(b2.first == Approx(b1.first / factor).epsilon(1e-12));
+    REQUIRE(b2.second == Approx(b1.second / factor).epsilon(1e-12));
+  }
 }
