@@ -581,29 +581,41 @@ void EAMRefit::check_rho_table(double win_lo) const {
   const std::string window = "the fit window [" +
                              tadah::core::to_string(win_lo, 6) + ", " +
                              tadah::core::to_string(rcut_, 6) + "] A";
+  // The key that declares the form, and its remedy: a component's FORM (a
+  // configuration with DESCRIPTOR blocks refuses the DM_REAM key RHOFORM),
+  // or RHOFORM.
+  const std::string who =
+      cfg_.component ? "the density component " +
+                           tadah::core::to_upper(cfg_.component->id) +
+                           "'s FORM "
+                     : "RHOFORM ";
+  const auto use = [&](const std::string &forms) {
+    return cfg_.component ? "Use FORM " + forms + " in its DENSITY block."
+                          : "Use RHOFORM " + forms + ".";
+  };
   for (const std::size_t i : nodes) {
     if (!(tab[i] < -tol)) continue;
     throw std::runtime_error(
-        "EAMRefit: RHOFORM " + form + " cannot fit this table: the "
+        "EAMRefit: " + who + form + " cannot fit this table: the "
         "tabulated density is rho = " + tadah::core::format_roundtrip(tab[i]) +
         " < 0 at r = " +
         tadah::core::to_string(static_cast<double>(i) * eam_.dr(), 6) +
         " A, inside " + window + ", and a " + form + " density is >= 0 "
-        "(every amplitude a_n >= 0). Use RHOFORM SIGNED.");
+        "(every amplitude a_n >= 0). " + use("SIGNED"));
   }
   if (cfg_.rho_form != RhoForm::Monotone) return;
   for (std::size_t q = 0; q + 1 < nodes.size(); ++q) {
     const std::size_t i = nodes[q], j = nodes[q + 1];
     if (!(tab[j] - tab[i] > tol)) continue;
     throw std::runtime_error(
-        "EAMRefit: RHOFORM MONOTONE cannot fit this table: the tabulated "
+        "EAMRefit: " + who + "MONOTONE cannot fit this table: the tabulated "
         "density rises from rho = " + tadah::core::format_roundtrip(tab[i]) +
         " at r = " +
         tadah::core::to_string(static_cast<double>(i) * eam_.dr(), 6) +
         " A to " + tadah::core::format_roundtrip(tab[j]) + " at r = " +
         tadah::core::to_string(static_cast<double>(j) * eam_.dr(), 6) +
         " A, inside " + window + ", and a MONOTONE density is "
-        "non-increasing. Use RHOFORM NONNEG or SIGNED.");
+        "non-increasing. " + use("NONNEG or SIGNED"));
   }
 }
 
