@@ -1,6 +1,8 @@
 #ifndef TADAH_MODELS_EAM_LATTICE_H
 #define TADAH_MODELS_EAM_LATTICE_H
 
+#include <tadah/core/number_format.h>
+
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -53,6 +55,48 @@ inline double nn_distance(const std::string &lattice, double a) {
   if (lattice == "fcc") return a / std::sqrt(2.0);
   if (lattice == "hcp") return a;
   return a * std::sqrt(3.0) / 2.0;  // bcc (and fallback)
+}
+
+/** The nearest-neighbour distance of the crystal of lattice constant \p a0
+ *  compressed to a/a0 = \p reach_smin (REFIT_REACH_SMIN): the shortest
+ *  pair distance the refit's crystal sums visit, EAMRefit::r_reach(), which
+ *  is computed by this function. \p lattice in the canonical lower case
+ *  (as nn_distance). */
+inline double reach_distance(const std::string &lattice, double a0,
+                             double reach_smin) {
+  return reach_smin * nn_distance(lattice, a0);
+}
+
+/** The crystal gate of `tadah refit`: require_crystal(), and the crystal at
+ *  the strongest compression the refit tests, a/a0 = \p reach_smin
+ *  (REFIT_REACH_SMIN: the self-test's E-V scan and the reachability sweep
+ *  start there), must have its nearest neighbours at least the step \p dr
+ *  of the table's radial grid apart (reach_distance() >= dr). Closer, the
+ *  table, tabulated at r = 0, dr, 2 dr, ..., describes no pair distance of
+ *  that crystal: a lattice constant in the wrong unit or a subnormal one
+ *  (whose distance underflows to 0, and whose neighbour count does not fit
+ *  the enumeration's int). So EAMRefit::r_reach() >= dr > 0 for every
+ *  table it passes. Case-insensitive like require_crystal; throws
+ *  std::runtime_error naming a0, the lattice, the distance,
+ *  REFIT_REACH_SMIN and dr (each as the shortest text that reads back to
+ *  it). */
+inline void require_crystal_on_grid(const std::string &lattice, double a0,
+                                    double reach_smin, double dr) {
+  require_crystal(lattice, a0);
+  std::string l = lattice;
+  for (auto &ch : l) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+  const double r = reach_distance(l, a0, reach_smin);
+  if (r >= dr) return;
+  throw std::runtime_error(
+      "tadah refit: the lattice constant of the EAM header, a0 = " +
+      core::format_roundtrip(a0) + " A, puts the nearest neighbours of the " +
+      l + " crystal " + core::format_roundtrip(r) + " A apart at the "
+      "strongest compression the refit tests (a/a0 = REFIT_REACH_SMIN " +
+      core::format_roundtrip(reach_smin) + "), less than the step of the "
+      "table's radial grid, dr = " + core::format_roundtrip(dr) + " A: the "
+      "table describes no pair distance of that crystal. Edit the element "
+      "line of the setfl file (`<Z> <mass> <a0> <lattice>`): set the "
+      "equilibrium lattice constant, in Angstrom.");
 }
 
 /** All neighbour distances (one central atom) within \p rcut for lattice
