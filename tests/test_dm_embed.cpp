@@ -254,3 +254,13 @@ TEST_CASE("DM_Embed composes with legacy terms in explicit order and preserves f
     REQUIRE(energy(*combined.dmb,1.37)==before);
   }
 }
+
+TEST_CASE("DM_Embed component metadata counts only its owned embedding columns", "[unified-dm][metadata]") {
+  auto parent=embed_config();auto second=embed_specs(parent).at(0);second.id="tb";
+  parent.append_block(embed_block(second));DC_Selector all(parent);SeedView seed(parent);
+  for(const auto &child:embed_contexts(parent)) {
+    std::unique_ptr<DM_Base> descriptor(factory<DM_Base,const Context&>(child.get<std::string>("TYPEMB"),child));
+    auto meta=descriptor->meta();REQUIRE(meta.has_value());REQUIRE(bool(meta->expected_columns));
+    REQUIRE(meta->expected_columns(seed)==descriptor->size());
+  }
+}
