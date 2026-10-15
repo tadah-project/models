@@ -3,6 +3,7 @@
 #include <tadah/core/periodic_table.h>
 #include <tadah/models/dc_selector.h>
 #include <tadah/models/descriptors/d_basis_functions.h>
+#include <tadah/models/descriptors/dm/dm_embed.h>
 #include <memory>
 #include <sstream>
 
@@ -93,4 +94,57 @@ TEST_CASE("DM_Embed force buffers are additive and invalid reinit preserves stat
   for(std::size_t m=0;m<3;++m) g(m,0)=7;
   s.dmb->calc_dXijdri(73,73,1.3,1.69,Vec3d(1.3,0,0),rho,g);
   for(std::size_t m=0;m<3;++m) REQUIRE(g(m,0)==Approx(7+f(m,0)));
+}
+
+TEST_CASE("DM_Embed Wendland values derivatives and integrated tails have independent rational references",
+          "[unified-dm][reference]") {
+  for(bool c4:{false,true}) {
+    auto c=embed_config(c4?"WendlandC4":"WendlandC2",c4?"WendlandC4":"WendlandC2","MONOTONE","NONE");
+    auto spec=embed_specs(c).at(0); EmbedEvaluator e(spec);
+    const auto g=e.embedding(0,0.25);
+    // x = eta*q = 1/2. Independently expanded/differentiated polynomials.
+    REQUIRE(g.value==Approx((c4?83.0/768:3.0/16)-1));
+    REQUIRE(g.deriv==Approx(2*(c4?-49.0/48:-5.0/4)));
+    REQUIRE(g.second==Approx(4*(c4?161.0/24:5.0)));
+    const auto tail=e.density(1.25,'a',0);
+    REQUIRE(tail.value==Approx(c4?125.0/8192:1.0/32));
+    REQUIRE(tail.deriv==Approx(c4?-747.0/2048:-9.0/16));
+    REQUIRE(e.density(0,'a',0).value==1);
+    REQUIRE(e.density(3,'a',0).value==0);
+  }
+}
+
+TEST_CASE("DM_Embed named derivatives include width Jacobians zero references and force chains",
+          "[unified-dm][derivatives]") {
+  for(const auto &family:{"Blip","Blip5","Gaussian","Knot5","WendlandC2","WendlandC4"})
+    for(const auto &env:{"OFF","SinInv","Smoothstep2","Smoothstep4"}) {
+      auto c=embed_config(family,family,"NONNEG","Cut_Poly",env,true);
+      DC_Selector s(c); const double r=1.37,h=2e-6;
+      for(const auto &binding:embed_bindings(c)) {
+        CAPTURE(family,env,binding.path);
+        const int pos=1;
+        auto plus=c,minus=c;
+        binding.write(plus,0,binding.values[0]+h);
+        binding.write(minus,0,binding.values[0]-h);
+        DC_Selector p(plus),m(minus);
+        const double fd=(energy(*p.dmb,r)-energy(*m.dmb,r))/(2*h);
+        rho_type rho,drho; s.dmb->init_rhoi(rho); s.dmb->init_rhoi(drho);
+        s.dmb->calc_rho(73,73,r,r*r,Vec3d(r,0,0),rho);
+        aed_type a(3),da(3); a.set_zero(); da.set_zero(); s.dmb->calc_aed(rho,a);
+        REQUIRE(s.dmb->calc_drhoi_dtheta(binding.path,pos,73,73,r,r*r,Vec3d(r,0,0),drho));
+        REQUIRE(s.dmb->calc_daed_dtheta(binding.path,pos,rho,drho,da));
+        double value=0; for(std::size_t j=0;j<3;++j) value+=(j+1)*da(j);
+        REQUIRE(value==Approx(fd).margin(3e-7));
+        auto force=[&](DM_Base &d) {
+          rho_type pr; d.init_rhoi(pr); d.calc_rho(73,73,r,r*r,Vec3d(r,0,0),pr);
+          aed_type pa(3); pa.set_zero(); d.calc_aed(pr,pa);
+          fd_type pf(3); pf.set_zero(); d.calc_dXijdri(73,73,r,r*r,Vec3d(r,0,0),pr,pf);
+          double out=0; for(std::size_t j=0;j<3;++j) out+=(j+1)*pf(j,0); return out;
+        };
+        fd_type df(3); df.set_zero();
+        REQUIRE(s.dmb->calc_dXijdri_dtheta(binding.path,pos,73,73,r,r*r,Vec3d(r,0,0),rho,drho,df));
+        value=0; for(std::size_t j=0;j<3;++j) value+=(j+1)*df(j,0);
+        REQUIRE(value==Approx((force(*p.dmb)-force(*m.dmb))/(2*h)).margin(3e-7));
+      }
+    }
 }
