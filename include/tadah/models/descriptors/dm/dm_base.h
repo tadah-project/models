@@ -243,9 +243,11 @@ public:
     return false;
   }
 
-  /** Back-compat string-keyed shim. Decodes once and dispatches to the
-   *  enum-keyed virtual above. NOT virtual — derived classes override
-   *  the enum form. Layer-1 tests still call this signature. */
+  /** String-keyed form, the one the dPhi/dtheta walker calls. Decodes the
+   *  legacy key once and dispatches to the enum-keyed virtual above, which
+   *  the legacy descriptors override. A descriptor whose parameters are
+   *  named component paths (DM_Embed) or that routes them to its children
+   *  (DM_mJoin) overrides this form. */
   virtual bool calc_drhoi_dtheta(
       const std::string& theta_name,
       int                arg_pos,
@@ -291,7 +293,8 @@ public:
     return false;
   }
 
-  /** Back-compat string-keyed shim — decodes once, calls enum virtual. */
+  /** String-keyed form (see calc_drhoi_dtheta): decodes once, calls the
+   *  enum virtual. */
   virtual bool calc_daed_dtheta(
       const std::string& theta_name,
       int                arg_pos,
@@ -357,7 +360,8 @@ public:
     return false;
   }
 
-  /** Back-compat string-keyed shim — decodes once, calls enum virtual. */
+  /** String-keyed form (see calc_drhoi_dtheta): decodes once, calls the
+   *  enum virtual. */
   virtual bool calc_dXijdri_dtheta(
       const std::string& theta_name,
       int                arg_pos,
