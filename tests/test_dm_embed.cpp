@@ -122,10 +122,11 @@ TEST_CASE("DM_Embed named derivatives include width Jacobians zero references an
       DC_Selector s(c); const double r=1.37,h=2e-6;
       for(const auto &binding:embed_bindings(c)) {
         CAPTURE(family,env,binding.path);
-        const int pos=1;
+        const std::size_t index=binding.path.find(".EMBEDDING.")!=std::string::npos && binding.values.size()>1?1:0;
+        const int pos=static_cast<int>(index+1);
         auto plus=c,minus=c;
-        binding.write(plus,0,binding.values[0]+h);
-        binding.write(minus,0,binding.values[0]-h);
+        binding.write(plus,index,binding.values[index]+h);
+        binding.write(minus,index,binding.values[index]-h);
         DC_Selector p(plus),m(minus);
         const double fd=(energy(*p.dmb,r)-energy(*m.dmb,r))/(2*h);
         rho_type rho,drho; s.dmb->init_rhoi(rho); s.dmb->init_rhoi(drho);
