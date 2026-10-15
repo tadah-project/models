@@ -66,8 +66,10 @@ double EAMRefit::F_ref(double rho) const {
   return eam_.F_tab(rho) - F0tab_;                // ZERO: exactly 0 at rho = 0
 }
 
-// Hard cutoff (Cut_Dummy): f_c=1 inside r_cut, 0 beyond — matches LAMMPS
-// eam/alloy so the native fit reproduces the original tabulated potential.
+// The spatial cutoff the written potential evaluates (EAMRefitConfig::rctype,
+// RCTYPE2B and the density's cutoff): f_c(r) inside r_cut, 0 beyond. The
+// hard Cut_Dummy (f_c = 1 inside r_cut) matches LAMMPS eam/alloy, so the
+// native fit reproduces the original tabulated potential.
 double EAMRefit::cutoff(double r) const {
   return r<=rcut_?spatial_cutoff_->calc(r):0;
 }
@@ -546,8 +548,9 @@ double EAMRefit::rho_term(double r, std::size_t n) const {
 }
 
 // The terms in DM_REAM's order (ascending n, a_n times the term, the cutoff
-// outside the sum): for r < rcut, where both cutoffs are 1, this is the pair
-// density of the written potential, including under MONOTONE.
+// outside the sum, f_c(r) of the configured spatial cutoff): for r < rcut
+// this is the pair density of the written potential, including under
+// MONOTONE.
 double EAMRefit::rho_fit(double r) const {
   if(component_evaluator_) return component_evaluator_->density(r).value;
   const double fc = cutoff(r);
@@ -866,6 +869,11 @@ tadah::core::Context EAMRefit::build_pot_context() const {
 }
 
 void EAMRefit::fit_components(double rwin_lo) {
+  // The density's fit window, as the legacy fit's (fit()): the wall edge
+  // rwin_lo may lie below r_lo (0.8 r_reach < r_lo), but nothing below r_lo
+  // is fitted, so neither the samples nor the NONNEG/MONOTONE table check
+  // start below it.
+  const double win=std::max(rwin_lo,r_lo_);
   auto spec=*cfg_.component;
   const auto nr=static_cast<std::size_t>(std::max(2048,cfg_.oversample*static_cast<int>(spec.density.centres.size())));
   const auto nf=static_cast<std::size_t>(std::max(2048,cfg_.oversample*static_cast<int>(spec.embedding.centres.size())));
@@ -895,17 +903,17 @@ void EAMRefit::fit_components(double rwin_lo) {
     st.n=rows;st.rmse=std::sqrt(sum/rows);st.mae=abs/rows;return st;
   };
   if(cfg_.fit_density_amplitudes) {
-    check_rho_table(rwin_lo);
+    check_rho_table(win);
     rho_stats_=solve(nr,spec.density.centres.size(),
       [&](std::size_t i,double q){return component_evaluator_->density(q,'a',i).value;},
-      [&](double q){return eam_.rho_tab(q);},rhoform_is_positive(spec.form),rwin_lo,spec.radius,spec.density.amplitudes);
+      [&](double q){return eam_.rho_tab(q);},rhoform_is_positive(spec.form),win,spec.radius,spec.density.amplitudes);
   }
   cfg_.component=spec;
   component_evaluator_=std::make_unique<EmbedEvaluator>(spec);
   if(!cfg_.fit_density_amplitudes) {
     double square=0,absolute=0;
     for(std::size_t i=0;i<nr;++i) {
-      double q=rwin_lo+(spec.radius-rwin_lo)*i/(nr-1);
+      double q=win+(spec.radius-win)*i/(nr-1);
       double error=component_evaluator_->density(q).value-eam_.rho_tab(q);
       square+=error*error;absolute+=std::abs(error);rho_stats_.maxabs=std::max(rho_stats_.maxabs,std::abs(error));
     }
@@ -918,7 +926,7 @@ void EAMRefit::fit_components(double rwin_lo) {
   srho_.clear();for(std::size_t i=0;i<crho_.size();++i) srho_.push_back(embed_eta(spec.density,i));
   cF_=spec.embedding.centres;sF_.clear();for(std::size_t i=0;i<cF_.size();++i) sF_.push_back(embed_eta(spec.embedding,i));
   degrho_=spec.density.degrees;degF_=spec.embedding.degrees;
-  fit_r_lo_=rwin_lo;fit_rho_hi_=rhomax_;
+  fit_r_lo_=win;fit_rho_hi_=rhomax_;
   weights_=c2b_;weights_.insert(weights_.end(),cmb_.begin(),cmb_.end());
 }
 
