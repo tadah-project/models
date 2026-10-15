@@ -257,10 +257,9 @@ TEST_CASE( "Testing Cutoffs: Cut_PT", "[Cut_PT]" ) {
 /* Pins: f(0) and f(r_cut) of every cutoff are the values of the
  * documentation's cutoff table (Tadah.MLIP docs, cutoffs.rst): 1 and 0 for
  * the spatial tapers, tanh(1)^3 (about 0.442) and 0 for Cut_Tanh (the
- * normalisation the UDM-006 correction documents), 1 and 0 for the
- * normalised Cut_PT, and 0 and 1 for the inverse envelope Cut_SinInv. The
- * correction changed the documentation, not the code: this pins the code to
- * it (no test checked f(0) before). */
+ * documented normalisation), 1 and 0 for the normalised Cut_PT, and 0 and
+ * 1 for the inverse envelope Cut_SinInv. The documentation was corrected,
+ * not the code: this pins the code to it (no test checked f(0) before). */
 TEST_CASE("Cutoff values at the origin and the radius are those of the "
           "cutoff table",
           "[cutoffs][unified-dm]") {

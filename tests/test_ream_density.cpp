@@ -240,7 +240,7 @@ TEST_CASE("ReamDensity::scan_grid is bitwise value() for a non-finite "
           "SIGNED amplitude too", "[ream][rhoform][density]") {
   // SIGNED accepts any amplitude, as tadah did before 1.6.0. An infinite a_n makes
   // its term a_n * 0 = NaN outside the bump as well, so the scan must not
-  // skip it there (the review found rho = 0.082 where value() is NaN).
+  // skip it there (rho = 0.082 was found where value() is NaN).
   ReamDensity d;
   d.basis = BasisKind::Blip5;
   d.form = RhoForm::Signed;
@@ -506,7 +506,7 @@ TEST_CASE_METHOD(DensityFixture, "DM_REAM: density form validation messages",
     }
   }
   SECTION("NONNEG / MONOTONE: a non-finite centre or width") {
-    // each would make rho NaN (review: pair_density(2.5) = nan was accepted)
+    // each would make rho NaN (pair_density(2.5) = nan was accepted)
     const double inf = std::numeric_limits<double>::infinity();
     for (const FormCase &fc : {FormCase{BasisKind::Blip5, "NONNEG", true},
                                FormCase{BasisKind::Knot5, "NONNEG", true},
@@ -1071,7 +1071,7 @@ TEST_CASE_METHOD(DensityFixture,
                  "rhoform: the OPTIM low-bound rule of a configuration adds "
                  "every radial bump width > 0 to the density-form rules",
                  "[ream][rhoform][optim_rule][bump_width]") {
-  // Owner decision (2026-09-29, C8): a radial bump channel -- SGRID2B of a
+  // A radial bump channel -- SGRID2B of a
   // D2_Blip/D2_Blip5 pair term, SGRIDMB of a DM_REAM Blip/Blip5 density --
   // needs every width > 0 in every RHOFORM: a bump spans [c - w/s, c + w/s],
   // and a width <= 0 has no support edge. The density-form rules

@@ -20,9 +20,9 @@ namespace models {
  * I_no_bias) where the intercept columns (the first `n_bias`) are
  * unregularised.
  *
- * Phase 2A only supports `Algorithm::NormalEquations` (OALGO=4); other
+ * Only `Algorithm::NormalEquations` (OALGO=4) is supported; other
  * algorithms throw at construction time. SVD-based IFT (for OALGO=1/2/3)
- * is deferred to Phase 2C.
+ * is not implemented.
  *
  * Lifetime: the handle owns its own buffer (std::vector<double>), so
  * the workspace that produced it can be freely reused / reallocated
@@ -48,7 +48,7 @@ struct FactorHandle {
   std::size_t n_bias = 0;
 
   /** Algorithm used to produce the factor. Only NormalEquations is
-   *  supported in Phase 2A. */
+   *  supported. */
   Algorithm algo = Algorithm::NormalEquations;
 
   /** True after a successful solveAndCacheFactor; false on default-

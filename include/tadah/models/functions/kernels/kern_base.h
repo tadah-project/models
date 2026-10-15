@@ -56,7 +56,7 @@ class Kern_Base: public virtual Function_Base {
         /** \brief Closed-form derivative of K(b, af) with respect to a
          *  named kernel hyperparameter.
          *
-         *  Used by HPO analytical / hybrid gradients (Phase 2) — parallel
+         *  Used by HPO analytical / hybrid gradients — parallel
          *  to D2_Base::calc_dDdtheta on the kernel arm. The default
          *  returns false: "this kernel does not own theta_name". Concrete
          *  kernels override for the (theta_name, arg_pos) pairs they

@@ -5,7 +5,7 @@
 //
 // Each registered descriptor (D2_*, DM_*) optionally returns a
 // DescriptorMeta from its overridden `D_Base::meta() const`. The
-// pipeline (Phases 4 / 5 / 6 / 7) reads this metadata to:
+// HPO bound-validation pipeline reads this metadata to:
 //
 //   * Suggest data-driven OPTIM bounds (BoundSuggester).
 //   * Diagnose degenerate parameter combinations (HealthCheck).
@@ -58,8 +58,8 @@ struct HardLimit {
 /** \brief Whether a parameter must be optimised.
  *  - Critical: a fixed value that misses the data can make the
  *    descriptor vanish (e.g. a CGRIDMB centre outside the neighbour
- *    distances collapses ρ); used by Phase 5 to warn when no OPTIM
- *    block is present.
+ *    distances collapses ρ); used by the pre-flight audit to warn when
+ *    no OPTIM block is present.
  *  - Recommended: optimisation usually helps; not strictly necessary.
  *  - Optional: routine to fix.
  */
@@ -185,7 +185,7 @@ using HealthCheck = std::function<HealthVerdict(
     const SeedView&)>;
 
 /** \brief Predict the number of design-matrix columns this descriptor
- *  occupies, given a seed. Used by Phase 2 (ColumnLayout) to populate
+ *  occupies, given a seed. Used by ColumnLayout to populate
  *  the per-block layout without instantiating descriptors.
  */
 using ColumnCounter = std::function<std::size_t(const SeedView&)>;
@@ -214,7 +214,7 @@ struct ParamMeta {
   HealthCheck    check{};
 
   /** Per-parameter aggregate thresholds used by the per-iter health
-   *  monitor (Phase 6). All have rationale-bearing defaults; descriptors
+   *  monitor. All have rationale-bearing defaults; descriptors
    *  may override.
    *
    *  drift_to_bound_threshold: a parameter that sits within
@@ -251,10 +251,9 @@ struct DescriptorMeta {
   ColumnCounter                  expected_columns{};
   /** Block-dead column-norm-ratio threshold, in [0, 1). A column block
    *  whose median column norm is < `block_dead_norm_ratio * max_block_norm`
-   *  is flagged "dead" by the pre-flight audit (Phase 5). The default
-   *  comes from `DESIGN_GENERALITY_ACROSS_MATERIALS.md` §"What is
-   *  universal" — a column block 6 orders of magnitude smaller than
-   *  another block in the same matrix has no meaningful signal. */
+   *  is flagged "dead" by the pre-flight audit. The default: a column
+   *  block 6 orders of magnitude smaller than another block in the same
+   *  matrix has no meaningful signal. */
   double block_dead_norm_ratio{1.0e-6};
 };
 

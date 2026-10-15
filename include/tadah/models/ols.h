@@ -152,7 +152,7 @@ void solveWithPseudoinverse(int m, int n, V1& B, V2& weights, memory::SVDWorkspa
      * @ref LinearRegressor::backsolve without re-factorising.
      *
      * Only NormalEquations is supported. Pseudoinverse / GELS / GELSD
-     * paths require an SVD-based IFT not implemented in Phase 2A.
+     * paths require an SVD-based IFT, which is not implemented.
      *
      * @tparam M Type of the matrix A.
      * @tparam V Type of the vectors B and weights.

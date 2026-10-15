@@ -5,9 +5,8 @@
 // Cut_Base::calc_drcut. The reference is a central finite difference
 // constructed from two freshly-built cutoff instances at rcut +/- h.
 //
-// Cut_Cos and Cut_Dummy are covered separately in test_d2_bp_dtheta.cpp
-// (left there since 2A.3); this file picks up the rest of the family
-// added in Phase 2B.
+// Cut_Cos and Cut_Dummy are covered separately in test_d2_bp_dtheta.cpp;
+// this file covers the rest of the family.
 
 #include "catch2/catch.hpp"
 
@@ -372,8 +371,8 @@ TEST_CASE("Cut_SinInv calc_prime_drcut returns 0 above rcut",
 /* ------------------------------------------------------------------- *
  *  Layer-1 parity tests for calc_double_prime — d^2 f_c / dr^2 at fixed
  *  rcut, central-FD reference on calc_prime. Required by F_mEnv::calc_d2F
- *  to close the radial-θ force chain for DM_mEAD<F_mEnv> configs (Phase
- *  2D follow-up). Same FD harness as fd_drcut: build a fresh cutoff so
+ *  to close the radial-θ force chain for DM_mEAD<F_mEnv> configs. Same FD
+ *  harness as fd_drcut: build a fresh cutoff so
  *  any rcut-dependent precomputed state is reset. The reference here
  *  perturbs r (not rcut), so a single instance is fine.
  * ------------------------------------------------------------------- */

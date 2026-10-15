@@ -196,7 +196,7 @@ TEST_CASE_METHOD(WatomTestFixture, "WATOM default (no WATOM key) leaves pair wei
 
 TEST_CASE_METHOD(WatomTestFixture, "WATOM single-species H reduces to old per-Zj semantics",
           "[D_Base][watom][dual_format][regression]") {
-  // Phase 2C-WATOM regression: single H species → diagonal chain == 1.0,
+  // WATOM regression: single H species → diagonal chain == 1.0,
   // recovers the old δ(Zj, Z_target) gate.
   Context c = make_minimal_blip_context_watom_tests();
   c.add("ATOM", "H");

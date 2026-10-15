@@ -265,7 +265,7 @@ TEST_CASE_METHOD(TestFixture,
 }
 
 // ----------------------------------------------------------------------
-// Force-descriptor θ-derivative parity (Phase 2C C-step).
+// Force-descriptor θ-derivative parity.
 // fd_radial(c) = w(Zj) * (fc * eta_c * b'(x_c) + fcp * B(x_c))
 // FD reference: central difference of calc_dXijdri at perturbed θ.
 // Probes stay strictly inside |x_c| in (0,1) ∪ (1,2) and at least 0.2
@@ -438,7 +438,7 @@ TEST_CASE_METHOD(TestFixture,
 }
 
 // ----------------------------------------------------------------------
-// WATOM parity (Phase 2C-WATOM).
+// WATOM parity.
 // D2_Blip's per-pair contribution is weights[Zj] * t_pair; the WATOM
 // derivative drops the weights[Zj] factor and only fires when Zj matches
 // the species the optimised W[arg_pos] indexes into.

@@ -1,5 +1,5 @@
-// Catch2 v2 tests for the per-descriptor metadata schema introduced in
-// Phase 1 of the HPO bound-validation pipeline. Verifies:
+// Catch2 v2 tests for the per-descriptor metadata schema of the HPO
+// bound-validation pipeline. Verifies:
 //   * D_Base::meta() default returns nullopt
 //   * D2_Blip::meta() returns a DescriptorMeta with the expected
 //     parameter set, suggester output, and column counter
@@ -255,7 +255,7 @@ TEST_CASE("DM_mBlipEnv expected_columns equals CEMBFUNC size") {
 }
 
 // ----------------------------------------------------------------
-// Phase 8 — Coverage audit
+// Coverage audit
 //
 // Assert that every registered D_Base subclass either has a populated
 // meta() or is on the exempt list (Dummy / mJoin meta-descriptors).

@@ -172,7 +172,7 @@ std::optional<BasisKind> optim_rule_basis(const tadah::core::Context &ctx);
  *  DM_REAM children count) and SGRID2B of a D2_Blip or D2_Blip5 pair term
  *  (potedit::bump_channel_halfwidth): a bump spans [c - w/s, c + w/s], and
  *  a width s <= 0 has no support edge, so no bump-support rule can hold it
- *  inside the cutoff (owner decision 2026-09-29). tadah hpo refuses such a
+ *  inside the cutoff. tadah hpo refuses such a
  *  box and such a seed width at startup; tadah analysis check_bounds
  *  reports it. Throws the migration text (require_rhoform) for a DM_REAM
  *  configuration without RHOFORM. */

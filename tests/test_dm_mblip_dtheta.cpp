@@ -56,7 +56,7 @@ struct TestFixture {
 
 /* Context builder for DM_mEAD<F_Blip> (= DM_mBlip).
  *
- * Note that F_Blip enforces CGRIDMB and SGRIDMB to be size 1; the
+ * F_Blip enforces CGRIDMB and SGRIDMB to be size 1; the
  * embedding output dimension comes from CEMBFUNC / SEMBFUNC sizes. */
 Context make_mblip_mb_context(double               cgrid_val,
                               double               sgrid_val,
@@ -1051,7 +1051,7 @@ TEST_CASE_METHOD(TestFixture,
 }
 
 /* ------------------------------------------------------------------------
- * Phase 2C-WATOM — WATOM[1] parity for DM_mBlip<F_Blip>.
+ * WATOM[1] parity for DM_mBlip<F_Blip>.
  * d(rho)/d WATOM[Z_target] is the unweighted per-pair calc_rho contribution
  * fired only on pairs with Zj == Z_target; calc_daed_dtheta chains via
  * F'(rho) * drho/dWATOM. For the force side, the additional direct-factor
@@ -1239,7 +1239,7 @@ TEST_CASE_METHOD(TestFixture,
 
 /* ------------------------------------------------------------------------
  * DM_mBlipEnv FORCE-side closed forms — exercises the radial-θ chain
- * through F_mEnv::calc_d2F (Phase 2D follow-up). Without this, the
+ * through F_mEnv::calc_d2F. Without this, the
  * radial-θ branch in DM_mEAD::calc_dXijdri_dtheta returned false for
  * any F_mEnv config because calc_d2F was a stub. With Cut_*::calc_double_prime
  * + the product-rule wiring, the chain is fully analytical.

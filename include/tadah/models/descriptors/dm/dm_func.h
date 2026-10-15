@@ -376,7 +376,7 @@ public:
     }
     if (theta_name == "RCUTENV") {
       /* Fanned out — every p contributes. dfcut/drcut comes from the
-       * cutoff's calc_drcut method (Phase 2A.3 family). */
+       * cutoff's calc_drcut method. */
       out = fcut.calc_drcut(rho) * B(rho, sfuncgrid[p], cfuncgrid[p]);
       return true;
     }
@@ -392,7 +392,7 @@ public:
    *
    *  fcut'' is supplied by Cut_Base::calc_double_prime (default 0; smooth
    *  cutoffs override). Closes the radial-θ force chain for
-   *  DM_mEAD<F_mEnv> configs (Phase 2D follow-up).
+   *  DM_mEAD<F_mEnv> configs.
    *
    *  Note on smoothness: the blip B is C^2 globally (b'' is continuous,
    *  piecewise linear; only b''' jumps at the knots x_c = 0, +-1, +-2).

@@ -306,7 +306,7 @@ TEST_CASE_METHOD(TestFixture,
 }
 
 /* ------------------------------------------------------------------------
- * Phase 2C-WATOM — WATOM[1] parity for DM_EAD. Same chain-rule structure
+ * WATOM[1] parity for DM_EAD. Same chain-rule structure
  * as DM_mBlip's WATOM test: drho/dW[Z] is the unweighted per-pair
  * contribution fired only on pairs with Zj == Z_target; calc_daed_dtheta
  * chains via F'(rho) * drho/dW[Z]. f doesn't depend on WATOM.

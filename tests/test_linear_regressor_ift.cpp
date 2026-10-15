@@ -1,7 +1,7 @@
 // test_linear_regressor_ift.cpp
 //
 // Layer-2 parity tests for the implicit-function-theorem (IFT) gradient
-// path used by HPO analytical / hybrid gradients in Phase 2.
+// path used by HPO analytical / hybrid gradients.
 //
 // What we test:
 //   1. solveAndCacheFactor produces the same weights as OLS::solve under

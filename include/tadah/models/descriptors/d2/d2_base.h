@@ -73,7 +73,7 @@ public:
   /** \brief Closed-form derivative of \ref AED with respect to a named
    *  hyperparameter.
    *
-   * Used by HPO analytical / hybrid gradients (Phase 2) to assemble
+   * Used by HPO analytical / hybrid gradients to assemble
    * dPhi/dtheta one pair at a time, mirroring how calc_aed assembles
    * Phi. The default returns false: "this descriptor does not own
    * `theta_name`". Concrete descriptors override for the (theta_name,
@@ -114,7 +114,7 @@ public:
   /** \brief Closed-form derivative of \ref FD with respect to a named
    *  hyperparameter.
    *
-   * Used by HPO analytical / hybrid gradients (Phase 2) to assemble
+   * Used by HPO analytical / hybrid gradients to assemble
    * dPhi/dtheta force rows one pair at a time, mirroring how
    * calc_dXijdri assembles fd_ij. The default returns false: "this
    * descriptor does not own `theta_name` for the force chain".
