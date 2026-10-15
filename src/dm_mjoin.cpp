@@ -1,10 +1,13 @@
 #include <cstddef>
+#include <memory>
 #include <tadah/models/descriptors/dm/dm_mjoin.h>
+#include <tadah/models/descriptors/dm/embed_spec.h>
 namespace tadah {
 namespace models {
 
-DM_mJoin::DM_mJoin(const tadah::core::Context& c)             // new, const version
-  : DM_mJoin::DM_mJoin(const_cast<tadah::core::Context&>(c)) {}      // delegates to old one
+DM_mJoin::DM_mJoin(const tadah::core::Context& c):DM_Base(c) {
+  init();auto copy=c;build_children(copy);
+}
 
 DM_mJoin::DM_mJoin() {
   init();
@@ -15,15 +18,22 @@ DM_mJoin::~DM_mJoin() {
 
 DM_mJoin::DM_mJoin(tadah::core::Context &c) : DM_Base(c) {
   init();
+  build_children(c);
+}
+void DM_mJoin::build_children(tadah::core::Context &c) {
   contexts = parse_context(c, "TYPEMB");
   expand_grids(c, contexts, "TYPEMB");
+  if(!c.blocks("DESCRIPTOR").empty())
+    set_fcut(new Cut_Dummy(c.get<double>("RCUTMBMAX")),true);
 
+  std::vector<std::unique_ptr<DM_Base>> pending;
   for (auto &c1 : contexts) {
-    ds.push_back(tadah::core::factory<DM_Base, tadah::core::Context&>(c1.get<std::string>("TYPEMB"), c1));
-    s += ds.back()->size();
-    rhoisize += ds.back()->rhoi_size();
-    rhoipsize += ds.back()->rhoip_size();
+    pending.emplace_back(tadah::core::factory<DM_Base, tadah::core::Context&>(c1.get<std::string>("TYPEMB"), c1));
+    s += pending.back()->size();
+    rhoisize += pending.back()->rhoi_size();
+    rhoipsize += pending.back()->rhoip_size();
   }
+  ds.reserve(pending.size());for(auto &d:pending)ds.push_back(d.release());
   set_rfidx(0);
   set_drfidx(rhoisize);
 }
@@ -88,9 +98,12 @@ std::string DM_mJoin::label() const {
 }
 
 std::optional<EmbF0Mode> DM_mJoin::embf0_mode() const {
-  for (auto d : ds)
-    if (auto m = d->embf0_mode()) return m;
-  return std::nullopt;
+  std::optional<EmbF0Mode> mode;
+  for(auto d:ds) if(auto current=d->embf0_mode()) {
+    if(mode && *mode!=*current)return std::nullopt;
+    mode=current;
+  }
+  return mode;
 }
 
 std::optional<double>
@@ -143,6 +156,17 @@ std::string DM_mJoin::cutoff_fixed_by(std::size_t i) const {
 }
 
 bool DM_mJoin::reinit(const tadah::core::Context& ctx) {
+  if(!ctx.blocks("DESCRIPTOR").empty()) {
+    auto copy=ctx;resolve_embed_blocks(copy);
+    DM_mJoin candidate(copy);
+    candidate.set_fidx(fidx);candidate.set_rfidx(rfidx);candidate.set_drfidx(rfidx+candidate.rhoisize);
+    const bool changed=s!=candidate.s || rhoisize!=candidate.rhoisize || rhoipsize!=candidate.rhoipsize;
+    std::unique_ptr<Cut_Base> cutoff(new Cut_Dummy(copy.get<double>("RCUTMBMAX")));
+    ds.swap(candidate.ds);contexts.swap(candidate.contexts);
+    std::swap(s,candidate.s);std::swap(rhoisize,candidate.rhoisize);std::swap(rhoipsize,candidate.rhoipsize);
+    drfidx=rfidx+rhoisize;set_fcut(cutoff.release(),true);
+    return changed;
+  }
   // Re-derive per-child sub-contexts from the updated master context.
   // Copy ctx because expand_grids may add default keys to the context.
   // Note: contexts[0] is the first child (DM_mJoin itself is filtered by parse_context).

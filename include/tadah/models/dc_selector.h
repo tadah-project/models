@@ -38,9 +38,23 @@ namespace tadah {
           return *this;
         }
 
-        explicit DC_Selector(const tadah::core::Context& c) { init(c); }
+        explicit DC_Selector(const tadah::core::Context& c) {
+          try {init(c);}catch(...){release();throw;}
+        }
+        explicit DC_Selector(tadah::core::Context& c) {
+          try {init(c);}catch(...){release();throw;}
+        }
 
-        void init(const tadah::core::Context &context) {
+        void init(tadah::core::Context &context) {
+          resolve_embed_blocks(context);
+          init(static_cast<const tadah::core::Context &>(context));
+        }
+
+        void init(const tadah::core::Context &input) {
+          const bool component_blocks = !input.blocks("DESCRIPTOR").empty();
+          tadah::core::Context resolved;
+          if (component_blocks) { resolved=input; resolve_embed_blocks(resolved); }
+          const auto &context=component_blocks?resolved:input;
           double rcutzero = 0.0; // for dummies
 
           // EMBF0 / RHOFORM without a DM_REAM block have no effect: one
@@ -62,8 +76,16 @@ namespace tadah {
 
           if (context.get<bool>("INITMB")) {
             double rcutmb = context.get<double>("RCUTMBMAX");
-            cmb = tadah::core::factory<Cut_Base,double&>( context.get<std::string>("RCTYPEMB"), rcutmb );
-            dmb = tadah::core::factory<DM_Base,const tadah::core::Context&>( context.get<std::string>("TYPEMB"), context );
+            if (component_blocks) {
+              auto children=embed_contexts(context);
+              cmb = new Cut_Dummy(rcutmb);
+              if(children.size()==1)
+                dmb=tadah::core::factory<DM_Base,const tadah::core::Context&>(children[0].get<std::string>("TYPEMB"),children[0]);
+              else dmb=new DM_mJoin(context);
+            } else {
+              cmb = tadah::core::factory<Cut_Base,double&>( context.get<std::string>("RCTYPEMB"), rcutmb );
+              dmb = tadah::core::factory<DM_Base,const tadah::core::Context&>( context.get<std::string>("TYPEMB"), context );
+            }
             dmb->warn_if_discontinuous_noncompact();
           }
           else {
@@ -123,6 +145,11 @@ namespace tadah {
 
         ~DC_Selector()
         {
+          release();
+        }
+
+      private:
+        void release() {
           if (d2b)
             delete d2b;
           if (c2b)
@@ -131,6 +158,7 @@ namespace tadah {
             delete cmb;
           if (dmb)
             delete dmb;
+          d2b=nullptr;c2b=nullptr;cmb=nullptr;dmb=nullptr;
         }
 
       private:

@@ -606,8 +606,8 @@ std::optional<DescriptorMeta> DM_Blip::meta() const {
   ParamMeta p_sgrid;
   p_sgrid.key      = "SGRIDMB";
   p_sgrid.arg_pos  = 0;
-  p_sgrid.scale    = Scale::InverseDistanceSq;
-  p_sgrid.units    = "Å^-2";
+  p_sgrid.scale    = Scale::InverseDistance;
+  p_sgrid.units    = "Å^-1";
   p_sgrid.role     = "Inverse width of the i-th MB radial Gaussian.";
   p_sgrid.hard.lo  = 1.0e-6;
   p_sgrid.crit     = Criticality::Critical;

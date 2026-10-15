@@ -88,7 +88,7 @@ void add_degs(core::Context &c, const std::string &key,
 // Raw basis function k of a curve at x, with CurveView::value's evaluator
 // (for the bump families the bare radial form IS the embedding form; a
 // RHOFORM MONOTONE density evaluates the integrated bump S_k).
-double basis_value(const CurveView &c, std::size_t k, double x) {
+double basis_value_bare(const CurveView &c, std::size_t k, double x) {
   if (c.form == RhoForm::Monotone)
     return radial_step_value_bare(c.family, x, c.width(k), c.mu[k]);
   return c.right_active
@@ -96,6 +96,10 @@ double basis_value(const CurveView &c, std::size_t k, double x) {
       : radial_value_bare(c.family, x, c.width(k), c.mu[k], c.degree(k));
 }
 
+double basis_value(const CurveView &c,std::size_t k,double x) {
+  if(c.rcut>0 && x>c.rcut)return 0;
+  return basis_value_bare(c,k,x)*(c.spatial_cutoff?c.spatial_cutoff->calc(x):1);
+}
 }  // namespace
 
 // ---------------------------------------------------------------------------
@@ -106,62 +110,43 @@ double CurveView::support_infinity() {
   return std::numeric_limits<double>::max();
 }
 
+namespace {
+double bare_curve(const CurveView &c,double x,int order) {
+  double sum=0;
+  for(std::size_t k=0;k<c.n();++k) {
+    double v;
+    if(c.form==RhoForm::Monotone) {
+      v=order==0?radial_step_value_bare(c.family,x,c.width(k),c.mu[k]):
+        order==1?radial_step_deriv_bare(c.family,x,c.width(k),c.mu[k]):
+                 radial_step_deriv2_bare(c.family,x,c.width(k),c.mu[k]);
+    } else if(c.right_active) {
+      v=order==0?embedding_value(c.family,x,c.width(k),c.mu[k],c.degree(k)):
+        order==1?embedding_deriv(c.family,x,c.width(k),c.mu[k],c.degree(k)):
+                 embedding_deriv2(c.family,x,c.width(k),c.mu[k],c.degree(k));
+    } else {
+      v=order==0?radial_value_bare(c.family,x,c.width(k),c.mu[k],c.degree(k)):
+        order==1?radial_deriv_bare(c.family,x,c.width(k),c.mu[k],c.degree(k)):
+                 radial_deriv2_bare(c.family,x,c.width(k),c.mu[k],c.degree(k));
+    }
+    if(order==0 && c.zero_ref)v-=basis_value(c,k,0);
+    sum+=c.coeff[k]*v;
+  }
+  return sum;
+}
+}
 double CurveView::value(double x) const {
-  if (!right_active && rcut > 0.0 && x > rcut) return 0.0;  // Cut_Dummy
-  if (zero_ref) {
-    // EMBF0 ZERO: sum_k coeff_k (g_k(x) - g_k(0)), each term formed as
-    // DM_REAM::calc_aed forms it; exactly 0 at x == 0.
-    if (x == 0.0) return 0.0;
-    double acc = 0.0;
-    for (std::size_t k = 0; k < n(); ++k)
-      acc += coeff[k] *
-             (basis_value(*this, k, x) - basis_value(*this, k, 0.0));
-    return acc;
-  }
-  double acc = 0.0;
-  if (form == RhoForm::Monotone) {  // the integrated bumps S_k
-    for (std::size_t k = 0; k < n(); ++k)
-      acc += coeff[k] * radial_step_value_bare(family, x, width(k), mu[k]);
-    return acc;
-  }
-  for (std::size_t k = 0; k < n(); ++k) {
-    acc += coeff[k] * (right_active
-        ? embedding_value(family, x, width(k), mu[k], degree(k))
-        : radial_value_bare(family, x, width(k), mu[k], degree(k)));
-  }
-  return acc;
+  if((rcut>0 && x>rcut) || (zero_ref && x==0))return 0;
+  return bare_curve(*this,x,0)*(spatial_cutoff?spatial_cutoff->calc(x):1);
 }
-
 double CurveView::deriv(double x) const {
-  if (!right_active && rcut > 0.0 && x > rcut) return 0.0;
-  double acc = 0.0;
-  if (form == RhoForm::Monotone) {
-    for (std::size_t k = 0; k < n(); ++k)
-      acc += coeff[k] * radial_step_deriv_bare(family, x, width(k), mu[k]);
-    return acc;
-  }
-  for (std::size_t k = 0; k < n(); ++k) {
-    acc += coeff[k] * (right_active
-        ? embedding_deriv(family, x, width(k), mu[k], degree(k))
-        : radial_deriv_bare(family, x, width(k), mu[k], degree(k)));
-  }
-  return acc;
+  if(rcut>0 && x>rcut)return 0;
+  double d=bare_curve(*this,x,1);
+  return spatial_cutoff?d*spatial_cutoff->calc(x)+bare_curve(*this,x,0)*spatial_cutoff->calc_prime(x):d;
 }
-
 double CurveView::deriv2(double x) const {
-  if (!right_active && rcut > 0.0 && x > rcut) return 0.0;
-  double acc = 0.0;
-  if (form == RhoForm::Monotone) {
-    for (std::size_t k = 0; k < n(); ++k)
-      acc += coeff[k] * radial_step_deriv2_bare(family, x, width(k), mu[k]);
-    return acc;
-  }
-  for (std::size_t k = 0; k < n(); ++k) {
-    acc += coeff[k] * (right_active
-        ? embedding_deriv2(family, x, width(k), mu[k], degree(k))
-        : radial_deriv2_bare(family, x, width(k), mu[k], degree(k)));
-  }
-  return acc;
+  if(rcut>0 && x>rcut)return 0;
+  double dd=bare_curve(*this,x,2);
+  return spatial_cutoff?dd*spatial_cutoff->calc(x)+2*bare_curve(*this,x,1)*spatial_cutoff->calc_prime(x)+bare_curve(*this,x,0)*spatial_cutoff->calc_double_prime(x):dd;
 }
 
 std::pair<double, double> CurveView::support(std::size_t k) const {
@@ -267,6 +252,7 @@ PotEAMView parse_pot_view(const core::Context &ctx) {
       throw std::runtime_error("pot edit: SGRID2B/CGRID2B size mismatch.");
   }
   v.phi.rcut = ctx.get<double>("RCUT2B");
+  v.phi.spatial_cutoff.reset(core::factory<Cut_Base,double&>(ctx.get<std::string>("RCTYPE2B"),v.phi.rcut));
 
   if (v.mb == MBKind::Ream) {
     // ---- rho ----
@@ -285,6 +271,7 @@ PotEAMView parse_pot_view(const core::Context &ctx) {
         throw std::runtime_error("pot edit: SGRIDMB/CGRIDMB size mismatch.");
     }
     v.rho.rcut = ctx.get<double>("RCUTMB");
+  v.rho.spatial_cutoff.reset(core::factory<Cut_Base,double&>(ctx.get<std::string>("RCTYPEMB"),v.rho.rcut));
     // The density must be valid in its form before it is edited: the checks
     // DM_REAM applies on load (amplitude signs, widths, the MONOTONE basis
     // and cutoff, the density pair weights), with their messages.

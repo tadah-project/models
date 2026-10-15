@@ -6,6 +6,7 @@
 #include <tadah/models/eam/eam_setfl_io.h>
 #include <tadah/models/descriptors/basis_kind.h>
 #include <tadah/models/descriptors/dm/rhoform.h>
+#include <tadah/models/descriptors/dm/embed_kernel.h>
 
 #include <string>
 #include <vector>
@@ -15,6 +16,9 @@ namespace models {
 
 /** \brief Configuration for a `tadah refit` run. */
 struct EAMRefitConfig {
+  std::optional<EmbedSpec> component;
+  bool fit_density_amplitudes = true;
+  bool unified_output = false;
   std::string basis  = "Blip";       ///< "Blip", "Blip5", "Knot5" or "Gaussian"
                                      ///<  (Knot5 = one-sided quintic knot
                                      ///<   functions; compact mode only)
@@ -222,6 +226,9 @@ public:
   double fit_window_rho_hi() const { return fit_rho_hi_; }  ///< see fit_window_r_lo()
 
 private:
+  void fit_components(double rwin_lo);
+  std::unique_ptr<EmbedEvaluator> component_evaluator_;
+  std::unique_ptr<Cut_Base> spatial_cutoff_;
   /** Evaluate one basis function. `emb` selects the embedding-channel
    *  orientation (right-active) for the Knot5 family; ignored for the
    *  symmetric Blip/Gaussian families. */
