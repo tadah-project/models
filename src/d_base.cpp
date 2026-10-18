@@ -15,28 +15,67 @@
 namespace tadah {
 namespace models {
 
+namespace {
+// The generator as written, for a message: "LIN 9" or "GEOM 3 2 -4".
+std::string generator_text(std::vector<std::string>::const_iterator b,
+                           std::vector<std::string>::const_iterator e) {
+  std::string s;
+  for (auto i = b; i != e; ++i) s += (s.empty() ? "" : " ") + *i;
+  return s;
+}
+}  // namespace
+
 core::v_type D_Base::get_grid(const std::vector<std::string>&vold) {
+  // The largest number of points a generator makes, as in the embedding
+  // grids of a component specification (embed_spec.cpp).
+  constexpr double max_points = 1000000;
   core::v_type vnew;
   auto it = vold.begin();
   while (it != vold.end()) {
+    const auto first = it;
     std::string token = *it++;
-    // core::to_double: std::stod that also accepts a subnormal value (the
-    // lossless Context/pot writers produce one for every subnormal double).
-    if (core::to_upper(token) == "LIN") {
-      size_t cg = std::stoul(*it++);
-      double cgmin = core::to_double(*it++);
-      double cgmax = core::to_double(*it++);
-      core::v_type v = core::linspace(cgmin, cgmax, cg);
-      vnew.insert(vnew.end(), v.begin(), v.end());
-    }
-    else if (core::to_upper(token) == "GEOM") {
-      size_t cg = std::stoul(*it++);
-      double cgmin = core::to_double(*it++);
-      double cgmax = core::to_double(*it++);
-      core::v_type v = core::geomspace(cgmin, cgmax, cg, exp(1));
+    const std::string gen = core::to_upper(token);
+    if (gen == "LIN" || gen == "GEOM") {
+      // <n> <start> <stop>: each value is read only if the list holds it.
+      if (vold.end() - it < 3)
+        throw std::invalid_argument(
+            "Invalid grid specification: " + gen +
+            " takes three values, <n> <start> <stop>, but the grid ends "
+            "after '" + generator_text(first, vold.end()) + "'");
+      const std::string text = generator_text(first, it + 3);
+      double n = 0.0;
+      if (!core::parse_decimal_finite(*it, n) || n < 1 || n > max_points ||
+          std::floor(n) != n)
+        throw std::invalid_argument(
+            "Invalid grid specification: the number of points of '" + text +
+            "' must be a whole number from 1 to 1000000");
+      // parse_decimal_finite: a finite decimal literal, a subnormal value
+      // included (the lossless Context/pot writers produce one).
+      double cgmin = 0.0, cgmax = 0.0;
+      if (!core::parse_decimal_finite(*(it + 1), cgmin) ||
+          !core::parse_decimal_finite(*(it + 2), cgmax))
+        throw std::invalid_argument(
+            "Invalid grid specification: the start and stop of '" + text +
+            "' must be finite decimal numbers");
+      it += 3;
+      const int cg = static_cast<int>(n);
+      core::v_type v;
+      if (gen == "LIN") {
+        v = core::linspace(cgmin, cgmax, cg);
+      } else {
+        // A geometric progression from start to stop: both above 0.
+        if (!(cgmin > 0.0) || !(cgmax > 0.0))
+          throw std::invalid_argument(
+              "Invalid grid specification: the start and stop of '" + text +
+              "' must be above 0 (GEOM makes a geometric progression)");
+        v = core::geomspace(cgmin, cgmax, cg, exp(1));
+      }
       vnew.insert(vnew.end(), v.begin(), v.end());
     }
     else {
+      // core::parse_number: std::stod that also accepts a subnormal value
+      // (the lossless Context/pot writers produce one for every subnormal
+      // double).
       double v = 0.0;
       if (!core::parse_number(token, v))
         throw std::invalid_argument("Invalid grid specification: " + token);
@@ -49,7 +88,11 @@ core::v_type D_Base::get_grid(const std::vector<std::string>&vold) {
 void D_Base::get_grid(const tadah::core::Context &c, const std::string &key, tadah::core::v_type &v) {
   std::vector<std::string> grid_line(c.size(key));
   c.get<>(key, grid_line);
-  v = get_grid(grid_line);
+  try {
+    v = get_grid(grid_line);
+  } catch (const std::invalid_argument &e) {
+    throw std::invalid_argument(key + ": " + e.what());
+  }
 }
 
 D_Base::~D_Base() {

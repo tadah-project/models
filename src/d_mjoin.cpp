@@ -58,6 +58,17 @@ std::vector<std::string> convert_to_strings(const tadah::core::v_type& vec) {
   return result;
 }
 
+// The grid of `key` (its values and LIN/GEOM generators) as values; a
+// refusal of get_grid names the key, as D_Base::get_grid(Context) does.
+static std::vector<std::string> expanded_grid(const std::vector<std::string> &g,
+                                              const std::string &key) {
+  try {
+    return convert_to_strings(D_Base::get_grid(g));
+  } catch (const std::invalid_argument &e) {
+    throw std::invalid_argument(key + ": " + e.what());
+  }
+}
+
 void D_mJoin::expand_grids(tadah::core::Context &c) {
   resolve_embed_blocks(c);
   if (mjoin_can_handle(c, "TYPE2B")) {
@@ -142,28 +153,28 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
   if (c.contains(cgridkey)) {
     cgrid.resize(c.size(cgridkey));
     c.get(cgridkey, cgrid);
-    cgrid = convert_to_strings(D_Base::get_grid(cgrid));
+    cgrid = expanded_grid(cgrid, cgridkey);
     data_map[cgridkey] = {&cgrid, 0};
   }
   std::vector<std::string> sgrid;
   if (c.contains(sgridkey)) {
     sgrid.resize(c.size(sgridkey));
     c.get(sgridkey, sgrid);
-    sgrid = convert_to_strings(D_Base::get_grid(sgrid));
+    sgrid = expanded_grid(sgrid, sgridkey);
     data_map[sgridkey] = {&sgrid, 0};
   }
   std::vector<std::string> cembgrid;
   if (c.contains("CEMBFUNC")) {
     cembgrid.resize(c.size("CEMBFUNC"));
     c.get("CEMBFUNC", cembgrid);
-    cembgrid = convert_to_strings(D_Base::get_grid(cembgrid));
+    cembgrid = expanded_grid(cembgrid, "CEMBFUNC");
     data_map["CEMBFUNC"] = {&cembgrid, 0};
   }
   std::vector<std::string> sembgrid;
   if (c.contains("SEMBFUNC")) {
     sembgrid.resize(c.size("SEMBFUNC"));
     c.get("SEMBFUNC", sembgrid);
-    sembgrid = convert_to_strings(D_Base::get_grid(sembgrid));
+    sembgrid = expanded_grid(sembgrid, "SEMBFUNC");
     data_map["SEMBFUNC"] = {&sembgrid, 0};
   }
   // additional splittable lists: density amplitudes (optimizable key) and
@@ -175,7 +186,7 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
     if (c.contains(k)) {
       extra_lists[e].resize(c.size(k));
       c.get(k, extra_lists[e]);
-      extra_lists[e] = convert_to_strings(D_Base::get_grid(extra_lists[e]));
+      extra_lists[e] = expanded_grid(extra_lists[e], k);
       data_map[k] = {&extra_lists[e], 0};
     }
   }
