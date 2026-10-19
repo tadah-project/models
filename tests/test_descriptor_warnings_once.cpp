@@ -239,7 +239,7 @@ TEST_CASE("DM_Poly OrbitalWise warns once per process of a channel that is "
           "not rotationally invariant",
           "[descriptor][warn_once]") {
   tadah::core::PeriodicTable::initialize();
-  Context c = many_body("DM_OW_SQRT 1 1 1 Ta Ta");
+  Context c = many_body("DM_OW_SQRT 1 2 2 Ta Ta");
   c.add("CGRIDMB", "1 2");
   c.add("SGRIDMB", "0.1 0.2");
   c.add("SEMBFUNC", "1 1");
