@@ -386,7 +386,10 @@ TEST_CASE("D_Base::get_grid refuses an incomplete or invalid LIN/GEOM "
  * LIN and GEOM, and every example of those keys is a grid get_grid reads.
  * Before the fix: CGRID2B, SGRID2B and SGRIDMB named 'LOG or LIN' and
  * CGRIDMB 'L' (logarithmic) or 'U' (uniform spacing); get_grid refuses
- * each of LOG, L and U. */
+ * each of LOG, L and U. The help states the rule of a joined line (the
+ * values of all lines form one list) and the format line names the
+ * generator '<generator>' (before the fix: 'one list ... for each joined
+ * descriptor, one per line', and '<algorithm>'). */
 TEST_CASE("The radial grid keys' help names the LIN and GEOM generators",
           "[D_Base][grid][blueprint]") {
   using Catch::Matchers::Contains;
@@ -401,6 +404,18 @@ TEST_CASE("The radial grid keys' help names the LIN and GEOM generators",
     CHECK_THAT(text, !Contains("LOG"));
     CHECK_THAT(text, !Contains("'L'"));
     CHECK_THAT(text, !Contains("'U'"));
+    // the rule D_mJoin::parse_context applies: the values of all lines are
+    // one list, taken by the joined descriptors in the order of their TYPE
+    // lines; no per-line list
+    CHECK_THAT(text, Contains("form one list"));
+    CHECK_THAT(text, Contains("in the order of the"));
+    CHECK_THAT(text, !Contains("one per line"));
+    // the format line names the generator as the text does
+    REQUIRE(it->second.value_format.size() == 2);
+    CHECK(it->second.value_format[1] ==
+          "(<generator> <n> <start> <stop>) [...]");
+    for (const auto &f : it->second.value_format)
+      CHECK_THAT(f, !Contains("<algorithm>"));
     for (const std::string &ex : it->second.examples) {
       INFO(ex);
       std::istringstream in(ex);
