@@ -22,18 +22,22 @@ namespace models {
  * 
  * ```
  * TYPE2B    D2_mJoin     # <-- Meta descriptor for concatenating two-body descriptors
- * TYPE2B    D2_MIE 11 6 Ti Ti   # <-- MIE exponents
+ * TYPE2B    D2_MIE 11 6 Ta Ta   # <-- MIE exponents
  * RCTYPE2B  Cut_Cos
  * RCUT2B    3.0
  *
- * TYPE2B    D2_Blip 6 6 Ti Nb Nb Nb   # <-- grid sizes
+ * TYPE2B    D2_Blip 6 6 Ta Ta   # <-- grid sizes
  * RCTYPE2B  Cut_Tanh
  * RCUT2B    7.5
- * SGRID2B   -2 6 0.1 10   # Grid for D2_Blip, blips widths, auto generated
- * CGRID2B   0 0 0 0 0 0   # Grid for D2_Blip, blip centers
+ * SGRID2B   GEOM 6 0.1 10   # D2_Blip: 6 blip widths from 0.1 to 10
+ * CGRID2B   0 0 0 0 0 0     # D2_Blip: 6 blip centres
  * ```
  *
- * Note: Grids can be specified on a single line, and the order of the grids is important. 
+ * The values of a list key form one list, whatever lines they are written
+ * on: each descriptor takes as many values as its TYPE2B line asks for, in
+ * the order of the TYPE2B lines, and more or fewer values are refused. A
+ * line gives values or generators: LIN n start stop gives n evenly spaced
+ * values, GEOM n start stop n values in a geometric progression.
  *
  * There is no limit to the number of descriptors that can be concatenated.
  *
