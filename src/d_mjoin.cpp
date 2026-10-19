@@ -17,8 +17,10 @@ namespace models {
 namespace {
 // parse_context() splits the standard grid keys (and the declared
 // data_keys, e.g. the knot-degree lists). A descriptor whose keys fall
-// outside the supported set is left untouched by expand_grids; it reads its
-// own grids straight from the context. mJoin meta-descriptors are always
+// outside the supported set, or that reads list keys whole (its
+// context_keys: the CEMBFUNC/SEMBFUNC of a DM_Poly channel function), is
+// left untouched by expand_grids; it reads its own grids straight from the
+// context. mJoin meta-descriptors are always
 // handled (their sub-descriptors are standard). Keyless descriptors (D2_EAM,
 // DM_EAM) are trivially handled.
 bool mjoin_can_handle(const tadah::core::Context &c, const std::string &type_str) {
@@ -34,6 +36,7 @@ bool mjoin_can_handle(const tadah::core::Context &c, const std::string &type_str
                                               "KDEGEMB"};
   const std::set<std::string> &sup = (type_str == "TYPE2B") ? sup2b : supmb;
   std::unique_ptr<D_Base> d(tadah::core::factory<D_Base>(label));
+  if (!d->context_keys.empty()) return false;  // read whole (DM_Poly)
   for (const auto &k : d->keys)
     if (!sup.count(k)) return false;
   for (const auto &k : d->data_keys)

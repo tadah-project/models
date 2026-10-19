@@ -404,6 +404,7 @@ template <typename ChannelFn, typename RadialBasis, typename AggMode>
 void DM_Poly<ChannelFn, RadialBasis, AggMode>::init()
 {
   keys = {"CGRIDMB", "SGRIDMB"};
+  context_keys = ChannelFn::context_keys();
   nparams = 2 + 1;
 }
 
