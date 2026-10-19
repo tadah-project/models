@@ -1,6 +1,7 @@
 #include "tadah/core/registry.h"
 #include <cstddef>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <set>
 #include <stdexcept>
@@ -199,22 +200,33 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
     lines.back().push_back(t);
   }
 
-  // One RCTYPE and one RCUT value per descriptor, in the order of the lines.
+  // The descriptors of the line, for a message: "2 descriptors (D2_BP,
+  // D2_BP)".
+  std::string named = std::to_string(lines.size()) +
+                      (lines.size() == 1 ? " descriptor (" : " descriptors (");
+  for (std::size_t i = 0; i < lines.size(); ++i)
+    named += (i ? ", " : "") + lines[i][0];
+  named += ")";
+  auto values = [](size_t v) {
+    return std::to_string(v) + (v == 1 ? " value" : " values");
+  };
+
+  // One RCTYPE and one RCUT value per descriptor, in the order of the lines:
+  // fewer would be read past their end, more would never be read.
   for (const std::string &key : {rctypekey, rcutkey}) {
     const std::size_t have = data_map[key].first->size();
-    if (have >= lines.size()) continue;
-    std::string names;
-    for (std::size_t i = 0; i < lines.size(); ++i)
-      names += (i ? ", " : "") + lines[i][0];
+    if (have == lines.size()) continue;
     throw std::runtime_error(
-        type_str + " names " + std::to_string(lines.size()) +
-        " descriptors (" + names + ") but " + key + " has " +
-        std::to_string(have) + (have == 1 ? " value" : " values") +
-        ": give one " + key + " value per descriptor, in the order of the " +
-        type_str + " lines");
+        type_str + " names " + named + " but " + key + " has " +
+        values(have) + ": give one " + key +
+        " value per descriptor, in the order of the " + type_str + " lines");
   }
 
   std::vector<tadah::core::Context> contexts;
+  // The list keys some descriptor of the line reads (SIZE 0 included), with
+  // the values they take, for the check of leftover values below.
+  std::map<std::string, size_t> read_keys;
+  std::string last_text;
   for (size_t li = 0; li < lines.size(); ++li) {
     const auto &line = lines[li];
     const std::string &token = line[0];
@@ -276,12 +288,10 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
       const size_t n = sizes[k];
       // The key (set when n > 0, checked above) must hold n more values:
       // those the descriptors before this one on the line took are theirs.
+      read_keys[key] += n;
       const size_t given = n > 0 ? data_map.at(key).first->size() : 0;
       const size_t taken = n > 0 ? data_map.at(key).second : 0;
       if (n > 0 && taken + n > given) {
-        auto values = [](size_t v) {
-          return std::to_string(v) + (v == 1 ? " value" : " values");
-        };
         std::string where = type_str + " " + token;
         if (lines.size() > 1)
           where += " (descriptor " + std::to_string(li + 1) + " of " +
@@ -321,6 +331,26 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
     for (const auto &e : elements) c1.add(type_str, e);
 
     contexts.push_back(c1);
+    last_text = text;
+  }
+
+  // Every value of a list key the line reads belongs to a descriptor: values
+  // past those the descriptors take would be dropped from the model and the
+  // potential without a word.
+  for (const auto &[key, taken] : read_keys) {
+    const auto it = data_map.find(key);
+    const size_t given = it == data_map.end() ? 0 : it->second.first->size();
+    if (given <= taken) continue;
+    const std::string takes = std::to_string(taken) + " " + key +
+                              (taken == 1 ? " value" : " values");
+    if (lines.size() == 1)
+      throw std::runtime_error(type_str + " " + lines[0][0] + " takes " +
+                               takes + ", but " + key + " has " +
+                               values(given) + ": " + last_text);
+    throw std::runtime_error(
+        type_str + " names " + named + ", which take " + takes + ", but " +
+        key + " has " + values(given) + ": give each descriptor's " + key +
+        " values, in the order of the " + type_str + " lines");
   }
   return contexts;
 }
