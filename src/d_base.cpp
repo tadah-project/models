@@ -70,6 +70,18 @@ core::v_type D_Base::get_grid(const std::vector<std::string>&vold) {
               "' must be above 0 (GEOM makes a geometric progression)");
         v = core::geomspace(cgmin, cgmax, cg, exp(1));
       }
+      // Finite endpoints whose difference is beyond the largest double
+      // make an infinite LIN step, and a GEOM point rounded past the
+      // largest double is infinite: such points are not numbers.
+      for (const double x : v)
+        if (!std::isfinite(x))
+          throw std::invalid_argument(
+              "Invalid grid specification: the points of '" + text +
+              "' are not all finite numbers (" +
+              (gen == "LIN" ? "its stop minus its start is beyond the "
+                              "largest number"
+                            : "a point is beyond the largest number") +
+              ")");
       vnew.insert(vnew.end(), v.begin(), v.end());
     }
     else {
