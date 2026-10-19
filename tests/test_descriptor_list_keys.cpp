@@ -391,3 +391,109 @@ TEST_CASE("Descriptor list keys: a list key with too few values is refused "
     }
   }
 }
+
+/* A list key with more values than the descriptors of its TYPE line take is
+ * refused, as one with fewer is, naming the line, the key, the values the
+ * line takes and the values there are:
+ *  - TYPEMB DM_mBlipEnv 0 1 1 7 7 Ta Ta with CGRIDMB 2.88 3.0: "TYPEMB
+ *    DM_mBlipEnv takes 1 CGRIDMB value, but CGRIDMB has 2 values: TYPEMB
+ *    DM_mBlipEnv 0 1 1 7 7 Ta Ta";
+ *  - a D2_mJoin of two D2_BP 2 2 Ta Ta lines with 5 CGRID2B values:
+ *    "TYPE2B names 2 descriptors (D2_BP, D2_BP), which take 4 CGRID2B
+ *    values, but CGRID2B has 5 values: give each descriptor's CGRID2B
+ *    values, in the order of the TYPE2B lines";
+ *  - a SIZE of 0 with values: D2_Knot5 2 0 Ta Ta with KDEG2B 3;
+ *  - every descriptor with list keys (each SIZE 2), each key in turn with
+ *    3 values;
+ *  - more RCTYPE2B or RCUT2B values than descriptors: "TYPE2B names 1
+ *    descriptor (D2_BP) but RCUT2B has 2 values: give one RCUT2B value per
+ *    descriptor, in the order of the TYPE2B lines".
+ * Before the fix: each was split without an error; the extra values were
+ * dropped (`tadah train` trained with CGRIDMB 2.88 and wrote CGRIDMB 2.88
+ * to the potential) and the extra cutoff values were kept but never read. */
+TEST_CASE("Descriptor list keys: a list key with more values than the line "
+          "takes is refused naming the line",
+          "[D_mJoin][list_keys]") {
+  PeriodicTable::initialize();
+  const auto refusal = [](Context c) {
+    std::string what;
+    try {
+      D_mJoin::expand_grids(c);
+    } catch (const std::exception &e) {
+      what = e.what();
+    }
+    return what;
+  };
+  {
+    Context c;
+    c.add("VERBOSE", 0);
+    c.add("INITMB", "true");
+    c.add("TYPEMB", "DM_mBlipEnv 0 1 1 7 7 Ta Ta");
+    c.add("RCTYPEMB", "Cut_Cos");
+    c.add("RCUTMB", 5.0);
+    c.add("CGRIDMB", "2.88 3.0");
+    c.add("SGRIDMB", "0.2");
+    c.add("CEMBFUNC", "1 2 3 4 5 6 7");
+    c.add("SEMBFUNC", "1 1 1 1 1 1 1");
+    CHECK(refusal(c) ==
+          "TYPEMB DM_mBlipEnv takes 1 CGRIDMB value, but CGRIDMB has 2 "
+          "values: TYPEMB DM_mBlipEnv 0 1 1 7 7 Ta Ta");
+  }
+  {
+    Context c;
+    c.add("VERBOSE", 0);
+    c.add("INIT2B", "true");
+    c.add("TYPE2B", "D2_mJoin");
+    c.add("TYPE2B", "D2_BP 2 2 Ta Ta");
+    c.add("TYPE2B", "D2_BP 2 2 Ta Ta");
+    c.add("RCTYPE2B", "Cut_Cos Cut_Cos");
+    c.add("RCUT2B", "4.5 4.5");
+    c.add("CGRID2B", "2.5 3.5 4.0 4.2 4.4");
+    c.add("SGRID2B", "0.5 0.5 0.5 0.5");
+    CHECK(refusal(c) ==
+          "TYPE2B names 2 descriptors (D2_BP, D2_BP), which take 4 CGRID2B "
+          "values, but CGRID2B has 5 values: give each descriptor's CGRID2B "
+          "values, in the order of the TYPE2B lines");
+  }
+  {
+    Context c;
+    c.add("VERBOSE", 0);
+    c.add("INIT2B", "true");
+    c.add("RCTYPE2B", "Cut_Cos");
+    c.add("RCUT2B", 4.5);
+    c.add("TYPE2B", "D2_Knot5 2 0 Ta Ta");
+    c.add("CGRID2B", "3.0 4.5");
+    c.add("KDEG2B", "3");
+    CHECK(refusal(c) ==
+          "TYPE2B D2_Knot5 takes 0 KDEG2B values, but KDEG2B has 1 value: "
+          "TYPE2B D2_Knot5 2 0 Ta Ta");
+  }
+  for (const auto &label : descriptors_with_list_keys()) {
+    const LineSpec s = spec_for(label, 2);
+    for (const auto &key : s.list_keys) {
+      Context c = context_for(s, {});
+      c.add(key, 3);
+      const std::string what = refusal(c);
+      INFO(s.type_key << " " << s.line << " with 3 " << key << " values: '"
+                      << what << "'");
+      CHECK_THAT(what, Contains(s.type_key + " " + s.line));
+      CHECK_THAT(what, Contains("takes 2 " + key + " values, but " + key +
+                                " has 3 values"));
+    }
+  }
+  for (const std::string key : {"RCTYPE2B", "RCUT2B"}) {
+    INFO(key);
+    Context c;
+    c.add("VERBOSE", 0);
+    c.add("INIT2B", "true");
+    c.add("TYPE2B", "D2_BP 2 2 Ta Ta");
+    c.add("RCTYPE2B", key == "RCTYPE2B" ? "Cut_Cos Cut_Cos" : "Cut_Cos");
+    c.add("RCUT2B", key == "RCUT2B" ? "4.5 5.0" : "4.5");
+    c.add("CGRID2B", "2.5 3.5");
+    c.add("SGRID2B", "0.5 0.5");
+    CHECK(refusal(c) == "TYPE2B names 1 descriptor (D2_BP) but " + key +
+                            " has 2 values: give one " + key +
+                            " value per descriptor, in the order of the "
+                            "TYPE2B lines");
+  }
+}
