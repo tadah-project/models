@@ -31,7 +31,7 @@ namespace models {
  * where the density \f$ \rho \f$ is calculated using Gaussian Type Orbitals:
  * \f[
  * \rho_i^{\eta,r_s,l_x,l_y,l_z} = \sum_{j \neq i} x_{ij}^{l_x} y_{ij}^{l_y} z_{ij}^{l_z}
- * \exp{\Big(\eta(r_{ij}-r_s)\Big)} f_c(r_{ij})
+ * \exp{\Big(-\eta(r_{ij}-r_s)^2\Big)} f_c(r_{ij})
  * \f]
  *
  * \ref CGRIDMB parameters control the position \f$ r_s \f$ of the Gaussian basis function.
