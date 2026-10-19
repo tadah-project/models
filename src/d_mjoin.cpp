@@ -218,8 +218,8 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
     if (have == lines.size()) continue;
     throw std::runtime_error(
         type_str + " names " + named + " but " + key + " has " +
-        values(have) + ": give one " + key +
-        " value per descriptor, in the order of the " + type_str + " lines");
+        values(have) + ": each descriptor takes one " + key +
+        " value, in the order of the " + type_str + " lines");
   }
 
   std::vector<tadah::core::Context> contexts;
@@ -349,7 +349,7 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
                                values(given) + ": " + last_text);
     throw std::runtime_error(
         type_str + " names " + named + ", which take " + takes + ", but " +
-        key + " has " + values(given) + ": give each descriptor's " + key +
+        key + " has " + values(given) + ": each descriptor takes its " + key +
         " values, in the order of the " + type_str + " lines");
   }
   return contexts;
