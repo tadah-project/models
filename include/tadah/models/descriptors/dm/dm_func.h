@@ -34,6 +34,18 @@ public:
   static constexpr bool expands_dimensions = false;
 
   /**
+   * @brief The list keys the function reads from the context
+   *        (CEMBFUNC, SEMBFUNC); none for F_SQ.
+   *
+   * DM_mEAD gives them SIZE parameters on its TYPE line (its `keys`);
+   * DM_Poly reads them whole (its `context_keys`).
+   */
+  static std::vector<std::string> context_keys() { return {}; }
+  /** @brief Whether the function runs without its context_keys (F_SQRT:
+   *  every SEMBFUNC value 1 when SEMBFUNC is not set). */
+  static constexpr bool context_keys_optional = false;
+
+  /**
    * @brief Returns the number of output channels per orbital per L.
    *
    * For most embedding functions this equals the radial grid size (ng).
@@ -151,6 +163,7 @@ private:
   tadah::core::v_type cfuncgrid;   // control x-intercep at 1/c
   double eps=1e-10; // small value to avoid log(0)
 public:
+  static std::vector<std::string> context_keys() { return {"CEMBFUNC", "SEMBFUNC"}; }
   F_RLR(const tadah::core::Context &context, size_t cSize, size_t sSize);
   F_RLR() = default;
   size_t output_dim() const override final { return sfuncgrid.size(); }
@@ -176,6 +189,8 @@ private:
   double eps=1e-10; // small value to avoid sqrt(0)
 
 public:
+  static std::vector<std::string> context_keys() { return {"SEMBFUNC"}; }
+  static constexpr bool context_keys_optional = true;
   /**
    * @brief Constructs F_SQRT from a Context object.
    * @param context Reference to a Context instance.
@@ -247,6 +262,7 @@ private:
   tadah::core::v_type sfuncgrid;   // controls width of the "blip"
   tadah::core::v_type cfuncgrid;   // control blip offset
 public:
+  static std::vector<std::string> context_keys() { return {"CEMBFUNC", "SEMBFUNC"}; }
   static constexpr bool expands_dimensions = true;
 
   F_Blip(const tadah::core::Context &context, size_t cSize, size_t sSize);
@@ -304,6 +320,7 @@ private:
   tadah::core::v_type cfuncgrid;   // control blip offset
   F fcut;
 public:
+  static std::vector<std::string> context_keys() { return {"CEMBFUNC", "SEMBFUNC"}; }
   static constexpr bool expands_dimensions = true;
 
   F_mEnv(const tadah::core::Context &c, size_t cSize, size_t sSize):

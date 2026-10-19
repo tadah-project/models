@@ -67,6 +67,14 @@ public:
   // non-negative integers; element_tokens() checks them.
   std::vector<std::string> keys;       // optimizable list parameters
   std::vector<std::string> data_keys;  // split-only list data (no OPTIM)
+  // `context_keys`: list keys the descriptor reads whole from the context
+  //   besides `keys` and `data_keys`, with no SIZE token on its TYPE line
+  //   (the CEMBFUNC/SEMBFUNC of a DM_Poly channel function). A single line
+  //   of such a descriptor keeps them whole (D_mJoin::parse_context); a
+  //   joined line gives it none, so one that cannot run without them
+  //   (`context_keys_required`) cannot be joined.
+  std::vector<std::string> context_keys;
+  bool context_keys_required = false;
   size_t nparams;  // number of params which follow TYPExB
   std::vector<bool> is_optimizable;
   static void get_grid(const tadah::core::Context &c, const std::string &key, tadah::core::v_type &v);

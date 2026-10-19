@@ -27,17 +27,21 @@ namespace models {
  * TYPEMB    DM_EAD 1 5 5 * *    # L number, cgrid, sgrid, list of element pairs
  * RCTYPEMB  Cut_Cos
  * RCUTMB    3.0
- * CGRIDMB   -1 5 0 3.0       # Grid for DM_EAD, blips centers, auto-generated
- * SGRIDMB   -2 5 1.0 10.0    # Grid for DM_EAD, blips widths, auto-generated
- * 
+ * CGRIDMB   LIN 5 0 3.0      # DM_EAD: 5 Gaussian centres from 0 to 3.0
+ * SGRIDMB   GEOM 5 1.0 10.0  # DM_EAD: 5 widths from 1.0 to 10.0
+ *
  * TYPEMB    DM_Blip 0 7 7 Ta Ta   # L number, cgrid, sgrid, list of element pairs
  * RCTYPEMB  Cut_Tanh
  * RCUTMB    7.5
- * SGRIDMB   -2 7 0.1 10      # Grid for DM_Blip, blips widths, auto-generated
- * CGRIDMB   0 0 0 0 0 0 0    # Grid for DM_Blip, blips centers
+ * SGRIDMB   GEOM 7 0.1 10    # DM_Blip: 7 blip widths from 0.1 to 10
+ * CGRIDMB   0 0 0 0 0 0 0    # DM_Blip: 7 blip centres
  * ```
  *
- * Note: Grids can be specified on a single line, and the order of the grids should match the order of descriptors.
+ * The values of a list key form one list, whatever lines they are written
+ * on: each descriptor takes as many values as its TYPEMB line asks for, in
+ * the order of the TYPEMB lines, and more or fewer values are refused. A
+ * line gives values or generators: LIN n start stop gives n evenly spaced
+ * values, GEOM n start stop n values in a geometric progression.
  *
  * There is no limit to the number of descriptors that can be concatenated.
  *
