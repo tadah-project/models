@@ -61,6 +61,12 @@ namespace tadah {
           // stderr notice per key and process, wherever a model is built.
           report_ream_only_keys(context);
 
+          // The RCTYPE, RCUT and list values of a single descriptor's line,
+          // as D2_mJoin and DM_mJoin check theirs: refused in a
+          // configuration, reported in a potential when no descriptor reads
+          // them.
+          D_mJoin::check_single_lines(context);
+
           bias = static_cast<int>(tadah::core::n_intercept_columns(context));
 
           if (context.get<bool>("INIT2B")) {

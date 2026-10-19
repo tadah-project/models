@@ -6,6 +6,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <tadah/core/key_notice.h>
 #include <tadah/core/number_format.h>
 #include <tadah/models/descriptors/d_mjoin.h>
 #include <tadah/models/descriptors/d_base.h>
@@ -23,18 +24,24 @@ namespace {
 // context. mJoin meta-descriptors are always
 // handled (their sub-descriptors are standard). Keyless descriptors (D2_EAM,
 // DM_EAM) are trivially handled.
-bool mjoin_can_handle(const tadah::core::Context &c, const std::string &type_str) {
-  if(type_str=="TYPEMB" && !c.blocks("DESCRIPTOR").empty()) return true;
-  if (!c.contains(type_str) || c.size(type_str) == 0) return false;
-  const std::string label = c.get<std::string>(type_str, 0);
-  if (label.find("mJoin") != std::string::npos) return true;
+// The list keys parse_context splits among the descriptors of a TYPE2B or
+// a TYPEMB line.
+const std::set<std::string> &list_keys_of(const std::string &type_str) {
   static const std::set<std::string> sup2b = {"CGRID2B", "SGRID2B",
                                               "KDEG2B"};
   static const std::set<std::string> supmb = {"CGRIDMB", "SGRIDMB",
                                               "CEMBFUNC", "SEMBFUNC",
                                               "AMPGRIDMB", "KDEGMB",
                                               "KDEGEMB"};
-  const std::set<std::string> &sup = (type_str == "TYPE2B") ? sup2b : supmb;
+  return type_str == "TYPE2B" ? sup2b : supmb;
+}
+
+bool mjoin_can_handle(const tadah::core::Context &c, const std::string &type_str) {
+  if(type_str=="TYPEMB" && !c.blocks("DESCRIPTOR").empty()) return true;
+  if (!c.contains(type_str) || c.size(type_str) == 0) return false;
+  const std::string label = c.get<std::string>(type_str, 0);
+  if (label.find("mJoin") != std::string::npos) return true;
+  const std::set<std::string> &sup = list_keys_of(type_str);
   std::unique_ptr<D_Base> d(tadah::core::factory<D_Base>(label));
   if (!d->context_keys.empty()) return false;  // read whole (DM_Poly)
   for (const auto &k : d->keys)
@@ -42,6 +49,13 @@ bool mjoin_can_handle(const tadah::core::Context &c, const std::string &type_str
   for (const auto &k : d->data_keys)
     if (!sup.count(k)) return false;
   return true;
+}
+
+std::string joined_text(const std::vector<std::string> &v, std::size_t from,
+                        std::size_t to) {
+  std::string s;
+  for (std::size_t i = from; i < to; ++i) s += (s.empty() ? "" : " ") + v[i];
+  return s;
 }
 } // namespace
 
@@ -87,6 +101,16 @@ void D_mJoin::expand_grids(tadah::core::Context &c) {
 void D_mJoin::expand_grids(tadah::core::Context &c, std::string type_str) {
   std::vector<tadah::core::Context> contexts = parse_context(c, type_str);
   expand_grids(c,contexts,type_str);
+}
+void D_mJoin::check_single_lines(const tadah::core::Context &c) {
+  for (const std::string type_str : {"TYPE2B", "TYPEMB"}) {
+    if (!c.get<bool>(type_str == "TYPE2B" ? "INIT2B" : "INITMB")) continue;
+    if (type_str == "TYPEMB" && !c.blocks("DESCRIPTOR").empty()) continue;
+    if (!mjoin_can_handle(c, type_str)) continue;
+    if (c.get<std::string>(type_str, 0).find("mJoin") != std::string::npos)
+      continue;  // D2_mJoin and DM_mJoin split their own lines
+    parse_context(c, type_str);
+  }
 }
 void D_mJoin::expand_grids(tadah::core::Context &c, std::vector<tadah::core::Context> &contexts,std::string type_str) {
   if (type_str=="TYPE2B") {
@@ -214,11 +238,67 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
     return std::to_string(v) + (v == 1 ? " value" : " values");
   };
 
+  // A potential (WEIGHTS) is read as it was written. tadah 1.5.0 kept
+  // RCTYPE, RCUT, AMPGRIDMB and KDEG values that no descriptor takes in the
+  // potentials it wrote, and its descriptors read the same values as here:
+  // each such key is reported once (on standard error, or to the capture of
+  // pair_style tadah) and the potential loads. A configuration with them is
+  // refused: the values would be dropped from the model without a word.
+  const bool potential = c.has_stored("WEIGHTS");
+  const bool joined =
+      c.get<std::string>(type_str, 0).find("mJoin") != std::string::npos;
+  const std::string label0 = lines.empty() ? "" : lines[0][0];
+  // "TYPE2B D2_Blip takes" or "TYPE2B names 2 descriptors (...), which take"
+  const std::string who =
+      joined ? type_str + " names " + named +
+                   (lines.size() == 1 ? ", which takes" : ", which take")
+             : type_str + " " + label0 + " takes";
+  auto report_unread = [&](const std::string &key,
+                           const std::vector<std::string> &v,
+                           std::size_t taken) {
+    const std::size_t n = v.size() - taken;
+    const std::string without =
+        "; the potential works unchanged without " +
+        std::string(n == 1 || taken == 0 ? "it" : "them");
+    if (taken == 0) {
+      tadah::core::report_ignored_key_once(
+          key, "Key " + key + " (" + joined_text(v, 0, v.size()) + ")",
+          who + " none of its values" + without);
+      return;
+    }
+    tadah::core::report_ignored_key_once(
+        key, "Part of " + key + " (" + joined_text(v, taken, v.size()) + ")",
+        who + " its first " +
+            (taken == 1 ? std::string("value") : values(taken)) + without);
+  };
+
   // One RCTYPE and one RCUT value per descriptor, in the order of the lines:
   // fewer would be read past their end, more would never be read.
   for (const std::string &key : {rctypekey, rcutkey}) {
-    const std::size_t have = data_map[key].first->size();
+    const std::vector<std::string> &v = *data_map[key].first;
+    const std::size_t have = v.size();
     if (have == lines.size()) continue;
+    if (potential && have > lines.size() && !lines.empty()) {
+      if (joined || key == rctypekey) {
+        report_unread(key, v, lines.size());
+        continue;
+      }
+      // A single descriptor's cutoff is the largest RCUT value (RCUT2BMAX,
+      // RCUTMBMAX): the other values are the ones it does not read.
+      std::size_t largest = 0;
+      for (std::size_t i = 1; i < have; ++i)
+        if (c.get<double>(key, i) > c.get<double>(key, largest)) largest = i;
+      std::vector<std::string> rest;
+      for (std::size_t i = 0; i < have; ++i)
+        if (i != largest) rest.push_back(v[i]);
+      tadah::core::report_ignored_key_once(
+          key, "Part of " + key + " (" + joined_text(rest, 0, rest.size()) +
+                   ")",
+          who + " one " + key + " value, and its cutoff is the largest, " +
+              v[largest] + "; the potential works unchanged with " + key +
+              " " + v[largest] + " alone");
+      continue;
+    }
     throw std::runtime_error(
         type_str + " names " + named + " but " + key + " has " +
         values(have) + ": each descriptor takes one " + key +
@@ -337,13 +417,26 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
     last_text = text;
   }
 
-  // Every value of a list key the line reads belongs to a descriptor: values
-  // past those the descriptors take would be dropped from the model and the
-  // potential without a word.
+  // Every value of a list key of the line's type belongs to a descriptor:
+  // values past those the descriptors take, and the values of a key no
+  // descriptor of the line reads, would be dropped from the model and the
+  // potential without a word. In a potential, a joined line's descriptors
+  // take theirs in order, and a single descriptor reads none of a key it
+  // does not declare: the others are reported. A single descriptor reads
+  // every value of the keys it declares, so their count is checked as in a
+  // configuration.
+  std::set<std::string> declared;
+  for (const auto &[key, taken] : read_keys) declared.insert(key);
+  for (const auto &key : list_keys_of(type_str))
+    if (data_map.count(key)) read_keys.emplace(key, 0);
   for (const auto &[key, taken] : read_keys) {
     const auto it = data_map.find(key);
     const size_t given = it == data_map.end() ? 0 : it->second.first->size();
     if (given <= taken) continue;
+    if (potential && (joined || !declared.count(key))) {
+      report_unread(key, *it->second.first, taken);
+      continue;
+    }
     const std::string takes = std::to_string(taken) + " " + key +
                               (taken == 1 ? " value" : " values");
     if (lines.size() == 1)

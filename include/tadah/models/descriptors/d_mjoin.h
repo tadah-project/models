@@ -37,10 +37,33 @@ public:
    *  descriptors before it take theirs first: 'TYPE2B D2_BP (descriptor 2
    *  of 2) takes 2 CGRID2B values, but CGRID2B has 1 value left of 3 (the
    *  descriptors before it take 2): TYPE2B D2_BP 2 2 Ta Ta'; the values are
-   *  counted after LIN/GEOM expansion), and when RCTYPE or RCUT has fewer
-   *  values than the line has descriptors.
+   *  counted after LIN/GEOM expansion), when RCTYPE or RCUT has fewer or
+   *  more values than the line has descriptors, and when a list key of the
+   *  line's type has more values than the descriptors take (a key that no
+   *  descriptor of the line reads included: 'TYPE2B D2_LJ takes 0 CGRID2B
+   *  values, but CGRID2B has 3 values: TYPE2B D2_LJ Ta Ta').
+   *
+   *  A potential (@p c with WEIGHTS) is read as it was written: values its
+   *  model does not read are reported once per key and process
+   *  (core::report_ignored_key_once: 'Part of RCUT2B (6) is ignored: TYPE2B
+   *  names 2 descriptors (D2_Blip, D2_Knot5), which take its first 2
+   *  values; the potential works unchanged without it') instead of
+   *  refused. Those are the RCTYPE, RCUT and list values past the ones a
+   *  joined line's descriptors take, the RCTYPE values past the first and
+   *  the RCUT values but the largest (its cutoff) of a single descriptor,
+   *  and the values of a key no descriptor of the line reads. A single
+   *  descriptor reads every value of the list keys it declares: their
+   *  count is checked as in a configuration.
    */
   static std::vector<tadah::core::Context> parse_context(const tadah::core::Context &c, std::string type_str);
+
+  /** \brief The checks of parse_context() on the TYPE2B and TYPEMB lines
+   *  of @p c that hold one descriptor (D2_mJoin and DM_mJoin check their
+   *  own lines), for a model built from @p c (DC_Selector): a potential
+   *  read by tadah predict or pair_style tadah reports the values its
+   *  descriptors do not read, as a joined line's does.
+   */
+  static void check_single_lines(const tadah::core::Context &c);
 
   static void expand_grids(tadah::core::Context &c, std::vector<tadah::core::Context> &contexts, std::string type_str);
 
