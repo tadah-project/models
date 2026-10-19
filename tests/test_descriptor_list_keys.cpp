@@ -87,16 +87,14 @@ Context context_for(const LineSpec &s,
 }
 
 /* Every registered descriptor whose TYPE line takes list values, mJoin
- * excluded (its keys are the TYPE/RCTYPE/RCUT keys it splits), and so are
- * the descriptors that read list keys whole (context_keys: a DM_Poly whose
- * channel function reads CEMBFUNC/SEMBFUNC), whose single line
- * D_mJoin::expand_grids leaves to the descriptor. */
+ * excluded (its keys are the TYPE/RCTYPE/RCUT keys it splits). A DM_Poly
+ * whose channel function reads CEMBFUNC/SEMBFUNC whole is included: its
+ * line is checked and split as any other. */
 std::vector<std::string> descriptors_with_list_keys() {
   std::vector<std::string> out;
   for (const auto &label : Registry<D_Base>::names()) {
     if (label.find("mJoin") != std::string::npos) continue;
     std::unique_ptr<D_Base> d(factory<D_Base>(label));
-    if (!d->context_keys.empty()) continue;
     if (!d->keys.empty() || !d->data_keys.empty()) out.push_back(label);
   }
   return out;
@@ -123,26 +121,23 @@ void check_refused(const LineSpec &s, const std::vector<std::string> &unset) {
 
 } // namespace
 
-/* Pins: the sweep covers the descriptors with list keys (D2_BP, D2_Blip,
+/* The sweep covers the descriptors with list keys (D2_BP, D2_Blip,
  * D2_Blip5, D2_Knot5, DM_Blip, DM_EAD, DM_REAM, the DM_m* family and the
- * DM_Poly descriptors with F_SQ), and with every key set
- * D_mJoin::expand_grids splits each of their lines without an error; a
- * DM_Poly whose channel function reads CEMBFUNC/SEMBFUNC is not split.
- * Before the fix: passes as well (a pin of the fixture the refusals below
- * rely on). */
+ * DM_Poly family, those whose channel function reads CEMBFUNC/SEMBFUNC
+ * whole included), and with every key set D_mJoin::expand_grids splits each
+ * of their lines without an error. The refusals below hold for each of
+ * them (before the fix: a DM_Poly line whose channel function reads
+ * CEMBFUNC/SEMBFUNC was left to the descriptor, unchecked). */
 TEST_CASE("Descriptor list keys: every descriptor line with its list keys "
           "set is split",
           "[D_mJoin][list_keys]") {
   const auto labels = descriptors_with_list_keys();
   for (const char *expected : {"D2_BP", "D2_Blip", "D2_Blip5", "D2_Knot5",
                                "DM_Blip", "DM_EAD", "DM_REAM", "DM_mBlip",
-                               "DM_mBlipEnv", "DM_PS_SQ", "DM_GOW_SQ"}) {
+                               "DM_mBlipEnv", "DM_PS_SQ", "DM_GOW_SQ",
+                               "DM_PS_SQRT", "DM_GOW_Blip", "DM_OW_RLR"}) {
     INFO(expected);
     CHECK(std::find(labels.begin(), labels.end(), expected) != labels.end());
-  }
-  for (const char *whole : {"DM_PS_SQRT", "DM_GOW_Blip", "DM_OW_RLR"}) {
-    INFO(whole);
-    CHECK(std::find(labels.begin(), labels.end(), whole) == labels.end());
   }
   for (const auto &label : labels) {
     const LineSpec s = spec_for(label, 2);

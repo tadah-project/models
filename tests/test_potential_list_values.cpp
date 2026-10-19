@@ -418,9 +418,8 @@ TEST_CASE("A single descriptor's potential whose list key disagrees with "
 
 /* A DM_Poly descriptor reads the CEMBFUNC and SEMBFUNC of its channel
  * function (F_RLR, F_Blip; F_SQRT reads SEMBFUNC when set) whole from the
- * context: its TYPE line has no SIZE parameter for them, so D_mJoin cannot
- * split them, and a single DM_Poly line is left to the descriptor, as a
- * line whose keys D_mJoin does not split is. Before the fix: tadah train
+ * context: its TYPE line has no SIZE parameter for them. A single DM_Poly
+ * line keeps them whole through the grid split. Before the fix: tadah train
  * (D_mJoin::expand_grids) removed them from the configuration, so DM_PS_RLR
  * failed with 'Key not found in the Context object: SEMBFUNC' and
  * DM_PS_SQRT trained with every SEMBFUNC value 1. */
@@ -466,4 +465,218 @@ TEST_CASE("A single DM_Poly line keeps the CEMBFUNC and SEMBFUNC its "
   DC_Selector s23(sqrt23), s11(sqrt11);
   const auto a = aed_mb(s23, 2.5), b = aed_mb(s11, 2.5);
   CHECK(a != b);
+}
+
+namespace {
+
+/* A single DM_Poly line of `label` (L 1, 2 centres, 2 widths) with the
+ * CEMBFUNC and SEMBFUNC its channel function reads whole. */
+Context dm_poly(const std::string &label, bool potential) {
+  tadah::core::PeriodicTable::initialize();
+  Context c;
+  c.add("VERBOSE", 0);
+  c.add("INIT2B", "false");
+  c.add("INITMB", "true");
+  c.add("TYPEMB", label + " 1 2 2 Ta Ta");
+  c.add("RCTYPEMB", "Cut_Cos");
+  c.add("RCUTMB", 5.0);
+  c.add("CGRIDMB", "2 3");
+  c.add("SGRIDMB", "1 1");
+  if (label.find("SQRT") == std::string::npos) c.add("CEMBFUNC", "0.5 0.5");
+  c.add("SEMBFUNC", "2 3");
+  if (potential) c.add("WEIGHTS", "0.1 0.2 0.3");
+  return c;
+}
+
+void replace(Context &c, const std::string &key, const std::string &value) {
+  c.remove(key);
+  c.add(key, value);
+}
+
+} // namespace
+
+/* A single DM_Poly line whose channel function reads CEMBFUNC/SEMBFUNC
+ * whole is checked as any single line: in a training configuration more
+ * RCTYPE/RCUT values than descriptors, more or fewer CGRIDMB values than its
+ * SIZE parameter, and a list key it does not read (AMPGRIDMB) are refused;
+ * in a potential the RCUT values below the largest and the unread key are
+ * reported. The keys it reads whole are neither split nor reported.
+ * Before the fix: the line was left to the descriptor, unchecked: each of
+ * these trained and loaded without a word, DM_Poly reading every CGRIDMB
+ * value whatever its SIZE parameter. */
+TEST_CASE("A single DM_Poly line whose channel function reads CEMBFUNC or "
+          "SEMBFUNC is checked as any single line",
+          "[D_mJoin][list_keys][dm_poly]") {
+  for (const std::string label : {"DM_PS_RLR", "DM_PS_SQRT", "DM_GOW_RLR"}) {
+    INFO(label);
+    const std::string line = "TYPEMB " + label + " 1 2 2 Ta Ta";
+    CHECK(refusal(dm_poly(label, false)) == "");
+    {
+      Context c = dm_poly(label, false);
+      replace(c, "RCUTMB", "5 6");
+      CHECK(refusal(c) == "TYPEMB names 1 descriptor (" + label +
+                              ") but RCUTMB has 2 values: each descriptor "
+                              "takes one RCUTMB value, in the order of the "
+                              "TYPEMB lines");
+    }
+    {
+      Context c = dm_poly(label, false);
+      replace(c, "CGRIDMB", "2 3 4");
+      CHECK(refusal(c) == "TYPEMB " + label + " takes 2 CGRIDMB values, "
+                          "but CGRIDMB has 3 values: " + line);
+      replace(c, "CGRIDMB", "2");
+      CHECK(refusal(c) == "TYPEMB " + label + " takes 2 CGRIDMB values, "
+                          "but CGRIDMB has 1 value: " + line);
+    }
+    {
+      Context c = dm_poly(label, false);
+      c.add("AMPGRIDMB", "1 1");
+      CHECK(refusal(c) == "TYPEMB " + label + " takes 0 AMPGRIDMB values, "
+                          "but AMPGRIDMB has 2 values: " + line);
+    }
+    /* a potential: reported, and the model builds */
+    Context pot = dm_poly(label, true);
+    replace(pot, "RCUTMB", "5 6");
+    pot.add("AMPGRIDMB", "1 1");
+    std::vector<std::string> notices;
+    {
+      IgnoredKeyNoticeCapture cap;
+      REQUIRE_NOTHROW(DC_Selector(pot));
+      notices = cap.notices();
+    }
+    CHECK(count_of(notices, "Part of RCUTMB (5) is ignored: TYPEMB " + label +
+                                " takes one RCUTMB value, and its cutoff is "
+                                "the largest, 6; the potential works "
+                                "unchanged with RCUTMB 6 alone") == 1);
+    CHECK(count_of(notices, "Key AMPGRIDMB (1 1) is ignored: TYPEMB " +
+                                label + " takes none of its values; the "
+                                "potential works unchanged without it") == 1);
+    CHECK(notices.size() == 2);
+  }
+}
+
+/* The grids of such a line are expanded as any line's: OPTIM CGRIDMB (i)
+ * addresses the i-th centre, and a written potential holds the values. The
+ * keys it reads whole are expanded too.
+ * Before the fix: the line was left to the descriptor with 'LIN 3 2 4.5' as
+ * written, so CGRIDMB (2) was the generator's start, 2, not the second
+ * centre, 3.25. */
+TEST_CASE("The grids of a single DM_Poly line whose channel function reads "
+          "SEMBFUNC are expanded",
+          "[D_mJoin][list_keys][dm_poly]") {
+  Context c = dm_poly("DM_PS_SQRT", false);
+  replace(c, "TYPEMB", "DM_PS_SQRT 1 3 3 Ta Ta");
+  replace(c, "CGRIDMB", "LIN 3 2 4.5");
+  replace(c, "SGRIDMB", "GEOM 3 1 4");
+  replace(c, "SEMBFUNC", "LIN 3 1 3");
+  REQUIRE_NOTHROW(D_mJoin::expand_grids(c));
+  REQUIRE(c.size("CGRIDMB") == 3);
+  CHECK(c.get<double>("CGRIDMB", 1) == 3.25);
+  REQUIRE(c.size("SGRIDMB") == 3);
+  CHECK(c.get<double>("SGRIDMB", 2) == Approx(4.0));
+  REQUIRE(c.size("SEMBFUNC") == 3);
+  CHECK(c.get<double>("SEMBFUNC", 1) == 2.0);
+  REQUIRE_NOTHROW(DC_Selector(c));
+}
+
+/* In a DM_mJoin line a descriptor takes its share of each list key: one
+ * whose channel function needs CEMBFUNC and SEMBFUNC of its own (F_RLR,
+ * F_Blip) cannot be joined, and is refused naming it. One whose channel
+ * function reads SEMBFUNC only when set (F_SQRT) is joined with none, every
+ * SEMBFUNC value 1, as a single line without SEMBFUNC.
+ * Before the fix: the joined DM_PS_RLR was built without its keys ('Key not
+ * found in the Context object: SEMBFUNC'). */
+TEST_CASE("A DM_mJoin line refuses a DM_Poly descriptor that needs CEMBFUNC "
+          "and SEMBFUNC of its own",
+          "[D_mJoin][list_keys][dm_poly]") {
+  const auto joined = [](const std::string &second) {
+    tadah::core::PeriodicTable::initialize();
+    Context c;
+    c.add("VERBOSE", 0);
+    c.add("INIT2B", "false");
+    c.add("INITMB", "true");
+    c.add("TYPEMB", "DM_mJoin");
+    c.add("TYPEMB", "DM_EAD 0 1 1 Ta Ta");
+    c.add("TYPEMB", second);
+    c.add("RCTYPEMB", "Cut_Cos Cut_Cos");
+    c.add("RCUTMB", "5 5");
+    c.add("CGRIDMB", "2 2 3");
+    c.add("SGRIDMB", "1 1 1");
+    return c;
+  };
+  {
+    Context c = joined("DM_PS_RLR 1 2 2 Ta Ta");
+    c.add("CEMBFUNC", "0.5 0.5");
+    c.add("SEMBFUNC", "2 3");
+    const std::string what =
+        "TYPEMB DM_PS_RLR (descriptor 2 of 2) reads CEMBFUNC and SEMBFUNC "
+        "whole and cannot be joined: a DM_mJoin line gives each descriptor "
+        "only its share of a list key; DM_PS_RLR can be the only TYPEMB "
+        "descriptor";
+    CHECK(refusal(c) == what);
+    REQUIRE_THROWS_WITH(DC_Selector(c), what);
+  }
+  {
+    Context c = joined("DM_PS_SQRT 1 2 2 Ta Ta");
+    REQUIRE_NOTHROW(D_mJoin::expand_grids(c));
+    REQUIRE_NOTHROW(DC_Selector(c));
+  }
+}
+
+/* Training from a potential (tadah train -c pot.tadah, tadah hpo -c
+ * pot.tadah) reports the values no descriptor takes and goes on with the
+ * potential's model: D_mJoin::expand_grids leaves them out of the context,
+ * so the training context (the potential without its WEIGHTS, as
+ * Trainer::training_context makes it) builds that model and a retrained
+ * potential is written without them. A single descriptor keeps its largest
+ * RCUT value, its cutoff.
+ * Before the fix: they stayed in the context, and the model of the training
+ * context was refused ('TYPE2B names 2 descriptors (D2_Blip, D2_Knot5) but
+ * RCTYPE2B has 3 values: ...'). */
+TEST_CASE("Training from a potential with values its descriptors do not take "
+          "leaves them out",
+          "[D_mJoin][list_keys][potential]") {
+  const auto retrain = [](Context pot) {
+    REQUIRE_NOTHROW(D_mJoin::expand_grids(pot));
+    pot.remove("WEIGHTS");
+    return pot;
+  };
+  {
+    Context c = retrain(joined_2b(true, true));
+    CHECK(c.size("RCUT2B") == 2);
+    CHECK(c.size("RCTYPE2B") == 2);
+    CHECK(c.size("KDEG2B") == 2);
+    std::unique_ptr<DC_Selector> s;
+    REQUIRE_NOTHROW(s.reset(new DC_Selector(c)));
+    Context clean = joined_2b(false, false);
+    DC_Selector reference(clean);
+    for (const double r : {2.5, 4.9})
+      CHECK_THAT(aed_2b(*s, r),
+                 Catch::Matchers::Approx(aed_2b(reference, r)).margin(1e-14));
+  }
+  {
+    Context c = retrain(joined_mb(true, true));
+    CHECK(c.size("RCUTMB") == 2);
+    CHECK(c.size("RCTYPEMB") == 2);
+    CHECK_FALSE(c.contains("AMPGRIDMB"));
+    REQUIRE_NOTHROW(DC_Selector(c));
+  }
+  {
+    Context c = retrain(single_2b(true, false));
+    REQUIRE(c.size("RCUT2B") == 1);
+    CHECK(c.get<double>("RCUT2B") == 6.0);
+    REQUIRE(c.size("RCTYPE2B") == 1);
+    CHECK(c.get<std::string>("RCTYPE2B") == "Cut_Cos");
+    CHECK_FALSE(c.contains("KDEG2B"));
+    std::unique_ptr<DC_Selector> s;
+    REQUIRE_NOTHROW(s.reset(new DC_Selector(c)));
+    CHECK(s->d2b->get_rcut() == Approx(6.0));
+  }
+  {
+    Context c = retrain(single_mb(true, false));
+    REQUIRE(c.size("RCUTMB") == 1);
+    CHECK(c.get<double>("RCUTMB") == 5.0);
+    CHECK_FALSE(c.contains("AMPGRIDMB"));
+    REQUIRE_NOTHROW(DC_Selector(c));
+  }
 }
