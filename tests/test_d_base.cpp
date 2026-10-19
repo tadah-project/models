@@ -1,15 +1,19 @@
 #include "catch2/catch.hpp"
 #include <tadah/models/descriptors/d_base.h>
 #include <tadah/models/descriptors/d2/d2_blip.h>
+#include <tadah/models/descriptors/d2/d2_blip5.h>
+#include <tadah/models/descriptors/d2/d2_bp.h>
 #include <tadah/models/descriptors/d_mjoin.h>
 #include <tadah/core/context.h>
 #include <tadah/core/core_types.h>
 #include <tadah/core/periodic_table.h>
 #include <tadah/core/blueprint_parser.h>
 #include <tadah/core/core_user_config_parser.h>
+#include <tadah/core/logger.h>
 #include <tadah/core/number_format.h>
 
 #include <cmath>
+#include <iostream>
 #include <limits>
 #include <sstream>
 #include <string>
@@ -389,4 +393,45 @@ TEST_CASE("The radial grid keys' help names the LIN and GEOM generators",
     CHECK_THROWS_AS(D_Base::get_grid(std::vector<std::string>{
                         gen, "3", "1", "4"}),
                     std::invalid_argument);
+}
+
+/* With the INFO log level (tadah train -v 2) a two-body descriptor lists its
+ * grids under their keys, CGRID2B and SGRID2B: "D2_Blip CGRID2B:".
+ * Before the fix: D2_Blip, D2_BP and D2_Blip5 labelled them "CGRIDMB:" and
+ * "SGRIDMB:", the keys of the many-body grids. */
+TEST_CASE("A two-body descriptor names its grids CGRID2B and SGRID2B in the "
+          "log", "[D_Base][grid][log]") {
+  PeriodicTable::initialize();
+  for (const char *label : {"D2_Blip", "D2_BP", "D2_Blip5"}) {
+    INFO(label);
+    Context c = make_minimal_blip_context_watom_tests();
+    c.remove("TYPE2B");
+    for (const std::string t : {std::string(label), std::string("2"),
+                                std::string("2"), std::string("H"),
+                                std::string("H")})
+      c.add("TYPE2B", t);
+    std::ostringstream captured;
+    auto &logger = Logger::instance();
+    const LogLevel level = logger.getLogLevel();
+    logger.setLogLevel(LogLevel::INFO);
+    auto *old = std::cout.rdbuf(captured.rdbuf());
+    try {
+      if (std::string(label) == "D2_Blip") D2_Blip d(c);
+      else if (std::string(label) == "D2_BP") D2_BP d(c);
+      else D2_Blip5 d(c);
+    } catch (...) {
+      std::cout.rdbuf(old);
+      logger.setLogLevel(level);
+      throw;
+    }
+    std::cout.rdbuf(old);
+    logger.setLogLevel(level);
+    const std::string text = captured.str();
+    INFO(text);
+    CHECK_THAT(text, Catch::Matchers::Contains(std::string(label) +
+                                               " CGRID2B:"));
+    CHECK_THAT(text, Catch::Matchers::Contains(std::string(label) +
+                                               " SGRID2B:"));
+    CHECK(text.find("GRIDMB") == std::string::npos);
+  }
 }
