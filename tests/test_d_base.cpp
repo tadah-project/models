@@ -410,6 +410,9 @@ TEST_CASE("The radial grid keys' help names the LIN and GEOM generators",
     CHECK_THAT(text, Contains("form one list"));
     CHECK_THAT(text, Contains("in the order of the"));
     CHECK_THAT(text, !Contains("one per line"));
+    // a line holds values or generators, as the key's format allows
+    CHECK_THAT(text, Contains("A line holds values or generators"));
+    CHECK_THAT(text, !Contains("or both"));
     // the format line names the generator as the text does
     REQUIRE(it->second.value_format.size() == 2);
     CHECK(it->second.value_format[1] ==
@@ -428,6 +431,37 @@ TEST_CASE("The radial grid keys' help names the LIN and GEOM generators",
     CHECK_THROWS_AS(D_Base::get_grid(std::vector<std::string>{
                         gen, "3", "1", "4"}),
                     std::invalid_argument);
+}
+
+/* A grid key's line holds values or generators (one or more), and lines of
+ * each kind may follow one another, as the help says: such a configuration
+ * is read and its grid is the lines' values in order. A line with values
+ * and a generator together is refused by the key's format.
+ * Before the fix: passes as well (the help said a line holds values,
+ * generators or both). */
+TEST_CASE("A grid key takes lines of values and lines of generators",
+          "[D_Base][grid][blueprint]") {
+  using tadah::core::CoreUserConfigParser;
+  Context c;
+  REQUIRE_NOTHROW(c = CoreUserConfigParser().parse(std::vector<std::string>{
+                      "ATOM Ta", "CGRID2B 1.0 1.5", "CGRID2B LIN 2 2 3",
+                      "CGRID2B LIN 2 4 5 GEOM 2 6 12"}));
+  v_type g;
+  D_Base::get_grid(c, "CGRID2B", g);
+  const std::vector<double> want = {1.0, 1.5, 2.0, 3.0, 4.0, 5.0, 6.0, 12.0};
+  REQUIRE(g.size() == want.size());
+  for (std::size_t i = 0; i < want.size(); ++i) CHECK(g[i] == Approx(want[i]));
+  std::ostringstream quiet;
+  auto *old = std::cerr.rdbuf(quiet.rdbuf());
+  auto *old_out = std::cout.rdbuf(quiet.rdbuf());
+  for (const std::string line : {"CGRID2B 1.0 LIN 3 2 5.3",
+                                 "SGRID2B GEOM 3 0.2 1.0 0.1"}) {
+    INFO(line);
+    CHECK_THROWS(CoreUserConfigParser().parse(
+        std::vector<std::string>{"ATOM Ta", line}));
+  }
+  std::cerr.rdbuf(old);
+  std::cout.rdbuf(old_out);
 }
 
 /* With the INFO log level (tadah train -v 2) a two-body descriptor lists its
