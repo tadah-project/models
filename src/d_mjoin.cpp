@@ -119,19 +119,44 @@ static void keep_read_values(tadah::core::Context &c,
   }
 }
 
-void D_mJoin::expand_grids(tadah::core::Context &c) {
+std::vector<D_mJoin::LeftOut> D_mJoin::expand_grids(tadah::core::Context &c) {
   resolve_embed_blocks(c);
   // Training from a potential leaves out what its descriptors do not read,
   // so the training context builds the potential's model.
   const bool potential = c.has_stored("WEIGHTS");
+  std::vector<LeftOut> left_out;
   for (const std::string type_str : {"TYPE2B", "TYPEMB"}) {
     if (!mjoin_can_handle(c, type_str)) continue;
     std::vector<tadah::core::Context> contexts = parse_context(c, type_str);
+    const bool keep = potential &&
+                      !(type_str == "TYPEMB" && !c.blocks("DESCRIPTOR").empty());
+    // The potential's values as given, list keys expanded as they are kept
+    // (parse_context has read them).
+    std::vector<LeftOut> given;
+    if (keep) {
+      const std::string sfx = type_str.substr(type_str.size() - 2);
+      std::vector<std::string> keys = {"RC" + type_str, "RCUT" + sfx};
+      for (const auto &k : list_keys_of(type_str)) keys.push_back(k);
+      for (const auto &k : keys) {
+        if (!c.contains(k)) continue;
+        std::vector<std::string> v(c.size(k));
+        c.get(k, v);
+        if (k.rfind("RC", 0) != 0) v = convert_to_strings(D_Base::get_grid(v));
+        given.push_back({k, v, {}});
+      }
+    }
     expand_grids(c, contexts, type_str);
-    if (potential &&
-        !(type_str == "TYPEMB" && !c.blocks("DESCRIPTOR").empty()))
-      keep_read_values(c, contexts, type_str);
+    if (!keep) continue;
+    keep_read_values(c, contexts, type_str);
+    for (auto &g : given) {
+      if (c.contains(g.key)) {
+        g.kept.resize(c.size(g.key));
+        c.get(g.key, g.kept);
+      }
+      if (g.kept.size() < g.given.size()) left_out.push_back(std::move(g));
+    }
   }
+  return left_out;
 }
 void D_mJoin::expand_grids(tadah::core::Context &c, std::string type_str) {
   std::vector<tadah::core::Context> contexts = parse_context(c, type_str);

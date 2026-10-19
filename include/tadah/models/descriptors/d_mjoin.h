@@ -75,14 +75,25 @@ public:
   static void expand_grids(tadah::core::Context &c, std::vector<tadah::core::Context> &contexts, std::string type_str);
 
   static void expand_grids(tadah::core::Context &c, std::string type_str);
+  /** \brief The values of a key of a potential that expand_grids() left
+   *  out: the key's values as the potential gives them (list keys expanded)
+   *  and those kept, in order. */
+  struct LeftOut {
+    std::string key;
+    std::vector<std::string> given;
+    std::vector<std::string> kept;
+  };
+
   /** \brief The TYPE2B and TYPEMB lines of @p c split and checked
    *  (parse_context()), and their grids expanded in @p c, for tadah train
    *  and tadah hpo. For a potential (@p c with WEIGHTS: training from a
    *  potential) the values its descriptors do not read are reported and
    *  left out of @p c, so the training context builds the potential's
    *  model: a single descriptor keeps its largest RCUT value, its cutoff.
+   *  Returns the keys whose values were left out (tadah hpo names them
+   *  when an OPTIM index is past the values kept).
    */
-  static void expand_grids(tadah::core::Context &c);
+  static std::vector<LeftOut> expand_grids(tadah::core::Context &c);
 };
 } // namespace models
 } // namespace tadah

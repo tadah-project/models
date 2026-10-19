@@ -673,6 +673,24 @@ TEST_CASE("Training from a potential with values its descriptors do not take "
     CHECK(s->d2b->get_rcut() == Approx(6.0));
   }
   {
+    /* what was left out, for the messages of tadah hpo */
+    Context pot = single_2b(true, false);
+    const auto left = D_mJoin::expand_grids(pot);
+    REQUIRE(left.size() == 3);
+    CHECK(left[0].key == "RCTYPE2B");
+    CHECK(left[0].given == std::vector<std::string>{"Cut_Cos", "Cut_Tanh"});
+    CHECK(left[0].kept == std::vector<std::string>{"Cut_Cos"});
+    CHECK(left[1].key == "RCUT2B");
+    CHECK(left[1].given == std::vector<std::string>{"5", "6"});
+    CHECK(left[1].kept == std::vector<std::string>{"6"});
+    CHECK(left[2].key == "KDEG2B");
+    CHECK(left[2].given == std::vector<std::string>{"5", "5"});
+    CHECK(left[2].kept.empty());
+    /* a configuration, or a potential without such values: nothing */
+    Context clean = single_2b(true, true);
+    CHECK(D_mJoin::expand_grids(clean).empty());
+  }
+  {
     Context c = retrain(single_mb(true, false));
     REQUIRE(c.size("RCUTMB") == 1);
     CHECK(c.get<double>("RCUTMB") == 5.0);
