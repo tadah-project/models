@@ -54,6 +54,13 @@ public:
    *  and the values of a key no descriptor of the line reads. A single
    *  descriptor reads every value of the list keys it declares: their
    *  count is checked as in a configuration.
+   *
+   *  The list keys a descriptor reads whole (D_Base::context_keys, the
+   *  CEMBFUNC/SEMBFUNC of a DM_Poly channel function) go whole, expanded,
+   *  to a single line's descriptor. A joined line gives such a descriptor
+   *  none; one that cannot run without them is refused ('TYPEMB DM_PS_RLR
+   *  (descriptor 2 of 2) reads CEMBFUNC and SEMBFUNC whole and cannot be
+   *  joined: ...').
    */
   static std::vector<tadah::core::Context> parse_context(const tadah::core::Context &c, std::string type_str);
 
@@ -68,6 +75,13 @@ public:
   static void expand_grids(tadah::core::Context &c, std::vector<tadah::core::Context> &contexts, std::string type_str);
 
   static void expand_grids(tadah::core::Context &c, std::string type_str);
+  /** \brief The TYPE2B and TYPEMB lines of @p c split and checked
+   *  (parse_context()), and their grids expanded in @p c, for tadah train
+   *  and tadah hpo. For a potential (@p c with WEIGHTS: training from a
+   *  potential) the values its descriptors do not read are reported and
+   *  left out of @p c, so the training context builds the potential's
+   *  model: a single descriptor keeps its largest RCUT value, its cutoff.
+   */
   static void expand_grids(tadah::core::Context &c);
 };
 } // namespace models

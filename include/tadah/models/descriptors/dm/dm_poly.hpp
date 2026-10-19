@@ -405,6 +405,8 @@ void DM_Poly<ChannelFn, RadialBasis, AggMode>::init()
 {
   keys = {"CGRIDMB", "SGRIDMB"};
   context_keys = ChannelFn::context_keys();
+  context_keys_required =
+      !context_keys.empty() && !ChannelFn::context_keys_optional;
   nparams = 2 + 1;
 }
 

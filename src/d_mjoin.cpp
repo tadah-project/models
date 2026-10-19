@@ -18,10 +18,10 @@ namespace models {
 namespace {
 // parse_context() splits the standard grid keys (and the declared
 // data_keys, e.g. the knot-degree lists). A descriptor whose keys fall
-// outside the supported set, or that reads list keys whole (its
-// context_keys: the CEMBFUNC/SEMBFUNC of a DM_Poly channel function), is
-// left untouched by expand_grids; it reads its own grids straight from the
-// context. mJoin meta-descriptors are always
+// outside the supported set is left untouched by expand_grids; it reads its
+// own grids straight from the context. The list keys a descriptor reads
+// whole (its context_keys: the CEMBFUNC/SEMBFUNC of a DM_Poly channel
+// function) are kept whole on a single line (parse_context). mJoin meta-descriptors are always
 // handled (their sub-descriptors are standard). Keyless descriptors (D2_EAM,
 // DM_EAM) are trivially handled.
 // The list keys parse_context splits among the descriptors of a TYPE2B or
@@ -43,7 +43,6 @@ bool mjoin_can_handle(const tadah::core::Context &c, const std::string &type_str
   if (label.find("mJoin") != std::string::npos) return true;
   const std::set<std::string> &sup = list_keys_of(type_str);
   std::unique_ptr<D_Base> d(tadah::core::factory<D_Base>(label));
-  if (!d->context_keys.empty()) return false;  // read whole (DM_Poly)
   for (const auto &k : d->keys)
     if (!sup.count(k)) return false;
   for (const auto &k : d->data_keys)
@@ -87,15 +86,51 @@ static std::vector<std::string> expanded_grid(const std::vector<std::string> &g,
   }
 }
 
+// A potential's RCTYPE, RCUT and list values as its descriptors read them
+// (parse_context has reported the others): the values the descriptors of
+// the line take, in order -- the whole of a key a single descriptor reads
+// whole -- and none of a key no descriptor reads. A single descriptor's
+// cutoff is the largest RCUT value, which it keeps.
+static void keep_read_values(tadah::core::Context &c,
+                             const std::vector<tadah::core::Context> &contexts,
+                             const std::string &type_str) {
+  const std::string sfx = type_str.substr(type_str.size() - 2);
+  const std::string rctype = "RC" + type_str, rcut = "RCUT" + sfx;
+  const bool joined =
+      c.get<std::string>(type_str, 0).find("mJoin") != std::string::npos;
+  std::vector<std::string> keys = {rctype, rcut};
+  for (const auto &k : list_keys_of(type_str)) keys.push_back(k);
+  for (const auto &key : keys) {
+    if (!c.contains(key)) continue;
+    std::vector<std::string> kept;
+    if (key == rcut && !joined) {
+      std::size_t largest = 0;
+      for (std::size_t i = 1; i < c.size(key); ++i)
+        if (c.get<double>(key, i) > c.get<double>(key, largest)) largest = i;
+      kept.push_back(c.get<std::string>(key, largest));
+    } else {
+      for (const auto &c1 : contexts)
+        if (c1.contains(key))
+          for (std::size_t i = 0; i < c1.size(key); ++i)
+            kept.push_back(c1.get<std::string>(key, i));
+    }
+    c.remove(key);
+    for (const auto &v : kept) c.add(key, v);
+  }
+}
+
 void D_mJoin::expand_grids(tadah::core::Context &c) {
   resolve_embed_blocks(c);
-  if (mjoin_can_handle(c, "TYPE2B")) {
-    std::vector<tadah::core::Context> contexts1 = parse_context(c, "TYPE2B");
-    expand_grids(c,contexts1,"TYPE2B");
-  }
-  if (mjoin_can_handle(c, "TYPEMB")) {
-    std::vector<tadah::core::Context> contexts2 = parse_context(c, "TYPEMB");
-    expand_grids(c,contexts2,"TYPEMB");
+  // Training from a potential leaves out what its descriptors do not read,
+  // so the training context builds the potential's model.
+  const bool potential = c.has_stored("WEIGHTS");
+  for (const std::string type_str : {"TYPE2B", "TYPEMB"}) {
+    if (!mjoin_can_handle(c, type_str)) continue;
+    std::vector<tadah::core::Context> contexts = parse_context(c, type_str);
+    expand_grids(c, contexts, type_str);
+    if (potential &&
+        !(type_str == "TYPEMB" && !c.blocks("DESCRIPTOR").empty()))
+      keep_read_values(c, contexts, type_str);
   }
 }
 void D_mJoin::expand_grids(tadah::core::Context &c, std::string type_str) {
@@ -360,6 +395,34 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
     c1.remove("CEMBFUNC"); c1.remove("SEMBFUNC");
     c1.remove("AMPGRIDMB");
     c1.remove("KDEG2B"); c1.remove("KDEGMB"); c1.remove("KDEGEMB");
+    // The list keys the descriptor reads whole (a DM_Poly channel
+    // function's CEMBFUNC/SEMBFUNC): a single line keeps them whole,
+    // expanded; a joined line gives each descriptor only its share of a
+    // list key, so it gives such a descriptor none, and one that cannot
+    // run without them cannot be joined.
+    if (!d->context_keys.empty()) {
+      if (joined && d->context_keys_required) {
+        std::string read;
+        for (std::size_t k = 0; k < d->context_keys.size(); ++k)
+          read += (k == 0 ? "" : k + 1 == d->context_keys.size() ? " and "
+                                                                  : ", ") +
+                  d->context_keys[k];
+        throw std::runtime_error(
+            type_str + " " + token + " (descriptor " + std::to_string(li + 1) +
+            " of " + std::to_string(lines.size()) + ") reads " + read +
+            " whole and cannot be joined: a " +
+            c.get<std::string>(type_str, 0) + " line gives each descriptor "
+            "only its share of a list key; " + token + " can be the only " +
+            type_str + " descriptor");
+      }
+      if (!joined)
+        for (const auto &key : d->context_keys) {
+          const auto it = data_map.find(key);
+          if (it == data_map.end()) continue;
+          for (const auto &v : *it->second.first) c1.add(key, v);
+          read_keys[key] = it->second.first->size();
+        }
+    }
     c1.add(type_str,token);
     c1.add(rctypekey, (*data_map[rctypekey].first)[ data_map[rctypekey].second++ ]);
     c1.add(rcutkey, (*data_map[rcutkey].first)[ data_map[rcutkey].second++ ]);

@@ -41,6 +41,9 @@ public:
    * DM_Poly reads them whole (its `context_keys`).
    */
   static std::vector<std::string> context_keys() { return {}; }
+  /** @brief Whether the function runs without its context_keys (F_SQRT:
+   *  every SEMBFUNC value 1 when SEMBFUNC is not set). */
+  static constexpr bool context_keys_optional = false;
 
   /**
    * @brief Returns the number of output channels per orbital per L.
@@ -187,6 +190,7 @@ private:
 
 public:
   static std::vector<std::string> context_keys() { return {"SEMBFUNC"}; }
+  static constexpr bool context_keys_optional = true;
   /**
    * @brief Constructs F_SQRT from a Context object.
    * @param context Reference to a Context instance.
