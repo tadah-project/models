@@ -316,6 +316,26 @@ TEST_CASE("D_Base::get_grid refuses an incomplete or invalid LIN/GEOM "
                           Contains("must be above 0"));
     }
   }
+  SECTION("a generator whose points are not finite numbers") {
+    // finite endpoints whose difference is beyond the largest double: the
+    // step of LIN is infinite (before the fix: the points NaN, inf and
+    // 1.7e308, refused later as '-nan' for the key, without the generator)
+    for (const strings &g : {strings{"LIN", "3", "-1.7e308", "1.7e308"},
+                             strings{"1.0", "LIN", "2", "1.7e308",
+                                     "-1.7e308"}}) {
+      INFO(g.size());
+      REQUIRE_THROWS_AS(D_Base::get_grid(g), std::invalid_argument);
+    }
+    REQUIRE_THROWS_WITH(
+        D_Base::get_grid(strings{"LIN", "3", "-1.7e308", "1.7e308"}),
+        "Invalid grid specification: the points of 'LIN 3 -1.7e308 1.7e308' "
+        "are not all finite numbers (its stop minus its start is beyond the "
+        "largest number)");
+    // the largest finite range is a grid
+    const v_type ok = D_Base::get_grid(strings{"LIN", "3", "-8e307", "8e307"});
+    REQUIRE(ok.size() == 3);
+    CHECK(ok[1] == 0.0);
+  }
   SECTION("the Context overload names the key") {
     Context c;
     c.add("CGRID2B", "LIN");
