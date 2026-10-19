@@ -10,6 +10,10 @@ find_package(Threads REQUIRED)
 target_link_libraries(test_models PRIVATE Catch2 tadah.models tadah.core
                                           Threads::Threads)
 target_include_directories(test_models PRIVATE ../include)
+# test_api_examples.cpp reads the configuration examples of the class
+# documentation (the API reference) from the headers.
+target_compile_definitions(test_models PRIVATE
+    TADAH_MODELS_INCLUDE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../include")
 
 include(Catch)
 # WORKING_DIRECTORY pins each registered Catch test case's cwd to the
