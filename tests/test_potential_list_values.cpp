@@ -1,0 +1,417 @@
+// test_potential_list_values.cpp
+//
+// The values of the RCTYPE*, RCUT* and list keys (CGRID2B, SGRID2B,
+// KDEG2B; CGRIDMB, SGRIDMB, CEMBFUNC, SEMBFUNC, AMPGRIDMB, KDEGMB,
+// KDEGEMB) of a TYPE2B or TYPEMB line belong to its descriptors, in the
+// order of the TYPE lines (D_mJoin::parse_context).
+//
+// A training configuration with values no descriptor takes is refused:
+// more RCTYPE/RCUT values than descriptors, more list values than the
+// SIZE parameters ask for, and a list key of the line's type that no
+// descriptor of the line reads (D2_LJ with CGRID2B).
+//
+// A potential (a context with WEIGHTS: tadah predict, pair_style tadah,
+// training from a potential, tadah hpo with a potential as its training
+// configuration) is read as it was written: tadah 1.5.0 kept such values
+// of RCTYPE*, RCUT*, AMPGRIDMB and KDEG* in the potentials it wrote, and
+// read only the values its descriptors take. Each such key is reported
+// once (core::report_ignored_key_once, captured by pair_style tadah for
+// the LAMMPS log), naming the values, and the model is the one without
+// them: a joined line's descriptors take their values in order, a single
+// descriptor takes the first RCTYPE value and its cutoff is the largest
+// RCUT value.
+
+#include "catch2/catch.hpp"
+
+#include <tadah/core/context.h>
+#include <tadah/core/key_notice.h>
+#include <tadah/core/periodic_table.h>
+#include <tadah/models/dc_selector.h>
+#include <tadah/models/descriptors/d_mjoin.h>
+
+#include <algorithm>
+#include <string>
+#include <vector>
+
+using tadah::core::Context;
+using tadah::core::IgnoredKeyNoticeCapture;
+using tadah::models::D_mJoin;
+using tadah::models::DC_Selector;
+using Catch::Matchers::Contains;
+
+namespace {
+
+/* A two-body joined line: D2_Blip (2 centres) and D2_Knot5 (2 knots),
+ * with `extra` true one more RCTYPE2B, RCUT2B and KDEG2B value than the
+ * line takes, as tadah 1.5.0 wrote them into a potential. */
+Context joined_2b(bool potential, bool extra) {
+  tadah::core::PeriodicTable::initialize();
+  Context c;
+  c.add("VERBOSE", 0);
+  c.add("INIT2B", "true");
+  c.add("INITMB", "false");
+  c.add("TYPE2B", "D2_mJoin");
+  c.add("TYPE2B", "D2_Blip 2 2 Ta Ta");
+  c.add("TYPE2B", "D2_Knot5 2 2 Ta Ta");
+  c.add("RCTYPE2B", extra ? "Cut_Cos Cut_Cos Cut_Tanh" : "Cut_Cos Cut_Cos");
+  c.add("RCUT2B", extra ? "5 5 6" : "5 5");
+  c.add("CGRID2B", "2 3 3 4.5");
+  c.add("SGRID2B", "1 1");
+  c.add("KDEG2B", extra ? "5 5 3" : "5 5");
+  if (potential) c.add("WEIGHTS", "0.1 0.2 0.3 0.4 0.5");
+  return c;
+}
+
+/* A many-body joined line of two DM_EAD descriptors, with `extra` true
+ * one more RCTYPEMB and RCUTMB value than the line takes and an AMPGRIDMB
+ * that DM_EAD does not read. */
+Context joined_mb(bool potential, bool extra) {
+  tadah::core::PeriodicTable::initialize();
+  Context c;
+  c.add("VERBOSE", 0);
+  c.add("INIT2B", "false");
+  c.add("INITMB", "true");
+  c.add("TYPEMB", "DM_mJoin");
+  c.add("TYPEMB", "DM_EAD 0 2 2 Ta Ta");
+  c.add("TYPEMB", "DM_EAD 0 1 1 Ta Ta");
+  c.add("RCTYPEMB", extra ? "Cut_Cos Cut_Cos Cut_Cos" : "Cut_Cos Cut_Cos");
+  c.add("RCUTMB", extra ? "4.5 5 6" : "4.5 5");
+  c.add("CGRIDMB", "2 3 2.5");
+  c.add("SGRIDMB", "1 1 1");
+  if (extra) c.add("AMPGRIDMB", "1 1");
+  if (potential) c.add("WEIGHTS", "0.1 0.2 0.3 0.4");
+  return c;
+}
+
+/* A single D2_Blip with two RCTYPE2B and RCUT2B values and a KDEG2B that
+ * D2_Blip does not read; `clean` is the potential without them, the
+ * largest RCUT2B value its cutoff. */
+Context single_2b(bool potential, bool clean) {
+  tadah::core::PeriodicTable::initialize();
+  Context c;
+  c.add("VERBOSE", 0);
+  c.add("INIT2B", "true");
+  c.add("INITMB", "false");
+  c.add("TYPE2B", "D2_Blip 2 2 Ta Ta");
+  c.add("RCTYPE2B", clean ? "Cut_Cos" : "Cut_Cos Cut_Tanh");
+  c.add("RCUT2B", clean ? "6" : "5 6");
+  c.add("CGRID2B", "2 3");
+  c.add("SGRID2B", "1 1");
+  if (!clean) c.add("KDEG2B", "5 5");
+  if (potential) c.add("WEIGHTS", "0.1 0.2 0.3");
+  return c;
+}
+
+/* A single DM_EAD with two RCTYPEMB and RCUTMB values (the larger one
+ * first) and an AMPGRIDMB that DM_EAD does not read. */
+Context single_mb(bool potential, bool clean) {
+  tadah::core::PeriodicTable::initialize();
+  Context c;
+  c.add("VERBOSE", 0);
+  c.add("INIT2B", "false");
+  c.add("INITMB", "true");
+  c.add("TYPEMB", "DM_EAD 0 2 2 Ta Ta");
+  c.add("RCTYPEMB", clean ? "Cut_Cos" : "Cut_Cos Cut_Cos");
+  c.add("RCUTMB", clean ? "5" : "5 4");
+  c.add("CGRIDMB", "2 3");
+  c.add("SGRIDMB", "1 1");
+  if (!clean) c.add("AMPGRIDMB", "1 1");
+  if (potential) c.add("WEIGHTS", "0.1 0.2 0.3");
+  return c;
+}
+
+/* The two-body descriptor of `s` for a Ta-Ta pair at r. */
+std::vector<double> aed_2b(DC_Selector &s, double r) {
+  tadah::core::aed_type aed(s.descriptor_size());
+  aed.set_zero();
+  s.d2b->calc_aed(73, 73, r, r * r, aed, 1.0);
+  return std::vector<double>(aed.data(), aed.data() + s.descriptor_size());
+}
+
+/* The many-body descriptor of `s` for one Ta neighbour at r. */
+std::vector<double> aed_mb(DC_Selector &s, double r) {
+  tadah::core::rho_type rho;
+  s.dmb->init_rhoi(rho);
+  s.dmb->calc_rho(73, 73, r, r * r, tadah::core::Vec3d(r, 0, 0), rho);
+  tadah::core::aed_type aed(s.descriptor_size());
+  aed.set_zero();
+  s.dmb->calc_aed(rho, aed);
+  return std::vector<double>(aed.data(), aed.data() + s.descriptor_size());
+}
+
+std::size_t count_of(const std::vector<std::string> &notices,
+                     const std::string &notice) {
+  return static_cast<std::size_t>(
+      std::count(notices.begin(), notices.end(), notice));
+}
+
+std::string refusal(Context c) {
+  try {
+    D_mJoin::expand_grids(c);
+  } catch (const std::exception &e) {
+    return e.what();
+  }
+  return "";
+}
+
+const char *kJoined2B =
+    "TYPE2B names 2 descriptors (D2_Blip, D2_Knot5), which take its first 2 "
+    "values; the potential works unchanged without it";
+
+} // namespace
+
+/* A D2_mJoin potential with one more RCTYPE2B, RCUT2B and KDEG2B value than
+ * its line takes loads (DC_Selector, as tadah predict and pair_style tadah
+ * build it), each key reported once naming the value, and its model is the
+ * potential's without them. Before the fix: refused ('TYPE2B names 2
+ * descriptors (D2_Blip, D2_Knot5) but RCTYPE2B has 3 values: ...'). */
+TEST_CASE("A joined two-body potential with values its descriptors do not "
+          "take loads, the values reported and ignored",
+          "[D_mJoin][list_keys][potential]") {
+  Context pot = joined_2b(true, true);
+  Context clean = joined_2b(true, false);
+  std::vector<std::string> notices;
+  {
+    IgnoredKeyNoticeCapture cap;
+    DC_Selector loaded(pot);
+    notices = cap.notices();
+    DC_Selector reference(clean);
+    REQUIRE(loaded.descriptor_size() == reference.descriptor_size());
+    for (const double r : {2.5, 4.0, 4.9, 5.5})
+      CHECK_THAT(aed_2b(loaded, r),
+                 Catch::Matchers::Approx(aed_2b(reference, r)).margin(1e-14));
+  }
+  INFO([&] {
+    std::string s;
+    for (const auto &n : notices) s += n + "\n";
+    return s;
+  }());
+  CHECK(count_of(notices, std::string("Part of RCTYPE2B (Cut_Tanh) is "
+                                      "ignored: ") + kJoined2B) == 1);
+  CHECK(count_of(notices, std::string("Part of RCUT2B (6) is ignored: ") +
+                              kJoined2B) == 1);
+  CHECK(count_of(notices, std::string("Part of KDEG2B (3) is ignored: ") +
+                              kJoined2B) == 1);
+  CHECK(notices.size() == 3);
+}
+
+/* The same line in a training configuration is refused; training from the
+ * potential (D_mJoin::expand_grids with WEIGHTS: tadah train and tadah hpo
+ * with a potential as the training configuration) reports the values and
+ * goes on. Before the fix: expand_grids refused the potential too. */
+TEST_CASE("A joined two-body line with values its descriptors do not take: "
+          "refused in a training configuration, reported in a potential",
+          "[D_mJoin][list_keys][potential]") {
+  CHECK(refusal(joined_2b(false, true)) ==
+        "TYPE2B names 2 descriptors (D2_Blip, D2_Knot5) but RCTYPE2B has 3 "
+        "values: each descriptor takes one RCTYPE2B value, in the order of "
+        "the TYPE2B lines");
+  {
+    Context c = joined_2b(false, true);
+    REQUIRE_THROWS_WITH(DC_Selector(c), Contains("RCTYPE2B has 3 values"));
+  }
+  Context pot = joined_2b(true, true);
+  IgnoredKeyNoticeCapture cap;
+  REQUIRE_NOTHROW(D_mJoin::expand_grids(pot));
+  CHECK(count_of(cap.notices(), std::string("Part of RCUT2B (6) is "
+                                            "ignored: ") + kJoined2B) == 1);
+  CHECK(cap.notices().size() == 3);
+}
+
+/* A DM_mJoin potential: one more RCTYPEMB and RCUTMB value, and an AMPGRIDMB
+ * that no descriptor of the line reads. Before the fix: refused ('TYPEMB
+ * names 2 descriptors (DM_EAD, DM_EAD) but RCTYPEMB has 3 values: ...'). */
+TEST_CASE("A joined many-body potential with values its descriptors do not "
+          "take loads, the values reported and ignored",
+          "[D_mJoin][list_keys][potential]") {
+  const std::string who =
+      "TYPEMB names 2 descriptors (DM_EAD, DM_EAD), which take ";
+  std::vector<std::string> notices;
+  {
+    Context pot = joined_mb(true, true);
+    Context clean = joined_mb(true, false);
+    IgnoredKeyNoticeCapture cap;
+    DC_Selector loaded(pot);
+    notices = cap.notices();
+    DC_Selector reference(clean);
+    REQUIRE(loaded.descriptor_size() == reference.descriptor_size());
+    for (const double r : {2.5, 4.0, 4.9, 5.5})
+      CHECK_THAT(aed_mb(loaded, r),
+                 Catch::Matchers::Approx(aed_mb(reference, r)).margin(1e-14));
+  }
+  CHECK(count_of(notices, "Part of RCTYPEMB (Cut_Cos) is ignored: " + who +
+                              "its first 2 values; the potential works "
+                              "unchanged without it") == 1);
+  CHECK(count_of(notices, "Part of RCUTMB (6) is ignored: " + who +
+                              "its first 2 values; the potential works "
+                              "unchanged without it") == 1);
+  CHECK(count_of(notices, "Key AMPGRIDMB (1 1) is ignored: " + who +
+                              "none of its values; the potential works "
+                              "unchanged without it") == 1);
+  CHECK(notices.size() == 3);
+  CHECK(refusal(joined_mb(false, true)) ==
+        "TYPEMB names 2 descriptors (DM_EAD, DM_EAD) but RCTYPEMB has 3 "
+        "values: each descriptor takes one RCTYPEMB value, in the order of "
+        "the TYPEMB lines");
+}
+
+/* A single descriptor reads the first RCTYPE value, and its cutoff is the
+ * largest RCUT value (RCUT2BMAX): a potential with two of each and a list
+ * key the descriptor does not read loads as the potential with the first
+ * RCTYPE value and the largest RCUT value alone, each key reported. A
+ * training configuration with them is refused, as a joined line's is.
+ * Before the fix: the potential loaded without a word. */
+TEST_CASE("A single two-body descriptor's potential with values it does not "
+          "read loads, the values reported",
+          "[D_mJoin][list_keys][potential]") {
+  std::vector<std::string> notices;
+  {
+    Context pot = single_2b(true, false);
+    Context clean = single_2b(true, true);
+    IgnoredKeyNoticeCapture cap;
+    DC_Selector loaded(pot);
+    notices = cap.notices();
+    DC_Selector reference(clean);
+    CHECK(loaded.d2b->get_rcut() == Approx(6.0));
+    REQUIRE(loaded.descriptor_size() == reference.descriptor_size());
+    for (const double r : {2.5, 4.9, 5.5})
+      CHECK_THAT(aed_2b(loaded, r),
+                 Catch::Matchers::Approx(aed_2b(reference, r)).margin(1e-14));
+  }
+  INFO([&] {
+    std::string s;
+    for (const auto &n : notices) s += n + "\n";
+    return s;
+  }());
+  CHECK(count_of(notices, "Part of RCTYPE2B (Cut_Tanh) is ignored: TYPE2B "
+                          "D2_Blip takes its first value; the potential "
+                          "works unchanged without it") == 1);
+  CHECK(count_of(notices, "Part of RCUT2B (5) is ignored: TYPE2B D2_Blip "
+                          "takes one RCUT2B value, and its cutoff is the "
+                          "largest, 6; the potential works unchanged with "
+                          "RCUT2B 6 alone") == 1);
+  CHECK(count_of(notices, "Key KDEG2B (5 5) is ignored: TYPE2B D2_Blip "
+                          "takes none of its values; the potential works "
+                          "unchanged without it") == 1);
+  CHECK(notices.size() == 3);
+  CHECK(refusal(single_2b(false, false)) ==
+        "TYPE2B names 1 descriptor (D2_Blip) but RCTYPE2B has 2 values: each "
+        "descriptor takes one RCTYPE2B value, in the order of the TYPE2B "
+        "lines");
+  // training from the potential reports and goes on
+  Context pot = single_2b(true, false);
+  IgnoredKeyNoticeCapture cap;
+  REQUIRE_NOTHROW(D_mJoin::expand_grids(pot));
+  CHECK(cap.notices().size() == 3);
+}
+
+TEST_CASE("A single many-body descriptor's potential with values it does "
+          "not read loads, the values reported",
+          "[D_mJoin][list_keys][potential]") {
+  std::vector<std::string> notices;
+  {
+    Context pot = single_mb(true, false);
+    Context clean = single_mb(true, true);
+    IgnoredKeyNoticeCapture cap;
+    DC_Selector loaded(pot);
+    notices = cap.notices();
+    DC_Selector reference(clean);
+    CHECK(loaded.dmb->get_rcut() == Approx(5.0));
+    REQUIRE(loaded.descriptor_size() == reference.descriptor_size());
+    for (const double r : {2.5, 4.5})
+      CHECK_THAT(aed_mb(loaded, r),
+                 Catch::Matchers::Approx(aed_mb(reference, r)).margin(1e-14));
+  }
+  CHECK(count_of(notices, "Part of RCTYPEMB (Cut_Cos) is ignored: TYPEMB "
+                          "DM_EAD takes its first value; the potential works "
+                          "unchanged without it") == 1);
+  CHECK(count_of(notices, "Part of RCUTMB (4) is ignored: TYPEMB DM_EAD "
+                          "takes one RCUTMB value, and its cutoff is the "
+                          "largest, 5; the potential works unchanged with "
+                          "RCUTMB 5 alone") == 1);
+  CHECK(count_of(notices, "Key AMPGRIDMB (1 1) is ignored: TYPEMB DM_EAD "
+                          "takes none of its values; the potential works "
+                          "unchanged without it") == 1);
+  CHECK(notices.size() == 3);
+}
+
+/* A list key of the line's type that no descriptor of the line reads is
+ * refused in a training configuration as a SIZE of 0 with values is: the
+ * values would be dropped from the model and the potential. Before the
+ * fix: accepted, and CGRID2B and SGRID2B left out of the potential without
+ * a word. */
+TEST_CASE("A list key that no descriptor of the line reads is refused in a "
+          "training configuration",
+          "[D_mJoin][list_keys]") {
+  tadah::core::PeriodicTable::initialize();
+  {
+    Context c;
+    c.add("VERBOSE", 0);
+    c.add("INIT2B", "true");
+    c.add("TYPE2B", "D2_LJ Ta Ta");
+    c.add("RCTYPE2B", "Cut_Cos");
+    c.add("RCUT2B", 5.0);
+    c.add("CGRID2B", "1 2 3");
+    CHECK(refusal(c) == "TYPE2B D2_LJ takes 0 CGRID2B values, but CGRID2B "
+                        "has 3 values: TYPE2B D2_LJ Ta Ta");
+  }
+  {
+    Context c;
+    c.add("VERBOSE", 0);
+    c.add("INIT2B", "true");
+    c.add("TYPE2B", "D2_mJoin");
+    c.add("TYPE2B", "D2_LJ Ta Ta");
+    c.add("TYPE2B", "D2_MIE 12 6 Ta Ta");
+    c.add("RCTYPE2B", "Cut_Cos Cut_Cos");
+    c.add("RCUT2B", "5 5");
+    c.add("CGRID2B", "1 2");
+    c.add("SGRID2B", "1 1");
+    CHECK(refusal(c) ==
+          "TYPE2B names 2 descriptors (D2_LJ, D2_MIE), which take 0 CGRID2B "
+          "values, but CGRID2B has 2 values: each descriptor takes its "
+          "CGRID2B values, in the order of the TYPE2B lines");
+  }
+  {
+    Context c;
+    c.add("VERBOSE", 0);
+    c.add("INITMB", "true");
+    c.add("TYPEMB", "DM_EAD 0 2 2 Ta Ta");
+    c.add("RCTYPEMB", "Cut_Cos");
+    c.add("RCUTMB", 5.0);
+    c.add("CGRIDMB", "2 3");
+    c.add("SGRIDMB", "1 1");
+    c.add("AMPGRIDMB", "1 1");
+    CHECK(refusal(c) == "TYPEMB DM_EAD takes 0 AMPGRIDMB values, but "
+                        "AMPGRIDMB has 2 values: TYPEMB DM_EAD 0 2 2 Ta Ta");
+  }
+  {
+    // a key of the other line's type is not the line's
+    Context c;
+    c.add("VERBOSE", 0);
+    c.add("INIT2B", "true");
+    c.add("TYPE2B", "D2_Blip 2 2 Ta Ta");
+    c.add("RCTYPE2B", "Cut_Cos");
+    c.add("RCUT2B", 5.0);
+    c.add("CGRID2B", "2 3");
+    c.add("SGRID2B", "1 1");
+    c.add("KDEGMB", "3");
+    CHECK(refusal(c).empty());
+  }
+}
+
+/* A value a single descriptor reads is not ignored: the descriptor reads
+ * every value of its list keys, so a potential whose list key has more
+ * values than its TYPE line's SIZE parameter asks for is refused, as the
+ * configuration is. */
+TEST_CASE("A single descriptor's potential whose list key disagrees with "
+          "its TYPE line is refused",
+          "[D_mJoin][list_keys][potential]") {
+  Context pot = single_2b(true, true);
+  pot.remove("CGRID2B");
+  pot.remove("SGRID2B");
+  pot.add("CGRID2B", "2 3 4");
+  pot.add("SGRID2B", "1 1 1");
+  REQUIRE_THROWS_WITH(DC_Selector(pot),
+                      "TYPE2B D2_Blip takes 2 CGRID2B values, but CGRID2B "
+                      "has 3 values: TYPE2B D2_Blip 2 2 Ta Ta");
+}
