@@ -415,3 +415,55 @@ TEST_CASE("A single descriptor's potential whose list key disagrees with "
                       "TYPE2B D2_Blip takes 2 CGRID2B values, but CGRID2B "
                       "has 3 values: TYPE2B D2_Blip 2 2 Ta Ta");
 }
+
+/* A DM_Poly descriptor reads the CEMBFUNC and SEMBFUNC of its channel
+ * function (F_RLR, F_Blip; F_SQRT reads SEMBFUNC when set) whole from the
+ * context: its TYPE line has no SIZE parameter for them, so D_mJoin cannot
+ * split them, and a single DM_Poly line is left to the descriptor, as a
+ * line whose keys D_mJoin does not split is. Before the fix: tadah train
+ * (D_mJoin::expand_grids) removed them from the configuration, so DM_PS_RLR
+ * failed with 'Key not found in the Context object: SEMBFUNC' and
+ * DM_PS_SQRT trained with every SEMBFUNC value 1. */
+TEST_CASE("A single DM_Poly line keeps the CEMBFUNC and SEMBFUNC its "
+          "channel function reads",
+          "[D_mJoin][list_keys][dm_poly]") {
+  tadah::core::PeriodicTable::initialize();
+  const auto config = [](const std::string &line, bool cemb) {
+    // F_Blip expands one density into its CEMBFUNC/SEMBFUNC channels
+    const bool one = line.find("Blip") != std::string::npos;
+    Context c;
+    c.add("VERBOSE", 0);
+    c.add("INIT2B", "false");
+    c.add("INITMB", "true");
+    c.add("TYPEMB", line);
+    c.add("RCTYPEMB", "Cut_Cos");
+    c.add("RCUTMB", 5.0);
+    c.add("CGRIDMB", one ? "2" : "2 3");
+    c.add("SGRIDMB", one ? "1" : "1 1");
+    if (cemb) c.add("CEMBFUNC", "0.5 0.5");
+    c.add("SEMBFUNC", "2 3");
+    return c;
+  };
+  for (const std::string line :
+       {"DM_PS_RLR 1 2 2 Ta Ta", "DM_GOW_Blip 1 1 1 Ta Ta",
+        "DM_PS_SQRT 1 2 2 Ta Ta", "DM_OW_SQRT 1 2 2 Ta Ta"}) {
+    INFO(line);
+    const bool cemb = line.find("SQRT") == std::string::npos;
+    Context c = config(line, cemb);
+    REQUIRE_NOTHROW(D_mJoin::expand_grids(c));
+    REQUIRE(c.contains("SEMBFUNC"));
+    CHECK(c.size("SEMBFUNC") == 2);
+    CHECK(c.get<double>("SEMBFUNC", 1) == 3.0);
+    CHECK(c.contains("CEMBFUNC") == cemb);
+    REQUIRE_NOTHROW(DC_Selector(c));
+  }
+  // DM_PS_SQRT reads SEMBFUNC: its descriptor differs from SEMBFUNC 1 1
+  Context sqrt23 = config("DM_PS_SQRT 1 2 2 Ta Ta", false);
+  D_mJoin::expand_grids(sqrt23);
+  Context sqrt11 = sqrt23;
+  sqrt11.remove("SEMBFUNC");
+  sqrt11.add("SEMBFUNC", "1 1");
+  DC_Selector s23(sqrt23), s11(sqrt11);
+  const auto a = aed_mb(s23, 2.5), b = aed_mb(s11, 2.5);
+  CHECK(a != b);
+}
