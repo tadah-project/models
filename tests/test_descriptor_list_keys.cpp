@@ -400,14 +400,15 @@ TEST_CASE("Descriptor list keys: a list key with too few values is refused "
  *    DM_mBlipEnv 0 1 1 7 7 Ta Ta";
  *  - a D2_mJoin of two D2_BP 2 2 Ta Ta lines with 5 CGRID2B values:
  *    "TYPE2B names 2 descriptors (D2_BP, D2_BP), which take 4 CGRID2B
- *    values, but CGRID2B has 5 values: give each descriptor's CGRID2B
+ *    values, but CGRID2B has 5 values: each descriptor takes its CGRID2B
  *    values, in the order of the TYPE2B lines";
  *  - a SIZE of 0 with values: D2_Knot5 2 0 Ta Ta with KDEG2B 3;
  *  - every descriptor with list keys (each SIZE 2), each key in turn with
  *    3 values;
  *  - more RCTYPE2B or RCUT2B values than descriptors: "TYPE2B names 1
- *    descriptor (D2_BP) but RCUT2B has 2 values: give one RCUT2B value per
- *    descriptor, in the order of the TYPE2B lines".
+ *    descriptor (D2_BP) but RCUT2B has 2 values: each descriptor takes one
+ *    RCUT2B value, in the order of the TYPE2B lines" (its message for
+ *    fewer values said "give one RCUT2B value per descriptor").
  * Before the fix: each was split without an error; the extra values were
  * dropped (`tadah train` trained with CGRIDMB 2.88 and wrote CGRIDMB 2.88
  * to the potential) and the extra cutoff values were kept but never read. */
@@ -452,8 +453,8 @@ TEST_CASE("Descriptor list keys: a list key with more values than the line "
     c.add("SGRID2B", "0.5 0.5 0.5 0.5");
     CHECK(refusal(c) ==
           "TYPE2B names 2 descriptors (D2_BP, D2_BP), which take 4 CGRID2B "
-          "values, but CGRID2B has 5 values: give each descriptor's CGRID2B "
-          "values, in the order of the TYPE2B lines");
+          "values, but CGRID2B has 5 values: each descriptor takes its "
+          "CGRID2B values, in the order of the TYPE2B lines");
   }
   {
     Context c;
@@ -492,8 +493,8 @@ TEST_CASE("Descriptor list keys: a list key with more values than the line "
     c.add("CGRID2B", "2.5 3.5");
     c.add("SGRID2B", "0.5 0.5");
     CHECK(refusal(c) == "TYPE2B names 1 descriptor (D2_BP) but " + key +
-                            " has 2 values: give one " + key +
-                            " value per descriptor, in the order of the "
-                            "TYPE2B lines");
+                            " has 2 values: each descriptor takes one " +
+                            key + " value, in the order of the TYPE2B "
+                            "lines");
   }
 }
