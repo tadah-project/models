@@ -60,14 +60,14 @@ bool finite_bits(double v) {
   return (u & UINT64_C(0x7ff0000000000000)) != UINT64_C(0x7ff0000000000000);
 }
 
-/* Captures std::cout (where the Logger prints) at WARNING level and
- * restores the stream and the level afterwards. */
+/* Captures std::cout (where the Logger prints) at @p level, WARNING by
+ * default, and restores the stream and the level afterwards. */
 class LogCapture {
 public:
-  LogCapture()
+  explicit LogCapture(LogLevel level = LogLevel::WARNING)
       : old_level_(Logger::instance().getLogLevel()),
         old_out_(std::cout.rdbuf(out_.rdbuf())) {
-    Logger::instance().setLogLevel(LogLevel::WARNING);
+    Logger::instance().setLogLevel(level);
   }
   ~LogCapture() {
     std::cout.rdbuf(old_out_);
@@ -380,4 +380,93 @@ TEST_CASE("A FitWarningCollector takes the WARNING of the evidence "
     other.join();
   }
   CHECK_THAT(log, Contains("WARNING") && Contains("41 iterations"));
+}
+
+/* The lines of @p text that hold @p what. */
+static size_t lines_with(const std::string &text, const std::string &what) {
+  size_t n = 0;
+  std::istringstream is(text);
+  for (std::string line; std::getline(is, line);)
+    if (line.find(what) != std::string::npos) ++n;
+  return n;
+}
+
+/* With VERBOSE 1, the default of tadah, and the Logger at WARNING (the
+ * level VERBOSE 1 sets), a fit whose evidence approximation stops at its
+ * iteration limit writes nothing on standard output but its WARNING, and
+ * one that converges writes nothing. The iterations of the evidence
+ * approximation (the relative changes of alpha and beta, alpha, beta,
+ * lambda and gamma of each) and how it ended are one INFO message of the
+ * Logger, printed at VERBOSE 2. A caller that fits many candidates (tadah
+ * hpo) then prints nothing per fit at the default verbosity: it says the
+ * WARNING once (FitWarningCollector).
+ * Before the fix: EA::run printed its table of iterations (printf) and
+ * 'Max number of steps reached: 41' or 'Number of steps for convergence:
+ * 6' on standard output whenever VERBOSE was not 0, whatever the level of
+ * the Logger, and the Logger had none of it. */
+TEST_CASE("The evidence approximation logs its iterations at INFO, not on "
+          "standard output",
+          "[ea][output]") {
+  auto verbose1 = [] {
+    Context c = ea_ctx();
+    c.remove("VERBOSE");
+    c.add("VERBOSE", "1");
+    return c;
+  };
+  SECTION("WARNING: a stop at the iteration limit is its WARNING alone") {
+    Context c = verbose1();
+    t_type w;
+    std::string log;
+    {
+      LogCapture cap;
+      REQUIRE(fit(c, design(kNoisyRows), target(kNoisyT), w) == "no exception");
+      log = cap.text();
+    }
+    INFO(log);
+    CHECK(log.find("Max number of steps") == std::string::npos);
+    CHECK(lines_with(log, "WARNING: LAMBDA -1 (evidence approximation): "
+                          "stopped at its iteration limit") == 1);
+    CHECK(lines_with(log, "") == 1);
+  }
+  SECTION("WARNING: a fit that converges writes nothing") {
+    Context c = verbose1();
+    t_type w;
+    std::string log;
+    {
+      LogCapture cap;
+      REQUIRE(fit(c, design(kLinearRows), target(kLinearT), w) == "no exception");
+      log = cap.text();
+    }
+    INFO(log);
+    CHECK(log.empty());
+  }
+  SECTION("INFO: the iterations and how the approximation ended") {
+    Context c = verbose1();
+    t_type w;
+    std::string log;
+    {
+      LogCapture cap(LogLevel::INFO);
+      REQUIRE(fit(c, design(kLinearRows), target(kLinearT), w) == "no exception");
+      log = cap.text();
+    }
+    INFO(log);
+    CHECK(lines_with(log, "INFO: LAMBDA -1 (evidence approximation): "
+                          "converged in 6 iterations") == 1);
+    CHECK(lines_with(log, "del alpha") == 1);
+    CHECK(log.find("Number of steps") == std::string::npos);
+    Context cs = verbose1();
+    {
+      LogCapture cap(LogLevel::INFO);
+      REQUIRE(fit(cs, design(kNoisyRows), target(kNoisyT), w) ==
+              "no exception");
+      log = cap.text();
+    }
+    INFO(log);
+    CHECK(lines_with(log, "INFO: LAMBDA -1 (evidence approximation): "
+                          "stopped at its iteration limit, 41 iterations") ==
+          1);
+    CHECK(lines_with(log, "WARNING: LAMBDA -1 (evidence approximation)") ==
+          1);
+    CHECK(log.find("Max number of steps") == std::string::npos);
+  }
 }
