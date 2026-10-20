@@ -852,6 +852,63 @@ TEST_CASE("LinearRegressor: with LAMBDA > 0 the OALGO 4 message names the "
         "(BIAS=true with ATOM) and LAMBDA != 0: use OALGO=1, 2 or 4 instead.");
 }
 
+/* OALGO 3 penalises every weight alike, so a fit with an intercept column
+ * (BIAS true with ATOM Ta: one) refuses a LAMBDA other than 0. For LAMBDA
+ * -1, the evidence approximation, which only OALGO 3 runs, the message
+ * says what the evidence approximation needs (BIAS false, or every
+ * intercept weight pinned with FIXINDEX and FIXWEIGHT) and what fits with
+ * BIAS true; it does not send the configuration to OALGO 1, 2 or 4, which
+ * refuse LAMBDA -1 ("LAMBDA -1 requests the evidence approximation, which
+ * only OALGO 3 (the SVD solve) runs; ..."). A positive LAMBDA keeps its
+ * message (the case above). LinearRegressor::require_oalgo3_intercepts,
+ * which a caller (tadah hpo) checks before any fit, throws the fit's
+ * message for the configuration and the number of intercept columns the
+ * fit has, and nothing with LAMBDA 0, another OALGO or no intercept column.
+ * Before the fix: the test does not compile (require_oalgo3_intercepts
+ * does not exist); the fit of LAMBDA -1 said "... The model has 1
+ * intercept column(s) (BIAS=true with ATOM) and LAMBDA != 0: use OALGO=1,
+ * 2 or 4 instead." */
+TEST_CASE("LinearRegressor: OALGO 3 with LAMBDA -1 and an intercept column "
+          "names what the evidence approximation needs",
+          "[linear_regressor][lapack_messages][bias]") {
+  auto ctx = [](const char *lambda, const char *oalgo) {
+    Context c = make_ctx(oalgo);
+    c.remove("LAMBDA");
+    c.add("LAMBDA", lambda);
+    c.add("BIAS", "true");
+    c.add("ATOM", "Ta");
+    c.add("ALPHA", "1");
+    c.add("BETA", "1");
+    return c;
+  };
+  const std::string ea =
+      fit_refusal(ctx("-1", "3"), ones_design(4, 3), target(4, 3));
+  CHECK(ea ==
+        "LAMBDA -1 requests the evidence approximation, which only OALGO 3 "
+        "runs; OALGO 3 penalises every weight alike, and the model has 1 "
+        "intercept column(s) (BIAS true with ATOM), which a ridge penalty "
+        "leaves out. The evidence approximation needs BIAS false, or every "
+        "intercept weight pinned with FIXINDEX and FIXWEIGHT. With BIAS true, "
+        "LAMBDA 0 fits with any OALGO, and LAMBDA > 0 with OALGO 1, 2 or 4.");
+  const std::string ridge =
+      fit_refusal(ctx("1e-3", "3"), ones_design(4, 3), target(4, 3));
+  REQUIRE_THAT(ridge, Catch::Matchers::Contains("use OALGO=1, 2 or 4"));
+
+  auto refusal = [](const Context &c, size_t n) {
+    try {
+      LinearRegressor::require_oalgo3_intercepts(c, n);
+    } catch (const std::exception &e) {
+      return std::string(e.what());
+    }
+    return std::string("no exception");
+  };
+  CHECK(refusal(ctx("-1", "3"), 1) == ea);
+  CHECK(refusal(ctx("1e-3", "3"), 1) == ridge);
+  CHECK(refusal(ctx("0", "3"), 1) == "no exception");
+  CHECK(refusal(ctx("-1", "3"), 0) == "no exception");
+  CHECK(refusal(ctx("1e-3", "1"), 1) == "no exception");
+}
+
 /* Pins: a layout that does not describe the design matrix (a logic error
  * of the C++ caller) is refused before train() or train_with_factor()
  * writes anything into it: a design matrix of 2 rows and 4 columns, which

@@ -38,6 +38,27 @@ inline void refuse_fixed_weights_in_train2(const tadah::core::Context &ctx,
 }
 
 /**
+ * @brief The LAMBDA rules of M_KRR implementation 2 (`MODEL M_KRR
+ * <kernel> 2`, M_KRR_Train::train2), checked on the configuration alone,
+ * with its messages: LinearRegressor::require_lambda_request(), then
+ * LAMBDA -1, which this solve, (K + LAMBDA I) w = t with a fixed LAMBDA,
+ * does not run. tadah hpo applies them when a run starts.
+ *
+ * @throws std::runtime_error naming the value, @p kernel and
+ * implementation 1.
+ */
+inline void require_krr_implementation2_lambda(
+    const tadah::core::Context &ctx, const std::string &kernel) {
+  LinearRegressor::require_lambda_request(ctx);
+  if (ctx.get<double>("LAMBDA") < 0)
+    throw std::runtime_error(
+        "MODEL M_KRR " + kernel + " 2 cannot use LAMBDA -1: implementation "
+        "2 solves (K + LAMBDA I) w = t with a fixed LAMBDA and does not run "
+        "the evidence approximation. Implementation 1 (MODEL M_KRR " +
+        kernel + " 1) with OALGO 3 runs it; LAMBDA >= 0 fits with either.");
+}
+
+/**
  * @class M_KRR_Train
  * @brief Implements Kernel Ridge Regression (KRR) training.
  *
@@ -226,19 +247,20 @@ public:
      *
      * @param B Basis matrix.
      * @param T Target vector.
-     * @throws std::runtime_error if lambda is negative for evidence
-     *         approximation, or with FIXINDEX or FIXWEIGHT.
+     * @throws std::runtime_error for a LAMBDA that requests nothing
+     *         (LinearRegressor::require_lambda_request: a second value, a
+     *         negative value other than -1), for LAMBDA -1 (the evidence
+     *         approximation, which this solve does not run), or with
+     *         FIXINDEX or FIXWEIGHT.
      */
     void train2(tadah::core::Matrix &B, tadah::core::t_type &T) {
         refuse_fixed_weights_in_train2(context, kernel.get_label());
         // This solve computes no covariance: the model keeps none of an
         // earlier fit.
         this->clear_covariance(krr_implementation2_without_covariance());
+        require_krr_implementation2_lambda(context, kernel.get_label());
         double lambda = context.template get<double>("LAMBDA");
 
-        if (lambda < 0)
-            throw std::runtime_error("This KRR implementation cannot use LAMBDA -1 (Evidence Approximation)");
-        
         if (M_KRR_Core<Kern>::is_verbose()) std::cout << "Computing Kernel tadah::core::Matrix" << std::endl;
         tadah::core::Matrix K(B.cols(), B.cols());
 

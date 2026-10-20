@@ -80,12 +80,18 @@ private:
 #define M_EA_H
 
 #include <tadah/core/context.h>
+#include <tadah/models/evidence_approximation_error.h>
 #include <tadah/models/svd.h>
+#include <cstdint>
+#include <cstring>
 #include <stdexcept>
 #include <string>
 #include <tadah/models/ols.h>
 #include <tadah/core/core_types.h>
 #include <tadah/core/lapack.h>
+#include <tadah/core/logger.h>
+#include <tadah/core/number_format.h>
+#include <cstdio>
 
 namespace tadah {
 namespace models {
@@ -105,6 +111,19 @@ namespace models {
  * the weights and the weight covariance do. (Before, N was max(rows,
  * cols), which counted the augmentation rows and the weight-0 rows, and
  * gamma kept every s_i with beta s_i^2 above the smallest double.)
+ *
+ * The iteration converges when the relative changes of alpha and beta
+ * both fall below 5e-12, and stops after 41 iterations otherwise (run()
+ * returns 0; stopped_at_limit_text() says so). An alpha or beta that is
+ * not finite is refused, before lambda is solved with: |w|^2 = 0 (every
+ * weight 0, as when every target is zero, or too small to square in double
+ * precision) makes alpha infinite or nan, and a fit that reproduces every
+ * target (RSS = 0) makes beta infinite.
+ *
+ * run() writes nothing on standard output. Its iterations (the relative
+ * changes of alpha and beta, alpha, beta, lambda and gamma of each) and how
+ * it ended are one INFO message of the Logger (VERBOSE 2); a caller reports
+ * a stop at the limit (LinearRegressor::train: a WARNING).
  */
 class EA {
   private:
@@ -112,23 +131,48 @@ class EA {
     tadah::models::SVD &svd;
     tadah::core::t_type &T;
     size_t n_obs;
-    int verbose;
+    size_t iterations_ = 0;
+    double last_change_alpha_ = 0.0;
+    double last_change_beta_ = 0.0;
+    double alpha_ = 0.0;
+    double beta_ = 0.0;
+
+    /* True for a value that is not NaN or +-inf; a test on the bits, which
+     * -ffast-math does not optimise away. */
+    static bool finite_bits(double v) {
+      std::uint64_t u = 0;
+      std::memcpy(&u, &v, sizeof u);
+      return (u & UINT64_C(0x7ff0000000000000)) != UINT64_C(0x7ff0000000000000);
+    }
   public:
+    /** The iterations of the last run() stop after this many updates
+     *  without convergence. */
+    static constexpr size_t max_iterations = 41;
+    /** The relative change of alpha and of beta below which run()
+     *  converges. */
+    static constexpr double tolerance = 5e-12;
+
     EA(const tadah::core::Context &c, tadah::models::SVD &svd, tadah::core::t_type &T,
        size_t n_obs):
       context(c),
       svd(svd),
       T(T),
-      n_obs(n_obs),
-      verbose(c.get<int>("VERBOSE"))
+      n_obs(n_obs)
   {}
 
+    /** Iterates alpha and beta from the values given to their fixed
+     *  point; @p alpha and @p beta receive the last ones.
+     *  @return 1 when it converged, 0 when it stopped after
+     *  max_iterations (stopped_at_limit_text()).
+     *  @throws EvidenceApproximationError when an iteration gives an alpha
+     *  or beta that is not finite, or with no more observations than
+     *  effective weights. */
     int run(double &alpha, double &beta) {
       // Phi = USV^T
       const size_t N = n_obs;
       size_t sizeS = std::min(svd.rows(), svd.cols());
-      size_t maxsteps=40;
-      const double EPS2 = 5e-12;
+      size_t maxsteps=max_iterations-1;
+      const double EPS2 = tolerance;
       int convergence_status = 1;
       double test1 = 2.0*EPS2;
       double test2 = 2.0*EPS2;
@@ -145,7 +189,19 @@ class EA {
       for (size_t i=0; i<sizeS; ++i)
         eval[i] = s[i]*s[i];
 
-      if (verbose) printf("%9s  %9s  %9s  %9s  %9s  %9s\n","del alpha", "del beta", "alpha", "beta", "lambda", "gamma");
+      // The iterations, one row each, for the INFO message of how the
+      // iteration ended (log_iterations).
+      std::string rows;
+      auto log_iterations = [&rows](const std::string &how) {
+        char head[96];
+        std::snprintf(head, sizeof head, "%9s  %9s  %9s  %9s  %9s  %9s",
+                      "del alpha", "del beta", "alpha", "beta", "lambda",
+                      "gamma");
+        tadah::core::Logger::instance().log(
+            tadah::core::LogLevel::INFO,
+            "LAMBDA -1 (evidence approximation): " + how + ":\n" + head +
+                rows);
+      };
       // D is a filter factors matrix
       double *d = new double[sizeS];
 
@@ -170,14 +226,14 @@ class EA {
         /*RidgeRegression::solve(svd,T,m_n,lambda,rcond);*/
         /*OLS::solve_with_svd_with_workspace(m, n, T, m_n, svd, ws, rcond, lambda);*/
         ols.solveWithPseudoinverse(m, n, T, m_n, svd.getSVDWorkspace(), rcond, lambda);
-
         double gamma = 0.0;
         for (size_t j=0; j<sizeS; j++) {
           if (s[j] > thresh) {
             gamma += (beta*eval[j])/(beta*eval[j]+alpha);
           }
         }
-        alpha = gamma / (m_n*m_n);
+        const double wnorm2 = m_n*m_n;
+        alpha = gamma / wnorm2;
 
         /*tadah::core::t_type Tpred = svd.predict(m_n,t,x);*/
         svdMultiplier.compute(m_n.data(), Tpred.data());
@@ -186,7 +242,8 @@ class EA {
         if (!(static_cast<double>(N) > gamma)) {
           delete [] eval;
           delete [] d;
-          throw std::runtime_error(
+          log_iterations("refused at iteration " + std::to_string(counter + 1));
+          throw EvidenceApproximationError(
               "LAMBDA -1 (evidence approximation): the fit has " +
               std::to_string(N) + " observations (rows with a non-zero "
               "weight) for an effective " + std::to_string(gamma) +
@@ -194,22 +251,67 @@ class EA {
               "the noise. Add data, or set LAMBDA >= 0.");
         }
         beta = (static_cast<double>(N)-gamma)/temp;
+        if (!finite_bits(alpha) || !finite_bits(beta)) {
+          delete [] eval;
+          delete [] d;
+          std::string why;
+          if (!(wnorm2 > 0.0))
+            why += "|w|^2 is 0 (the weights of the solve are 0, as when "
+                   "every target is zero, or too small to square in double "
+                   "precision, as when the scales of the design matrix and "
+                   "the targets are too far apart), so alpha = gamma / "
+                   "|w|^2 is not finite";
+          if (!(temp > 0.0))
+            why += std::string(why.empty() ? "" : "; ") +
+                   "the weights reproduce every target (the residual sum of "
+                   "squares is 0, as when every target is zero), so beta = "
+                   "(n_obs - gamma) / RSS is not finite";
+          if (why.empty())
+            why = "|w|^2 = " + tadah::core::format_roundtrip(wnorm2) +
+                  " and RSS = " + tadah::core::format_roundtrip(temp) +
+                  " are beyond double precision";
+          log_iterations("refused at iteration " + std::to_string(counter + 1));
+          throw EvidenceApproximationError(
+              "LAMBDA -1 (evidence approximation): iteration " +
+              std::to_string(counter + 1) + " gave alpha " +
+              tadah::core::format_roundtrip(alpha) + " and beta " +
+              tadah::core::format_roundtrip(beta) + ", which are not all "
+              "finite: " + why + ". The prior and the noise cannot be "
+              "estimated from these targets; no weights were fitted "
+              "(LAMBDA >= 0 fits without the estimate).");
+        }
 
         test1 = std::fabs(alpha_old-alpha)/alpha;
         test2 = std::fabs(beta_old-beta)/beta;
-        if (verbose) printf("%.3e  %.3e  %.3e  %.3e  %.3e  %.3e\n",test1, test2,alpha, beta, alpha/beta, gamma);
+        {
+          char row[128];
+          std::snprintf(row, sizeof row, "\n%.3e  %.3e  %.3e  %.3e  %.3e  %.3e",
+                        test1, test2, alpha, beta, alpha / beta, gamma);
+          rows += row;
+        }
 
         lambda = alpha/beta;
         alpha_old = alpha;
         beta_old = beta;
+        last_change_alpha_ = test1;
+        last_change_beta_ = test2;
 
-        if (++counter>maxsteps) {
+        // The limit stops only an iteration that has not converged: one
+        // whose last update brings both changes below the tolerance has
+        // converged, on whichever iteration it does.
+        if (++counter>maxsteps && (test1>EPS2 || test2>EPS2)) {
           convergence_status = 0;
           break;
         }
       }
-      if (convergence_status && verbose) std::cout << "Number of steps for convergence: " + std::to_string(counter) << std::endl;
-      if (!convergence_status && verbose) std::cout << "Max number of steps reached: " + std::to_string(counter) << std::endl;
+      iterations_ = counter;
+      alpha_ = alpha;
+      beta_ = beta;
+      log_iterations(convergence_status
+                         ? "converged in " + std::to_string(counter) +
+                               " iterations"
+                         : "stopped at its iteration limit, " +
+                               std::to_string(counter) + " iterations");
 
       delete [] eval;
       delete [] d;
@@ -217,6 +319,25 @@ class EA {
 
       return convergence_status;
     };
+
+    /** The iterations of the last run(). */
+    size_t iterations() const { return iterations_; }
+
+    /** What a WARNING says of a run() that returned 0: the iteration
+     *  limit, the last relative changes of alpha and beta, the tolerance,
+     *  and that the fit takes the last alpha and beta. */
+    std::string stopped_at_limit_text() const {
+      return "LAMBDA -1 (evidence approximation): stopped at its iteration "
+             "limit, " + std::to_string(iterations_) + " iterations, without "
+             "converging: the last relative changes of alpha and beta were " +
+             tadah::core::format_sig(last_change_alpha_, 3) + " and " +
+             tadah::core::format_sig(last_change_beta_, 3) + " (convergence "
+             "needs both below " + tadah::core::format_sig(tolerance, 3) +
+             "). The fit takes lambda = alpha / beta of the last iteration "
+             "(alpha " + tadah::core::format_sig(alpha_, 6) + ", beta " +
+             tadah::core::format_sig(beta_, 6) + "), which the potential "
+             "records as ALPHA and BETA.";
+    }
 };
 } // namespace models
 } // namespace tadah

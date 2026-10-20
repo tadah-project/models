@@ -17,6 +17,7 @@
 #include <tadah/core/utils.h>
 #include <tadah/models/ea.h>
 #include <tadah/models/factor_handle.h>
+#include <tadah/models/fit_warnings.h>
 #include <tadah/models/ols.h>
 #include <tadah/models/svd.h>
 #include <tadah/models/memory/imodels_workspace_manager.h>
@@ -345,6 +346,94 @@ private:
                                             std::min(n_bias, n)));
   }
 
+public:
+  /**
+   * @brief Refuses a LAMBDA that requests nothing: a second value, and a
+   *        negative value other than -1.
+   *
+   * LAMBDA takes one value: 0 fits without a penalty, a positive value is
+   * the ridge penalty, and -1 requests the evidence approximation (OALGO
+   * 3; the caller checks its OALGO). A second value was documented as the
+   * rank threshold but was never read: the threshold of OALGO 1 and 3 is
+   * OALGO's second value. Every fit calls this first (train(),
+   * train_with_factor(), M_KRR_Train::train2()). The messages give the
+   * values as @p context holds them.
+   *
+   * @throws std::runtime_error naming the values and what they mean.
+   */
+  static void require_lambda_request(const tadah::core::Context &context) {
+    const double lambda = context.get<double>("LAMBDA", 0);  // the default if absent
+    const std::vector<std::string> &given = context("LAMBDA");
+    std::string text = "LAMBDA";
+    for (const std::string &v : given) text += " " + v;
+    if (given.size() > 1)
+      throw std::runtime_error(
+          text + ": LAMBDA takes one value, the ridge penalty (0 for none, "
+          "-1 for the evidence approximation of OALGO 3); a second value is "
+          "not read. The rank threshold of OALGO 1 and 3 is OALGO's second "
+          "value (OALGO 1 " + given[1] + ", OALGO 3 " + given[1] + ").");
+    if (lambda < 0 && std::abs(lambda + 1) >= std::numeric_limits<double>::min())
+      throw std::runtime_error(
+          text + ": only LAMBDA -1 requests the evidence approximation, "
+          "which OALGO 3 runs; another negative value requests nothing. "
+          "LAMBDA 0 fits without a penalty, and a positive LAMBDA is the "
+          "ridge penalty.");
+  }
+
+  /** The LAMBDA rules of train(), checked on the configuration alone,
+   *  with its messages: require_lambda_request(), then LAMBDA -1 under an
+   *  OALGO other than 3, which alone runs the evidence approximation.
+   *  tadah hpo applies them when a run starts, so that no evaluation is
+   *  refused for them.
+   *  @throws std::runtime_error naming the value (and the OALGO). */
+  static void require_lambda_for_oalgo(const tadah::core::Context &context) {
+    require_lambda_request(context);
+    const double lambda = context.get<double>("LAMBDA", 0);
+    const int oalgo = context.get<int>("OALGO", 0);
+    if (std::abs(lambda + 1) < std::numeric_limits<double>::min() &&
+        oalgo != 3) {
+      throw std::runtime_error(
+          "LAMBDA -1 requests the evidence approximation, which only OALGO 3 "
+          "(the SVD solve) runs; the configuration has OALGO " +
+          std::to_string(oalgo) + " (LAMBDA >= 0 fits with any OALGO).");
+    }
+  }
+
+  /** The intercept rule of OALGO 3, checked on the configuration and the
+   *  number of intercept columns the fit has, with train()'s messages:
+   *  OALGO 3 penalises every weight alike, while a ridge penalty leaves the
+   *  intercept columns out, so with @p n_intercepts > 0 it refuses a LAMBDA
+   *  other than 0. LAMBDA -1 requests the evidence approximation, which
+   *  only OALGO 3 runs: its message says what it needs (BIAS false, or
+   *  every intercept weight pinned with FIXINDEX and FIXWEIGHT) and what
+   *  fits with BIAS true. @p n_intercepts counts the intercept columns the
+   *  fit fits (those FIXINDEX pins leave the design matrix). train() calls
+   *  it; tadah hpo applies it when a run starts (MLIP
+   *  require_oalgo3_intercepts counts the columns of a configuration).
+   *  @throws std::runtime_error naming the number of intercept columns. */
+  static void require_oalgo3_intercepts(const tadah::core::Context &context,
+                                        size_t n_intercepts) {
+    if (n_intercepts == 0 || context.get<int>("OALGO", 0) != 3) return;
+    const double lambda = context.get<double>("LAMBDA", 0);
+    if (lambda == 0.0) return;
+    const std::string n = std::to_string(n_intercepts);
+    if (std::abs(lambda + 1) < std::numeric_limits<double>::min())
+      throw std::runtime_error(
+          "LAMBDA -1 requests the evidence approximation, which only OALGO 3 "
+          "runs; OALGO 3 penalises every weight alike, and the model has " +
+          n + " intercept column(s) (BIAS true with ATOM), which a ridge "
+          "penalty leaves out. The evidence approximation needs BIAS false, "
+          "or every intercept weight pinned with FIXINDEX and FIXWEIGHT. "
+          "With BIAS true, LAMBDA 0 fits with any OALGO, and LAMBDA > 0 with "
+          "OALGO 1, 2 or 4.");
+    throw std::runtime_error(
+        "OALGO=3 (SVD with uniform ridge) does not support intercept "
+        "exclusion from regularisation. The model has " + n +
+        " intercept column(s) (BIAS=true with ATOM) and LAMBDA != 0: use "
+        "OALGO=1, 2 or 4 instead.");
+  }
+
+private:
   /**
    * @brief Train the model using the provided configuration and data matrices.
    *
@@ -393,7 +482,14 @@ private:
    *         to its LAMBDA and intercept columns. A design matrix whose
    *         columns are dependent but not exactly so in floating point can
    *         still be fitted by OALGO 2 and 4, with weights as large as the
-   *         rounding makes them.
+   *         rounding makes them. Also, before anything is solved, for a
+   *         LAMBDA that requests nothing (require_lambda_request(): a
+   *         second value, a negative value other than -1) and for LAMBDA
+   *         -1 under another OALGO than 3; and for an evidence
+   *         approximation whose alpha or beta is not finite (EA::run(),
+   *         before its lambda is solved with). An evidence
+   *         approximation that stops at its iteration limit is not refused:
+   *         a WARNING says so (EA::stopped_at_limit_text()).
    */
 public:
   static CovarianceFit train(tadah::core::Context &context,
@@ -406,16 +502,12 @@ public:
                     std::size_t n_obs,
                     const Layout &layout) {
 
+    require_lambda_for_oalgo(context);
     double lambda = context.get<double>("LAMBDA", 0);
     int oalgo = context.get<int>("OALGO", 0);
     double rcond =
         context.size("OALGO") == 2 ? context.get<double>("OALGO", 1) : 1e-8;
     weights.resize(Phi.cols());
-
-    if (std::abs(lambda + 1) < std::numeric_limits<double>::min() &&
-        oalgo != 3) {
-      throw std::runtime_error("LAMBDA -1 requires OALGO 3");
-    }
 
     // The caller's layout and intercept columns are checked before
     // anything is written into Phi: the ridge rows below are at
@@ -465,25 +557,19 @@ public:
         throw_rank_deficient(2, e, Phi, layout, lambda, nonzero, n_bias);
       }
     } else if (oalgo == 3) {
-      // SVD path applies a uniform ridge across all singular values; there is
-      // no per-column knob, so intercept-aware regularisation is not
-      // supported here. Reject loudly and point at the alternatives.
-      // TODO: implement Path B (residualise intercepts, run SVD on the
-      //       descriptor block only) so OALGO=3 + BIAS=true becomes valid.
-      if (n_bias > 0 && lambda != 0.0) {
-        throw std::runtime_error(
-            "OALGO=3 (SVD with uniform ridge) does not support intercept "
-            "exclusion from regularisation. The model has " +
-            std::to_string(n_bias) + " intercept column(s) (BIAS=true with "
-            "ATOM) and LAMBDA != 0: use OALGO=1, 2 or 4 instead.");
-      }
+      // The SVD path applies a uniform ridge across all singular values;
+      // there is no per-column penalty, so it cannot leave the intercept
+      // columns out of it (require_oalgo3_intercepts).
+      require_oalgo3_intercepts(context, n_bias);
       tadah::models::SVD svd;
       svd.compute(Phi);  // Phi is overwritten: the residuals come from the SVD
       if (lambda < 0) {
         double alpha = context.get<double>("ALPHA");
         double beta = context.get<double>("BETA");
         EA ea(context, svd, T, n_obs);
-        ea.run(alpha, beta);
+        if (!ea.run(alpha, beta))
+          fit_warning(FitWarningKind::EvidenceApproximationLimit,
+                      ea.stopped_at_limit_text());
         lambda = alpha / beta;
         context.remove("ALPHA");
         context.remove("BETA");
@@ -599,9 +685,10 @@ public:
    * @param factor      Output: receives the cached Cholesky factor.
    * @param workspaceManager  Workspace provider.
    * @throws std::runtime_error, before the factorisation, for what train()
-   *         refuses under OALGO 4 before LAPACK runs: a value of Phi or T
-   *         that is not finite, and fewer non-zero data rows than weights
-   *         (LAMBDA 0) or than intercept columns (LAMBDA > 0).
+   *         refuses under OALGO 4 before LAPACK runs: a LAMBDA that
+   *         requests nothing (require_lambda_request()), LAMBDA -1, a value
+   *         of Phi or T that is not finite, and fewer non-zero data rows
+   *         than weights (LAMBDA 0) or than intercept columns (LAMBDA > 0).
    */
   static void train_with_factor(
       tadah::core::Context &context,
@@ -614,6 +701,7 @@ public:
 
     (void)Sigma;  // Reserved for future BLR-IFT; OALGO=4 leaves it untouched.
 
+    require_lambda_request(context);
     const double lambda = context.get<double>("LAMBDA", 0);
     const int    oalgo  = context.get<int>("OALGO", 0);
     const double rcond  =
@@ -638,12 +726,6 @@ public:
           "IFT chain rule. Use a fixed "
           "LAMBDA >= 0, or GRAD_STRATEGY=NUMERICAL.");
     }
-    if (lambda < 0) {
-      throw std::runtime_error(
-          "LinearRegressor::train_with_factor: LAMBDA must be >= 0 "
-          "(got " + std::to_string(lambda) + ").");
-    }
-
     weights.resize(Phi.cols());
 
     const std::size_t n_bias = tadah::core::n_intercept_columns(context);
