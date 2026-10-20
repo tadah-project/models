@@ -28,8 +28,10 @@
 #include <tadah/core/context.h>
 #include <tadah/core/core_types.h>
 #include <tadah/core/logger.h>
+#include <tadah/models/ea.h>
 #include <tadah/models/linear_regressor.h>
 #include <tadah/models/memory/models_workspace_manager.h>
+#include <tadah/models/svd.h>
 
 #include <cmath>
 #include <cstdint>
@@ -38,6 +40,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 using namespace tadah::core;
 using namespace tadah::models;
@@ -177,6 +180,74 @@ TEST_CASE("The evidence approximation reports a stop at its iteration limit",
     INFO(log);
     CHECK(log.find("evidence approximation") == std::string::npos);
   }
+}
+
+/* The relative changes of alpha and beta of the last iteration of @p ea,
+ * as stopped_at_limit_text() gives them (3 significant digits). */
+static std::pair<double, double> last_changes(const EA &ea) {
+  const std::string t = ea.stopped_at_limit_text();
+  const std::string::size_type p = t.find("were ");
+  const std::string::size_type q = t.find(" and ", p);
+  REQUIRE(p != std::string::npos);
+  REQUIRE(q != std::string::npos);
+  return {std::stod(t.substr(p + 5)), std::stod(t.substr(q + 5))};
+}
+
+/* A run whose last iteration, the 41st, brings both relative changes below
+ * the tolerance has converged: run() returns 1 and the fit prints no
+ * WARNING. A run whose last changes are not both below it still returns 0
+ * (a pin). The problems are the noisy targets of the case above plus a
+ * signal a * (0.5 x1 - 0.3 x2); between a = 0.05555 and 0.05575 the
+ * iteration converges on its 41st step for some a (a = 0.05565 among them,
+ * last changes 4.99e-12 and 5.58e-13), and stops without converging for
+ * others. A change printed to 3 digits below 5e-12 is below the tolerance;
+ * one at 5.00e-12 is left undecided.
+ * Before the fix: every run of 41 iterations returned 0 and the fit printed
+ * the WARNING, 'stopped at its iteration limit, 41 iterations, without
+ * converging: the last relative changes of alpha and beta were 4.99e-12 and
+ * 5.58e-13 (convergence needs both below 5e-12)'. */
+TEST_CASE("The evidence approximation that converges on its last iteration "
+          "is not reported as stopped",
+          "[ea][warning]") {
+  size_t converged_last = 0, stopped = 0;
+  for (int k = 0; k <= 200; ++k) {
+    const double a = 0.05555 + k * 1e-6;
+    double t[6];
+    for (size_t i = 0; i < 6; ++i)
+      t[i] = kNoisyT[i] + a * (0.5 * kNoisyRows[i][0] - 0.3 * kNoisyRows[i][1]);
+    Context c = ea_ctx();
+    phi_type Phi = design(kNoisyRows);
+    t_type T = target(t);
+    SVD svd;
+    svd.compute(Phi);
+    EA ea(c, svd, T, 6);
+    double alpha = 1.0, beta = 1.0;
+    const int status = ea.run(alpha, beta);
+    if (ea.iterations() != EA::max_iterations) continue;
+    const std::pair<double, double> ch = last_changes(ea);
+    CAPTURE(a, status, ch.first, ch.second);
+    if (ch.first < EA::tolerance && ch.second < EA::tolerance) {
+      ++converged_last;
+      CHECK(status == 1);
+      /* The fit of the same problem prints no WARNING. */
+      Context cf = ea_ctx();
+      t_type w;
+      std::string log;
+      {
+        LogCapture cap;
+        REQUIRE(fit(cf, design(kNoisyRows), target(t), w) == "no exception");
+        log = cap.text();
+      }
+      INFO(log);
+      CHECK(log.find("evidence approximation") == std::string::npos);
+    } else if (ch.first > 5.001e-12 || ch.second > 5.001e-12) {
+      ++stopped;
+      CHECK(status == 0);
+    }
+  }
+  /* The scan has both kinds of run. */
+  CHECK(converged_last > 0);
+  CHECK(stopped > 0);
 }
 
 /* A design matrix and targets whose scales are too far apart are refused
