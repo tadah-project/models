@@ -790,15 +790,18 @@ TEST_CASE("LAMBDA -1 refuses a fit without observations",
  * what to change: after an OALGO 1 fit "fit with OALGO 3"; after M_KRR
  * implementation 2 (train2) "MODEL M_KRR <kernel> 1"; after an OALGO 3 fit
  * with 2 observations for 4 weights at LAMBDA 0 (gamma = 2, the noise
- * variance undefined) "2 observations" and "add data with a non-zero
- * weight"; with every weight pinned and no observation (FIXINDEX 1-2, n_obs
- * 0) "no observations" and the same remedy. tadah train --uncertainty
+ * variance undefined) "2 observations (data rows of priority above 0 that
+ * are not zero in every column)" and "add data of priority above 0"; with
+ * every weight pinned and no observation (FIXINDEX 1-2, n_obs 0) "no
+ * observations" and the same remedy. tadah train --uncertainty
  * gives the reason as its remedy.
  * Before the fix: the reasons said why, not what to change ("OALGO 1
  * computes no weight covariance (only OALGO 3, the SVD solve, does)", "...
  * so its noise variance is undefined"), and tadah train --uncertainty
  * appended "Add observations (data with a non-zero weight)" to every one,
- * M_KRR implementation 2's included. */
+ * M_KRR implementation 2's included. Before the priority wording fix: the
+ * observations were "rows with a non-zero weight", and the remedy "add
+ * data with a non-zero weight". */
 TEST_CASE("A fit without a weight covariance says what to change",
           "[weight_covariance][uncertainty]") {
   auto message = [](auto &m) {
@@ -847,8 +850,9 @@ TEST_CASE("A fit without a weight covariance says what to change",
     m.train(Phi, t);
     const std::string msg = message(m);
     INFO(msg);
-    CHECK(msg.find("2 observations") != std::string::npos);
-    CHECK(msg.find("add data with a non-zero weight") != std::string::npos);
+    CHECK(msg.find("2 observations (data rows of priority above 0 that "
+                   "are not zero in every column)") != std::string::npos);
+    CHECK(msg.find("add data of priority above 0") != std::string::npos);
   }
   {
     Context c = oalgo3_context("0");
@@ -864,7 +868,7 @@ TEST_CASE("A fit without a weight covariance says what to change",
     const std::string msg = message(m);
     INFO(msg);
     CHECK(msg.find("no observations") != std::string::npos);
-    CHECK(msg.find("add data with a non-zero weight") != std::string::npos);
+    CHECK(msg.find("add data of priority above 0") != std::string::npos);
   }
 }
 

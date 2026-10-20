@@ -2,7 +2,7 @@
 //
 // What LinearRegressor::train says when LAPACK cannot fit the weights:
 // a design matrix with fewer data rows than weights, or fewer non-zero
-// ones (a row of weight 0 is zero), refused by OALGO 2 (DGELS, QR) and
+// ones (a row of priority 0 is zero), refused by OALGO 2 (DGELS, QR) and
 // OALGO 4 (normal equations, Cholesky) before LAPACK runs, a
 // rank-deficient design matrix that LAPACK reports, and a design matrix
 // or target with a value that is not finite, under every OALGO; with
@@ -189,7 +189,7 @@ std::string model_refusal(bool krr, Context c, phi_type Phi, t_type T) {
   return "no exception";
 }
 
-/* `Phi` and `T` with data row `i` (0-based) zero, as a row of weight 0 is
+/* `Phi` and `T` with data row `i` (0-based) zero, as a row of priority 0 is
  * in DesignMatrix (its row and its target are multiplied by 0). */
 void zero_row(phi_type &Phi, t_type &T, size_t i) {
   for (size_t j = 0; j < Phi.cols(); ++j) Phi(i, j) = 0.0;
@@ -210,12 +210,12 @@ phi_type ones_design(size_t data, size_t n) {
  * name them): without FIXINDEX, and with FIXINDEX pinning a weight. */
 const char *const kZeroRows =
     " (a data row that is zero in every column adds nothing to the rank: a "
-    "row of weight 0, or a row the descriptors make zero, such as the y and "
-    "z force rows of a linear molecule along x)";
+    "row of priority 0, or a row the descriptors make zero, such as the y "
+    "and z force rows of a linear molecule along x)";
 const char *const kZeroRowsFixed =
     " (a data row that is zero in every column adds nothing to the rank: a "
-    "row of weight 0, a row whose values are all in FIXINDEX columns, or a "
-    "row the descriptors make zero, such as the y and z force rows of a "
+    "row of priority 0, a row whose values are all in FIXINDEX columns, or "
+    "a row the descriptors make zero, such as the y and z force rows of a "
     "linear molecule along x)";
 
 const char *const kRemedies =
@@ -620,7 +620,7 @@ TEST_CASE("LinearRegressor: with FIXINDEX and BIAS the OALGO 2 and 4 "
  *    LAPACK: "OALGO 4 (normal equations, Cholesky) cannot fit these 3
  *    weights: the design matrix has 2 non-zero data rows of 3 (a data row
  *    that is zero in every column adds nothing to the rank: a row of
- *    weight 0, or a row the descriptors make zero, such as the y and z
+ *    priority 0, or a row the descriptors make zero, such as the y and z
  *    force rows of a linear molecule along x) for 3 weights, LAMBDA 0:
  *    fewer non-zero data rows than weights, so it does not have full
  *    column rank and the least-squares weights are not unique." + the
@@ -642,14 +642,15 @@ TEST_CASE("LinearRegressor: with FIXINDEX and BIAS the OALGO 2 and 4 "
  *    weights, rows 3 and 4 zero: "OALGO 2 (DGELS, QR) cannot fit these 4
  *    free weights (FIXINDEX pins 1 of the 5 weights): the design matrix
  *    has 2 non-zero data rows of 4 (a data row that is zero in every
- *    column adds nothing to the rank: a row of weight 0, a row whose
+ *    column adds nothing to the rank: a row of priority 0, a row whose
  *    values are all in FIXINDEX columns, or a row the descriptors make
  *    zero, ...) for 4 weights, LAMBDA 0: fewer non-zero data rows than
  *    weights, ...".
  * Without a zero data row the messages are those of the cases above. Rows
- * that are zero for another reason than weight 0: the next case. (Until
+ * that are zero for another reason than priority 0: the next case. (Until
  * the zero-row wording fix the parenthesis was "(a row of weight 0 is
- * zero)", whatever made the rows zero.)
+ * zero)", whatever made the rows zero; until the priority wording fix it
+ * said "a row of weight 0".)
  * Before the fix: the pre-check counted every data row, a zero one too, so
  * whether the fit was refused depended on the rounding again: OALGO 4
  * fitted the 2 non-zero sine rows for 3 weights without an error, in
@@ -667,7 +668,7 @@ TEST_CASE("LinearRegressor: with FIXINDEX and BIAS the OALGO 2 and 4 "
  * 3 (weight 3) is zero or a linear combination of the columns before it,
  * ...". */
 TEST_CASE("LinearRegressor: OALGO 2 and 4 count the non-zero data rows, "
-          "a row of weight 0 being zero",
+          "a row of priority 0 being zero",
           "[linear_regressor][lapack_messages][weight_zero]") {
   phi_type sine3 = sine_design(3, 3);
   t_type t3 = target(3, 3);
@@ -733,25 +734,25 @@ TEST_CASE("LinearRegressor: OALGO 2 and 4 count the non-zero data rows, "
   CHECK(krr_fix_refusal("2", "5", {"0.1"}, fix4, tf) == fixed);
 }
 
-/* Pins: a data row that is zero for another reason than weight 0 is
- * counted as zero too, and the message does not blame weight 0: with
+/* Pins: a data row that is zero for another reason than priority 0 is
+ * counted as zero too, and the message does not blame priority 0: with
  * FIXINDEX 1 of 3 weights (M_BLR_Train and M_KRR_Train, OALGO 2 and 4,
  * LAMBDA 0), 2 data rows of which the second has a value in the pinned
  * column 1 only, so it is zero in the 2 free columns: "OALGO 2 (DGELS, QR)
  * cannot fit these 2 free weights (FIXINDEX pins 1 of the 3 weights): the
  * design matrix has 1 non-zero data row of 2 (a data row that is zero in
- * every column adds nothing to the rank: a row of weight 0, a row whose
+ * every column adds nothing to the rank: a row of priority 0, a row whose
  * values are all in FIXINDEX columns, or a row the descriptors make zero,
  * such as the y and z force rows of a linear molecule along x) for 2
  * weights, LAMBDA 0: fewer non-zero data rows than weights, so it does not
  * have full column rank and the least-squares weights are not unique." +
  * the remedies. (Tadah.MLIP's CLI tests: a dimer's y and z force rows and
- * an isolated atom's energy, of weight 1.)
+ * an isolated atom's energy, of priority 1.)
  * Before the fix: the rows were counted alike, but the message said "the
  * design matrix has 1 non-zero data row of 2 (a row of weight 0 is zero)
  * for 2 weights, ...", whatever made the row zero. */
 TEST_CASE("LinearRegressor: OALGO 2 and 4 count a zero data row of a "
-          "non-zero weight, not blaming weight 0",
+          "priority above 0, not blaming priority 0",
           "[linear_regressor][lapack_messages][weight_zero][fixed_weights]") {
   phi_type Phi = design(2, 3, 3);
   Phi(1, 1) = 0.0;
