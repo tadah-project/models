@@ -408,7 +408,9 @@ void OLS::solveWithPseudoinverse(int m, int n, V1& B, V2& weights, memory::SVDWo
     int lda = m;
   tadah::core::dgemv_(&trans, &m, &minmn, &alpha, U, &lda, B.ptr(), &incx, &beta, ws->UtB, &incy);
 
-    // Threshold for singular values (shared with LinearRegressor::get_sigma)
+    // Threshold for singular values (shared with
+    // LinearRegressor::dropped_directions and the evidence approximation,
+    // ea.h)
     const double thresh = pseudoinverse_threshold(S, minmn, rcond);
 
     // Compute the pseudoinverse solution
