@@ -17,6 +17,7 @@
 #include <tadah/core/utils.h>
 #include <tadah/models/ea.h>
 #include <tadah/models/factor_handle.h>
+#include <tadah/models/fit_warnings.h>
 #include <tadah/models/ols.h>
 #include <tadah/models/svd.h>
 #include <tadah/models/memory/imodels_workspace_manager.h>
@@ -379,6 +380,25 @@ public:
           "ridge penalty.");
   }
 
+  /** The LAMBDA rules of train(), checked on the configuration alone,
+   *  with its messages: require_lambda_request(), then LAMBDA -1 under an
+   *  OALGO other than 3, which alone runs the evidence approximation.
+   *  tadah hpo applies them when a run starts, so that no evaluation is
+   *  refused for them.
+   *  @throws std::runtime_error naming the value (and the OALGO). */
+  static void require_lambda_for_oalgo(const tadah::core::Context &context) {
+    require_lambda_request(context);
+    const double lambda = context.get<double>("LAMBDA", 0);
+    const int oalgo = context.get<int>("OALGO", 0);
+    if (std::abs(lambda + 1) < std::numeric_limits<double>::min() &&
+        oalgo != 3) {
+      throw std::runtime_error(
+          "LAMBDA -1 requests the evidence approximation, which only OALGO 3 "
+          "(the SVD solve) runs; the configuration has OALGO " +
+          std::to_string(oalgo) + " (LAMBDA >= 0 fits with any OALGO).");
+    }
+  }
+
 private:
   /**
    * @brief Train the model using the provided configuration and data matrices.
@@ -448,20 +468,12 @@ public:
                     std::size_t n_obs,
                     const Layout &layout) {
 
-    require_lambda_request(context);
+    require_lambda_for_oalgo(context);
     double lambda = context.get<double>("LAMBDA", 0);
     int oalgo = context.get<int>("OALGO", 0);
     double rcond =
         context.size("OALGO") == 2 ? context.get<double>("OALGO", 1) : 1e-8;
     weights.resize(Phi.cols());
-
-    if (std::abs(lambda + 1) < std::numeric_limits<double>::min() &&
-        oalgo != 3) {
-      throw std::runtime_error(
-          "LAMBDA -1 requests the evidence approximation, which only OALGO 3 "
-          "(the SVD solve) runs; the configuration has OALGO " +
-          std::to_string(oalgo) + " (LAMBDA >= 0 fits with any OALGO).");
-    }
 
     // The caller's layout and intercept columns are checked before
     // anything is written into Phi: the ridge rows below are at
@@ -530,8 +542,8 @@ public:
         double beta = context.get<double>("BETA");
         EA ea(context, svd, T, n_obs);
         if (!ea.run(alpha, beta))
-          core::Logger::instance().log(tadah::core::LogLevel::WARNING,
-              ea.stopped_at_limit_text());
+          fit_warning(FitWarningKind::EvidenceApproximationLimit,
+                      ea.stopped_at_limit_text());
         lambda = alpha / beta;
         context.remove("ALPHA");
         context.remove("BETA");

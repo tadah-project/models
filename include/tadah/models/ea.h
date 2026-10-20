@@ -80,6 +80,7 @@ private:
 #define M_EA_H
 
 #include <tadah/core/context.h>
+#include <tadah/models/evidence_approximation_error.h>
 #include <tadah/models/svd.h>
 #include <cstdint>
 #include <cstring>
@@ -158,9 +159,9 @@ class EA {
      *  point; @p alpha and @p beta receive the last ones.
      *  @return 1 when it converged, 0 when it stopped after
      *  max_iterations (stopped_at_limit_text()).
-     *  @throws std::runtime_error when an iteration gives an alpha or beta
-     *  that is not finite, or with no more observations than effective
-     *  weights. */
+     *  @throws EvidenceApproximationError when an iteration gives an alpha
+     *  or beta that is not finite, or with no more observations than
+     *  effective weights. */
     int run(double &alpha, double &beta) {
       // Phi = USV^T
       const size_t N = n_obs;
@@ -224,7 +225,7 @@ class EA {
         if (!(static_cast<double>(N) > gamma)) {
           delete [] eval;
           delete [] d;
-          throw std::runtime_error(
+          throw EvidenceApproximationError(
               "LAMBDA -1 (evidence approximation): the fit has " +
               std::to_string(N) + " observations (rows with a non-zero "
               "weight) for an effective " + std::to_string(gamma) +
@@ -251,7 +252,7 @@ class EA {
             why = "|w|^2 = " + tadah::core::format_roundtrip(wnorm2) +
                   " and RSS = " + tadah::core::format_roundtrip(temp) +
                   " are beyond double precision";
-          throw std::runtime_error(
+          throw EvidenceApproximationError(
               "LAMBDA -1 (evidence approximation): iteration " +
               std::to_string(counter + 1) + " gave alpha " +
               tadah::core::format_roundtrip(alpha) + " and beta " +
