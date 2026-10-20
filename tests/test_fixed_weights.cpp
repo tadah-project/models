@@ -338,10 +338,11 @@ TEST_CASE("BLR and KRR FIXINDEX naming a weight twice or a descending range "
 }
 
 /* Pins: M_KRR_Train::train2, the solve of MODEL M_KRR <kernel> 2 ((K +
- * LAMBDA I) w = t on the basis vectors, every weight at once), refuses a
- * context with FIXINDEX or FIXWEIGHT, for Kern_Linear and Kern_RBF
- * (MPARAMS 1.0), on four basis vectors: "MODEL M_KRR Kern_Linear 2 cannot
- * pin weights: ..." naming implementation 1, for FIXINDEX 1 / FIXWEIGHT 14,
+ * LAMBDA sigma^2 I) w = t on the basis vectors, sigma = ESIGMA in eV,
+ * every weight at once), refuses a context with FIXINDEX or FIXWEIGHT, for
+ * Kern_Linear and Kern_RBF (MPARAMS 1.0), on four basis vectors: "MODEL
+ * M_KRR Kern_Linear 2 cannot pin weights: ..." stating that solve and
+ * naming implementation 1, for FIXINDEX 1 / FIXWEIGHT 14,
  * FIXINDEX 2-1 with two values and a lone FIXINDEX 1 alike (the solve pins
  * nothing, whatever the keys say); without them it fits its weights: 4 for
  * Kern_RBF, one per basis vector, and 8 for Kern_Linear, one per component
@@ -351,7 +352,8 @@ TEST_CASE("BLR and KRR FIXINDEX naming a weight twice or a descending range "
  * Before the fix: train2 read neither key: it fitted every weight with
  * the pins ignored (weight 1 was not 14), and '2-1' and a lone FIXINDEX
  * passed too (tadah train exited 0 and copied FIXINDEX and FIXWEIGHT into
- * the potential). */
+ * the potential); then the refusal wrote the solve (K + LAMBDA I) w = t,
+ * without the error scale that train2 applies. */
 TEST_CASE("M_KRR implementation 2 (train2) refuses FIXINDEX and FIXWEIGHT",
           "[fixed_weights][fixindex][krr]") {
   for (const char *kern : {"Kern_Linear", "Kern_RBF"}) {
@@ -383,10 +385,11 @@ TEST_CASE("M_KRR implementation 2 (train2) refuses FIXINDEX and FIXWEIGHT",
     DYNAMIC_SECTION(kern) {
       const std::string refusal =
           std::string("MODEL M_KRR ") + kern + " 2 cannot pin weights: "
-          "implementation 2 solves (K + LAMBDA I) w = t for the weights of "
-          "all its basis vectors at once, so FIXINDEX and FIXWEIGHT would be "
-          "ignored. Use implementation 1 (MODEL M_KRR " + kern + " 1), "
-          "which pins them, or remove FIXINDEX and FIXWEIGHT.";
+          "implementation 2 solves (K + LAMBDA sigma^2 I) w = t, sigma = "
+          "ESIGMA in eV, for the weights of all its basis vectors at once, "
+          "so FIXINDEX and FIXWEIGHT would be ignored. Implementation 1 "
+          "(MODEL M_KRR " + kern + " 1) pins them; implementation 2 fits "
+          "without FIXINDEX and FIXWEIGHT.";
       t_type w;
       REQUIRE_NOTHROW(w = train2("", {}));
       CHECK(w.size() == (std::string(kern) == "Kern_Linear" ? 8u : 4u));

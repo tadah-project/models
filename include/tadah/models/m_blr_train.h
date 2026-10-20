@@ -59,7 +59,7 @@ public:
     /**
      * @brief Trains the model on given feature and target matrices, whose
      *        observations are rows - cols (a design matrix with its
-     *        ridge-augmentation rows and no rows of weight 0).
+     *        ridge-augmentation rows and no rows of priority 0).
      */
   void train(tadah::core::phi_type &Phi, tadah::core::t_type &T) {
     train(Phi, T, LinearRegressor::augmented_observations(Phi));
@@ -78,8 +78,9 @@ public:
      *
      * @param Phi Feature matrix.
      * @param T Target vector.
-     * @param n_obs The observations: the rows of Phi with a non-zero
-     *        weight, without the ridge-augmentation rows.
+     * @param n_obs The observations: the data rows of Phi of priority
+     *        above 0 that are not zero in every column (zero_rows()),
+     *        without the ridge-augmentation rows.
      * @throws std::runtime_error if the object is already trained.
      */
   void train(tadah::core::phi_type &Phi, tadah::core::t_type &T, size_t n_obs) {

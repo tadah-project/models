@@ -179,6 +179,25 @@ TEST_CASE("A second LAMBDA value is refused, naming OALGO's second value",
   CHECK(train2_refusal(make_ctx({"0.01"}, {"1"})) == "no exception");
 }
 
+/* Pins: M_KRR implementation 2 refuses LAMBDA -1 stating its solve,
+ * (K + LAMBDA sigma^2 I) w = t with sigma = ESIGMA in eV, which takes a
+ * fixed LAMBDA, and naming implementation 1 with OALGO 3, which runs the
+ * evidence approximation.
+ * Before the fix: the message wrote the solve (K + LAMBDA I) w = t,
+ * without the error scale that train2 applies. */
+TEST_CASE("M_KRR implementation 2 refuses LAMBDA -1 stating its solve",
+          "[lambda][refusal][krr]") {
+  for (const std::string oalgo : {"1", "3"}) {
+    INFO("OALGO " << oalgo);
+    CHECK(train2_refusal(make_ctx({"-1"}, {oalgo})) ==
+          "MODEL M_KRR Kern_RBF 2 cannot use LAMBDA -1: implementation 2 "
+          "solves (K + LAMBDA sigma^2 I) w = t, sigma = ESIGMA in eV, with a "
+          "fixed LAMBDA and does not run the evidence approximation. "
+          "Implementation 1 (MODEL M_KRR Kern_RBF 1) with OALGO 3 runs it; "
+          "LAMBDA >= 0 fits with either.");
+  }
+}
+
 /* The rules above can be checked before any fit, on the configuration
  * alone (tadah hpo checks them when the run starts, and every evaluation
  * would refuse them otherwise): LinearRegressor::require_lambda_for_oalgo

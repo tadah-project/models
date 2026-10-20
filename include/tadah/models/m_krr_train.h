@@ -12,6 +12,7 @@
 
 #include <iostream>
 #include <stdexcept>
+#include <limits>
 #include <string>
 
 namespace tadah {
@@ -21,28 +22,31 @@ namespace models {
  * @brief Refuses FIXINDEX and FIXWEIGHT for M_KRR implementation 2 (MODEL
  * M_KRR <kernel> 2, M_KRR_Train::train2).
  *
- * Its solve, (K + LAMBDA I) w = t on the basis vectors, fits every weight
- * at once and pins none, so the keys would be ignored. A no-op without
- * either key; with either, whatever its values, throws std::runtime_error
- * naming @p kernel and implementation 1, which pins them.
+ * Its solve, (K + LAMBDA sigma^2 I) w = t on the basis vectors (sigma =
+ * ESIGMA in eV, the error scale Tadah.MLIP passes), fits every weight at
+ * once and pins none, so the keys would be ignored. A no-op without either
+ * key; with either, whatever its values, throws std::runtime_error stating
+ * that solve and naming @p kernel and implementation 1, which pins them.
  */
 inline void refuse_fixed_weights_in_train2(const tadah::core::Context &ctx,
                                            const std::string &kernel) {
   if (!ctx.has_stored("FIXINDEX") && !ctx.has_stored("FIXWEIGHT")) return;
   throw std::runtime_error(
       "MODEL M_KRR " + kernel + " 2 cannot pin weights: implementation 2 "
-      "solves (K + LAMBDA I) w = t for the weights of all its basis vectors "
-      "at once, so FIXINDEX and FIXWEIGHT would be ignored. Use "
-      "implementation 1 (MODEL M_KRR " + kernel + " 1), which pins them, or "
-      "remove FIXINDEX and FIXWEIGHT.");
+      "solves (K + LAMBDA sigma^2 I) w = t, sigma = ESIGMA in eV, for the "
+      "weights of all its basis vectors at once, so FIXINDEX and FIXWEIGHT "
+      "would be ignored. Implementation 1 (MODEL M_KRR " + kernel + " 1) "
+      "pins them; implementation 2 fits without FIXINDEX and FIXWEIGHT.");
 }
 
 /**
  * @brief The LAMBDA rules of M_KRR implementation 2 (`MODEL M_KRR
  * <kernel> 2`, M_KRR_Train::train2), checked on the configuration alone,
  * with its messages: LinearRegressor::require_lambda_request(), then
- * LAMBDA -1, which this solve, (K + LAMBDA I) w = t with a fixed LAMBDA,
- * does not run. tadah hpo applies them when a run starts.
+ * LAMBDA -1, which this solve, (K + LAMBDA sigma^2 I) w = t with a fixed
+ * LAMBDA (sigma = ESIGMA in eV, the error scale Tadah.MLIP passes), does
+ * not run; its message states that solve. tadah hpo applies them when a
+ * run starts.
  *
  * @throws std::runtime_error naming the value, @p kernel and
  * implementation 1.
@@ -53,8 +57,9 @@ inline void require_krr_implementation2_lambda(
   if (ctx.get<double>("LAMBDA") < 0)
     throw std::runtime_error(
         "MODEL M_KRR " + kernel + " 2 cannot use LAMBDA -1: implementation "
-        "2 solves (K + LAMBDA I) w = t with a fixed LAMBDA and does not run "
-        "the evidence approximation. Implementation 1 (MODEL M_KRR " +
+        "2 solves (K + LAMBDA sigma^2 I) w = t, sigma = ESIGMA in eV, with a "
+        "fixed LAMBDA and does not run the evidence approximation. "
+        "Implementation 1 (MODEL M_KRR " +
         kernel + " 1) with OALGO 3 runs it; LAMBDA >= 0 fits with either.");
 }
 
@@ -110,7 +115,7 @@ public:
     /**
      * @brief Trains the model on given feature and target matrices, whose
      *        observations are rows - cols (a design matrix with its
-     *        ridge-augmentation rows and no rows of weight 0).
+     *        ridge-augmentation rows and no rows of priority 0).
      */
   void train(tadah::core::phi_type &Phi, tadah::core::t_type &T) {
     train(Phi, T, LinearRegressor::augmented_observations(Phi));
@@ -129,8 +134,9 @@ public:
      *
      * @param Phi Feature matrix.
      * @param T Target vector.
-     * @param n_obs The observations: the rows of Phi with a non-zero
-     *        weight, without the ridge-augmentation rows.
+     * @param n_obs The observations: the data rows of Phi of priority
+     *        above 0 that are not zero in every column (zero_rows()),
+     *        without the ridge-augmentation rows.
      * @throws std::runtime_error if the object is already trained.
      */
   void train(tadah::core::phi_type &Phi, tadah::core::t_type &T, size_t n_obs) {
@@ -236,7 +242,13 @@ public:
      *
      * Trains the model on energies using the covariance matrix K: the
      * coefficients w of the basis vectors b_j (the columns of @p B) solve
-     * (K + LAMBDA I) w = T, K_ij = K(b_i, b_j). A non-linear kernel's
+     * (K + LAMBDA sigma^2 I) w = T, K_ij = K(b_i, b_j), sigma = @p
+     * error_scale: the kernel ridge regression of the targets with every
+     * residual over sigma, sum_i ((T_i - f(b_i)) / sigma)^2 + LAMBDA |f|^2,
+     * so LAMBDA weighs against the residuals in units of sigma, as in
+     * every other fit (Tadah.MLIP passes ESIGMA in eV for energies per
+     * atom; 1, the default, weighs the residuals in the unit of T). A
+     * non-linear kernel's
      * weights are w (it predicts sum_j w_j K(b_j, x)). Kern_Linear's are
      * the descriptor weights B w = sum_j w_j b_j, one per row of @p B: its
      * prediction is linear in the descriptor, weights . x (Kern_Linear::
@@ -247,19 +259,31 @@ public:
      *
      * @param B Basis matrix.
      * @param T Target vector.
+     * @param error_scale sigma, the error scale of every residual in the
+     *        unit of @p T (> 0).
      * @throws std::runtime_error for a LAMBDA that requests nothing
      *         (LinearRegressor::require_lambda_request: a second value, a
      *         negative value other than -1), for LAMBDA -1 (the evidence
      *         approximation, which this solve does not run), or with
      *         FIXINDEX or FIXWEIGHT.
+     * @throws std::logic_error for an error scale that is not a finite
+     *         number > 0 (Tadah.MLIP refuses such an ESIGMA first).
      */
-    void train2(tadah::core::Matrix &B, tadah::core::t_type &T) {
+    void train2(tadah::core::Matrix &B, tadah::core::t_type &T,
+                double error_scale = 1.0) {
         refuse_fixed_weights_in_train2(context, kernel.get_label());
         // This solve computes no covariance: the model keeps none of an
         // earlier fit.
         this->clear_covariance(krr_implementation2_without_covariance());
         require_krr_implementation2_lambda(context, kernel.get_label());
-        double lambda = context.template get<double>("LAMBDA");
+        if (!(error_scale > 0.0) ||
+            !(error_scale < std::numeric_limits<double>::infinity()))
+            throw std::logic_error(
+                "M_KRR_Train::train2: the error scale of the targets is a "
+                "finite number > 0, not " + std::to_string(error_scale));
+        // LAMBDA against the residuals over the error scale.
+        const double lambda = context.template get<double>("LAMBDA") *
+                              error_scale * error_scale;
 
         if (M_KRR_Core<Kern>::is_verbose()) std::cout << "Computing Kernel tadah::core::Matrix" << std::endl;
         tadah::core::Matrix K(B.cols(), B.cols());
