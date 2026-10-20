@@ -381,12 +381,11 @@ TEST_CASE("train_with_factor rejects OALGO != 4",
     Matrix Phi = random_matrix(m, n, /*seed=*/300);
     Vector T   = random_vector(m, /*seed=*/301);
     Vector w(n);
-    Matrix Sigma;
     tadah::models::FactorHandle factor;
 
     CHECK_THROWS_WITH(
         tadah::models::LinearRegressor::train_with_factor(
-            ctx, Phi, T, w, Sigma, factor),
+            ctx, Phi, T, w, factor),
         Catch::Contains("OALGO=4"));
 }
 
@@ -401,11 +400,10 @@ TEST_CASE("train_with_factor rejects LAMBDA == -1 (BLR)",
     Matrix Phi = random_matrix(m, n, /*seed=*/400);
     Vector T   = random_vector(m, /*seed=*/401);
     Vector w(n);
-    Matrix Sigma;
     tadah::models::FactorHandle factor;
 
     CHECK_THROWS_WITH(
         tadah::models::LinearRegressor::train_with_factor(
-            ctx, Phi, T, w, Sigma, factor),
+            ctx, Phi, T, w, factor),
         Catch::Contains("BLR") || Catch::Contains("LAMBDA"));
 }

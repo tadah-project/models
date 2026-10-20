@@ -127,8 +127,8 @@ void solveWithPseudoinverse(int m, int n, V1& B, V2& weights, memory::SVDWorkspa
      *        solution (its weight component is 0).
      *
      * rcond * max(S[0..k-1]) for rcond > 0, else 0 (only exact zeros are
-     * left out). LinearRegressor::get_sigma drops the same directions from
-     * the weight covariance.
+     * left out). LinearRegressor::dropped_directions counts the directions it
+     * leaves out.
      *
      * @param S The k = min(m, n) singular values.
      */

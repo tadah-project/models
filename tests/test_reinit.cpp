@@ -757,8 +757,6 @@ namespace {
 // Minimal concrete M_Core subclass used only by the test below.
 struct ConcreteModel : tadah::models::M_Core {
     double predict(const tadah::core::aed_type&) const override { return 0.0; }
-    tadah::core::t_type get_weights_uncertainty() const override
-        { return tadah::core::t_type(); }
 };
 
 } // anonymous namespace

@@ -109,7 +109,7 @@ namespace models {
  * of the weighted matrix. gamma = sum_i beta s_i^2 / (beta s_i^2 + alpha)
  * runs over the directions the solve keeps (s_i above
  * OLS::pseudoinverse_threshold), as
- * the weights and the weight covariance do. (Before, N was max(rows,
+ * the weights do. (Before, N was max(rows,
  * cols), which counted the augmentation rows and the weight-0 rows, and
  * gamma kept every s_i with beta s_i^2 above the smallest double.)
  *

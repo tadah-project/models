@@ -68,9 +68,8 @@ std::string train_refusal(Context c) {
   phi_type Phi = design();
   t_type T = target();
   t_type w;
-  Matrix Sigma;
   try {
-    LinearRegressor::train(c, Phi, T, w, Sigma);
+    LinearRegressor::train(c, Phi, T, w);
   } catch (const std::exception &e) {
     return e.what();
   }
@@ -82,11 +81,10 @@ std::string factor_refusal(Context c) {
   phi_type Phi = design();
   t_type T = target();
   t_type w;
-  Matrix Sigma;
   FactorHandle factor;
   tadah::models::memory::ModelsWorkspaceManager wm;
   try {
-    LinearRegressor::train_with_factor(c, Phi, T, w, Sigma, factor, wm);
+    LinearRegressor::train_with_factor(c, Phi, T, w, factor, wm);
   } catch (const std::exception &e) {
     return e.what();
   }
