@@ -399,6 +399,40 @@ public:
     }
   }
 
+  /** The intercept rule of OALGO 3, checked on the configuration and the
+   *  number of intercept columns the fit has, with train()'s messages:
+   *  OALGO 3 penalises every weight alike, while a ridge penalty leaves the
+   *  intercept columns out, so with @p n_intercepts > 0 it refuses a LAMBDA
+   *  other than 0. LAMBDA -1 requests the evidence approximation, which
+   *  only OALGO 3 runs: its message says what it needs (BIAS false, or
+   *  every intercept weight pinned with FIXINDEX and FIXWEIGHT) and what
+   *  fits with BIAS true. @p n_intercepts counts the intercept columns the
+   *  fit fits (those FIXINDEX pins leave the design matrix). train() calls
+   *  it; tadah hpo applies it when a run starts (MLIP
+   *  require_oalgo3_intercepts counts the columns of a configuration).
+   *  @throws std::runtime_error naming the number of intercept columns. */
+  static void require_oalgo3_intercepts(const tadah::core::Context &context,
+                                        size_t n_intercepts) {
+    if (n_intercepts == 0 || context.get<int>("OALGO", 0) != 3) return;
+    const double lambda = context.get<double>("LAMBDA", 0);
+    if (lambda == 0.0) return;
+    const std::string n = std::to_string(n_intercepts);
+    if (std::abs(lambda + 1) < std::numeric_limits<double>::min())
+      throw std::runtime_error(
+          "LAMBDA -1 requests the evidence approximation, which only OALGO 3 "
+          "runs; OALGO 3 penalises every weight alike, and the model has " +
+          n + " intercept column(s) (BIAS true with ATOM), which a ridge "
+          "penalty leaves out. The evidence approximation needs BIAS false, "
+          "or every intercept weight pinned with FIXINDEX and FIXWEIGHT. "
+          "With BIAS true, LAMBDA 0 fits with any OALGO, and LAMBDA > 0 with "
+          "OALGO 1, 2 or 4.");
+    throw std::runtime_error(
+        "OALGO=3 (SVD with uniform ridge) does not support intercept "
+        "exclusion from regularisation. The model has " + n +
+        " intercept column(s) (BIAS=true with ATOM) and LAMBDA != 0: use "
+        "OALGO=1, 2 or 4 instead.");
+  }
+
 private:
   /**
    * @brief Train the model using the provided configuration and data matrices.
@@ -523,18 +557,10 @@ public:
         throw_rank_deficient(2, e, Phi, layout, lambda, nonzero, n_bias);
       }
     } else if (oalgo == 3) {
-      // SVD path applies a uniform ridge across all singular values; there is
-      // no per-column knob, so intercept-aware regularisation is not
-      // supported here. Reject loudly and point at the alternatives.
-      // TODO: implement Path B (residualise intercepts, run SVD on the
-      //       descriptor block only) so OALGO=3 + BIAS=true becomes valid.
-      if (n_bias > 0 && lambda != 0.0) {
-        throw std::runtime_error(
-            "OALGO=3 (SVD with uniform ridge) does not support intercept "
-            "exclusion from regularisation. The model has " +
-            std::to_string(n_bias) + " intercept column(s) (BIAS=true with "
-            "ATOM) and LAMBDA != 0: use OALGO=1, 2 or 4 instead.");
-      }
+      // The SVD path applies a uniform ridge across all singular values;
+      // there is no per-column penalty, so it cannot leave the intercept
+      // columns out of it (require_oalgo3_intercepts).
+      require_oalgo3_intercepts(context, n_bias);
       tadah::models::SVD svd;
       svd.compute(Phi);  // Phi is overwritten: the residuals come from the SVD
       if (lambda < 0) {

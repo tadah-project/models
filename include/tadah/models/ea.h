@@ -89,7 +89,9 @@ private:
 #include <tadah/models/ols.h>
 #include <tadah/core/core_types.h>
 #include <tadah/core/lapack.h>
+#include <tadah/core/logger.h>
 #include <tadah/core/number_format.h>
+#include <cstdio>
 
 namespace tadah {
 namespace models {
@@ -117,6 +119,11 @@ namespace models {
  * weight 0, as when every target is zero, or too small to square in double
  * precision) makes alpha infinite or nan, and a fit that reproduces every
  * target (RSS = 0) makes beta infinite.
+ *
+ * run() writes nothing on standard output. Its iterations (the relative
+ * changes of alpha and beta, alpha, beta, lambda and gamma of each) and how
+ * it ended are one INFO message of the Logger (VERBOSE 2); a caller reports
+ * a stop at the limit (LinearRegressor::train: a WARNING).
  */
 class EA {
   private:
@@ -124,7 +131,6 @@ class EA {
     tadah::models::SVD &svd;
     tadah::core::t_type &T;
     size_t n_obs;
-    int verbose;
     size_t iterations_ = 0;
     double last_change_alpha_ = 0.0;
     double last_change_beta_ = 0.0;
@@ -151,8 +157,7 @@ class EA {
       context(c),
       svd(svd),
       T(T),
-      n_obs(n_obs),
-      verbose(c.get<int>("VERBOSE"))
+      n_obs(n_obs)
   {}
 
     /** Iterates alpha and beta from the values given to their fixed
@@ -184,7 +189,19 @@ class EA {
       for (size_t i=0; i<sizeS; ++i)
         eval[i] = s[i]*s[i];
 
-      if (verbose) printf("%9s  %9s  %9s  %9s  %9s  %9s\n","del alpha", "del beta", "alpha", "beta", "lambda", "gamma");
+      // The iterations, one row each, for the INFO message of how the
+      // iteration ended (log_iterations).
+      std::string rows;
+      auto log_iterations = [&rows](const std::string &how) {
+        char head[96];
+        std::snprintf(head, sizeof head, "%9s  %9s  %9s  %9s  %9s  %9s",
+                      "del alpha", "del beta", "alpha", "beta", "lambda",
+                      "gamma");
+        tadah::core::Logger::instance().log(
+            tadah::core::LogLevel::INFO,
+            "LAMBDA -1 (evidence approximation): " + how + ":\n" + head +
+                rows);
+      };
       // D is a filter factors matrix
       double *d = new double[sizeS];
 
@@ -225,6 +242,7 @@ class EA {
         if (!(static_cast<double>(N) > gamma)) {
           delete [] eval;
           delete [] d;
+          log_iterations("refused at iteration " + std::to_string(counter + 1));
           throw EvidenceApproximationError(
               "LAMBDA -1 (evidence approximation): the fit has " +
               std::to_string(N) + " observations (rows with a non-zero "
@@ -252,6 +270,7 @@ class EA {
             why = "|w|^2 = " + tadah::core::format_roundtrip(wnorm2) +
                   " and RSS = " + tadah::core::format_roundtrip(temp) +
                   " are beyond double precision";
+          log_iterations("refused at iteration " + std::to_string(counter + 1));
           throw EvidenceApproximationError(
               "LAMBDA -1 (evidence approximation): iteration " +
               std::to_string(counter + 1) + " gave alpha " +
@@ -264,7 +283,12 @@ class EA {
 
         test1 = std::fabs(alpha_old-alpha)/alpha;
         test2 = std::fabs(beta_old-beta)/beta;
-        if (verbose) printf("%.3e  %.3e  %.3e  %.3e  %.3e  %.3e\n",test1, test2,alpha, beta, alpha/beta, gamma);
+        {
+          char row[128];
+          std::snprintf(row, sizeof row, "\n%.3e  %.3e  %.3e  %.3e  %.3e  %.3e",
+                        test1, test2, alpha, beta, alpha / beta, gamma);
+          rows += row;
+        }
 
         lambda = alpha/beta;
         alpha_old = alpha;
@@ -283,8 +307,11 @@ class EA {
       iterations_ = counter;
       alpha_ = alpha;
       beta_ = beta;
-      if (convergence_status && verbose) std::cout << "Number of steps for convergence: " + std::to_string(counter) << std::endl;
-      if (!convergence_status && verbose) std::cout << "Max number of steps reached: " + std::to_string(counter) << std::endl;
+      log_iterations(convergence_status
+                         ? "converged in " + std::to_string(counter) +
+                               " iterations"
+                         : "stopped at its iteration limit, " +
+                               std::to_string(counter) + " iterations");
 
       delete [] eval;
       delete [] d;
