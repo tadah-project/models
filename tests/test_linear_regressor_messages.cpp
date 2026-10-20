@@ -611,9 +611,10 @@ TEST_CASE("LinearRegressor: with FIXINDEX and BIAS the OALGO 2 and 4 "
 }
 
 /* Pins: OALGO 2 and 4 count the non-zero data rows of the design matrix,
- * which bound its rank: a row of weight 0 (EWEIGHT, FWEIGHT or SWEIGHT 0,
- * or a structure's weight 0) is zero in the design matrix DesignMatrix
- * builds, and so is its target. With zero data rows:
+ * which bound its rank: a row of priority 0 (a structure's eweight,
+ * fweight or sweight 0, a WDBFILE value of 0, or an energy under ENERGY
+ * false) is zero in the design matrix DesignMatrix builds, and so is its
+ * target. With zero data rows:
  *  - 3 data rows of sine values for 3 weights, row 3 zero, LAMBDA 0: OALGO
  *    4 in train() and train_with_factor(), and OALGO 2, refuse before
  *    LAPACK: "OALGO 4 (normal equations, Cholesky) cannot fit these 3

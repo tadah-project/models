@@ -243,8 +243,9 @@ private:
   /* The data rows of Phi (its first L.data_rows) that are not zero in
    * every column. A zero row adds nothing to the rank, so the rank is at
    * most their number plus the ridge rows that carry a penalty; a row of
-   * weight 0 (EWEIGHT, FWEIGHT or SWEIGHT 0, or a structure's weight 0) is
-   * zero in the design matrix DesignMatrix builds, and so is a row whose
+   * priority 0 (a structure's eweight, fweight or sweight 0, a WDBFILE value
+   * of 0, or an energy under ENERGY false) is zero in the design matrix
+   * DesignMatrix builds, and so is a row whose
    * values are all in pinned (removed) columns. Called after
    * require_finite: every value compares. */
   static size_t nonzero_data_rows(const tadah::core::phi_type &Phi,
