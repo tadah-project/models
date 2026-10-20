@@ -271,7 +271,10 @@ class EA {
         last_change_alpha_ = test1;
         last_change_beta_ = test2;
 
-        if (++counter>maxsteps) {
+        // The limit stops only an iteration that has not converged: one
+        // whose last update brings both changes below the tolerance has
+        // converged, on whichever iteration it does.
+        if (++counter>maxsteps && (test1>EPS2 || test2>EPS2)) {
           convergence_status = 0;
           break;
         }
