@@ -104,7 +104,7 @@ namespace models {
  *
  * N is the number of observations, @p n_obs of the constructor: the data
  * rows of the design matrix of priority above 0 that are not zero in every
- * column, without the ridge-augmentation rows the design matrix appends
+ * column (zero_rows()), without the ridge-augmentation rows the design matrix appends
  * (one per column) and without the rows of priority 0, which are zero rows
  * of the weighted matrix. gamma = sum_i beta s_i^2 / (beta s_i^2 + alpha)
  * runs over the directions the solve keeps (s_i above

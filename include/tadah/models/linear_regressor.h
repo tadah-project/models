@@ -20,6 +20,7 @@
 #include <tadah/models/fit_warnings.h>
 #include <tadah/models/ols.h>
 #include <tadah/models/svd.h>
+#include <tadah/models/zero_rows.h>
 #include <tadah/models/memory/imodels_workspace_manager.h>
 
 #include <algorithm>
@@ -241,25 +242,19 @@ private:
   }
 
   /* The data rows of Phi (its first L.data_rows) that are not zero in
-   * every column. A zero row adds nothing to the rank, so the rank is at
-   * most their number plus the ridge rows that carry a penalty; a row of
+   * every column (zero_rows(): no value above kZeroRowTolerance of the
+   * largest magnitude of its column, so a row of rounding residues is
+   * zero). A zero row adds nothing to the rank, so the rank is at most
+   * their number plus the ridge rows that carry a penalty; a row of
    * priority 0 (a structure's eweight, fweight or sweight 0, a WDBFILE value
    * of 0, or an energy under ENERGY false) is zero in the design matrix
-   * DesignMatrix builds, and so is a row whose
-   * values are all in pinned (removed) columns. Called after
-   * require_finite: every value compares. */
+   * DesignMatrix builds, and so is a row whose values are all in pinned
+   * (removed) columns, or a force row of an atom at a centre of
+   * symmetry. */
   static size_t nonzero_data_rows(const tadah::core::phi_type &Phi,
                                   const Layout &L) {
-    const size_t data = std::min(L.data_rows, Phi.rows());
-    std::vector<char> nonzero(data, 0);
-    size_t count = 0;
-    for (size_t j = 0; j < Phi.cols() && count < data; ++j)
-      for (size_t i = 0; i < data; ++i)
-        if (!nonzero[i] && Phi(i, j) != 0.0) {
-          nonzero[i] = 1;
-          ++count;
-        }
-    return count;
+    const std::vector<char> zero = zero_rows(Phi, L.data_rows);
+    return static_cast<size_t>(std::count(zero.begin(), zero.end(), 0));
   }
 
   /* "6 data rows", or with zero data rows "4 non-zero data rows of 6". */
@@ -454,7 +449,9 @@ private:
    *        every other column, and OALGO 3, whose ridge penalises every
    *        column alike, refuses LAMBDA != 0 when there is one.
    * @param n_obs The number of observations: the data rows of Phi of
-   *        priority above 0 that are not zero in every column, without its
+   *        priority above 0 that are not zero in every column
+   *        (zero_rows(): no value above 1e-10 of the largest magnitude of
+   *        its column), without its
    *        ridge-augmentation rows (the DesignMatrix appends one per
    *        column) and without the rows of priority 0 (zero rows of the
    *        weighted matrix). OALGO 3 estimates
