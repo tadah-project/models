@@ -22,20 +22,21 @@ namespace models {
  * @brief Refuses FIXINDEX and FIXWEIGHT for M_KRR implementation 2 (MODEL
  * M_KRR <kernel> 2, M_KRR_Train::train2).
  *
- * Its solve, (K + LAMBDA I) w = t on the basis vectors, fits every weight
- * at once and pins none, so the keys would be ignored. A no-op without
- * either key; with either, whatever its values, throws std::runtime_error
- * naming @p kernel and implementation 1, which pins them.
+ * Its solve, (K + LAMBDA sigma^2 I) w = t on the basis vectors (sigma =
+ * ESIGMA in eV, the error scale Tadah.MLIP passes), fits every weight at
+ * once and pins none, so the keys would be ignored. A no-op without either
+ * key; with either, whatever its values, throws std::runtime_error stating
+ * that solve and naming @p kernel and implementation 1, which pins them.
  */
 inline void refuse_fixed_weights_in_train2(const tadah::core::Context &ctx,
                                            const std::string &kernel) {
   if (!ctx.has_stored("FIXINDEX") && !ctx.has_stored("FIXWEIGHT")) return;
   throw std::runtime_error(
       "MODEL M_KRR " + kernel + " 2 cannot pin weights: implementation 2 "
-      "solves (K + LAMBDA I) w = t for the weights of all its basis vectors "
-      "at once, so FIXINDEX and FIXWEIGHT would be ignored. Use "
-      "implementation 1 (MODEL M_KRR " + kernel + " 1), which pins them, or "
-      "remove FIXINDEX and FIXWEIGHT.");
+      "solves (K + LAMBDA sigma^2 I) w = t, sigma = ESIGMA in eV, for the "
+      "weights of all its basis vectors at once, so FIXINDEX and FIXWEIGHT "
+      "would be ignored. Implementation 1 (MODEL M_KRR " + kernel + " 1) "
+      "pins them; implementation 2 fits without FIXINDEX and FIXWEIGHT.");
 }
 
 /**
@@ -43,7 +44,9 @@ inline void refuse_fixed_weights_in_train2(const tadah::core::Context &ctx,
  * <kernel> 2`, M_KRR_Train::train2), checked on the configuration alone,
  * with its messages: LinearRegressor::require_lambda_request(), then
  * LAMBDA -1, which this solve, (K + LAMBDA sigma^2 I) w = t with a fixed
- * LAMBDA, does not run. tadah hpo applies them when a run starts.
+ * LAMBDA (sigma = ESIGMA in eV, the error scale Tadah.MLIP passes), does
+ * not run; its message states that solve. tadah hpo applies them when a
+ * run starts.
  *
  * @throws std::runtime_error naming the value, @p kernel and
  * implementation 1.
@@ -54,8 +57,9 @@ inline void require_krr_implementation2_lambda(
   if (ctx.get<double>("LAMBDA") < 0)
     throw std::runtime_error(
         "MODEL M_KRR " + kernel + " 2 cannot use LAMBDA -1: implementation "
-        "2 solves (K + LAMBDA I) w = t with a fixed LAMBDA and does not run "
-        "the evidence approximation. Implementation 1 (MODEL M_KRR " +
+        "2 solves (K + LAMBDA sigma^2 I) w = t, sigma = ESIGMA in eV, with a "
+        "fixed LAMBDA and does not run the evidence approximation. "
+        "Implementation 1 (MODEL M_KRR " +
         kernel + " 1) with OALGO 3 runs it; LAMBDA >= 0 fits with either.");
 }
 
