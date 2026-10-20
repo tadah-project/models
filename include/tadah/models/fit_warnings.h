@@ -19,8 +19,8 @@ enum class FitWarningKind {
 
 /** One WARNING of a fit: its kind and its text. */
 struct FitWarning {
-  FitWarningKind kind;
-  std::string text;
+  FitWarningKind kind;  ///< what the WARNING is about
+  std::string text;     ///< the WARNING as the Logger would print it
 };
 
 class FitWarningCollector;

@@ -38,11 +38,11 @@ inline void refuse_fixed_weights_in_train2(const tadah::core::Context &ctx,
 }
 
 /**
- * @brief The LAMBDA rules of M_KRR implementation 2 (MODEL M_KRR <kernel>
- * 2, M_KRR_Train::train2), checked on the configuration alone, with its
- * messages: LinearRegressor::require_lambda_request(), then LAMBDA -1,
- * which this solve, (K + LAMBDA I) w = t with a fixed LAMBDA, does not
- * run. tadah hpo applies them when a run starts.
+ * @brief The LAMBDA rules of M_KRR implementation 2 (`MODEL M_KRR
+ * <kernel> 2`, M_KRR_Train::train2), checked on the configuration alone,
+ * with its messages: LinearRegressor::require_lambda_request(), then
+ * LAMBDA -1, which this solve, (K + LAMBDA I) w = t with a fixed LAMBDA,
+ * does not run. tadah hpo applies them when a run starts.
  *
  * @throws std::runtime_error naming the value, @p kernel and
  * implementation 1.
