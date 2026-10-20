@@ -228,11 +228,11 @@ private:
            "), " + data;
   }
 
-  /* What the messages say of the zero data rows: a row of weight 0 is
+  /* What the messages say of the zero data rows: a row of priority 0 is
    * one, but not the only one. */
   static std::string zero_rows_text(size_t cols, const Layout &L) {
     return std::string(" (a data row that is zero in every column adds "
-                       "nothing to the rank: a row of weight 0, ") +
+                       "nothing to the rank: a row of priority 0, ") +
            (L.pinned(cols) > 0 ? "a row whose values are all in FIXINDEX "
                                  "columns, or "
                                : "or ") +
@@ -453,10 +453,11 @@ private:
    *        some): the LAMBDA ridge penalty leaves them out and penalises
    *        every other column, and OALGO 3, whose ridge penalises every
    *        column alike, refuses LAMBDA != 0 when there is one.
-   * @param n_obs The number of observations: the rows of Phi with a
-   *        non-zero weight, without its ridge-augmentation rows (the
-   *        DesignMatrix appends one per column) and without the rows of
-   *        weight 0 (zero rows of the weighted matrix). OALGO 3 estimates
+   * @param n_obs The number of observations: the data rows of Phi of
+   *        priority above 0 that are not zero in every column, without its
+   *        ridge-augmentation rows (the DesignMatrix appends one per
+   *        column) and without the rows of priority 0 (zero rows of the
+   *        weighted matrix). OALGO 3 estimates
    *        the noise variance with it, and LAMBDA -1 the evidence.
    * @param layout Phi's data rows and the weight each column fits
    *        (Layout::of(Phi) for DesignMatrix's layout, Layout::fixed()
@@ -475,7 +476,7 @@ private:
    * @throws std::runtime_error for a value of Phi or T that is not finite
    *         (every OALGO), and under OALGO 2 and 4 for a design matrix
    *         whose non-zero data rows (a data row that is zero in every
-   *         column, such as a row of weight 0, adds nothing to the rank)
+   *         column, such as a row of priority 0, adds nothing to the rank)
    *         and, with LAMBDA > 0, ridge rows cannot give it full column
    *         rank, before LAPACK runs, or whose QR or Cholesky factorisation
    *         LAPACK cannot complete; each names the rows (and how many are
@@ -611,7 +612,7 @@ public:
   }
   /** @brief train() of a design matrix laid out as DesignMatrix lays it
    *  out (Layout::of(Phi): its data rows, then one ridge row per column)
-   *  with no rows of weight 0: n_obs = rows - cols (0 when Phi has no more
+   *  with no rows of priority 0: n_obs = rows - cols (0 when Phi has no more
    *  rows than columns). A design matrix without some of its columns
    *  (FIXINDEX) takes the full overload, with Layout::fixed(). */
   static CovarianceFit train(tadah::core::Context &context,
@@ -658,7 +659,7 @@ public:
   /** @brief The observations of a design matrix with its cols
    *  ridge-augmentation rows (the DesignMatrix contract, which the LAMBDA
    *  ridge of OALGO 1 and 2 writes into): rows - cols, or 0 when Phi has
-   *  no more rows than columns. A caller that knows the rows of weight 0
+   *  no more rows than columns. A caller that knows the rows of priority 0
    *  passes their exclusion to train() itself. */
   static std::size_t augmented_observations(const tadah::core::phi_type &Phi) {
     return Phi.rows() > Phi.cols() ? Phi.rows() - Phi.cols() : 0;
@@ -881,7 +882,7 @@ public:
    *        s^2 = RSS / (n_obs - gamma).
    *
    * RSS = |T - A w|^2, with A w computed from @p svd (SVDMultiplier: the
-   * solve overwrote A); the augmentation rows and the rows of weight 0
+   * solve overwrote A); the augmentation rows and the rows of priority 0
    * are zero in A and in T, so they add nothing. gamma = sum over the kept
    * directions of s_i^2 / (s_i^2 + lambda). When n_obs <= gamma the noise
    * variance is undefined: @p Sigma is 0 x 0 and the result says why.
@@ -911,10 +912,11 @@ public:
     if (!(dof > 0.0)) {
       Sigma = tadah::core::Matrix();
       fit.why_not = "the fit has " + std::to_string(n_obs) +
-                    " observations (rows with a non-zero weight) for an "
-                    "effective " + core::to_string(fit.gamma) +
+                    " observations (data rows of priority above 0 that are "
+                    "not zero in every column) for an effective " +
+                    core::to_string(fit.gamma) +
                     " weights (gamma), so its noise variance is undefined: "
-                    "add data with a non-zero weight (it needs more "
+                    "add data of priority above 0 (it needs more "
                     "observations than effective weights)";
       return fit;
     }
