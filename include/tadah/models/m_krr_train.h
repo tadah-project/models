@@ -226,18 +226,27 @@ public:
      *
      * @param B Basis matrix.
      * @param T Target vector.
-     * @throws std::runtime_error if lambda is negative for evidence
-     *         approximation, or with FIXINDEX or FIXWEIGHT.
+     * @throws std::runtime_error for a LAMBDA that requests nothing
+     *         (LinearRegressor::require_lambda_request: a second value, a
+     *         negative value other than -1), for LAMBDA -1 (the evidence
+     *         approximation, which this solve does not run), or with
+     *         FIXINDEX or FIXWEIGHT.
      */
     void train2(tadah::core::Matrix &B, tadah::core::t_type &T) {
         refuse_fixed_weights_in_train2(context, kernel.get_label());
         // This solve computes no covariance: the model keeps none of an
         // earlier fit.
         this->clear_covariance(krr_implementation2_without_covariance());
+        LinearRegressor::require_lambda_request(context);
         double lambda = context.template get<double>("LAMBDA");
 
         if (lambda < 0)
-            throw std::runtime_error("This KRR implementation cannot use LAMBDA -1 (Evidence Approximation)");
+            throw std::runtime_error(
+                "MODEL M_KRR " + kernel.get_label() + " 2 cannot use LAMBDA "
+                "-1: implementation 2 solves (K + LAMBDA I) w = t with a "
+                "fixed LAMBDA and does not run the evidence approximation. "
+                "Implementation 1 (MODEL M_KRR " + kernel.get_label() +
+                " 1) with OALGO 3 runs it; LAMBDA >= 0 fits with either.");
         
         if (M_KRR_Core<Kern>::is_verbose()) std::cout << "Computing Kernel tadah::core::Matrix" << std::endl;
         tadah::core::Matrix K(B.cols(), B.cols());

@@ -345,6 +345,41 @@ private:
                                             std::min(n_bias, n)));
   }
 
+public:
+  /**
+   * @brief Refuses a LAMBDA that requests nothing: a second value, and a
+   *        negative value other than -1.
+   *
+   * LAMBDA takes one value: 0 fits without a penalty, a positive value is
+   * the ridge penalty, and -1 requests the evidence approximation (OALGO
+   * 3; the caller checks its OALGO). A second value was documented as the
+   * rank threshold but was never read: the threshold of OALGO 1 and 3 is
+   * OALGO's second value. Every fit calls this first (train(),
+   * train_with_factor(), M_KRR_Train::train2()). The messages give the
+   * values as @p context holds them.
+   *
+   * @throws std::runtime_error naming the values and what they mean.
+   */
+  static void require_lambda_request(const tadah::core::Context &context) {
+    const double lambda = context.get<double>("LAMBDA", 0);  // the default if absent
+    const std::vector<std::string> &given = context("LAMBDA");
+    std::string text = "LAMBDA";
+    for (const std::string &v : given) text += " " + v;
+    if (given.size() > 1)
+      throw std::runtime_error(
+          text + ": LAMBDA takes one value, the ridge penalty (0 for none, "
+          "-1 for the evidence approximation of OALGO 3); a second value is "
+          "not read. The rank threshold of OALGO 1 and 3 is OALGO's second "
+          "value (OALGO 1 " + given[1] + ", OALGO 3 " + given[1] + ").");
+    if (lambda < 0 && std::abs(lambda + 1) >= std::numeric_limits<double>::min())
+      throw std::runtime_error(
+          text + ": only LAMBDA -1 requests the evidence approximation, "
+          "which OALGO 3 runs; another negative value requests nothing. "
+          "LAMBDA 0 fits without a penalty, and a positive LAMBDA is the "
+          "ridge penalty.");
+  }
+
+private:
   /**
    * @brief Train the model using the provided configuration and data matrices.
    *
@@ -393,7 +428,14 @@ private:
    *         to its LAMBDA and intercept columns. A design matrix whose
    *         columns are dependent but not exactly so in floating point can
    *         still be fitted by OALGO 2 and 4, with weights as large as the
-   *         rounding makes them.
+   *         rounding makes them. Also, before anything is solved, for a
+   *         LAMBDA that requests nothing (require_lambda_request(): a
+   *         second value, a negative value other than -1) and for LAMBDA
+   *         -1 under another OALGO than 3; and for an evidence
+   *         approximation whose alpha or beta is not finite (EA::run(),
+   *         before its lambda is solved with). An evidence
+   *         approximation that stops at its iteration limit is not refused:
+   *         a WARNING says so (EA::stopped_at_limit_text()).
    */
 public:
   static CovarianceFit train(tadah::core::Context &context,
@@ -406,6 +448,7 @@ public:
                     std::size_t n_obs,
                     const Layout &layout) {
 
+    require_lambda_request(context);
     double lambda = context.get<double>("LAMBDA", 0);
     int oalgo = context.get<int>("OALGO", 0);
     double rcond =
@@ -414,7 +457,10 @@ public:
 
     if (std::abs(lambda + 1) < std::numeric_limits<double>::min() &&
         oalgo != 3) {
-      throw std::runtime_error("LAMBDA -1 requires OALGO 3");
+      throw std::runtime_error(
+          "LAMBDA -1 requests the evidence approximation, which only OALGO 3 "
+          "(the SVD solve) runs; the configuration has OALGO " +
+          std::to_string(oalgo) + " (LAMBDA >= 0 fits with any OALGO).");
     }
 
     // The caller's layout and intercept columns are checked before
@@ -483,7 +529,9 @@ public:
         double alpha = context.get<double>("ALPHA");
         double beta = context.get<double>("BETA");
         EA ea(context, svd, T, n_obs);
-        ea.run(alpha, beta);
+        if (!ea.run(alpha, beta))
+          core::Logger::instance().log(tadah::core::LogLevel::WARNING,
+              ea.stopped_at_limit_text());
         lambda = alpha / beta;
         context.remove("ALPHA");
         context.remove("BETA");
@@ -599,9 +647,10 @@ public:
    * @param factor      Output: receives the cached Cholesky factor.
    * @param workspaceManager  Workspace provider.
    * @throws std::runtime_error, before the factorisation, for what train()
-   *         refuses under OALGO 4 before LAPACK runs: a value of Phi or T
-   *         that is not finite, and fewer non-zero data rows than weights
-   *         (LAMBDA 0) or than intercept columns (LAMBDA > 0).
+   *         refuses under OALGO 4 before LAPACK runs: a LAMBDA that
+   *         requests nothing (require_lambda_request()), LAMBDA -1, a value
+   *         of Phi or T that is not finite, and fewer non-zero data rows
+   *         than weights (LAMBDA 0) or than intercept columns (LAMBDA > 0).
    */
   static void train_with_factor(
       tadah::core::Context &context,
@@ -614,6 +663,7 @@ public:
 
     (void)Sigma;  // Reserved for future BLR-IFT; OALGO=4 leaves it untouched.
 
+    require_lambda_request(context);
     const double lambda = context.get<double>("LAMBDA", 0);
     const int    oalgo  = context.get<int>("OALGO", 0);
     const double rcond  =
@@ -638,12 +688,6 @@ public:
           "IFT chain rule. Use a fixed "
           "LAMBDA >= 0, or GRAD_STRATEGY=NUMERICAL.");
     }
-    if (lambda < 0) {
-      throw std::runtime_error(
-          "LinearRegressor::train_with_factor: LAMBDA must be >= 0 "
-          "(got " + std::to_string(lambda) + ").");
-    }
-
     weights.resize(Phi.cols());
 
     const std::size_t n_bias = tadah::core::n_intercept_columns(context);
