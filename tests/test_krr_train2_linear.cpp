@@ -2,7 +2,8 @@
 //
 // M_KRR_Train::train2, the solve of MODEL M_KRR <kernel> 2, finds the
 // coefficients w of its basis vectors b_j (the columns of B) from
-// (K + LAMBDA I) w = T, K_ij = K(b_i, b_j). A non-linear kernel predicts
+// (K + LAMBDA sigma^2 I) w = T, K_ij = K(b_i, b_j), sigma the error scale
+// of the targets (1 by default). A non-linear kernel predicts
 // with them: E(x) = sum_j w_j K(b_j, x). Kern_Linear predicts weights . x
 // (Kern_Linear::epredict, as everything that evaluates a Kern_Linear
 // model), so its weights are the descriptor weights the coefficients make,
@@ -17,6 +18,7 @@
 
 #include <cmath>
 #include <cstddef>
+#include <stdexcept>
 #include <utility>
 #include <vector>
 
@@ -157,5 +159,64 @@ TEST_CASE("M_KRR implementation 2 (train2) with Kern_RBF keeps the weights "
   for (size_t j = 0; j < B.cols(); ++j) {
     INFO("weight " << j);
     CHECK(w[j] == Approx(coef[j]).epsilon(1e-12).margin(1e-300));
+  }
+}
+
+/* Pins: train2 with an error scale sigma of the targets solves (K + LAMBDA
+ * sigma^2 I) w = T, the ridge of the residuals over sigma: Kern_Linear and
+ * Kern_RBF on the basis above with LAMBDA 1e-3 and sigma 0.05 have the
+ * weights of the solve with lambda 1e-3 x 0.05^2 here (1e-12 relative); an
+ * error scale of 0, -1 or NaN is a logic_error (Tadah.MLIP refuses such an
+ * ESIGMA before a fit).
+ * Before the fix: train2 took no error scale (the test does not compile),
+ * so Tadah.MLIP's ESIGMA did not reach the solve. */
+TEST_CASE("M_KRR implementation 2 (train2) weighs LAMBDA against the "
+          "residuals over the error scale",
+          "[krr][train2][error_scale]") {
+  Context c = make_ctx();
+  const Matrix B = make_basis();
+  const t_type T = make_targets(B.cols());
+  const double sigma = 0.05;
+  SECTION("Kern_Linear") {
+    Kern_Linear k;
+    M_KRR_Train<Kern_Linear> m(k, c);
+    Matrix Bt = B;
+    t_type Tt = T;
+    REQUIRE_NOTHROW(m.train2(Bt, Tt, sigma));
+    const t_type w = m.get_weights();
+    const std::vector<double> coef =
+        coefficients(k, B, T, 1e-3 * sigma * sigma);
+    REQUIRE(w.size() == B.rows());
+    for (size_t i = 0; i < B.rows(); ++i) {
+      double Bw = 0;
+      for (size_t j = 0; j < B.cols(); ++j) Bw += B(i, j) * coef[j];
+      INFO("weight " << i);
+      CHECK(w[i] == Approx(Bw).epsilon(1e-12).margin(1e-300));
+    }
+  }
+  SECTION("Kern_RBF") {
+    Kern_RBF k(c);
+    M_KRR_Train<Kern_RBF> m(k, c);
+    Matrix Bt = B;
+    t_type Tt = T;
+    REQUIRE_NOTHROW(m.train2(Bt, Tt, sigma));
+    const t_type w = m.get_weights();
+    const std::vector<double> coef =
+        coefficients(k, B, T, 1e-3 * sigma * sigma);
+    REQUIRE(w.size() == B.cols());
+    for (size_t j = 0; j < B.cols(); ++j) {
+      INFO("weight " << j);
+      CHECK(w[j] == Approx(coef[j]).epsilon(1e-12).margin(1e-300));
+    }
+  }
+  SECTION("an error scale that is not a finite number > 0") {
+    for (double bad : {0.0, -1.0, std::nan("")}) {
+      INFO("error scale " << bad);
+      Kern_Linear k;
+      M_KRR_Train<Kern_Linear> m(k, c);
+      Matrix Bt = B;
+      t_type Tt = T;
+      CHECK_THROWS_AS(m.train2(Bt, Tt, bad), std::logic_error);
+    }
   }
 }
