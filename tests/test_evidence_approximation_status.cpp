@@ -29,6 +29,7 @@
 #include <tadah/core/core_types.h>
 #include <tadah/core/logger.h>
 #include <tadah/models/ea.h>
+#include <tadah/models/fit_warnings.h>
 #include <tadah/models/linear_regressor.h>
 #include <tadah/models/memory/models_workspace_manager.h>
 #include <tadah/models/svd.h>
@@ -36,11 +37,14 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <future>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <utility>
+#include <vector>
 
 using namespace tadah::core;
 using namespace tadah::models;
@@ -282,4 +286,98 @@ TEST_CASE("The evidence approximation refuses weights too small to square",
                       Contains("iteration 1") && Contains("alpha") &&
                       Contains("too small to square") &&
                       Contains("no weights were fitted"));
+}
+
+/* The refusals of the evidence approximation have a type of their own,
+ * EvidenceApproximationError (a std::runtime_error): a caller that fits
+ * many candidates (tadah hpo) fails the candidate whose targets the
+ * approximation cannot estimate, and tells that apart from an error of
+ * its own. Both refusals: alpha and beta that are not finite (targets all
+ * zero), and weights too small to square.
+ * Before the fix: the type did not exist (the test does not compile). */
+TEST_CASE("The refusals of the evidence approximation are "
+          "EvidenceApproximationError",
+          "[ea][refusal]") {
+  SECTION("targets all zero") {
+    Context c = ea_ctx();
+    const double zero[6] = {0, 0, 0, 0, 0, 0};
+    phi_type Phi = design(kLinearRows);
+    t_type T = target(zero), w;
+    Matrix Sigma;
+    tadah::models::memory::ModelsWorkspaceManager wm;
+    CHECK_THROWS_AS(LinearRegressor::train(c, Phi, T, w, Sigma, wm, {}, 6,
+                                           LinearRegressor::Layout::of(Phi)),
+                    EvidenceApproximationError);
+  }
+  SECTION("weights too small to square") {
+    Context c = ea_ctx();
+    phi_type Phi(2, 1);
+    Phi.set_zero();
+    Phi(0, 0) = 1e-300;
+    t_type T(2), w;
+    T[0] = 1e10;
+    T[1] = 0.0;
+    Matrix Sigma;
+    tadah::models::memory::ModelsWorkspaceManager wm;
+    CHECK_THROWS_AS(LinearRegressor::train(c, Phi, T, w, Sigma, wm, {}, 1,
+                                           LinearRegressor::Layout::of(Phi)),
+                    EvidenceApproximationError);
+  }
+}
+
+/* While a FitWarningCollector lives on the calling thread, the WARNING of
+ * a fit whose evidence approximation stops at its iteration limit goes to
+ * it, with its kind, and the Logger prints nothing: a caller that fits many
+ * candidates (tadah hpo) says it once. Without a collector, and after one
+ * is gone, the Logger prints it (the case above). A collector of another
+ * thread collects nothing of this one.
+ * Before the fix: FitWarningCollector did not exist (the test does not
+ * compile). */
+TEST_CASE("A FitWarningCollector takes the WARNING of the evidence "
+          "approximation instead of the Logger",
+          "[ea][warning]") {
+  Context c = ea_ctx();
+  t_type w;
+  std::string log;
+  std::vector<FitWarning> got;
+  {
+    LogCapture cap;
+    {
+      FitWarningCollector collect;
+      REQUIRE(fit(c, design(kNoisyRows), target(kNoisyT), w) == "no exception");
+      got = collect.warnings();
+    }
+    log = cap.text();
+  }
+  INFO(log);
+  CHECK(log.find("evidence approximation") == std::string::npos);
+  REQUIRE(got.size() == 1);
+  CHECK(got[0].kind == FitWarningKind::EvidenceApproximationLimit);
+  CHECK_THAT(got[0].text, Contains("LAMBDA -1 (evidence approximation)") &&
+                              Contains("41 iterations"));
+  /* The collector is gone, and another thread's collector collects
+   * nothing of this thread: the Logger prints the WARNING again. */
+  {
+    std::promise<void> fitted;
+    std::promise<std::size_t> other_count;
+    std::promise<void> ready;
+    std::thread other([&] {
+      FitWarningCollector theirs;
+      ready.set_value();
+      fitted.get_future().wait();
+      other_count.set_value(theirs.warnings().size());
+    });
+    ready.get_future().wait();
+    Context c2 = ea_ctx();
+    {
+      LogCapture cap;
+      REQUIRE(fit(c2, design(kNoisyRows), target(kNoisyT), w) ==
+              "no exception");
+      log = cap.text();
+    }
+    fitted.set_value();
+    CHECK(other_count.get_future().get() == 0);
+    other.join();
+  }
+  CHECK_THAT(log, Contains("WARNING") && Contains("41 iterations"));
 }

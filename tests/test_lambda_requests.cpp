@@ -26,6 +26,7 @@
 
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 using namespace tadah::core;
@@ -176,4 +177,48 @@ TEST_CASE("A second LAMBDA value is refused, naming OALGO's second value",
   CHECK_THAT(train2_refusal(make_ctx({"0", "1e-12"}, {"1"})),
              Contains("LAMBDA 0 1e-12") && Contains("OALGO's second value"));
   CHECK(train2_refusal(make_ctx({"0.01"}, {"1"})) == "no exception");
+}
+
+/* The rules above can be checked before any fit, on the configuration
+ * alone (tadah hpo checks them when the run starts, and every evaluation
+ * would refuse them otherwise): LinearRegressor::require_lambda_for_oalgo
+ * refuses what LinearRegressor::train refuses, with its message, and
+ * require_krr_implementation2_lambda what M_KRR_Train::train2 refuses.
+ * Before the fix: neither function existed (the test does not compile). */
+TEST_CASE("The LAMBDA rules of a fit are checked without fitting",
+          "[lambda][refusal]") {
+  const std::vector<std::pair<std::vector<std::string>,
+                              std::vector<std::string>>> cases = {
+      {{"-2"}, {"1"}},  {{"-0.5"}, {"3"}}, {{"-1"}, {"1"}},
+      {{"-1"}, {"2"}},  {{"-1"}, {"4"}},   {{"0", "1e-12"}, {"3"}},
+      {{"-1"}, {"3"}},  {{"0"}, {"1"}},    {{"1e-3"}, {"4"}},
+      {{"0.1"}, {"3"}}};
+  for (const auto &[lambda, oalgo] : cases) {
+    const Context c = make_ctx(lambda, oalgo);
+    std::string given = "LAMBDA";
+    for (const std::string &v : lambda) given += " " + v;
+    INFO(given << ", OALGO " << oalgo[0]);
+    std::string checked = "no exception";
+    try {
+      LinearRegressor::require_lambda_for_oalgo(c);
+    } catch (const std::exception &e) {
+      checked = e.what();
+    }
+    CHECK(checked == train_refusal(c));
+  }
+  for (const std::vector<std::string> lambda :
+       {std::vector<std::string>{"-1"}, {"-2"}, {"0", "1e-12"}, {"0.01"},
+        {"0"}}) {
+    const Context c = make_ctx(lambda, {"1"});
+    std::string given = "LAMBDA";
+    for (const std::string &v : lambda) given += " " + v;
+    INFO(given);
+    std::string checked = "no exception";
+    try {
+      require_krr_implementation2_lambda(c, "Kern_RBF");
+    } catch (const std::exception &e) {
+      checked = e.what();
+    }
+    CHECK(checked == train2_refusal(c));
+  }
 }
