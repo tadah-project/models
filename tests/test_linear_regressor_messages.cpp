@@ -775,6 +775,42 @@ TEST_CASE("LinearRegressor: OALGO 2 and 4 count a zero data row of a "
   }
 }
 
+/* Pins: a data row whose values are rounding -- at most 1e-10 of the
+ * largest magnitude of their column among the data rows, as the force
+ * rows of an atom at a centre of symmetry come out of their cancelling
+ * sums -- is a zero row: 3 data rows of 3 sine columns whose third row is
+ * 1e-17 times the sines (its target 1.5), OALGO 2 and 4, LAMBDA 0,
+ * are refused as 2 non-zero data rows of 3 for 3 weights, the message of
+ * an exactly zero third row. A third row of 1e-8 times the sines is a data
+ * row: OALGO 2 fits it.
+ * Before the fix: a row counted unless every value was exactly 0, so the
+ * rounded row made 3 data rows and LAPACK fitted weights of the order of
+ * 1e17 (no exception). */
+TEST_CASE("LinearRegressor: OALGO 2 and 4 count a data row of rounding "
+          "residues as zero",
+          "[linear_regressor][lapack_messages][weight_zero]") {
+  auto scaled_third_row = [](double scale) {
+    phi_type Phi = sine_design(3, 3);
+    for (size_t j = 0; j < 3; ++j)
+      Phi(2, j) = scale * std::sin(2.0 + 0.3 * static_cast<double>(j));
+    return Phi;
+  };
+  const t_type T = target(3, 3);
+  const std::string two_of_three =
+      " cannot fit these 3 weights: the design matrix has 2 non-zero data "
+      "rows of 3" + std::string(kZeroRows) + " for 3 weights, LAMBDA 0: "
+      "fewer non-zero data rows than weights, so it does not have full column "
+      "rank and the least-squares weights are not unique." +
+      std::string(kRemedies);
+  const phi_type rounded = scaled_third_row(1e-17);
+  CHECK(fit_refusal("4", rounded, T) ==
+        "OALGO 4 (normal equations, Cholesky)" + two_of_three);
+  CHECK(factor_refusal(rounded, T) ==
+        "OALGO 4 (normal equations, Cholesky)" + two_of_three);
+  CHECK(fit_refusal("2", rounded, T) == "OALGO 2 (DGELS, QR)" + two_of_three);
+  CHECK(fit_refusal("2", scaled_third_row(1e-8), T) == "no exception");
+}
+
 /* Pins: with LAMBDA > 0 the message of a fit LAPACK cannot make names the
  * remedies that apply to it: 4 data rows for 2 equal columns (every value
  * 1), LAMBDA 1e-20, whose ridge 1e-20 vanishes against Phi^T Phi's 4, so
