@@ -545,13 +545,19 @@ public:
       ols.solveWithPseudoinverse(Phi.rows(), Phi.cols(), T, weights,
                                  svd.getSVDWorkspace(), rcond, lambda);
       const std::size_t n_dropped = dropped_directions(svd, rcond);
+      // The threshold as OLS::pseudoinverse_threshold sets it: rcond
+      // times the largest singular value, 0 for an rcond of 0 or less.
       if (n_dropped > 0)
         core::Logger::instance().log(tadah::core::LogLevel::WARNING,
             "LinearRegressor (OALGO 3): " + std::to_string(n_dropped) +
             " of " + std::to_string(Phi.cols()) + " singular directions of "
-            "the design matrix are at or below the rank threshold (OALGO's "
-            "rcond " + core::to_string(rcond) + " times the largest "
-            "singular value): the solve leaves them out of the weights.");
+            "the design matrix are at or below the rank threshold " +
+            (rcond > 0.0
+                 ? "(OALGO's rcond " + core::to_string(rcond) +
+                       " times the largest singular value)"
+                 : "(0, as OALGO's rcond " + core::to_string(rcond) +
+                       " is not above 0)") +
+            ": the solve leaves them out of the weights.");
     } else if (oalgo == 4) {
       try {
         ols.solve(Phi, T, weights, rcond,
