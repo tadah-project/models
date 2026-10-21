@@ -6,11 +6,12 @@
 //  - OALGO 1 (DGELSD) leaves out of the solution a singular direction
 //    whose singular value is at most M times the largest for 0 < M < 1,
 //    and at most the machine precision of LAPACK, 2^-53, times the largest
-//    for any other M (DGELSD replaces such an M);
+//    for M < 0;
 //  - OALGO 3 (the SVD solve) leaves out one whose singular value is at
-//    most M times the largest for M > 0 (every direction for M >= 1), and
-//    only one of singular value 0 for M <= 0; its WARNING names that
-//    threshold.
+//    most M times the largest for 0 < M < 1, and only one of singular
+//    value 0 for M <= 0; its WARNING names that threshold.
+//
+// The other values of M are refused (test_oalgo_requests.cpp).
 //
 // The design matrix: two data rows, (1, 0) and (0, t), with targets 1 and
 // 1, and the two zero ridge-augmentation rows of the DesignMatrix layout
@@ -102,40 +103,33 @@ private:
 }  // namespace
 
 /* Pins: OALGO 1 with M 1e-8 or 0.5 leaves out the singular value 1e-12;
- * with M -1, 0, 1 or 1.5 it keeps it, and 1.5e-16, and leaves out 1e-16:
- * DGELSD's threshold is then 2^-53 (1.11e-16) times the largest.
- * A guard (DGELSD's rule, which the help of OALGO states): it passes
- * before the help is corrected; a fit that passed DGELSD an M of 0 or
- * less as the smallest positive double fails its cases t 1e-16 with M -1
- * and 0. */
-TEST_CASE("OALGO 1: an M of 0 or less, or of 1 or more, is the machine "
-          "precision",
+ * with M -1 it keeps it, and 1.5e-16, and leaves out 1e-16: DGELSD's
+ * threshold is then 2^-53 (1.11e-16) times the largest.
+ * A guard (DGELSD's rule, which the help of OALGO states): a fit that
+ * passed DGELSD an M below 0 as the smallest positive double fails its
+ * case t 1e-16 with M -1. */
+TEST_CASE("OALGO 1: an M below 0 is the machine precision",
           "[oalgo1][rank_threshold]") {
   for (const Case &k :
        {Case{1e-12, "1e-8", true, false}, Case{1e-12, "0.5", true, false},
         Case{1e-6, "1e-8", true, true}, Case{1e-12, "-1", true, true},
-        Case{1e-12, "0", true, true}, Case{1e-12, "1", true, true},
-        Case{1e-12, "1.5", true, true}, Case{1.5e-16, "-1", true, true},
-        Case{1.5e-16, "0", true, true}, Case{1.5e-16, "1.5", true, true},
-        Case{1e-16, "-1", true, false}, Case{1e-16, "0", true, false},
-        Case{1e-16, "1.5", true, false}})
+        Case{1.5e-16, "-1", true, true}, Case{1e-16, "-1", true, false}})
     check(1, k);
 }
 
 /* Pins: OALGO 3 with M -1 or 0 keeps the singular value 1e-17, below the
- * machine precision times the largest (the weight 1e17), and with M 1e-8
- * leaves it out; M 1 leaves out both directions (the weights 0).
+ * machine precision times the largest (the coefficient 1e17), and with M
+ * 1e-8 or 0.5 leaves it out.
  * A guard (the rule of OLS::pseudoinverse_threshold, which the help of
- * OALGO states): it passes before the help is corrected; a threshold of
- * 2^-53 times the largest for an M of 0 or less fails its cases t 1e-17
- * with M -1 and 0. */
+ * OALGO states): a threshold of 2^-53 times the largest for an M of 0 or
+ * less fails its cases t 1e-17 with M -1 and 0. */
 TEST_CASE("OALGO 3: an M of 0 or less keeps every singular value above 0",
           "[oalgo3][rank_threshold]") {
   for (const Case &k :
        {Case{1e-17, "-1", true, true}, Case{1e-17, "0", true, true},
         Case{1e-12, "-1", true, true}, Case{1e-17, "1e-8", true, false},
         Case{1e-12, "1e-8", true, false}, Case{1e-6, "1e-8", true, true},
-        Case{0.5, "1", false, false}})
+        Case{0.2, "0.5", true, false}})
     check(3, k);
 }
 
