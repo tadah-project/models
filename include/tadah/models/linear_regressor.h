@@ -613,7 +613,7 @@ public:
                        " times the largest singular value)"
                  : "(0, as OALGO's rcond " + core::to_string(rcond) +
                        " is not above 0)") +
-            ": the solve leaves them out of the weights.");
+            ": the solve leaves them out of the coefficients.");
     } else if (oalgo == 4) {
       try {
         ols.solve(Phi, T, weights, rcond,
