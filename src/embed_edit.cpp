@@ -137,8 +137,7 @@ core::Context edit_embed_potential(const core::Context &source, bool density,
       config.add("OALGO", 1);
       config.add("LAMBDA", 0);
       core::t_type w;
-      core::Matrix sigma;
-      LinearRegressor::train(config, phi, y, w, sigma);
+      LinearRegressor::train(config, phi, y, w);
       for (std::size_t i = 0; i < cols; ++i)
         coefficients[i] = w(i);
     }

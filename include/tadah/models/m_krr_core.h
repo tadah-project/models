@@ -13,16 +13,6 @@
 namespace tadah {
 namespace models {
 
-/** Why M_KRR implementation 2 (MODEL M_KRR <kernel> 2, its solve of the
- *  kernel matrix: M_KRR_Train::train2) leaves no weight covariance, and
- *  what to change: the reason of its fit (covariance_unavailable()), and
- *  of tadah train --uncertainty's refusal before training. */
-inline std::string krr_implementation2_without_covariance() {
-  return "M_KRR implementation 2 (MODEL M_KRR <kernel> 2) computes no weight "
-         "covariance; only an OALGO 3 fit of implementation 1 does: use "
-         "MODEL M_KRR <kernel> 1";
-}
-
 /**
  * @class M_KRR_Core
  * @brief Implements core functionality for Kernel Ridge Regression (KRR).

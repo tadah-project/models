@@ -339,8 +339,7 @@ FitStats EAMRefit::lsq_fit_windowed(const std::vector<double> &xs,
     lc.add("OALGO", 1);
     lc.add("LAMBDA", cfg_.lambda);
     tadah::core::t_type w;
-    tadah::core::Matrix Sigma;
-    LinearRegressor::train(lc, Phi, T, w, Sigma);
+    LinearRegressor::train(lc, Phi, T, w);
     for (std::size_t q = 0; q < cols.size(); ++q) coeffs[cols[q]] = w(q);
   };
 
@@ -904,7 +903,7 @@ void EAMRefit::fit_components(double rwin_lo) {
         "DM_Embed density NNLS: ",nnls_stop_text(result.stop),"; fit statistics report the resulting residual");
     } else {
       core::Context context;context.add("OALGO",1);context.add("LAMBDA",cfg_.lambda);
-      core::t_type w;core::Matrix sigma;LinearRegressor::train(context,phi,y,w,sigma);
+      core::t_type w;LinearRegressor::train(context,phi,y,w);
       for(std::size_t j=0;j<cols;++j) coef[j]=w(j);
     }
     FitStats st;double sum=0,abs=0;

@@ -6,8 +6,6 @@
 #include <tadah/models/memory/imodels_workspace_manager.h>
 #include <tadah/models/memory/models_workspace_manager.h>
 
-#include <string>
-
 namespace tadah {
 namespace models {
 
@@ -113,48 +111,6 @@ public:
           break;
         }
     return out;
-  }
-
-  /**
- * The covariance of all n weights from that of the n_free solved ones
- * (OALGO 3: Sigma is n_free x n_free, free weight j at move_map[j]), as
- * predict --error multiplies it by the full design-matrix rows: a pinned
- * weight has no variance and no covariance (its row and column are 0).
- */
-  template <typename M>
-  static void sigma_of_all_weights(M &Sigma, const std::vector<size_t> &move_map,
-                                   size_t n_free, size_t n) {
-    M full(n, n);
-    full.set_zero();
-    for (size_t a = 0; a < n_free; ++a)
-      for (size_t b = 0; b < n_free; ++b)
-        full(move_map[a], move_map[b]) = Sigma(a, b);
-    Sigma = full;
-  }
-
-  /**
- * The covariance of a fit with every weight pinned (FIXINDEX covering all
- * n weights, OALGO 3): nothing is solved, so no weight has a variance (an
- * n x n zero matrix), and the noise variance is RSS / n_obs of the
- * residual target @p T_r (prep_train_with_residuals; its augmentation and
- * priority-0 rows are zero). Returns false, with @p why (the reason and what
- * to change), when n_obs is 0.
- */
-  static bool pinned_covariance(const tadah::core::t_type &T_r, size_t n,
-                                size_t n_obs, tadah::core::Matrix &Sigma,
-                                double &s2, std::string &why) {
-    if (n_obs == 0) {
-      why = "the fit has no observations (data rows of priority above 0 "
-            "that are not zero in every column), so its noise variance is "
-            "undefined: add data of priority above 0";
-      return false;
-    }
-    double rss = 0.0;
-    for (size_t i = 0; i < T_r.size(); ++i) rss += T_r[i] * T_r[i];
-    s2 = rss / static_cast<double>(n_obs);
-    Sigma = tadah::core::Matrix(n, n);
-    Sigma.set_zero();
-    return true;
   }
 
   void setWorkspaceManager(tadah::models::memory::IModelsWorkspaceManager  *workspaceManager) {

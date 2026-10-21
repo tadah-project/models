@@ -30,7 +30,6 @@ public:
     using M_BLR_Core<BF>::trained;
     using M_BLR_Core<BF>::context;
     using M_BLR_Core<BF>::weights;
-    using M_BLR_Core<BF>::Sigma;
     using M_BLR_Core<BF>::bf;
 
     /**
@@ -68,13 +67,8 @@ public:
     /**
      * @brief Trains the model on given feature and target matrices.
      *
-     * Uses a linear regressor to perform training. The model holds the
-     * weight covariance of this fit (M_Core::Sigma, noise_variance) or
-     * none: OALGO 3 computes it, of every weight (a pinned one with a zero
-     * row and column; with every weight pinned all zeros and the noise
-     * RSS / n_obs of the pinned weights), any other OALGO none. The
-     * covariance of an earlier fit is removed first, whatever this fit
-     * computes. Nothing is written into the Context.
+     * Uses a linear regressor to perform training. Nothing is written into
+     * the Context but the ALPHA and BETA of LAMBDA -1.
      *
      * @param Phi Feature matrix.
      * @param T Target vector.
@@ -87,7 +81,6 @@ public:
     if (trained) {
       throw std::runtime_error("This object is already trained!");
     }
-    this->clear_covariance("the fit computed no weight covariance");
 
     // The weights FIXWEIGHT pins (core::parse_fixindex: 1-based, in
     // declaration order, checked against the Phi.cols() weights and the
@@ -113,14 +106,12 @@ public:
       // Resize Phi for training, the rightmost columns correspond to FIXINDEX
       Phi.resize(Phi.rows(), Phi.cols() - indices.size());
 
-
-      CovarianceFit fit;
       if (Phi.cols() > 0) {
         // The function's intercept columns among the free ones, at their
         // new positions: the ridge leaves those out and penalises every
         // other free column. n_obs is that of the full design matrix: the
         // pinned columns leave Phi, its rows stay.
-        fit = LinearRegressor::train(context, Phi, T_r, weights, Sigma, *workspaceManager_,
+        LinearRegressor::train(context, Phi, T_r, weights, *workspaceManager_,
                                free_intercept_columns(bf.intercept_columns(context),
                                                       move_map, Phi.cols()),
                                n_obs,
@@ -151,37 +142,12 @@ public:
         w_full[indices[k]] = w_f[k];
       }
       weights = w_full;
-      // OALGO 3 computed the covariance of the free weights; the model's
-      // is that of every weight, a pinned one with none.
-      if (n_free > 0) {
-        if (fit.computed) {
-          sigma_of_all_weights(Sigma, move_map, n_free, weights.size());
-          this->set_covariance(Sigma, fit.noise_variance);
-        } else {
-          this->clear_covariance(fit.why_not);
-        }
-      } else if (context.template get<int>("OALGO", 0) == 3) {
-        double s2 = 0.0;
-        std::string why;
-        if (pinned_covariance(T_r, weights.size(), n_obs, Sigma, s2, why))
-          this->set_covariance(Sigma, s2);
-        else
-          this->clear_covariance(why);
-      } else {
-        this->clear_covariance(fit.why_not.empty()
-            ? LinearRegressor::oalgo_without_covariance(
-                  context.template get<int>("OALGO", 0))
-            : fit.why_not);
-      }
       trained = true;
     }
     else {
-      const CovarianceFit fit =
-          LinearRegressor::train(context, Phi, T, weights, Sigma, *workspaceManager_,
-                                 bf.intercept_columns(context), n_obs,
-                                 LinearRegressor::Layout::of(Phi));
-      if (fit.computed) this->set_covariance(Sigma, fit.noise_variance);
-      else this->clear_covariance(fit.why_not);
+      LinearRegressor::train(context, Phi, T, weights, *workspaceManager_,
+                             bf.intercept_columns(context), n_obs,
+                             LinearRegressor::Layout::of(Phi));
       trained = true;
     }
 

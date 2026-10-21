@@ -32,33 +32,6 @@ namespace tadah {
 namespace models {
 
 /**
- * @brief What LinearRegressor::train computes besides the weights: the
- *        weight covariance of an OALGO 3 fit, or why there is none.
- */
-struct CovarianceFit {
-  /** Whether the Sigma out-parameter of train() holds the covariance of
-   *  this fit's weights (else it is 0 x 0). */
-  bool computed = false;
-  /** s^2 = RSS / (n_obs - gamma), the noise variance per unit row weight
-   *  (0 when not computed). */
-  double noise_variance = 0.0;
-  /** The weighted residual sum of squares of the weights (OALGO 3). */
-  double rss = 0.0;
-  /** The effective number of weights, sum over the kept directions of
-   *  s_i^2 / (s_i^2 + lambda) (OALGO 3). */
-  double gamma = 0.0;
-  /** The number of observations the fit was given. */
-  std::size_t n_obs = 0;
-  /** The directions of the weights the solve leaves out: s_i at most the
-   *  rank threshold, and the n - min(m, n) directions of a matrix with
-   *  fewer rows than columns (OALGO 3). */
-  std::size_t n_dropped = 0;
-  /** Why no covariance was computed and what to change (empty when it
-   *  was). */
-  std::string why_not;
-};
-
-/**
  * @class LinearRegressor
  * @brief Performs linear regression using Singular Value Decomposition (SVD).
  *
@@ -440,7 +413,6 @@ private:
    * @param Phi Design matrix.
    * @param T Target matrix.
    * @param weights Vector to store the resultant weights.
-   * @param Sigma tadah::core::Matrix to store the covariance matrix.
    * @param workspaceManager Workspace provider.
    * @param intercepts The intercept columns of Phi, 0-based indices into
    *        its columns (Function_Base::intercept_columns() of the function
@@ -454,18 +426,15 @@ private:
    *        its column), without its
    *        ridge-augmentation rows (the DesignMatrix appends one per
    *        column) and without the rows of priority 0 (zero rows of the
-   *        weighted matrix). OALGO 3 estimates
-   *        the noise variance with it, and LAMBDA -1 the evidence.
+   *        weighted matrix). LAMBDA -1 (OALGO 3) estimates the evidence
+   *        with it.
    * @param layout Phi's data rows and the weight each column fits
    *        (Layout::of(Phi) for DesignMatrix's layout, Layout::fixed()
    *        after FIXINDEX removed columns): the checks and messages count
    *        them.
-   * @return With OALGO 3: the weight covariance in @p Sigma, s^2 times
-   *         sum over the kept directions of v_i v_i^T / (s_i^2 + lambda)
-   *         (get_sigma), s^2 = RSS / (n_obs - gamma), and the numbers it
-   *         came from; none (Sigma 0 x 0, a WARNING) when n_obs <= gamma.
-   *         Any other OALGO computes none. Nothing is written into
-   *         @p context but the ALPHA and BETA of LAMBDA -1.
+   * Nothing is written into @p context but the ALPHA and BETA of LAMBDA
+   * -1. With OALGO 3, the singular directions the solve leaves out of the
+   * weights (dropped_directions()) are named in a WARNING.
    * @throws std::logic_error, before anything is written into @p Phi,
    *         for a @p layout that does not describe it (fewer rows than
    *         its data rows and one ridge row per column, or another number
@@ -491,11 +460,10 @@ private:
    *         a WARNING says so (EA::stopped_at_limit_text()).
    */
 public:
-  static CovarianceFit train(tadah::core::Context &context,
+  static void train(tadah::core::Context &context,
                     tadah::core::phi_type &Phi,
                     tadah::core::t_type &T,
                     tadah::core::t_type &weights,
-                    tadah::core::Matrix &Sigma,
                     tadah::models::memory::IModelsWorkspaceManager &workspaceManager,
                     const std::vector<size_t> &intercepts,
                     std::size_t n_obs,
@@ -532,11 +500,6 @@ public:
       for (size_t j = 0; j < Phi.cols(); ++j)
         if (!intercept[j]) Phi(aug_start + j, j) = std::sqrt(lambda);
     }
-
-    CovarianceFit fit;
-    fit.n_obs = n_obs;
-    fit.why_not = oalgo_without_covariance(oalgo);
-    Sigma = tadah::core::Matrix();
 
     tadah::models::OLS ols(workspaceManager);
     // tadah::models::OLS ols;
@@ -581,20 +544,14 @@ public:
 
       ols.solveWithPseudoinverse(Phi.rows(), Phi.cols(), T, weights,
                                  svd.getSVDWorkspace(), rcond, lambda);
-      fit = covariance_of_fit(svd, T, weights, lambda, rcond, n_obs, Sigma);
-      if (fit.n_dropped > 0)
+      const std::size_t n_dropped = dropped_directions(svd, rcond);
+      if (n_dropped > 0)
         core::Logger::instance().log(tadah::core::LogLevel::WARNING,
-            "LinearRegressor (OALGO 3): " + std::to_string(fit.n_dropped) +
+            "LinearRegressor (OALGO 3): " + std::to_string(n_dropped) +
             " of " + std::to_string(Phi.cols()) + " singular directions of "
             "the design matrix are at or below the rank threshold (OALGO's "
             "rcond " + core::to_string(rcond) + " times the largest "
-            "singular value): the solve leaves them out of the weights, and "
-            "the weight covariance WCOV leaves them out too (no uncertainty "
-            "along them).");
-      if (!fit.computed)
-        core::Logger::instance().log(tadah::core::LogLevel::WARNING,
-            "LinearRegressor (OALGO 3): no weight covariance: " +
-            fit.why_not + ".");
+            "singular value): the solve leaves them out of the weights.");
     } else if (oalgo == 4) {
       try {
         ols.solve(Phi, T, weights, rcond,
@@ -605,52 +562,40 @@ public:
     } else {
       throw std::runtime_error("Unsupported OALGO: " + std::to_string(oalgo));
     }
-    return fit;
   }
   /** @brief train() of a design matrix laid out as DesignMatrix lays it
    *  out (Layout::of(Phi): its data rows, then one ridge row per column)
    *  with no rows of priority 0: n_obs = rows - cols (0 when Phi has no more
    *  rows than columns). A design matrix without some of its columns
    *  (FIXINDEX) takes the full overload, with Layout::fixed(). */
-  static CovarianceFit train(tadah::core::Context &context,
+  static void train(tadah::core::Context &context,
                     tadah::core::phi_type &Phi,
                     tadah::core::t_type &T,
                     tadah::core::t_type &weights,
-                    tadah::core::Matrix &Sigma,
                     tadah::models::memory::IModelsWorkspaceManager &workspaceManager,
                     const std::vector<size_t> &intercepts) {
-    return train(context, Phi, T, weights, Sigma, workspaceManager, intercepts,
-                 augmented_observations(Phi), Layout::of(Phi));
+    train(context, Phi, T, weights, workspaceManager, intercepts,
+          augmented_observations(Phi), Layout::of(Phi));
   }
   /** @brief train() of a linear model on a design matrix laid out as
    *  DesignMatrix lays it out (Layout::of(Phi)): its intercept columns are
    *  the intercept columns of the descriptor, 0 .. N-1 with N =
    *  tadah::core::n_intercept_columns() (Function_Base::intercept_columns()
    *  of BF_Linear and Kern_Linear); n_obs = rows - cols. */
-  static CovarianceFit train(tadah::core::Context &context,
+  static void train(tadah::core::Context &context,
                     tadah::core::phi_type &Phi,
                     tadah::core::t_type &T,
                     tadah::core::t_type &weights,
-                    tadah::core::Matrix &Sigma,
                     tadah::models::memory::IModelsWorkspaceManager &workspaceManager) {
     std::vector<size_t> intercepts(tadah::core::n_intercept_columns(context));
     for (size_t k = 0; k < intercepts.size(); ++k) intercepts[k] = k;
-    return train(context, Phi, T, weights, Sigma, workspaceManager, intercepts);
+    train(context, Phi, T, weights, workspaceManager, intercepts);
   }
   /** @brief train() of a linear model with a temporary workspace manager. */
-  static CovarianceFit train(tadah::core::Context &context, tadah::core::phi_type &Phi, tadah::core::t_type &T, tadah::core::t_type &weights,
-                    tadah::core::Matrix &Sigma) {
+  static void train(tadah::core::Context &context, tadah::core::phi_type &Phi,
+                    tadah::core::t_type &T, tadah::core::t_type &weights) {
     tadah::models::memory::ModelsWorkspaceManager workspaceManager;
-    return train(context, Phi, T, weights, Sigma, workspaceManager);
-  }
-
-  /** @brief Why a fit with @p oalgo (not 3) computes no weight
-   *  covariance, and what to change: "OALGO <oalgo> computes no weight
-   *  covariance (only OALGO 3, the SVD solve, does): fit with OALGO 3". */
-  static std::string oalgo_without_covariance(int oalgo) {
-    return "OALGO " + std::to_string(oalgo) +
-           " computes no weight covariance (only OALGO 3, the SVD solve, "
-           "does): fit with OALGO 3";
+    train(context, Phi, T, weights, workspaceManager);
   }
 
   /** @brief The observations of a design matrix with its cols
@@ -680,7 +625,6 @@ public:
    *                    block written in place if LAMBDA>0).
    * @param T           Target vector.
    * @param weights     Receives the OLS solution.
-   * @param Sigma       Unused for OALGO=4 but kept for API symmetry.
    * @param factor      Output: receives the cached Cholesky factor.
    * @param workspaceManager  Workspace provider.
    * @throws std::runtime_error, before the factorisation, for what train()
@@ -694,11 +638,8 @@ public:
       tadah::core::phi_type &Phi,
       tadah::core::t_type &T,
       tadah::core::t_type &weights,
-      tadah::core::Matrix &Sigma,
       FactorHandle &factor,
       tadah::models::memory::IModelsWorkspaceManager &workspaceManager) {
-
-    (void)Sigma;  // Reserved for future BLR-IFT; OALGO=4 leaves it untouched.
 
     require_lambda_request(context);
     const double lambda = context.get<double>("LAMBDA", 0);
@@ -758,10 +699,9 @@ public:
       tadah::core::phi_type &Phi,
       tadah::core::t_type &T,
       tadah::core::t_type &weights,
-      tadah::core::Matrix &Sigma,
       FactorHandle &factor) {
     tadah::models::memory::ModelsWorkspaceManager workspaceManager;
-    train_with_factor(context, Phi, T, weights, Sigma, factor, workspaceManager);
+    train_with_factor(context, Phi, T, weights, factor, workspaceManager);
   }
 
   /**
@@ -825,104 +765,23 @@ public:
   }
 
   /**
-   * @brief The unscaled weight covariance of the SVD solve:
-   *        sum over the kept directions i of v_i v_i^T / (s_i^2 + lambda).
-   *
-   * A = U S V^T is the (weighted) design matrix of @p svd (m x n, V^T
-   * min(m,n) x n with leading dimension min(m,n)); v_i is row i of V^T. A
-   * direction is kept when s_i is above OLS::pseudoinverse_threshold(S,
-   * min(m,n), @p rcond), the rule solveWithPseudoinverse leaves the other
-   * directions out of the weights with (one rule for every lambda: the
-   * covariance is that of the weights the solve returns). With every
-   * direction kept and m >= n it is (A^T A + lambda I)^-1. Computed as
-   * W^T W (dsyrk), W the kept rows of V^T scaled by 1/sqrt(s_i^2+lambda).
-   *
-   * @param n_dropped Receives the number of directions left out: the
-   *        directions at or below the threshold, plus n - min(m,n).
-   * @return The n x n matrix, symmetric.
+   * @brief The directions of the weights the SVD solve of @p svd leaves
+   *        out: the singular values at or below
+   *        OLS::pseudoinverse_threshold(S, min(m,n), @p rcond), the rule
+   *        solveWithPseudoinverse leaves them out of the weights with, and
+   *        the n - min(m,n) directions of a matrix with fewer rows than
+   *        columns (m x n, the design matrix of @p svd).
    */
-  static tadah::core::Matrix get_sigma(tadah::models::SVD &svd, double lambda,
-                                       double rcond, std::size_t &n_dropped) {
-    const double *VT = svd.getVT();
+  static std::size_t dropped_directions(tadah::models::SVD &svd,
+                                        double rcond) {
     const double *S = svd.getS();
-    const int m = svd.rows();
     const int n = svd.cols();
-    const int k = std::min(m, n);
+    const int k = std::min(svd.rows(), n);
     const double thresh = OLS::pseudoinverse_threshold(S, k, rcond);
-    std::vector<int> kept;
+    int kept = 0;
     for (int i = 0; i < k; ++i)
-      if (S[i] > thresh) kept.push_back(i);
-    n_dropped = static_cast<std::size_t>(n - static_cast<int>(kept.size()));
-
-    tadah::core::Matrix Sigma(static_cast<size_t>(n), static_cast<size_t>(n));
-    Sigma.set_zero();
-    int kk = static_cast<int>(kept.size());
-    if (kk == 0 || n == 0) return Sigma;
-    std::vector<double> W(static_cast<size_t>(kk) * static_cast<size_t>(n));
-    for (int t = 0; t < kk; ++t) {
-      const int i = kept[t];
-      const double f = 1.0 / std::sqrt(S[i] * S[i] + lambda);
-      for (int j = 0; j < n; ++j) W[t + j * kk] = f * VT[i + j * k];
-    }
-    char uplo = 'U', trans = 'T';
-    double one = 1.0, zero = 0.0;
-    int ldc = n;
-    tadah::core::dsyrk_(&uplo, &trans, &ldc, &kk, &one, W.data(), &kk, &zero,
-                        Sigma.ptr(), &ldc);
-    for (int c = 0; c < n; ++c)
-      for (int r = c + 1; r < n; ++r) Sigma(r, c) = Sigma(c, r);
-    return Sigma;
-  }
-
-  /**
-   * @brief The covariance of an OALGO 3 fit's @p weights: s^2 get_sigma(),
-   *        s^2 = RSS / (n_obs - gamma).
-   *
-   * RSS = |T - A w|^2, with A w computed from @p svd (SVDMultiplier: the
-   * solve overwrote A); the augmentation rows and the rows of priority 0
-   * are zero in A and in T, so they add nothing. gamma = sum over the kept
-   * directions of s_i^2 / (s_i^2 + lambda). When n_obs <= gamma the noise
-   * variance is undefined: @p Sigma is 0 x 0 and the result says why.
-   */
-  static CovarianceFit covariance_of_fit(tadah::models::SVD &svd,
-                                         const tadah::core::t_type &T,
-                                         tadah::core::t_type &weights,
-                                         double lambda, double rcond,
-                                         std::size_t n_obs,
-                                         tadah::core::Matrix &Sigma) {
-    CovarianceFit fit;
-    fit.n_obs = n_obs;
-    const int m = svd.rows();
-    const int k = std::min(m, svd.cols());
-    const double *S = svd.getS();
-    const double thresh = OLS::pseudoinverse_threshold(S, k, rcond);
-    for (int i = 0; i < k; ++i)
-      if (S[i] > thresh) fit.gamma += S[i] * S[i] / (S[i] * S[i] + lambda);
-    std::vector<double> Tpred(static_cast<size_t>(m));
-    SVDMultiplier(svd).compute(weights.ptr(), Tpred.data());
-    for (int i = 0; i < m; ++i) {
-      const double r = T[static_cast<size_t>(i)] - Tpred[static_cast<size_t>(i)];
-      fit.rss += r * r;
-    }
-    Sigma = get_sigma(svd, lambda, rcond, fit.n_dropped);
-    const double dof = static_cast<double>(n_obs) - fit.gamma;
-    if (!(dof > 0.0)) {
-      Sigma = tadah::core::Matrix();
-      fit.why_not = "the fit has " + std::to_string(n_obs) +
-                    " observations (data rows of priority above 0 that are "
-                    "not zero in every column) for an effective " +
-                    core::to_string(fit.gamma) +
-                    " weights (gamma), so its noise variance is undefined: "
-                    "add data of priority above 0 (it needs more "
-                    "observations than effective weights)";
-      return fit;
-    }
-    fit.noise_variance = fit.rss / dof;
-    for (size_t c = 0; c < Sigma.cols(); ++c)
-      for (size_t r = 0; r < Sigma.rows(); ++r) Sigma(r, c) *= fit.noise_variance;
-    fit.computed = true;
-    fit.why_not.clear();
-    return fit;
+      if (S[i] > thresh) ++kept;
+    return static_cast<std::size_t>(n - kept);
   }
 };
 } // namespace models

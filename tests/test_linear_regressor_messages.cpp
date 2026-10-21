@@ -71,9 +71,8 @@ t_type target(size_t data, size_t n) {
 std::string fit_refusal(const std::string &oalgo, phi_type Phi, t_type T) {
   Context c = make_ctx(oalgo);
   t_type w;
-  Matrix Sigma;
   try {
-    LinearRegressor::train(c, Phi, T, w, Sigma);
+    LinearRegressor::train(c, Phi, T, w);
   } catch (const std::exception &e) {
     return e.what();
   }
@@ -84,9 +83,8 @@ std::string fit_refusal(const std::string &oalgo, phi_type Phi, t_type T) {
  * exception". */
 std::string fit_refusal(Context c, phi_type Phi, t_type T) {
   t_type w;
-  Matrix Sigma;
   try {
-    LinearRegressor::train(c, Phi, T, w, Sigma);
+    LinearRegressor::train(c, Phi, T, w);
   } catch (const std::exception &e) {
     return e.what();
   }
@@ -97,11 +95,10 @@ std::string fit_refusal(Context c, phi_type Phi, t_type T) {
 std::string factor_refusal(phi_type Phi, t_type T) {
   Context c = make_ctx("4");
   t_type w;
-  Matrix Sigma;
   FactorHandle factor;
   tadah::models::memory::ModelsWorkspaceManager wm;
   try {
-    LinearRegressor::train_with_factor(c, Phi, T, w, Sigma, factor, wm);
+    LinearRegressor::train_with_factor(c, Phi, T, w, factor, wm);
   } catch (const std::exception &e) {
     return e.what();
   }
@@ -268,8 +265,7 @@ TEST_CASE("LinearRegressor: OALGO 2 and 4 refuse a rank-deficient design "
     phi_type Phi = design(6, 4, 2);
     t_type T = target(6, 4);
     t_type w;
-    Matrix Sigma;
-    REQUIRE_NOTHROW(LinearRegressor::train(c, Phi, T, w, Sigma));
+    REQUIRE_NOTHROW(LinearRegressor::train(c, Phi, T, w));
     REQUIRE(w.size() == 4);
     CHECK(std::abs(w[2]) < 1e-12);
     CHECK(std::abs(w[3]) < 1e-12);
@@ -994,10 +990,9 @@ TEST_CASE("LinearRegressor: a layout that does not describe the design "
     phi_type Phi = Phi0;
     t_type T1 = T;
     t_type w;
-    Matrix Sigma;
     std::string msg = "no exception";
     try {
-      LinearRegressor::train(c, Phi, T1, w, Sigma);
+      LinearRegressor::train(c, Phi, T1, w);
     } catch (const std::logic_error &e) {
       msg = e.what();
     }
@@ -1008,12 +1003,11 @@ TEST_CASE("LinearRegressor: a layout that does not describe the design "
   phi_type Phi = Phi0;
   t_type T1 = T;
   t_type w;
-  Matrix Sigma;
   FactorHandle factor;
   tadah::models::memory::ModelsWorkspaceManager wm;
   std::string msg = "no exception";
   try {
-    LinearRegressor::train_with_factor(c, Phi, T1, w, Sigma, factor, wm);
+    LinearRegressor::train_with_factor(c, Phi, T1, w, factor, wm);
   } catch (const std::logic_error &e) {
     msg = e.what();
   } catch (const std::exception &e) {
@@ -1081,12 +1075,11 @@ TEST_CASE("LinearRegressor::train_with_factor refuses a design matrix that "
   Phi(1, 2) = std::numeric_limits<double>::quiet_NaN();
   t_type T = target(6, 4);
   t_type w;
-  Matrix Sigma;
   FactorHandle factor;
   tadah::models::memory::ModelsWorkspaceManager wm;
   std::string msg = "no exception";
   try {
-    LinearRegressor::train_with_factor(c, Phi, T, w, Sigma, factor, wm);
+    LinearRegressor::train_with_factor(c, Phi, T, w, factor, wm);
   } catch (const std::exception &e) {
     msg = e.what();
   }

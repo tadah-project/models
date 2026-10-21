@@ -116,10 +116,9 @@ Context ea_ctx() {
 /* LinearRegressor::train of (Phi, T) in @p c with n_obs 6: the message it
  * throws, or "no exception". */
 std::string fit(Context &c, phi_type Phi, t_type T, t_type &w) {
-  Matrix Sigma;
   tadah::models::memory::ModelsWorkspaceManager wm;
   try {
-    LinearRegressor::train(c, Phi, T, w, Sigma, wm, {}, 6,
+    LinearRegressor::train(c, Phi, T, w, wm, {}, 6,
                            LinearRegressor::Layout::of(Phi));
   } catch (const std::exception &e) {
     return e.what();
@@ -273,11 +272,10 @@ TEST_CASE("The evidence approximation refuses weights too small to square",
   T[0] = 1e10;
   T[1] = 0.0;
   t_type w;
-  Matrix Sigma;
   tadah::models::memory::ModelsWorkspaceManager wm;
   std::string msg = "no exception";
   try {
-    LinearRegressor::train(c, Phi, T, w, Sigma, wm, {}, 1,
+    LinearRegressor::train(c, Phi, T, w, wm, {}, 1,
                            LinearRegressor::Layout::of(Phi));
   } catch (const std::exception &e) {
     msg = e.what();
@@ -303,9 +301,8 @@ TEST_CASE("The refusals of the evidence approximation are "
     const double zero[6] = {0, 0, 0, 0, 0, 0};
     phi_type Phi = design(kLinearRows);
     t_type T = target(zero), w;
-    Matrix Sigma;
     tadah::models::memory::ModelsWorkspaceManager wm;
-    CHECK_THROWS_AS(LinearRegressor::train(c, Phi, T, w, Sigma, wm, {}, 6,
+    CHECK_THROWS_AS(LinearRegressor::train(c, Phi, T, w, wm, {}, 6,
                                            LinearRegressor::Layout::of(Phi)),
                     EvidenceApproximationError);
   }
@@ -317,9 +314,8 @@ TEST_CASE("The refusals of the evidence approximation are "
     t_type T(2), w;
     T[0] = 1e10;
     T[1] = 0.0;
-    Matrix Sigma;
     tadah::models::memory::ModelsWorkspaceManager wm;
-    CHECK_THROWS_AS(LinearRegressor::train(c, Phi, T, w, Sigma, wm, {}, 1,
+    CHECK_THROWS_AS(LinearRegressor::train(c, Phi, T, w, wm, {}, 1,
                                            LinearRegressor::Layout::of(Phi)),
                     EvidenceApproximationError);
   }

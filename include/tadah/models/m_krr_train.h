@@ -75,8 +75,7 @@ inline void require_krr_implementation2_lambda(
  * (The columns used to be rotated first by the right singular vectors of
  * the kernel matrix of the basis, EKM. The rotation was orthogonal, so it
  * did not change a fit without intercept columns, but with BIAS true it
- * left rotated column 0 out of the ridge penalty, and the covariance
- * SIGMA of OALGO 3 was that of the rotated weights.)
+ * left rotated column 0 out of the ridge penalty.)
  *
  * @tparam Kern Kernel type, default is Function_Base.
  */
@@ -87,7 +86,6 @@ public:
     using M_KRR_Core<Kern>::context;
     using M_KRR_Core<Kern>::kernel;
     using M_KRR_Core<Kern>::weights;
-    using M_KRR_Core<Kern>::Sigma;
 
     /**
      * @brief Constructor using a configuration object.
@@ -126,11 +124,8 @@ public:
      *
      * Uses the linear regressor on the design-matrix columns as they are;
      * the kernel's intercept columns (Function_Base::intercept_columns())
-     * are left out of the ridge penalty. The model holds the weight
-     * covariance of this fit or none, as M_BLR_Train::train(Phi, T, n_obs)
-     * (for a non-linear kernel the covariance of its weights, one per basis
-     * vector); an earlier fit's is removed first. Nothing is written into
-     * the Context.
+     * are left out of the ridge penalty. Nothing is written into the
+     * Context but the ALPHA and BETA of LAMBDA -1.
      *
      * @param Phi Feature matrix.
      * @param T Target vector.
@@ -143,7 +138,6 @@ public:
     if (trained) {
       throw std::runtime_error("This object is already trained!");
     }
-    this->clear_covariance("the fit computed no weight covariance");
 
     // The weights FIXWEIGHT pins (core::parse_fixindex: 1-based, in
     // declaration order, checked against the Phi.cols() weights and the
@@ -172,14 +166,12 @@ public:
       // kept: an unpenalised zero column, a pinned intercept, made OALGO 2
       // and 4 singular.)
       Phi.resize(Phi.rows(), Phi.cols() - indices.size());
-
-      CovarianceFit fit;
       if (Phi.cols() > 0) {
         // The kernel's intercept columns among the free ones, at their new
         // positions: the ridge leaves those out and penalises every other
         // free column. n_obs is that of the full design matrix.
         const std::vector<size_t> intercepts = kernel.intercept_columns(context);
-        fit = LinearRegressor::train(context, Phi, T_r, weights, Sigma, *workspaceManager_,
+        LinearRegressor::train(context, Phi, T_r, weights, *workspaceManager_,
                                free_intercept_columns(intercepts, move_map,
                                                       Phi.cols()),
                                n_obs,
@@ -201,37 +193,12 @@ public:
         w_full[indices[k]] = w_f[k];
       }
       weights = w_full;
-      // OALGO 3 computed the covariance of the free weights; the model's
-      // is that of every weight, a pinned one with none.
-      if (n_free > 0) {
-        if (fit.computed) {
-          sigma_of_all_weights(Sigma, move_map, n_free, weights.size());
-          this->set_covariance(Sigma, fit.noise_variance);
-        } else {
-          this->clear_covariance(fit.why_not);
-        }
-      } else if (context.template get<int>("OALGO", 0) == 3) {
-        double s2 = 0.0;
-        std::string why;
-        if (pinned_covariance(T_r, weights.size(), n_obs, Sigma, s2, why))
-          this->set_covariance(Sigma, s2);
-        else
-          this->clear_covariance(why);
-      } else {
-        this->clear_covariance(fit.why_not.empty()
-            ? LinearRegressor::oalgo_without_covariance(
-                  context.template get<int>("OALGO", 0))
-            : fit.why_not);
-      }
       trained = true;
     }
     else {
-      const CovarianceFit fit =
-          LinearRegressor::train(context, Phi, T, weights, Sigma, *workspaceManager_,
-                                 kernel.intercept_columns(context), n_obs,
-                                 LinearRegressor::Layout::of(Phi));
-      if (fit.computed) this->set_covariance(Sigma, fit.noise_variance);
-      else this->clear_covariance(fit.why_not);
+      LinearRegressor::train(context, Phi, T, weights, *workspaceManager_,
+                             kernel.intercept_columns(context), n_obs,
+                             LinearRegressor::Layout::of(Phi));
       trained = true;
     }
 
@@ -252,10 +219,9 @@ public:
      * weights are w (it predicts sum_j w_j K(b_j, x)). Kern_Linear's are
      * the descriptor weights B w = sum_j w_j b_j, one per row of @p B: its
      * prediction is linear in the descriptor, weights . x (Kern_Linear::
-     * epredict), which is sum_j w_j K(b_j, x) for these weights. It
-     * computes no weight covariance, and the model keeps none of an
-     * earlier fit. It pins no weight: a context with FIXINDEX or
-     * FIXWEIGHT is refused (refuse_fixed_weights_in_train2).
+     * epredict), which is sum_j w_j K(b_j, x) for these weights. It pins
+     * no weight: a context with FIXINDEX or FIXWEIGHT is refused
+     * (refuse_fixed_weights_in_train2).
      *
      * @param B Basis matrix.
      * @param T Target vector.
@@ -272,9 +238,6 @@ public:
     void train2(tadah::core::Matrix &B, tadah::core::t_type &T,
                 double error_scale = 1.0) {
         refuse_fixed_weights_in_train2(context, kernel.get_label());
-        // This solve computes no covariance: the model keeps none of an
-        // earlier fit.
-        this->clear_covariance(krr_implementation2_without_covariance());
         require_krr_implementation2_lambda(context, kernel.get_label());
         if (!(error_scale > 0.0) ||
             !(error_scale < std::numeric_limits<double>::infinity()))
