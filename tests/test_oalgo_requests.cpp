@@ -9,9 +9,9 @@
 // 0. Every fit refuses, before it solves, what is none of these: an M of 0
 // or of 1 or more under OALGO 1 (DGELSD would take the machine precision
 // for either), an M of 1 or more under OALGO 3 (it would leave out every
-// direction: every coefficient 0), an M that is not a finite number, a
-// second value under OALGO 2 and 4 (they have no rank threshold), and a
-// first value other than 1 to 4. LinearRegressor::train,
+// direction: every coefficient 0), a second value under OALGO 2 and 4
+// (they have no rank threshold), and a first value other than 1 to 4. (A
+// value that is not a finite number the Context refuses when it reads it.) LinearRegressor::train,
 // LinearRegressor::train_with_factor (OALGO 4, the analytical gradients of
 // tadah hpo) and the check of the configuration alone that tadah hpo makes
 // when a run starts (require_lambda_for_oalgo) apply the same rules.
@@ -109,16 +109,15 @@ std::string config_refusal(const Context &c) {
 
 }  // namespace
 
-/* Pins: OALGO 1 refuses an M of 0, of 1 or more and one that is not a
- * finite number, naming the line, the range 0 < M < 1, a negative M for
- * the machine precision and why: DGELSD takes the machine precision for
- * any of them. The fit and the check of the configuration alone give the
+/* Pins: OALGO 1 refuses an M of 0 and of 1 or more, naming the line, the
+ * range 0 < M < 1, a negative M for the machine precision and why: DGELSD
+ * takes the machine precision for either. The fit and the check of the configuration alone give the
  * same message.
  * Before the fix: each was fitted with the machine precision of LAPACK
  * (no exception). */
 TEST_CASE("OALGO 1 refuses a rank threshold of 0 or of 1 or more",
           "[oalgo][refusal]") {
-  for (const std::string M : {"0", "1", "1.5", "nan", "inf"}) {
+  for (const std::string M : {"0", "1", "1.5"}) {
     const std::vector<std::string> o = {"1", M};
     INFO(line(o));
     const std::string msg = train_refusal(make_ctx(o));
@@ -128,20 +127,19 @@ TEST_CASE("OALGO 1 refuses a rank threshold of 0 or of 1 or more",
                      "M times the largest is left out of the coefficients) "
                      "or below 0 for the machine precision of LAPACK, 2^-53 "
                      "(OALGO 1 -1); DGELSD takes the machine precision for "
-                     "an M of 0, of 1 or more, or not a finite number.");
+                     "an M of 0 or of 1 or more.");
     CHECK(config_refusal(make_ctx(o)) == msg);
   }
 }
 
-/* Pins: OALGO 3 refuses an M of 1 or more and one that is not a finite
- * number, naming the line, the range 0 < M < 1, M <= 0 for every singular
- * value above 0, and why: an M of 1 or more leaves out every singular
- * direction.
+/* Pins: OALGO 3 refuses an M of 1 or more, naming the line, the range
+ * 0 < M < 1, M <= 0 for every singular value above 0, and why: an M of 1
+ * or more leaves out every singular direction.
  * Before the fix: OALGO 3 1 and 3 2 fitted every coefficient 0, with a
  * WARNING (no exception). */
 TEST_CASE("OALGO 3 refuses a rank threshold of 1 or more",
           "[oalgo][refusal]") {
-  for (const std::string M : {"1", "2", "nan"}) {
+  for (const std::string M : {"1", "2"}) {
     const std::vector<std::string> o = {"3", M};
     INFO(line(o));
     const std::string msg = train_refusal(make_ctx(o));
