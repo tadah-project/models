@@ -246,10 +246,12 @@ class EA {
           log_iterations("refused at iteration " + std::to_string(counter + 1));
           throw EvidenceApproximationError(
               "LAMBDA -1 (evidence approximation): the fit has " +
-              std::to_string(N) + " observations (rows with a non-zero "
-              "weight) for an effective " + std::to_string(gamma) +
-              " weights; it needs more observations than that to estimate "
-              "the noise. Add data, or set LAMBDA >= 0.");
+              std::to_string(N) + " observations (rows of priority above 0 "
+              "that are not zero in every column) for " +
+              std::to_string(gamma) +
+              " effective parameters; it needs more observations than "
+              "effective parameters to estimate the noise: more data, or "
+              "LAMBDA >= 0, fits.");
         }
         beta = (static_cast<double>(N)-gamma)/temp;
         if (!finite_bits(alpha) || !finite_bits(beta)) {

@@ -49,6 +49,7 @@
 using namespace tadah::core;
 using namespace tadah::models;
 using Catch::Matchers::Contains;
+using Catch::Matchers::StartsWith;
 
 namespace {
 
@@ -284,6 +285,48 @@ TEST_CASE("The evidence approximation refuses weights too small to square",
                       Contains("iteration 1") && Contains("alpha") &&
                       Contains("too small to square") &&
                       Contains("no weights were fitted"));
+}
+
+/* Pins: the evidence approximation refuses a fit of no more observations
+ * than effective parameters (n_obs 1 for a 3 x 2 design matrix of full
+ * rank, whose effective parameters at the first iteration are above 1),
+ * naming the observations as the rows of priority above 0 that are not
+ * zero in every column and gamma as the effective parameters.
+ * Before the fix: '... 1 observations (rows with a non-zero weight) for
+ * an effective 1.99... weights', priorities called weights and the
+ * effective parameters weights. */
+TEST_CASE("The evidence approximation refuses no more observations than "
+          "effective parameters",
+          "[ea][refusal]") {
+  Context c = ea_ctx();
+  phi_type Phi(5, 2);
+  Phi.set_zero();
+  Phi(0, 0) = 1.0;
+  Phi(1, 1) = 1.0;
+  Phi(2, 0) = 1.0;
+  Phi(2, 1) = 1.0;
+  t_type T(5);
+  T[0] = 1.0;
+  T[1] = 2.0;
+  T[2] = 3.5;
+  T[3] = 0.0;
+  T[4] = 0.0;
+  t_type w;
+  tadah::models::memory::ModelsWorkspaceManager wm;
+  std::string msg = "no exception";
+  try {
+    LinearRegressor::train(c, Phi, T, w, wm, {}, 1,
+                           LinearRegressor::Layout::of(Phi));
+  } catch (const std::exception &e) {
+    msg = e.what();
+  }
+  CHECK_THAT(msg, StartsWith("LAMBDA -1 (evidence approximation): the fit "
+                             "has 1 observations (rows of priority above 0 "
+                             "that are not zero in every column) for ") &&
+                      Contains(" effective parameters; it needs more "
+                               "observations than effective parameters to "
+                               "estimate the noise: more data, or LAMBDA "
+                               ">= 0, fits."));
 }
 
 /* The refusals of the evidence approximation have a type of their own,

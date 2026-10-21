@@ -290,7 +290,7 @@ TEST_CASE("OALGO 3 with FIXINDEX: the free weights are those of the solve "
  * for the direction the solve drops, about the weights alone:
  * "LinearRegressor (OALGO 3): 1 of 4 singular directions of the design
  * matrix are at or below the rank threshold (OALGO's rcond 1e-06 times the
- * largest singular value): the solve leaves them out of the weights."
+ * largest singular value): the solve leaves them out of the coefficients."
  * Before the fix: the WARNING went on "and the weight covariance WCOV
  * leaves them out too (no uncertainty along them)". */
 TEST_CASE("OALGO 3: a direction the solve drops is a WARNING about the "
@@ -314,7 +314,7 @@ TEST_CASE("OALGO 3: a direction the solve drops is a WARNING about the "
       "WARNING: LinearRegressor (OALGO 3): 1 of 4 singular directions of "
       "the design matrix are at or below the rank threshold (OALGO's rcond "
       "1e-06 times the largest singular value): the solve leaves them out "
-      "of the weights.\n";
+      "of the coefficients.\n";
   CHECK(log.size() >= warning.size());
   CHECK(log.compare(log.size() - warning.size(), warning.size(), warning) ==
         0);

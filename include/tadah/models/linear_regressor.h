@@ -349,13 +349,69 @@ public:
           "ridge penalty.");
   }
 
-  /** The LAMBDA rules of train(), checked on the configuration alone,
-   *  with its messages: require_lambda_request(), then LAMBDA -1 under an
-   *  OALGO other than 3, which alone runs the evidence approximation.
-   *  tadah hpo applies them when a run starts, so that no evaluation is
-   *  refused for them.
+  /**
+   * @brief Refuses an OALGO that requests nothing: a first value other
+   *        than 1 to 4, and a second value no solve reads as it is meant.
+   *
+   * OALGO's first value selects the solve: 1 (DGELSD), 2 (DGELS, QR), 3
+   * (the SVD solve) or 4 (the normal equations, Cholesky). Its second
+   * value M is the rank threshold of OALGO 1 and 3 (1e-8 when it is left
+   * out): a singular value at most M times the largest is left out of the
+   * coefficients for 0 < M < 1. Below 0 OALGO 1 takes the machine
+   * precision of LAPACK (DGELSD's rule, OALGO 1 -1), and at 0 or below
+   * OALGO 3 leaves out only a singular value of 0. Refused: under OALGO 1
+   * an M of 0 or of 1 or more (DGELSD replaces either by the machine
+   * precision), under OALGO 3 an M of 1 or more (it leaves out every
+   * direction: every coefficient 0), and any second value under OALGO 2
+   * and 4, which keep every direction.
+   * Every fit calls this first (require_lambda_for_oalgo(),
+   * train_with_factor()). The messages give the line as @p context holds
+   * it.
+   *
+   * @throws std::runtime_error naming the line and the values it takes.
+   */
+  static void require_oalgo_request(const tadah::core::Context &context) {
+    const std::vector<std::string> &given = context("OALGO");
+    std::string text = "OALGO";
+    for (const std::string &v : given) text += " " + v;
+    const int oalgo = context.get<int>("OALGO", 0);
+    if (oalgo < 1 || oalgo > 4)
+      throw std::runtime_error(
+          "OALGO " + std::to_string(oalgo) +
+          ": OALGO is 1 (DGELSD), 2 (DGELS, QR), 3 (the SVD solve) or 4 "
+          "(normal equations, Cholesky).");
+    if (given.size() < 2) return;
+    if (oalgo == 2 || oalgo == 4)
+      throw std::runtime_error(
+          text + ": " + oalgo_name(oalgo) +
+          " takes one value: it keeps every direction and has no rank "
+          "threshold, the second value of OALGO 1 and 3.");
+    // A value that is not a finite number the Context refuses to read.
+    const double M = context.get<double>("OALGO", 1);
+    if (oalgo == 1 && (M == 0.0 || M >= 1.0))
+      throw std::runtime_error(
+          text + ": the rank threshold M of OALGO 1 (DGELSD), its second "
+          "value, is a number 0 < M < 1 (a singular value at most M times "
+          "the largest is left out of the coefficients) or below 0 for the "
+          "machine precision of LAPACK, 2^-53 (OALGO 1 -1); DGELSD takes the "
+          "machine precision for an M of 0 or of 1 or more.");
+    if (oalgo == 3 && M >= 1.0)
+      throw std::runtime_error(
+          text + ": the rank threshold M of OALGO 3, its second value, is a "
+          "number 0 < M < 1 (a singular value at most M times the largest is "
+          "left out of the coefficients) or 0 or below (only a singular "
+          "value of 0 is left out); an M of 1 or more leaves out every "
+          "singular direction, every coefficient 0.");
+  }
+
+  /** The OALGO and LAMBDA rules of train(), checked on the configuration
+   *  alone, with its messages: require_oalgo_request(),
+   *  require_lambda_request(), then LAMBDA -1 under an OALGO other than
+   *  3, which alone runs the evidence approximation. tadah hpo applies
+   *  them when a run starts, so that no evaluation is refused for them.
    *  @throws std::runtime_error naming the value (and the OALGO). */
   static void require_lambda_for_oalgo(const tadah::core::Context &context) {
+    require_oalgo_request(context);
     require_lambda_request(context);
     const double lambda = context.get<double>("LAMBDA", 0);
     const int oalgo = context.get<int>("OALGO", 0);
@@ -545,13 +601,19 @@ public:
       ols.solveWithPseudoinverse(Phi.rows(), Phi.cols(), T, weights,
                                  svd.getSVDWorkspace(), rcond, lambda);
       const std::size_t n_dropped = dropped_directions(svd, rcond);
+      // The threshold as OLS::pseudoinverse_threshold sets it: rcond
+      // times the largest singular value, 0 for an rcond of 0 or less.
       if (n_dropped > 0)
         core::Logger::instance().log(tadah::core::LogLevel::WARNING,
             "LinearRegressor (OALGO 3): " + std::to_string(n_dropped) +
             " of " + std::to_string(Phi.cols()) + " singular directions of "
-            "the design matrix are at or below the rank threshold (OALGO's "
-            "rcond " + core::to_string(rcond) + " times the largest "
-            "singular value): the solve leaves them out of the weights.");
+            "the design matrix are at or below the rank threshold " +
+            (rcond > 0.0
+                 ? "(OALGO's rcond " + core::to_string(rcond) +
+                       " times the largest singular value)"
+                 : "(0, as OALGO's rcond " + core::to_string(rcond) +
+                       " is not above 0)") +
+            ": the solve leaves them out of the coefficients.");
     } else if (oalgo == 4) {
       try {
         ols.solve(Phi, T, weights, rcond,
@@ -641,6 +703,7 @@ public:
       FactorHandle &factor,
       tadah::models::memory::IModelsWorkspaceManager &workspaceManager) {
 
+    require_oalgo_request(context);
     require_lambda_request(context);
     const double lambda = context.get<double>("LAMBDA", 0);
     const int    oalgo  = context.get<int>("OALGO", 0);
