@@ -137,7 +137,7 @@ TEST_CASE("OALGO 3: an M of 0 or less keeps every singular value above 0",
  * its direction, and the one WARNING names the threshold 0:
  * "LinearRegressor (OALGO 3): 1 of 2 singular directions of the design
  * matrix are at or below the rank threshold (0, as OALGO's rcond -1 is not
- * above 0): the solve leaves them out of the weights."
+ * above 0): the solve leaves them out of the coefficients."
  * Before the fix: the WARNING named the threshold "OALGO's rcond -1 times
  * the largest singular value", a negative threshold the solve does not
  * use. */
@@ -160,7 +160,7 @@ TEST_CASE("OALGO 3: the WARNING of an M of 0 or less names the threshold 0",
           "WARNING: LinearRegressor (OALGO 3): 1 of 2 singular directions "
           "of the design matrix are at or below the rank threshold (0, as "
           "OALGO's rcond " + M + " is not above 0): the solve leaves them "
-          "out of the weights.\n";
+          "out of the coefficients.\n";
       REQUIRE(log.size() >= warning.size());
       CHECK(log.compare(log.size() - warning.size(), warning.size(),
                         warning) == 0);
