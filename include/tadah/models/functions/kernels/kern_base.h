@@ -142,8 +142,8 @@ class Kern_Base: public virtual Function_Base {
  *  or, for Lines::None, not at all.
  *
  *  Outside every scope each kernel built at VERBOSE > 0 prints its line:
- *  tadah train, tadah predict, pair_style tadah and each TASK of a task
- *  file print the line of every model they build. tadah hpo holds a scope
+ *  tadah train, tadah predict and pair_style tadah print the line of every
+ *  model they build. tadah hpo holds a scope
  *  for each run (hpo_run()): the run builds the model of every evaluation,
  *  and the potential each PC_LAMMPS script runs, from one configuration,
  *  and prints the line of the first model it builds, the -c model's. A

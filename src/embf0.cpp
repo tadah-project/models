@@ -96,29 +96,30 @@ void normalise_embf0_key(tadah::core::Context &c) {
 }
 
 void check_embf0_precedence(const tadah::core::Context &pot,
-                            const tadah::core::Context &task,
+                            const tadah::core::Context &config,
                             const std::string &pot_name) {
   if (!context_has_ream(pot)) {
     // a key on either side has no effect (validated when it was read)
-    if (pot.has_stored("EMBF0") || task.has_stored("EMBF0"))
+    if (pot.has_stored("EMBF0") || config.has_stored("EMBF0"))
       report_ream_only_key("EMBF0");
     return;
   }
-  const auto tv = stored_embf0(task);
-  if (!tv) return;
+  const auto cv = stored_embf0(config);
+  if (!cv) return;
   const auto pv = stored_embf0(pot);
-  if (pv && *pv != *tv)
+  if (pv && *pv != *cv)
     throw std::runtime_error(
         "EMBF0 conflict: " + pot_name + " declares EMBF0 " +
-        embf0_name(*pv) + " but the task configuration sets EMBF0 " +
-        embf0_name(*tv) +
+        embf0_name(*pv) + " and the configuration file sets EMBF0 " +
+        embf0_name(*cv) +
         ". EMBF0 is a property of the potential (its weights were fitted in "
-        "that embedding reference); edit the potential file instead.");
+        "that embedding reference): the potential file sets it, not the "
+        "configuration file.");
   if (!pv)
     tadah::core::Logger::instance().log(
         tadah::core::LogLevel::INFO,
-        "EMBF0 " + std::string(embf0_name(*tv)) +
-            " from the task configuration applies to " + pot_name +
+        "EMBF0 " + std::string(embf0_name(*cv)) +
+            " of the configuration file applies to " + pot_name +
             " (the potential does not declare EMBF0).");
 }
 
