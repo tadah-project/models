@@ -466,10 +466,6 @@ template <typename ChannelFn, typename RadialBasis, typename AggMode>
 std::optional<DescriptorMeta>
 DM_Poly<ChannelFn, RadialBasis, AggMode>::meta() const {
   using DataStats = tadah::core::stats::DataStats;
-  [[maybe_unused]] static constexpr std::size_t I_P10 = tadah::core::stats::IDX_P10;
-  static constexpr std::size_t I_P50 = tadah::core::stats::IDX_P50;
-  [[maybe_unused]] static constexpr std::size_t I_P90 = tadah::core::stats::IDX_P90;
-  static constexpr std::size_t I_P99 = tadah::core::stats::IDX_P99;
 
   DescriptorMeta dm;
   dm.label = label();   // runtime descriptor label
@@ -483,25 +479,9 @@ DM_Poly<ChannelFn, RadialBasis, AggMode>::meta() const {
   p_rcut.hard.lo  = 0.0;
   p_rcut.crit     = Criticality::Critical;
   p_rcut.scope    = PairScope::Global;
-  p_rcut.suggest  = [](const DataStats& d, const SeedView&, int) {
-    if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
-    const auto& pp = d.per_pair[0];
-    double low = pp.r_percentiles[I_P50];
-    if (pp.r_peaks.size() >= 2) low = pp.r_peaks[1].position * 1.05;
-    return std::make_pair(low, pp.r_percentiles[I_P99]);
-  };
-  p_rcut.check    = [](const DataStats& d, const SeedView& s) -> HealthVerdict {
-    if (!s.contains("RCUTMB")) return HealthOk{};
-    const double rc = s.get<double>("RCUTMB");
-    if (d.per_pair.empty() && d.n_atoms > 0)
-      return HealthFail{"RCUTMB=" + std::to_string(rc) +
-                        " is too small — no MB neighbours found."};
-    if (d.per_pair.empty()) return HealthOk{};
-    if (rc < d.per_pair[0].r_min)
-      return HealthFail{"RCUTMB=" + std::to_string(rc) +
-                        " is below dataset r_min=" +
-                        std::to_string(d.per_pair[0].r_min) + "."};
-    return HealthOk{};
+  p_rcut.suggest = cutoff_suggestion;
+  p_rcut.check = [](const DataStats& d, const SeedView& s) {
+    return cutoff_reach_check(d, s, "RCUTMB");
   };
   dm.params.push_back(std::move(p_rcut));
 
@@ -518,29 +498,11 @@ DM_Poly<ChannelFn, RadialBasis, AggMode>::meta() const {
   p_cgrid.hard.lo  = 0.0;
   p_cgrid.crit     = Criticality::Critical;
   p_cgrid.scope    = PairScope::PerElementPair;
-  if constexpr (RadialBasis::kind == BasisKind::Gaussian) {
+  // The suggestions read the seed's centre (density_reach.h).
+  if constexpr (RadialBasis::kind == BasisKind::Gaussian)
     p_cgrid.suggest = gaussian_centre_suggestion;
-  } else {
-    p_cgrid.suggest = [](const DataStats& d, const SeedView&,
-                         int) -> BoundSuggestion {
-      if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
-      const auto& pp = d.per_pair[0];
-      if (!pp.r_peaks.empty()) {
-        const double mu = pp.r_peaks[0].position;
-        const double w  = pp.r_peaks[0].fwhm > 0 ? pp.r_peaks[0].fwhm
-                                                 : 0.2 * mu;
-        return BoundSuggestion(std::max(0.0, mu - w), mu + w,
-                               "blip b(SGRIDMB (r - CGRIDMB)) centred on "
-                               "the first neighbour shell: its peak +- its "
-                               "FWHM");
-      }
-      return BoundSuggestion(pp.r_percentiles[I_P10],
-                             pp.r_percentiles[I_P90],
-                             "blip b(SGRIDMB (r - CGRIDMB)): the 10th to "
-                             "90th percentiles of the neighbour distances "
-                             "(no peak found)");
-    };
-  }
+  else
+    p_cgrid.suggest = blip_centre_suggestion;
   p_cgrid.check    = [](const DataStats& d, const SeedView& s) {
     return radial_reach_check(d, s, RadialBasis::kind);
   };
@@ -562,27 +524,10 @@ DM_Poly<ChannelFn, RadialBasis, AggMode>::meta() const {
   p_sgrid.hard.lo  = 1.0e-6;
   p_sgrid.crit     = Criticality::Critical;
   p_sgrid.scope    = PairScope::Global;
-  if constexpr (gaussian) {
+  if constexpr (gaussian)
     p_sgrid.suggest = gaussian_width_suggestion;
-  } else {
-    p_sgrid.suggest = [](const DataStats& d, const SeedView&,
-                         int) -> BoundSuggestion {
-      if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
-      const auto& pp = d.per_pair[0];
-      double w = pp.r_percentiles[I_P90] - pp.r_percentiles[I_P10];
-      if (!pp.r_peaks.empty()) w = pp.r_peaks[0].fwhm;
-      if (!(w > 0.0))
-        return BoundSuggestion::fixed_range(
-            0.1, 1.0, "fixed range: the neighbour distances have no spread "
-                      "to take a width of the blip from");
-      // eta in [1 / w, 6 / w]: the support half-width 2/eta runs from 2 w
-      // down to w/3 of the first peak's width (as DM_Blip's).
-      return BoundSuggestion(1.0 / w, 6.0 / w,
-                             "blip b(SGRIDMB (r - CGRIDMB)): its support "
-                             "half-width 2/SGRIDMB from 2 w down to w/3, "
-                             "with w the FWHM of the first neighbour shell");
-    };
-  }
+  else
+    p_sgrid.suggest = blip_width_suggestion;
   dm.params.push_back(std::move(p_sgrid));
 
   dm.cross_param_checks.push_back(

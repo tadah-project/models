@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <stdexcept>
+#include <tadah/models/descriptors/density_reach.h>
 namespace tadah {
 namespace models {
 
@@ -273,6 +274,9 @@ std::optional<DescriptorMeta> D2_Knot5::meta() const {
   p_rcut.hard.lo  = 0.0;
   p_rcut.crit     = Criticality::Critical;
   p_rcut.scope    = PairScope::Global;
+  p_rcut.check    = [](const DataStats& d, const SeedView& s) {
+    return cutoff_reach_check(d, s, "RCUT2B");
+  };
   dm.params.push_back(std::move(p_rcut));
 
   // CGRID2B — vector: knot positions (the only true shape parameters).
@@ -286,8 +290,8 @@ std::optional<DescriptorMeta> D2_Knot5::meta() const {
   p_cgrid.hard.lo  = 0.0;
   p_cgrid.crit     = Criticality::Recommended;
   p_cgrid.scope    = PairScope::PerElementPair;
-  p_cgrid.suggest  = [](const DataStats& d, const SeedView&, int) {
-    if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
+  p_cgrid.suggest  = [](const DataStats& d, const SeedView&, int) -> BoundSuggestion {
+    if (d.per_pair.empty()) return no_pair_suggestion();
     const auto& pp = d.per_pair[0];
     return std::make_pair(0.0, pp.r_percentiles[I_P99]);
   };

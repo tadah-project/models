@@ -25,7 +25,6 @@ DM_mEAD<F_mEnv<Cut_SinInv>>::meta() const {
   using DataStats = tadah::core::stats::DataStats;
   static constexpr std::size_t I_P1   = tadah::core::stats::IDX_P1;
   static constexpr std::size_t I_P10  = tadah::core::stats::IDX_P10;
-  static constexpr std::size_t I_P50  = tadah::core::stats::IDX_P50;
   static constexpr std::size_t I_P90  = tadah::core::stats::IDX_P90;
   static constexpr std::size_t I_P99  = tadah::core::stats::IDX_P99;
 
@@ -45,12 +44,9 @@ DM_mEAD<F_mEnv<Cut_SinInv>>::meta() const {
   p_rcut.hard.lo  = 0.0;
   p_rcut.crit     = Criticality::Critical;
   p_rcut.scope    = PairScope::Global;
-  p_rcut.suggest  = [](const DataStats& d, const SeedView&, int) {
-    if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
-    const auto& pp = d.per_pair[0];
-    double low = pp.r_percentiles[I_P50];
-    if (pp.r_peaks.size() >= 2) low = pp.r_peaks[1].position * 1.05;
-    return std::make_pair(low, pp.r_percentiles[I_P99]);
+  p_rcut.suggest = cutoff_suggestion;
+  p_rcut.check    = [](const DataStats& d, const SeedView& s) {
+    return cutoff_reach_check(d, s, "RCUTMB");
   };
   dm.params.push_back(std::move(p_rcut));
 

@@ -82,7 +82,214 @@ void shells(const DataStats &d, double &r1, double &r2, std::string &what) {
   }
 }
 
+/* The radial form of a channel of @p kind for a rationale, about its centre
+ * ("Gaussian exp(-SGRIDMB (r - CGRIDMB)^2)", "blip b(SGRIDMB (r -
+ * CGRIDMB))") or, with @p origin, at the origin ("Gaussian exp(-SGRIDMB
+ * r^2)", "blip b(SGRIDMB r)"). */
+std::string form(BasisKind kind, bool origin) {
+  if (kind == BasisKind::Gaussian)
+    return origin ? "Gaussian exp(-SGRIDMB r^2)"
+                  : "Gaussian exp(-SGRIDMB (r - CGRIDMB)^2)";
+  return origin ? "blip b(SGRIDMB r)" : "blip b(SGRIDMB (r - CGRIDMB))";
+}
+
+/* The suggestion of the centre CGRIDMB(@p arg_pos) of a channel of @p kind
+ * (gaussian_centre_suggestion, blip_centre_suggestion). */
+BoundSuggestion centre_suggestion(const DataStats &d, const SeedView &s,
+                                  int arg_pos, BasisKind kind) {
+  if (d.per_pair.empty()) return no_pair_suggestion();
+  double c = 0.0;
+  const bool seeded = seed_centre(s, arg_pos, c);
+  if (seeded && c == 0.0)
+    return BoundSuggestion::no_row(
+        form(kind, true) + " centred at the origin (the seed's CGRIDMB 0): "
+        "its width SGRIDMB, not its centre, sets its reach");
+  const auto &pp = d.per_pair[0];
+  double mu = 0.0, w = 0.0;
+  std::string width;
+  if (seeded && nearest_shell(d, c, mu, w, width)) {
+    // About the seed's centre, within the neighbour distances the channel
+    // sums over, unless the seed's centre lies outside them: the range
+    // always holds it.
+    const double rcut = s.contains("RCUTMB") ? s.get<double>("RCUTMB") : 0.0;
+    const NeighbourRange range = neighbour_range(d, rcut);
+    return BoundSuggestion(
+        std::max(c - w, std::min(c, range.lo)),
+        std::min(c + w, std::max(c, range.hi)),
+        form(kind, false) + " centred on the seed's centre (" + num(c) +
+            " Å): +- " + width + ", within the neighbour distances " +
+            num(range.lo) + " to " + num(range.hi) +
+            " Å unless the seed's centre lies outside them");
+  }
+  const bool gaussian = kind == BasisKind::Gaussian;
+  if (!pp.r_peaks.empty()) {
+    mu = pp.r_peaks[0].position;
+    w = pp.r_peaks[0].fwhm > 0.0 ? pp.r_peaks[0].fwhm : 0.2 * mu;
+    return BoundSuggestion(
+        std::max(gaussian ? pp.r_min : 0.0, mu - w), mu + w,
+        form(kind, false) + " centred on the first neighbour shell: its "
+        "peak (" + num(mu) + " Å) +- " + num(w) + " Å, " +
+            (gaussian ? "from r_min (" + num(pp.r_min) + " Å)"
+                      : std::string("not below 0")));
+  }
+  using tadah::core::stats::IDX_P10;
+  using tadah::core::stats::IDX_P90;
+  return BoundSuggestion(
+      pp.r_percentiles[IDX_P10], pp.r_percentiles[IDX_P90],
+      form(kind, false) + " centred on the first neighbour shell: the 10th "
+      "to 90th percentiles of the neighbour distances (no peak found)");
+}
+
+/* The suggestion of the width SGRIDMB(@p arg_pos) of a channel of @p kind
+ * (gaussian_width_suggestion, blip_width_suggestion). */
+BoundSuggestion width_suggestion(const DataStats &d, const SeedView &s,
+                                 int arg_pos, BasisKind kind) {
+  if (d.per_pair.empty()) return no_pair_suggestion();
+  const bool gaussian = kind == BasisKind::Gaussian;
+  const auto &pp = d.per_pair[0];
+  double c = 0.0;
+  const bool seeded = seed_centre(s, arg_pos, c);
+  if (seeded && c == 0.0 && gaussian) {
+    double r1 = 0.0, r2 = 0.0;
+    std::string between;
+    shells(d, r1, r2, between);
+    const double gap = r2 * r2 - r1 * r1;
+    if (!(gap > 0.0))
+      return BoundSuggestion::no_row(
+          "Gaussian exp(-SGRIDMB r^2) centred at the origin: the neighbour "
+          "distances show no second shell beyond the first");
+    const double lo = std::log(1.0 / 0.9) / gap;
+    const double drop = std::log(20.0) / gap;
+    const double reach = gaussian_reach_width(pp.r_min);
+    const double hi = std::min(drop, reach);
+    std::string why =
+        "Gaussian exp(-SGRIDMB r^2) centred at the origin (the seed's "
+        "CGRIDMB 0): its value drops by a factor of 0.9 to 1/20 " + between;
+    if (reach < drop)
+      why += ", up to " + num(reach) + ", where it is 1e-6 at r_min (" +
+             num(pp.r_min) + " Å)";
+    if (!(lo < hi))
+      return BoundSuggestion::no_row(
+          why + ": the widths it allows do not reach r_min");
+    return BoundSuggestion(lo, hi, why);
+  }
+  if (seeded && c == 0.0) {
+    // A blip at the origin reaches the distance x_f / SGRIDMB, where it is
+    // kDensityReachFloor: from the nearest neighbour to the farthest one
+    // the channel sums over.
+    const bool has_cut = s.contains("RCUTMB");
+    const double rcut = has_cut ? s.get<double>("RCUTMB") : 0.0;
+    const NeighbourRange range = neighbour_range(d, rcut);
+    const std::string origin =
+        "blip b(SGRIDMB r) centred at the origin (the seed's CGRIDMB 0)";
+    if (range.empty)
+      return BoundSuggestion::no_row(
+          origin + ": no neighbour distance lies within RCUTMB = " +
+          num(rcut) + " Å for it to reach");
+    const std::string farthest =
+        has_cut ? "the farthest neighbour distance within RCUTMB (" +
+                      num(range.hi) + " Å)"
+                : "the farthest neighbour distance (" + num(range.hi) + " Å)";
+    const std::string why =
+        origin + ": its reach, the distance at which it falls to 1e-6, from "
+        "r_min (" + num(range.lo) + " Å) to " + farthest;
+    const double lo = blip_reach_width(range.hi);
+    const double hi = blip_reach_width(range.lo);
+    if (!(lo < hi))
+      return BoundSuggestion::no_row(
+          why + ": the two are one distance, a range of zero width");
+    return BoundSuggestion(lo, hi, why);
+  }
+  double mu = 0.0, wn = 0.0;
+  std::string width;
+  if (seeded && nearest_shell(d, c, mu, wn, width)) {
+    if (gaussian)
+      return BoundSuggestion(
+          0.25 / (wn * wn), 9.0 / (wn * wn),
+          form(kind, false) + " centred on the seed's centre (" + num(c) +
+              " Å): 0.25/w^2 to 9/w^2 with w " + width);
+    return BoundSuggestion(
+        1.0 / wn, 6.0 / wn,
+        form(kind, false) + " centred on the seed's centre (" + num(c) +
+            " Å): its support half-width 2/SGRIDMB from 2 w down to w/3, "
+            "with w " + width);
+  }
+  using tadah::core::stats::IDX_P10;
+  using tadah::core::stats::IDX_P90;
+  double w = pp.r_percentiles[IDX_P90] - pp.r_percentiles[IDX_P10];
+  std::string what = "the spread from the 10th to the 90th percentile of "
+                     "the neighbour distances";
+  if (!pp.r_peaks.empty() && (!gaussian || pp.r_peaks[0].fwhm > 0.0)) {
+    w = pp.r_peaks[0].fwhm;
+    what = "the FWHM of the first neighbour shell";
+  }
+  if (!(w > 0.0))
+    return BoundSuggestion::fixed_range(
+        0.1, 1.0,
+        std::string("fixed range: the neighbour distances have no spread "
+                    "to take a width of the ") +
+            (gaussian ? "Gaussian" : "blip") + " from");
+  if (gaussian)
+    return BoundSuggestion(
+        0.25 / (w * w), 9.0 / (w * w),
+        form(kind, false) + " centred on the first neighbour shell: "
+        "0.25/w^2 to 9/w^2 with w = " + num(w) + " Å, " + what);
+  return BoundSuggestion(
+      1.0 / w, 6.0 / w,
+      form(kind, false) + ": its support half-width 2/SGRIDMB from 2 w down "
+      "to w/3, with w = " + num(w) + " Å, " + what);
+}
+
 }  // namespace
+
+BoundSuggestion no_pair_suggestion() {
+  return BoundSuggestion::no_row(
+      "no pair of atoms of the data lies within the reach of the neighbour "
+      "statistics (" + num(kCutoffSearchReach) + " times the largest cutoff "
+      "of the seed): no distance to take a range from");
+}
+
+BoundSuggestion cutoff_suggestion(const DataStats &d, const SeedView &,
+                                  int) {
+  if (d.per_pair.empty()) return no_pair_suggestion();
+  using tadah::core::stats::IDX_P50;
+  using tadah::core::stats::IDX_P99;
+  const auto &pp = d.per_pair[0];
+  const double top = pp.r_percentiles[IDX_P99];
+  const std::string up_to =
+      "the 99th percentile of the neighbour distances (" + num(top) +
+      " Å), which the statistics take up to " + num(kCutoffSearchReach) +
+      " times the largest cutoff of the seed";
+  if (pp.r_peaks.size() >= 2) {
+    const double r2 = pp.r_peaks[1].position;
+    if (1.05 * r2 < top)
+      return BoundSuggestion(1.05 * r2, top,
+                             "a cutoff past the second neighbour shell: from "
+                             "1.05 times its distance (" + num(r2) +
+                                 " Å) to " + up_to);
+  }
+  const double median = pp.r_percentiles[IDX_P50];
+  return BoundSuggestion(median, top,
+                         "a cutoff from the median of the neighbour "
+                         "distances (" + num(median) + " Å) to " + up_to);
+}
+
+HealthVerdict cutoff_reach_check(const DataStats &d, const SeedView &s,
+                                 const std::string &key) {
+  if (!s.contains(key) || d.n_atoms == 0) return HealthOk{};
+  const double rc = s.get<double>(key);
+  if (d.per_pair.empty())
+    return HealthFail{key + " = " + num(rc) +
+                      ": no pair of atoms of the dataset lies within it, so "
+                      "the descriptor sums over no neighbour and is 0 for "
+                      "every atom."};
+  const NeighbourRange range = neighbour_range(d, rc);
+  if (!range.empty) return HealthOk{};
+  return HealthFail{key + " = " + num(rc) +
+                    " is below the smallest neighbour distance of the "
+                    "dataset (" + num(range.lo) + " Å): the descriptor sums "
+                    "over no neighbour and is 0 for every atom."};
+}
 
 NeighbourRange neighbour_range(const DataStats &d, double rcut) {
   NeighbourRange r;
@@ -103,6 +310,11 @@ double gaussian_reach_width(double dist) {
   return std::log(1.0 / kDensityReachFloor) / (dist * dist);
 }
 
+double blip_reach_width(double dist) {
+  if (dist == 0.0) return std::numeric_limits<double>::infinity();
+  return (2.0 - std::cbrt(4.0 * kDensityReachFloor)) / dist;
+}
+
 HealthVerdict radial_reach_check(const DataStats &d, const SeedView &s,
                                  BasisKind kind) {
   if (kind != BasisKind::Gaussian && kind != BasisKind::Blip)
@@ -116,14 +328,12 @@ HealthVerdict radial_reach_check(const DataStats &d, const SeedView &s,
   const std::string within =
       has_cut ? "within RCUTMB = " + num(rcut) : "of the dataset";
   if (range.empty) {
-    if (!d.per_pair.empty() && has_cut)
-      return HealthFail{"RCUTMB = " + num(rcut) +
-                        " is below the smallest neighbour distance of the "
-                        "dataset (" + num(range.lo) +
-                        " Å): the density sums over no neighbour, so ρ is 0 "
-                        "for every atom."};
-    return HealthFail{"no pair of atoms of the dataset is " + within +
-                      ": ρ is 0 for every atom."};
+    // An RCUTMB below every neighbour distance, or data without a pair
+    // within it: the check of the cutoff (cutoff_reach_check) gives the
+    // finding, once.
+    if (has_cut) return HealthOk{};
+    return HealthFail{"the dataset has no pair of atoms: ρ is 0 for every "
+                      "atom."};
   }
   const std::string distances = "every neighbour distance " + within + " (" +
                                 num(range.lo) + " to " + num(range.hi) +
@@ -165,103 +375,22 @@ HealthVerdict radial_reach_check(const DataStats &d, const SeedView &s,
 
 BoundSuggestion gaussian_centre_suggestion(const DataStats &d,
                                            const SeedView &s, int arg_pos) {
-  if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
-  double c = 0.0;
-  const bool seeded = seed_centre(s, arg_pos, c);
-  if (seeded && c == 0.0)
-    return BoundSuggestion::no_row(
-        "Gaussian exp(-SGRIDMB r^2) centred at the origin (the seed's "
-        "CGRIDMB 0): its width SGRIDMB, not its centre, sets its reach");
-  const auto &pp = d.per_pair[0];
-  double mu = 0.0, w = 0.0;
-  std::string width;
-  if (seeded && nearest_shell(d, c, mu, w, width)) {
-    // About the seed's centre, within the neighbour distances the channel
-    // sums over, unless the seed's centre lies outside them: the range
-    // always holds it.
-    const double rcut = s.contains("RCUTMB") ? s.get<double>("RCUTMB") : 0.0;
-    const NeighbourRange range = neighbour_range(d, rcut);
-    return BoundSuggestion(
-        std::max(c - w, std::min(c, range.lo)),
-        std::min(c + w, std::max(c, range.hi)),
-        "Gaussian exp(-SGRIDMB (r - CGRIDMB)^2) centred on the seed's centre "
-        "(" + num(c) + " Å): +- " + width + ", within the neighbour "
-        "distances " + num(range.lo) + " to " + num(range.hi) +
-        " Å unless the seed's centre lies outside them");
-  }
-  if (!pp.r_peaks.empty()) {
-    mu = pp.r_peaks[0].position;
-    w = pp.r_peaks[0].fwhm > 0.0 ? pp.r_peaks[0].fwhm : 0.2 * mu;
-    return BoundSuggestion(
-        std::max(pp.r_min, mu - w), mu + w,
-        "Gaussian exp(-SGRIDMB (r - CGRIDMB)^2) centred on the first "
-        "neighbour shell: its peak (" + num(mu) + " Å) +- " + num(w) +
-        " Å, from r_min (" + num(pp.r_min) + " Å)");
-  }
-  using tadah::core::stats::IDX_P10;
-  using tadah::core::stats::IDX_P90;
-  return BoundSuggestion(
-      pp.r_percentiles[IDX_P10], pp.r_percentiles[IDX_P90],
-      "Gaussian exp(-SGRIDMB (r - CGRIDMB)^2) centred on the first "
-      "neighbour shell: the 10th to 90th percentiles of the neighbour "
-      "distances (no peak found)");
+  return centre_suggestion(d, s, arg_pos, BasisKind::Gaussian);
 }
 
 BoundSuggestion gaussian_width_suggestion(const DataStats &d,
                                           const SeedView &s, int arg_pos) {
-  if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
-  const auto &pp = d.per_pair[0];
-  double c = 0.0;
-  if (seed_centre(s, arg_pos, c) && c == 0.0) {
-    double r1 = 0.0, r2 = 0.0;
-    std::string between;
-    shells(d, r1, r2, between);
-    const double gap = r2 * r2 - r1 * r1;
-    if (!(gap > 0.0))
-      return BoundSuggestion::no_row(
-          "Gaussian exp(-SGRIDMB r^2) centred at the origin: the neighbour "
-          "distances show no second shell beyond the first");
-    const double lo = std::log(1.0 / 0.9) / gap;
-    const double drop = std::log(20.0) / gap;
-    const double reach = gaussian_reach_width(pp.r_min);
-    const double hi = std::min(drop, reach);
-    std::string why =
-        "Gaussian exp(-SGRIDMB r^2) centred at the origin (the seed's "
-        "CGRIDMB 0): its value drops by a factor of 0.9 to 1/20 " + between;
-    if (reach < drop)
-      why += ", up to " + num(reach) + ", where it is 1e-6 at r_min (" +
-             num(pp.r_min) + " Å)";
-    if (!(lo < hi))
-      return BoundSuggestion::no_row(
-          why + ": the widths it allows do not reach r_min");
-    return BoundSuggestion(lo, hi, why);
-  }
-  double mu = 0.0, wn = 0.0;
-  std::string width;
-  if (seed_centre(s, arg_pos, c) && nearest_shell(d, c, mu, wn, width))
-    return BoundSuggestion(
-        0.25 / (wn * wn), 9.0 / (wn * wn),
-        "Gaussian exp(-SGRIDMB (r - CGRIDMB)^2) centred on the seed's centre "
-        "(" + num(c) + " Å): 0.25/w^2 to 9/w^2 with w " + width);
-  using tadah::core::stats::IDX_P10;
-  using tadah::core::stats::IDX_P90;
-  double w = pp.r_percentiles[IDX_P90] - pp.r_percentiles[IDX_P10];
-  std::string what = "the spread from the 10th to the 90th percentile of "
-                     "the neighbour distances";
-  if (!pp.r_peaks.empty() && pp.r_peaks[0].fwhm > 0.0) {
-    w = pp.r_peaks[0].fwhm;
-    what = "the FWHM of the first neighbour shell";
-  }
-  if (!(w > 0.0))
-    return BoundSuggestion::fixed_range(
-        0.1, 1.0,
-        "fixed range: the neighbour distances have no spread to take a "
-        "width of the Gaussian from");
-  return BoundSuggestion(
-      0.25 / (w * w), 9.0 / (w * w),
-      "Gaussian exp(-SGRIDMB (r - CGRIDMB)^2) centred on the first "
-      "neighbour shell: 0.25/w^2 to 9/w^2 with w = " + num(w) + " Å, " +
-          what);
+  return width_suggestion(d, s, arg_pos, BasisKind::Gaussian);
+}
+
+BoundSuggestion blip_centre_suggestion(const DataStats &d, const SeedView &s,
+                                       int arg_pos) {
+  return centre_suggestion(d, s, arg_pos, BasisKind::Blip);
+}
+
+BoundSuggestion blip_width_suggestion(const DataStats &d, const SeedView &s,
+                                      int arg_pos) {
+  return width_suggestion(d, s, arg_pos, BasisKind::Blip);
 }
 
 }  // namespace models

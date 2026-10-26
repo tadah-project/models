@@ -7,6 +7,7 @@
 #include <limits>
 #include <stdexcept>
 #include <utility>
+#include <tadah/models/descriptors/density_reach.h>
 
 namespace tadah {
 namespace models {
@@ -399,8 +400,6 @@ void DM_REAM::init() {
 
 std::optional<DescriptorMeta> DM_REAM::meta() const {
   using DataStats = tadah::core::stats::DataStats;
-  static constexpr std::size_t I_P50 = tadah::core::stats::IDX_P50;
-  static constexpr std::size_t I_P99 = tadah::core::stats::IDX_P99;
 
   DescriptorMeta dm;
   dm.label = "DM_REAM";
@@ -415,17 +414,28 @@ std::optional<DescriptorMeta> DM_REAM::meta() const {
   p_rcut.hard.lo = 0.0;
   p_rcut.crit    = Criticality::Critical;
   p_rcut.scope   = PairScope::Global;
-  p_rcut.suggest = [](const DataStats& d, const SeedView&, int)
-      -> std::pair<double, double> {
-    if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
-    const auto& pp = d.per_pair[0];
-    return std::make_pair(pp.r_percentiles[I_P50], pp.r_percentiles[I_P99]);
+  p_rcut.suggest = cutoff_suggestion;
+  p_rcut.check    = [](const DataStats& d, const SeedView& s) {
+    return cutoff_reach_check(d, s, "RCUTMB");
   };
   dm.params.push_back(std::move(p_rcut));
 
-  // Density-expansion grids (r-space). Tunable, but `tadah refit` emits
-  // explicit ±% OPTIM bounds, so the data-driven suggesters stay neutral.
-  auto add_vec = [&dm](const std::string& key, Scale sc, const std::string& units,
+  // Density-expansion grids (r-space). Tunable, but the data give no range
+  // for them: `tadah refit` writes OPTIM lines of +-OPTIM_PCT percent about
+  // the values of a DM_REAM potential, and the knot degrees are structure
+  // data that tadah hpo does not search. Each gets a row without an OPTIM
+  // line, saying so.
+  auto no_ream_range = [](const std::string& key) {
+    if (key.rfind("KDEG", 0) == 0)
+      return BoundSuggestion::no_row(
+          "a knot degree (3 or 5), structure data that tadah hpo does not "
+          "search (it refuses OPTIM " + key + ")");
+    return BoundSuggestion::no_row(
+        "no range from the data for a value of a DM_REAM grid: tadah refit "
+        "writes an OPTIM line of +-OPTIM_PCT percent about each value of a "
+        "DM_REAM potential");
+  };
+  auto add_vec = [&dm, no_ream_range](const std::string& key, Scale sc, const std::string& units,
                        const std::string& role, double lo, Criticality crit) {
     ParamMeta p;
     p.key     = key;
@@ -436,8 +446,10 @@ std::optional<DescriptorMeta> DM_REAM::meta() const {
     p.hard.lo = lo;
     p.crit    = crit;
     p.scope   = PairScope::Global;
-    p.suggest = [](const DataStats&, const SeedView&, int)
-        -> std::pair<double, double> { return std::make_pair(0.0, 0.0); };
+    p.suggest = [key, no_ream_range](const DataStats&, const SeedView&,
+                                     int) {
+      return no_ream_range(key);
+    };
     dm.params.push_back(std::move(p));
   };
   add_vec("CGRIDMB", Scale::Distance, "Å",

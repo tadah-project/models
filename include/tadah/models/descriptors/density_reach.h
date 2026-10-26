@@ -1,21 +1,29 @@
 #ifndef TADAH_MODELS_DESCRIPTORS_DENSITY_REACH_H
 #define TADAH_MODELS_DESCRIPTORS_DENSITY_REACH_H
 
-// The reach of a radial density channel, and the OPTIM ranges of its centre
-// and width that the seed and the data suggest.
+// The reach of a cutoff and of a radial density channel, and the OPTIM
+// ranges of a cutoff and of a channel's centre and width that the seed and
+// the data suggest.
 //
-// A many-body density sums a radial function g(r) of each channel over the
-// neighbours within its cutoff, so a channel is judged by what g gives at the
-// neighbour distances of the data, not by where its centre lies: a Gaussian
-// exp(-SGRIDMB r^2) centred at the origin reaches the first neighbour shell
-// when its width SGRIDMB is small enough, and a blip centred below the
-// nearest neighbour reaches it when its support does.
+// A descriptor sums over the neighbours within its cutoff: a cutoff below
+// every neighbour distance of the data leaves it nothing to sum
+// (cutoff_reach_check). A many-body density sums a radial function g(r) of
+// each channel over those neighbours, so a channel is judged by what g gives
+// at the neighbour distances of the data, not by where its centre lies: a
+// Gaussian exp(-SGRIDMB r^2) centred at the origin reaches the first
+// neighbour shell when its width SGRIDMB is small enough, and a blip centred
+// below the nearest neighbour reaches it when its support does.
 //
 // One constant, kDensityReachFloor, is the value below which a radial
 // function or a density counts as reaching nothing: the CGRIDMB checks of the
 // densities (radial_reach_check), the rho-collapse checks of DM_mBlipEnv and
 // DM_Blip, and the widths tadah analysis suggest_bounds proposes for a
-// Gaussian at the origin (gaussian_width_suggestion) use it.
+// Gaussian or a blip at the origin (gaussian_width_suggestion,
+// blip_width_suggestion) use it.
+//
+// tadah analysis suggest_bounds takes the neighbour statistics up to
+// kCutoffSearchReach times the largest cutoff of the seed, so that the range
+// of a cutoff (cutoff_suggestion) can reach past the seed's.
 
 #include <string>
 
@@ -29,6 +37,37 @@ namespace models {
 /** \brief The value below which a radial function at a neighbour distance,
  *  or the density of an atom, counts as zero: 1e-6. */
 inline constexpr double kDensityReachFloor = 1.0e-6;
+
+/** \brief The factor by which tadah analysis suggest_bounds takes the
+ *  neighbour statistics past the largest cutoff of the seed: 1.25. The
+ *  suggested ranges come from the neighbour distances up to that radius, so
+ *  the range of a cutoff can end past the seed's cutoff. */
+inline constexpr double kCutoffSearchReach = 1.25;
+
+/** \brief The suggestion of a parameter whose range the neighbour
+ *  distances give, for data with no pair of atoms within the reach of the
+ *  statistics: no OPTIM line (BoundSuggestion::no_row), its rationale
+ *  saying so. */
+BoundSuggestion no_pair_suggestion();
+
+/** \brief The OPTIM range of a cutoff (RCUT2B, RCUTMB): from 1.05 times the
+ *  second peak of the neighbour distances of the first element pair of
+ *  @p d (their median without a second peak, or when that lies at or above
+ *  their 99th percentile) to their 99th percentile, the distances taken up
+ *  to the reach of the statistics (kCutoffSearchReach times the largest
+ *  cutoff of the seed); no_pair_suggestion() without a pair. The rationale
+ *  names the form and the statistics. */
+BoundSuggestion cutoff_suggestion(const tadah::core::stats::DataStats &d,
+                                  const SeedView &s, int arg_pos);
+
+/** \brief The check of the cutoff @p key (RCUT2B, RCUTMB) of @p s: it fails
+ *  when the data have atoms but no pair of them within the cutoff (the
+ *  cutoff is below the smallest neighbour distance of every element pair,
+ *  or the data have no pair at all: the descriptor sums over no neighbour),
+ *  naming the key, its value and the smallest neighbour distance. HealthOk
+ *  without the key or without atoms. */
+HealthVerdict cutoff_reach_check(const tadah::core::stats::DataStats &d,
+                                 const SeedView &s, const std::string &key);
 
 /** \brief The neighbour distances a density with cutoff @p rcut sums over:
  *  from the smallest r_min of the element pairs of @p d to the smaller of
@@ -47,6 +86,13 @@ NeighbourRange neighbour_range(const tadah::core::stats::DataStats &d,
  *  ln(1 / kDensityReachFloor) / dist^2 (infinite for @p dist 0). */
 double gaussian_reach_width(double dist);
 
+/** \brief The width eta above which a blip b(eta (r - c)) is below
+ *  kDensityReachFloor at the distance @p dist from its centre: x_f / dist,
+ *  with x_f = 2 - (4 kDensityReachFloor)^(1/3), where the tail 0.25 (2 -
+ *  x)^3 of the cubic B-spline is kDensityReachFloor (infinite for @p dist
+ *  0). */
+double blip_reach_width(double dist);
+
 /** \brief The reach check of the radial channels of a many-body density:
  *  each centre CGRIDMB(i) with its width SGRIDMB(i) and the cutoff RCUTMB
  *  of @p s, against the neighbour distances of @p d (neighbour_range).
@@ -59,12 +105,12 @@ double gaussian_reach_width(double dist);
  *  first channel that fails by its entry of the configuration
  *  (SeedView::entry_number(): CGRIDMB(3) for the second channel of a
  *  joined line's descriptor after one of another), its centre and width,
- *  the form and the range;
- *  also a range that is empty (RCUTMB below the smallest neighbour
- *  distance, or no pair within it, for data of one atom or more) and a
- *  centre without a width. HealthOk without CGRIDMB, or for data without
- *  atoms. @throws std::logic_error for a @p kind other than Gaussian and
- *  Blip. */
+ *  the form and the range; also a centre without a width, and data of one
+ *  atom or more without a pair when @p s has no RCUTMB. HealthOk for an
+ *  RCUTMB below every neighbour distance (or data without a pair within
+ *  it): the check of the cutoff (cutoff_reach_check) gives that finding.
+ *  HealthOk without CGRIDMB, or for data without atoms. @throws
+ *  std::logic_error for a @p kind other than Gaussian and Blip. */
 HealthVerdict radial_reach_check(const tadah::core::stats::DataStats &d,
                                  const SeedView &s, BasisKind kind);
 
@@ -79,7 +125,8 @@ HealthVerdict radial_reach_check(const tadah::core::stats::DataStats &d,
  *    holds c;
  *  - without a seed centre: the first peak of the neighbour distances +-
  *    its FWHM, from r_min;
- *  - without peaks: the 10th to 90th percentiles of the distances. */
+ *  - without peaks: the 10th to 90th percentiles of the distances;
+ *  - without a pair: no_pair_suggestion(). */
 BoundSuggestion gaussian_centre_suggestion(
     const tadah::core::stats::DataStats &d, const SeedView &s, int arg_pos);
 
@@ -97,8 +144,39 @@ BoundSuggestion gaussian_centre_suggestion(
  *  - without a seed centre, or without peaks: 0.25 / w^2 to 9 / w^2 with
  *    w the FWHM of the first peak (without peaks, or without a FWHM, the
  *    spread from the 10th to the 90th percentile), a fixed range 0.1 to 1
- *    when the distances have no spread. */
+ *    when the distances have no spread;
+ *  - without a pair: no_pair_suggestion(). */
 BoundSuggestion gaussian_width_suggestion(
+    const tadah::core::stats::DataStats &d, const SeedView &s, int arg_pos);
+
+/** \brief The OPTIM range of the centre CGRIDMB(@p arg_pos) (-1: the
+ *  first) of a blip density channel b(SGRIDMB (r - CGRIDMB)), by the seed's
+ *  centre c, as gaussian_centre_suggestion() reads it:
+ *  - at the origin (CGRIDMB 0): no row, the width alone sets the reach;
+ *  - elsewhere: c +- the FWHM of the neighbour shell nearest to c, within
+ *    the neighbour distances within RCUTMB unless c lies outside them;
+ *  - without a seed centre: the first peak of the neighbour distances +-
+ *    its FWHM, from 0;
+ *  - without peaks: the 10th to 90th percentiles of the distances;
+ *  - without a pair: no_pair_suggestion(). */
+BoundSuggestion blip_centre_suggestion(
+    const tadah::core::stats::DataStats &d, const SeedView &s, int arg_pos);
+
+/** \brief The OPTIM range of the width SGRIDMB(@p arg_pos) (-1: the first)
+ *  of a blip density channel, by the seed's centre CGRIDMB c of the same
+ *  entry:
+ *  - at the origin: the widths whose reach, the distance x_f / SGRIDMB at
+ *    which b(SGRIDMB r) falls to kDensityReachFloor, runs from r_min to the
+ *    farthest neighbour distance within RCUTMB (neighbour_range()):
+ *    blip_reach_width(farthest) to blip_reach_width(r_min); no row when
+ *    no neighbour distance lies within RCUTMB, or when the two are one;
+ *  - elsewhere: 1 / w to 6 / w with w the FWHM of the neighbour shell
+ *    nearest to c (the support half-width 2/SGRIDMB from 2 w down to w/3);
+ *  - without a seed centre, or without peaks: 1 / w to 6 / w with w the
+ *    FWHM of the first peak (without peaks, the spread from the 10th to the
+ *    90th percentile), a fixed range 0.1 to 1 when that is not above 0;
+ *  - without a pair: no_pair_suggestion(). */
+BoundSuggestion blip_width_suggestion(
     const tadah::core::stats::DataStats &d, const SeedView &s, int arg_pos);
 
 }  // namespace models
