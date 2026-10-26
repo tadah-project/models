@@ -92,30 +92,32 @@ void normalise_rhoform_key(tadah::core::Context &c) {
 }
 
 void check_rhoform_precedence(const tadah::core::Context &pot,
-                              const tadah::core::Context &task,
+                              const tadah::core::Context &config,
                               const std::string &pot_name) {
   if (!context_has_ream(pot)) {
     // a key on either side has no effect (validated when it was read)
-    if (pot.has_stored("RHOFORM") || task.has_stored("RHOFORM"))
+    if (pot.has_stored("RHOFORM") || config.has_stored("RHOFORM"))
       report_ream_only_key("RHOFORM");
     return;
   }
-  // The potential must declare its own form: a task value never supplies it.
-  if (!pot.has_stored("RHOFORM") && task.has_stored("RHOFORM"))
+  // The potential must declare its own form: a configuration value never
+  // supplies it.
+  if (!pot.has_stored("RHOFORM") && config.has_stored("RHOFORM"))
     throw DensityFormError(
-        pot_name + ": the task configuration's RHOFORM does not apply (the "
-        "form belongs to the potential, whose density amplitudes were "
-        "fitted in it); add the RHOFORM line to " + pot_name + ". " +
+        pot_name + ": the RHOFORM of the configuration file does not apply "
+        "(the form belongs to the potential, whose density amplitudes were "
+        "fitted in it); the RHOFORM line belongs in " + pot_name + ". " +
         rhoform_absent_message());
   const RhoForm pv = require_rhoform(pot, pot_name);
-  const auto tv = stored_rhoform(task);
-  if (tv && *tv != pv)
+  const auto cv = stored_rhoform(config);
+  if (cv && *cv != pv)
     throw DensityFormError(
         "RHOFORM conflict: " + pot_name + " declares RHOFORM " +
-        rhoform_name(pv) + " but the task configuration sets RHOFORM " +
-        rhoform_name(*tv) +
+        rhoform_name(pv) + " and the configuration file sets RHOFORM " +
+        rhoform_name(*cv) +
         ". RHOFORM is a property of the potential (its density amplitudes "
-        "were fitted in that form); edit the potential file instead.");
+        "were fitted in that form): the potential file sets it, not the "
+        "configuration file.");
 }
 
 std::string rhoform_subject(RhoForm f) {

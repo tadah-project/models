@@ -76,16 +76,20 @@ RhoForm require_rhoform(const tadah::core::Context &ctx,
  *  key. */
 void normalise_rhoform_key(tadah::core::Context &c);
 
-/** Engines that merge a task context over a loaded potential (predict,
- *  analysis): call with the potential as read and the task context BEFORE
- *  merging. RHOFORM is a property of the potential, so a potential with a
- *  DM_REAM block but no RHOFORM throws (DensityFormError, migration text)
- *  whatever the task says: the task cannot supply the key. Different
- *  explicit values throw as well. A RHOFORM on either side of a potential
- *  without a DM_REAM block is ignored (report_ream_only_key: a stderr notice
- *  once per process). */
+/** Engines that merge a run's configuration over a loaded potential (tadah
+ *  refit --edit with -c, analysis bfunc of a program's context): call with
+ *  the potential as read and the configuration BEFORE merging. RHOFORM is a
+ *  property of the potential, so a potential with a DM_REAM block but no
+ *  RHOFORM throws (DensityFormError, migration text) whatever the
+ *  configuration says: the configuration cannot supply the key ("<pot>: the
+ *  RHOFORM of the configuration file does not apply ..."). Different
+ *  explicit values throw as well ("RHOFORM conflict: ..."). A RHOFORM on
+ *  either side of a potential without a DM_REAM block is ignored
+ *  (report_ream_only_key: a stderr notice once per process). An engine
+ *  whose model is the potential's alone (tadah predict) passes an empty
+ *  configuration. */
 void check_rhoform_precedence(const tadah::core::Context &pot,
-                              const tadah::core::Context &task,
+                              const tadah::core::Context &config,
                               const std::string &pot_name);
 
 /** "DM_REAM: RHOFORM <form>", the subject of every form-rule message

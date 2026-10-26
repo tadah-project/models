@@ -2,8 +2,8 @@
 //
 // The line a kernel prints when it is built at VERBOSE > 0 (its label and
 // settings, "Kern_RBF | sigma: 1 | gamma: 1"). Every kernel built prints it
-// (tadah train, tadah predict, pair_style tadah, each TASK of a task file
-// print the line of each model they build), except while a
+// (tadah train, tadah predict and pair_style tadah print the line of each
+// model they build), except while a
 // KernelSettingsLineScope is open: tadah hpo holds one for each run, which
 // builds the model of every evaluation from one configuration, so the run
 // prints the line of its first build of each kernel only, and its
@@ -123,13 +123,13 @@ const std::string kPolyLine =
  * VERBOSE 0 prints nothing, three built at VERBOSE 1 from MPARAMS 1.0 print
  * "\nKern_RBF | sigma: 1 | gamma: 1\n" three times, and one built from
  * MPARAMS 2.0 then prints "\nKern_RBF | sigma: 2 | gamma: 0.25\n"
- * (check_every_build_prints): each model built, each TASK train of a task
- * file, prints the settings of its kernel, as the released code did.
+ * (check_every_build_prints): each model built prints the settings of its
+ * kernel, as the released code did.
  * Before the fix: once per process for each kernel (print_once keyed on
  * the label): one line among the three (none when the process had printed
- * it before), and none for MPARAMS 2.0, so a second TASK train of a task
- * file printed no line; KernelSettingsLineScope does not exist (the file
- * does not compile). */
+ * it before), and none for MPARAMS 2.0, so a second training in the
+ * process printed no line; KernelSettingsLineScope does not exist (the
+ * file does not compile). */
 TEST_CASE("Kern_RBF prints its settings line at every build at VERBOSE > 0",
           "[kernel][settings_line]") {
   check_every_build_prints<tadah::models::Kern_RBF>(

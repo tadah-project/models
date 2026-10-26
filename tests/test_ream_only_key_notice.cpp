@@ -136,8 +136,7 @@ TEST_CASE("EMBF0 and RHOFORM without a DM_REAM block: one stderr notice per "
 /* Pins: an EMBF0 or RHOFORM of a run's configuration over a potential
  * without a DM_REAM block gives the one notice per key and process of a
  * key without effect, as one in the potential does.
- * Before the fix: passes as well (a pin; the test was named for a task's
- * keys, which a TASK section of a task file gave). */
+ * Before the fix: passes as well (a pin). */
 TEST_CASE("An EMBF0 or RHOFORM of a configuration over a potential without "
           "a DM_REAM block is reported like one in the potential",
           "[embf0][rhoform][key_notice]") {

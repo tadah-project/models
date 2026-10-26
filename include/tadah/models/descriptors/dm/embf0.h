@@ -74,14 +74,18 @@ void report_ream_only_keys(const tadah::core::Context &c);
  *  DM_REAM block never carry the key. */
 void normalise_embf0_key(tadah::core::Context &c);
 
-/** Engines that merge a task context over a loaded potential (predict,
- *  analysis): call with the potential as read and the task context BEFORE
- *  merging. Different explicit values -> std::runtime_error (EMBF0 is a
- *  property of the potential); a task value for a potential without the key
- *  -> INFO (the value applies); an EMBF0 on either side of a potential
- *  without a DM_REAM block -> report_ream_only_key (ignored). */
+/** Engines that merge a run's configuration over a loaded potential (tadah
+ *  refit --edit with -c, analysis bfunc of a program's context): call with
+ *  the potential as read and the configuration BEFORE merging. Different
+ *  explicit values -> std::runtime_error ("EMBF0 conflict: <pot> declares
+ *  EMBF0 ZERO and the configuration file sets EMBF0 FREE. ..."; EMBF0 is a
+ *  property of the potential); a configuration value for a potential
+ *  without the key -> INFO (the value applies); an EMBF0 on either side of
+ *  a potential without a DM_REAM block -> report_ream_only_key (ignored).
+ *  An engine whose model is the potential's alone (tadah predict) passes
+ *  an empty configuration. */
 void check_embf0_precedence(const tadah::core::Context &pot,
-                            const tadah::core::Context &task,
+                            const tadah::core::Context &config,
                             const std::string &pot_name);
 
 }  // namespace models
