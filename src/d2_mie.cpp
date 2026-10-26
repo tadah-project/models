@@ -223,10 +223,12 @@ bool D2_MIE::calc_dXijdri_dtheta(
 // m (config index 2). For an LJ-like setup these would be 12 and 6;
 // the descriptor itself enforces only positivity (see ctor throw).
 //
-// arg_pos in ParamMeta uses the runtime arg_pos seen by calc_dDdtheta
-// — that's i+1 where i is the omap.opt config index. The leading
-// "D2_MIE" string token at config index 0 shifts the user-facing
-// OPTIM (n) by one, so n maps to arg_pos=2 and m to arg_pos=3.
+// arg_pos in ParamMeta uses the runtime arg_pos seen by calc_dDdtheta:
+// the value at index arg_pos - 1 of the descriptor's TYPE2B line, so n
+// maps to arg_pos=2 and m to arg_pos=3 (the leading "D2_MIE" token is
+// index 0). They have no bound suggester: tadah hpo searches no value of
+// a TYPE2B line (it refuses OPTIM TYPE2B), and tadah analysis
+// suggest_bounds gives each a row without an OPTIM line.
 // ----------------------------------------------------------------
 std::optional<DescriptorMeta> D2_MIE::meta() const {
   using DataStats = tadah::core::stats::DataStats;
@@ -278,13 +280,6 @@ std::optional<DescriptorMeta> D2_MIE::meta() const {
   p_n.hard.lo = 1.0e-6;     // strictly positive (constructor throws on <0)
   p_n.crit    = Criticality::Recommended;
   p_n.scope   = PairScope::Global;
-  // Suggester defaults span the typical literature range [6, 24] —
-  // wide enough to cover Buckingham-like and harder cores.
-  p_n.suggest = [](const DataStats&, const SeedView&, int)
-      -> BoundSuggestion {
-    return BoundSuggestion::fixed_range(
-        6.0, 24.0, "fixed range: the typical span of Mie repulsive exponents");
-  };
   dm.params.push_back(std::move(p_n));
 
   // m — attractive exponent (default LJ-like 6; must satisfy m < n
@@ -299,11 +294,6 @@ std::optional<DescriptorMeta> D2_MIE::meta() const {
   p_m.hard.lo = 1.0e-6;
   p_m.crit    = Criticality::Recommended;
   p_m.scope   = PairScope::Global;
-  p_m.suggest = [](const DataStats&, const SeedView&, int)
-      -> BoundSuggestion {
-    return BoundSuggestion::fixed_range(
-        2.0, 12.0, "fixed range: the typical span of Mie attractive exponents");
-  };
   dm.params.push_back(std::move(p_m));
 
   // Cross-param sanity: if both n and m are seeded, n > m keeps the
