@@ -21,9 +21,12 @@ std::string num(double v) {
   return os.str();
 }
 
-/* "KEY(i)" with i 1-based, as an OPTIM line names an entry. */
-std::string entry(const std::string &key, std::size_t i) {
-  return key + "(" + std::to_string(i + 1) + ")";
+/* "KEY(n)" for value @p i of @p key of @p s, n its 1-based number in the
+ * configuration, as an OPTIM line names an entry (SeedView::entry_number:
+ * the entries of a joined line's descriptor follow those of the
+ * descriptors before it). */
+std::string entry(const SeedView &s, const std::string &key, std::size_t i) {
+  return key + "(" + std::to_string(s.entry_number(key, i)) + ")";
 }
 
 /* The seed's centre of entry @p arg_pos (-1: the first) of CGRIDMB, when
@@ -33,6 +36,31 @@ bool seed_centre(const SeedView &s, int arg_pos, double &c) {
   const std::size_t i = arg_pos < 0 ? 0 : static_cast<std::size_t>(arg_pos);
   if (i >= s.size("CGRIDMB")) return false;
   c = s.get<double>("CGRIDMB", i);
+  return true;
+}
+
+/* The neighbour shell nearest to the distance @p c: the peak of the
+ * distances of the first element pair of @p d nearest to it, its position
+ * @p mu and its width @p w, the FWHM (0.2 times the position for a peak
+ * without one); @p what names the width. False when the distances show no
+ * peak. */
+bool nearest_shell(const DataStats &d, double c, double &mu, double &w,
+                   std::string &what) {
+  const auto &peaks = d.per_pair[0].r_peaks;
+  if (peaks.empty()) return false;
+  const auto *best = &peaks.front();
+  for (const auto &p : peaks)
+    if (std::abs(p.position - c) < std::abs(best->position - c)) best = &p;
+  mu = best->position;
+  if (best->fwhm > 0.0) {
+    w = best->fwhm;
+    what = "the FWHM (" + num(w) + " Å) of the neighbour shell nearest to "
+           "it (" + num(mu) + " Å)";
+  } else {
+    w = 0.2 * mu;
+    what = num(w) + " Å, 0.2 times the distance of the neighbour shell "
+           "nearest to it (" + num(mu) + " Å), which has no FWHM";
+  }
   return true;
 }
 
@@ -105,16 +133,16 @@ HealthVerdict radial_reach_check(const DataStats &d, const SeedView &s,
   for (std::size_t i = 0; i < n; ++i) {
     const double c = s.get<double>("CGRIDMB", i);
     if (i >= widths)
-      return HealthFail{entry("CGRIDMB", i) + " = " + num(c) +
-                        " has no width " + entry("SGRIDMB", i) +
+      return HealthFail{entry(s, "CGRIDMB", i) + " = " + num(c) +
+                        " has no width " + entry(s, "SGRIDMB", i) +
                         ": the reach of its channel of ρ cannot be judged."};
     const double eta = s.get<double>("SGRIDMB", i);
     if (!(eta > 0.0)) continue;  // no decay: refused by other rules
     // The distance from the centre to the nearest neighbour distance.
     const double dist =
         c < range.lo ? range.lo - c : (c > range.hi ? c - range.hi : 0.0);
-    const std::string channel = entry("CGRIDMB", i) + " = " + num(c) +
-                                " with " + entry("SGRIDMB", i) + " = " +
+    const std::string channel = entry(s, "CGRIDMB", i) + " = " + num(c) +
+                                " with " + entry(s, "SGRIDMB", i) + " = " +
                                 num(eta);
     if (kind == BasisKind::Gaussian) {
       if (!(eta > gaussian_reach_width(dist))) continue;
@@ -139,14 +167,31 @@ BoundSuggestion gaussian_centre_suggestion(const DataStats &d,
                                            const SeedView &s, int arg_pos) {
   if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
   double c = 0.0;
-  if (seed_centre(s, arg_pos, c) && c == 0.0)
+  const bool seeded = seed_centre(s, arg_pos, c);
+  if (seeded && c == 0.0)
     return BoundSuggestion::no_row(
         "Gaussian exp(-SGRIDMB r^2) centred at the origin (the seed's "
         "CGRIDMB 0): its width SGRIDMB, not its centre, sets its reach");
   const auto &pp = d.per_pair[0];
+  double mu = 0.0, w = 0.0;
+  std::string width;
+  if (seeded && nearest_shell(d, c, mu, w, width)) {
+    // About the seed's centre, within the neighbour distances the channel
+    // sums over, unless the seed's centre lies outside them: the range
+    // always holds it.
+    const double rcut = s.contains("RCUTMB") ? s.get<double>("RCUTMB") : 0.0;
+    const NeighbourRange range = neighbour_range(d, rcut);
+    return BoundSuggestion(
+        std::max(c - w, std::min(c, range.lo)),
+        std::min(c + w, std::max(c, range.hi)),
+        "Gaussian exp(-SGRIDMB (r - CGRIDMB)^2) centred on the seed's centre "
+        "(" + num(c) + " Å): +- " + width + ", within the neighbour "
+        "distances " + num(range.lo) + " to " + num(range.hi) +
+        " Å unless the seed's centre lies outside them");
+  }
   if (!pp.r_peaks.empty()) {
-    const double mu = pp.r_peaks[0].position;
-    const double w = pp.r_peaks[0].fwhm > 0.0 ? pp.r_peaks[0].fwhm : 0.2 * mu;
+    mu = pp.r_peaks[0].position;
+    w = pp.r_peaks[0].fwhm > 0.0 ? pp.r_peaks[0].fwhm : 0.2 * mu;
     return BoundSuggestion(
         std::max(pp.r_min, mu - w), mu + w,
         "Gaussian exp(-SGRIDMB (r - CGRIDMB)^2) centred on the first "
@@ -191,6 +236,13 @@ BoundSuggestion gaussian_width_suggestion(const DataStats &d,
           why + ": the widths it allows do not reach r_min");
     return BoundSuggestion(lo, hi, why);
   }
+  double mu = 0.0, wn = 0.0;
+  std::string width;
+  if (seed_centre(s, arg_pos, c) && nearest_shell(d, c, mu, wn, width))
+    return BoundSuggestion(
+        0.25 / (wn * wn), 9.0 / (wn * wn),
+        "Gaussian exp(-SGRIDMB (r - CGRIDMB)^2) centred on the seed's centre "
+        "(" + num(c) + " Å): 0.25/w^2 to 9/w^2 with w " + width);
   using tadah::core::stats::IDX_P10;
   using tadah::core::stats::IDX_P90;
   double w = pp.r_percentiles[IDX_P90] - pp.r_percentiles[IDX_P10];

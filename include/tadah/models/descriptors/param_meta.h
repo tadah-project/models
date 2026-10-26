@@ -17,6 +17,7 @@
 
 #include <cstddef>
 #include <functional>
+#include <map>
 #include <optional>
 #include <string>
 #include <utility>
@@ -104,12 +105,30 @@ inline std::string verdict_message(const HealthVerdict& v) {
  *  metadata closures access to the current parameter values without
  *  allowing mutation.
  *
- *  Constructed implicitly from a `const Context&`; the underlying
- *  Context must outlive the SeedView.
+ *  Constructed from a `const Context&`; the underlying Context must
+ *  outlive the SeedView.
  */
 class SeedView {
  public:
   explicit SeedView(const tadah::core::Context& c) : ctx_(&c) {}
+  /** \brief A view of @p c, the context of one descriptor of a joined
+   *  TYPE2B or TYPEMB line (D_mJoin::parse_context()): its values of a key
+   *  @p k come after @p first_entries.at(k) values of that key in the
+   *  configuration, those of the descriptors before it on the line, so
+   *  that a message numbers an entry as an OPTIM line of the
+   *  configuration does (entry_number()). */
+  SeedView(const tadah::core::Context& c,
+           std::map<std::string, std::size_t> first_entries)
+      : ctx_(&c), first_(std::move(first_entries)) {}
+
+  /** \brief The 1-based number of value @p i of @p key in the
+   *  configuration, as an OPTIM line names it: @p i + 1, after the values
+   *  of the key that come before the view's own (none but for the view of
+   *  a joined line's descriptor). */
+  std::size_t entry_number(const std::string& key, std::size_t i) const {
+    const auto it = first_.find(key);
+    return (it == first_.end() ? 0 : it->second) + i + 1;
+  }
 
   template <typename T>
   T get(const std::string& key) const {
@@ -156,6 +175,7 @@ class SeedView {
 
  private:
   const tadah::core::Context* ctx_;
+  std::map<std::string, std::size_t> first_;
 };
 
 // ---------------------------------------------------------------------

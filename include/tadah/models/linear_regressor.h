@@ -169,17 +169,22 @@ private:
   /* Refuses coefficients of a solve that are not finite (nan or inf),
    * naming the OALGO line and the first such coefficient (its weight, when
    * FIXINDEX pins some): a fit never returns them, and tadah train would
-   * write them into a potential no command reads. Under OALGO 3 the
-   * message gives the smallest singular value the solve keeps, a direction
-   * whose square is below the smallest double (rank threshold M 0 or less,
-   * LAMBDA 0) gives an infinite coefficient, and a positive M leaves such
-   * directions out. @p svd is the SVD of the OALGO 3 solve, null for the
-   * others. */
+   * write them into a potential no command reads. The design matrix and
+   * the targets are finite (require_finite()), so a product of the solve
+   * overflowed. @p svd is the SVD of the OALGO 3 solve (null for the
+   * others), with its rank threshold @p rcond and the LAMBDA @p lambda it
+   * solved with: when it keeps a singular direction whose factor S / (S^2 +
+   * LAMBDA) is not finite (S^2 below the smallest double at LAMBDA 0), the
+   * message names the smallest such S and what leaves it out or keeps its
+   * coefficient finite (a LAMBDA above 0; a rank threshold M of at least
+   * its ratio to the largest singular value, below 1, which the default
+   * 1e-8 is when the ratio is at most 1e-8); otherwise it names none. */
   static void require_finite_weights(const tadah::core::Context &context,
                                      const tadah::core::t_type &weights,
                                      const Layout &L,
                                      tadah::models::SVD *svd = nullptr,
-                                     double rcond = 0.0) {
+                                     double rcond = 0.0,
+                                     double lambda = 0.0) {
     size_t bad = weights.size();
     for (size_t j = 0; j < weights.size(); ++j)
       if (!finite_bits(weights[j])) {
@@ -200,17 +205,32 @@ private:
       const double *S = svd->getS();
       const int k = std::min(svd->rows(), svd->cols());
       const double thresh = OLS::pseudoinverse_threshold(S, k, rcond);
-      double smallest = 0.0;
+      double largest = 0.0;
+      for (int i = 0; i < k; ++i) largest = std::max(largest, S[i]);
+      // The smallest kept singular value whose factor in the solve is not
+      // finite (OLS::solveWithPseudoinverse: S / (S^2 + LAMBDA)).
+      double culprit = 0.0;
       for (int i = 0; i < k; ++i)
-        if (S[i] > thresh && (smallest == 0.0 || S[i] < smallest))
-          smallest = S[i];
-      std::ostringstream value;
-      value << smallest;
-      msg += ": it keeps a singular direction of the design matrix of "
-             "singular value " + value.str() + ", whose coefficient is not "
-             "finite (its square is below the smallest double at LAMBDA "
-             "0); a positive M, OALGO's second value (OALGO 3 1e-8, the "
-             "default), leaves such directions out";
+        if (S[i] > thresh && !finite_bits(S[i] / (S[i] * S[i] + lambda)) &&
+            (culprit == 0.0 || S[i] < culprit))
+          culprit = S[i];
+      if (culprit > 0.0) {
+        const double ratio = culprit / largest;
+        std::ostringstream value, share;
+        value << culprit;
+        share << ratio;
+        msg += ": it keeps a singular direction of the design matrix of "
+               "singular value " + value.str() + ", whose square is below "
+               "the smallest double, so that its coefficient is not finite "
+               "at LAMBDA 0. A LAMBDA above 0 keeps that coefficient finite";
+        if (ratio < 1.0)
+          msg += ", and a rank threshold M (OALGO's second value) of at "
+                 "least " + share.str() + ", the ratio of that singular "
+                 "value to the largest, leaves the direction out" +
+                 std::string(ratio <= 1e-8
+                                 ? " (OALGO 3 1e-8, the default, does)"
+                                 : "");
+      }
     }
     throw std::runtime_error(msg + ". No coefficients were fitted.");
   }
@@ -547,9 +567,10 @@ private:
    *         of column weights) or an intercept column past its columns.
    * @throws std::runtime_error for a value of Phi or T that is not finite
    *         (every OALGO), for coefficients of the solve that are not
-   *         finite (require_finite_weights(); under OALGO 3 with M 0 or
-   *         less and LAMBDA 0, a kept singular value whose square is below
-   *         the smallest double), and under OALGO 2 and 4 for a design matrix
+   *         finite (require_finite_weights(): the solve overflowed; under
+   *         OALGO 3 at LAMBDA 0 the message names a kept singular value
+   *         whose square is below the smallest double, when one is the
+   *         cause), and under OALGO 2 and 4 for a design matrix
    *         whose non-zero data rows (a data row that is zero in every
    *         column, such as a row of priority 0, adds nothing to the rank)
    *         and, with LAMBDA > 0, ridge rows cannot give it full column
@@ -655,7 +676,7 @@ public:
 
       ols.solveWithPseudoinverse(Phi.rows(), Phi.cols(), T, weights,
                                  svd.getSVDWorkspace(), rcond, lambda);
-      require_finite_weights(context, weights, layout, &svd, rcond);
+      require_finite_weights(context, weights, layout, &svd, rcond, lambda);
       const std::size_t n_dropped = dropped_directions(svd, rcond);
       // The threshold as OLS::pseudoinverse_threshold sets it: rcond
       // times the largest singular value, 0 for an rcond of 0 or less.

@@ -56,7 +56,10 @@ double gaussian_reach_width(double dist);
  *  range; a blip channel (Blip, b(SGRIDMB (r - CGRIDMB)), support |r -
  *  CGRIDMB| < 2/SGRIDMB) when its support holds none. A width of 0 or
  *  less is no reach failure (other rules refuse it). HealthFail names the
- *  first channel that fails, its centre and width, the form and the range;
+ *  first channel that fails by its entry of the configuration
+ *  (SeedView::entry_number(): CGRIDMB(3) for the second channel of a
+ *  joined line's descriptor after one of another), its centre and width,
+ *  the form and the range;
  *  also a range that is empty (RCUTMB below the smallest neighbour
  *  distance, or no pair within it, for data of one atom or more) and a
  *  centre without a width. HealthOk without CGRIDMB, or for data without
@@ -66,17 +69,22 @@ HealthVerdict radial_reach_check(const tadah::core::stats::DataStats &d,
                                  const SeedView &s, BasisKind kind);
 
 /** \brief The OPTIM range of the centre CGRIDMB(@p arg_pos) (-1: the
- *  first) of a Gaussian density channel, by the seed's centre:
+ *  first) of a Gaussian density channel, by the seed's centre c:
  *  - at the origin (CGRIDMB 0): no row, the width alone sets the reach;
- *  - elsewhere (or no seed centre): the first peak of the neighbour
- *    distances +- its FWHM (0.2 times the peak position for a peak
- *    without one), from r_min; without peaks, their 10th to 90th
- *    percentiles. */
+ *  - elsewhere: c +- the FWHM of the neighbour shell nearest to c (the
+ *    peak of the neighbour distances nearest to it; 0.2 times its position
+ *    for a peak without a FWHM), its low end not below r_min and its high
+ *    end not above the neighbour distances within RCUTMB
+ *    (neighbour_range()) unless c is (then the range ends at c): the range
+ *    holds c;
+ *  - without a seed centre: the first peak of the neighbour distances +-
+ *    its FWHM, from r_min;
+ *  - without peaks: the 10th to 90th percentiles of the distances. */
 BoundSuggestion gaussian_centre_suggestion(
     const tadah::core::stats::DataStats &d, const SeedView &s, int arg_pos);
 
 /** \brief The OPTIM range of the width SGRIDMB(@p arg_pos) (-1: the first)
- *  of a Gaussian density channel, by the seed's centre CGRIDMB of the
+ *  of a Gaussian density channel, by the seed's centre CGRIDMB c of the
  *  same entry:
  *  - at the origin: the widths at which exp(-SGRIDMB r^2) drops by a
  *    factor of 0.9 to 1/20 from the first neighbour shell r1 to the second
@@ -84,10 +92,12 @@ BoundSuggestion gaussian_centre_suggestion(
  *    at most gaussian_reach_width(r_min) (the shells: the first two peaks
  *    of the neighbour distances; without them, their 10th percentile and
  *    median);
- *  - elsewhere (or no seed centre): 0.25 / w^2 to 9 / w^2 with w the FWHM
- *    of the first peak (without peaks, or without a FWHM, the spread from
- *    the 10th to the 90th percentile), a fixed range 0.1 to 1 when the
- *    distances have no spread. */
+ *  - elsewhere: 0.25 / w^2 to 9 / w^2 with w the FWHM of the neighbour
+ *    shell nearest to c (as gaussian_centre_suggestion() takes it);
+ *  - without a seed centre, or without peaks: 0.25 / w^2 to 9 / w^2 with
+ *    w the FWHM of the first peak (without peaks, or without a FWHM, the
+ *    spread from the 10th to the 90th percentile), a fixed range 0.1 to 1
+ *    when the distances have no spread. */
 BoundSuggestion gaussian_width_suggestion(
     const tadah::core::stats::DataStats &d, const SeedView &s, int arg_pos);
 
