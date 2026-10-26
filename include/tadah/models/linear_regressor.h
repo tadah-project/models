@@ -174,7 +174,7 @@ private:
    * overflowed. @p svd is the SVD of the OALGO 3 solve (null for the
    * others), with its rank threshold @p rcond and the LAMBDA @p lambda it
    * solved with: when it keeps a singular direction whose factor S / (S^2 +
-   * LAMBDA) is not finite (S^2 below the smallest double at LAMBDA 0), the
+   * LAMBDA) is not finite (S^2 underflows to 0 at LAMBDA 0), the
    * message names the smallest such S and what leaves it out or keeps its
    * coefficient finite (a LAMBDA above 0; a rank threshold M of at least
    * its ratio to the largest singular value, below 1, which the default
@@ -220,15 +220,17 @@ private:
         value << culprit;
         share << ratio;
         msg += ": it keeps a singular direction of the design matrix of "
-               "singular value " + value.str() + ", whose square is below "
-               "the smallest double, so that its coefficient is not finite "
-               "at LAMBDA 0. A LAMBDA above 0 keeps that coefficient finite";
+               "singular value " + value.str() + ", whose square underflows "
+               "to 0 in double precision, so that its coefficient is not "
+               "finite at LAMBDA 0. A LAMBDA above 0 keeps that coefficient "
+               "finite";
         if (ratio < 1.0)
           msg += ", and a rank threshold M (OALGO's second value) of at "
                  "least " + share.str() + ", the ratio of that singular "
                  "value to the largest, leaves the direction out" +
                  std::string(ratio <= 1e-8
-                                 ? " (OALGO 3 1e-8, the default, does)"
+                                 ? " (OALGO 3 with its default M, 1e-8, "
+                                   "does)"
                                  : "");
       }
     }
@@ -569,8 +571,8 @@ private:
    *         (every OALGO), for coefficients of the solve that are not
    *         finite (require_finite_weights(): the solve overflowed; under
    *         OALGO 3 at LAMBDA 0 the message names a kept singular value
-   *         whose square is below the smallest double, when one is the
-   *         cause), and under OALGO 2 and 4 for a design matrix
+   *         whose square underflows to 0, when one is the cause), and
+   *         under OALGO 2 and 4 for a design matrix
    *         whose non-zero data rows (a data row that is zero in every
    *         column, such as a row of priority 0, adds nothing to the rank)
    *         and, with LAMBDA > 0, ridge rows cannot give it full column
