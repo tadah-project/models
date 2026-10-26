@@ -28,6 +28,7 @@
 #include <cmath>
 #include <iostream>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 
 using namespace tadah::core;
@@ -167,4 +168,38 @@ TEST_CASE("OALGO 3: the WARNING of an M of 0 or less names the threshold 0",
       CHECK(log.find("WARNING") == log.rfind("WARNING"));
     }
   }
+}
+
+/* Pins: OALGO 3 with M 0 or -1 and LAMBDA 0 keeps a singular value of
+ * 1e-200, whose square is below the smallest double: its coefficient,
+ * 1e-200 / (1e-200)^2, is not finite, and the fit is refused, the message
+ * naming the OALGO line, the singular value and that a positive M leaves
+ * it out ("... OALGO 3 0 keeps a singular direction of the design matrix
+ * of singular value 1e-200 ..."). With M 1e-8 the direction is left out
+ * and the coefficients are (1, 0).
+ * Before the fix: the fit returned the coefficient inf (or nan) without a
+ * word, and tadah train wrote it into the potential ("WEIGHTS -inf inf"),
+ * which no command could then read. */
+TEST_CASE("OALGO 3: a kept singular direction that gives coefficients that "
+          "are not finite is refused",
+          "[oalgo3][rank_threshold][nonfinite]") {
+  for (const std::string M : {"0", "-1"}) {
+    DYNAMIC_SECTION("OALGO 3 " << M) {
+      std::string what;
+      try {
+        (void)fit(3, M, 1e-200);
+      } catch (const std::runtime_error &e) {
+        what = e.what();
+      }
+      INFO(what);
+      CHECK(what.find("OALGO 3 " + M) != std::string::npos);
+      CHECK(what.find("not finite") != std::string::npos);
+      CHECK(what.find("1e-200") != std::string::npos);
+      CHECK(what.find("positive M") != std::string::npos);
+    }
+  }
+  const t_type w = fit(3, "1e-8", 1e-200);
+  REQUIRE(w.size() == 2);
+  CHECK(w[0] == Approx(1.0).epsilon(1e-12));
+  CHECK(w[1] == 0.0);
 }

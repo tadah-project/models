@@ -206,6 +206,13 @@ TEST_CASE("DM_mBlipEnv::meta: CGRIDMB is critical and the cross-param check "
   REQUIRE(is_ok(v_ok));
 }
 
+/* Pins: a narrow radial GTO at the origin fails the CGRIDMB check: with
+ * CGRIDMB 0 and SGRIDMB 6, exp(-6 r_min^2) is 1.8e-7 at the smallest
+ * neighbour distance (r_min 1.61), so ρ is ~0 for every atom; the message
+ * names CGRIDMB and ρ.
+ * Before the fix: passes as well (a pin: the check compared the centre
+ * alone with [r_min, r_max], so a centre at 0 failed whatever its width;
+ * this case had no SGRIDMB). */
 TEST_CASE("DM_mBlipEnv per-param check rejects out-of-range CGRIDMB") {
   DM_mEAD<F_mEnv<Cut_SinInv>> d;
   auto m = d.meta();
@@ -216,10 +223,10 @@ TEST_CASE("DM_mBlipEnv per-param check rejects out-of-range CGRIDMB") {
   REQUIRE(cgridmb != m->params.end());
   REQUIRE(static_cast<bool>(cgridmb->check));
 
-  // Empty context with CGRIDMB = 0.0, a centre outside the data's r_ij
-  // support (r_min=1.61)
+  // CGRIDMB = 0.0 with a narrow width: below 1e-6 at r_min = 1.61
   Context ctx;
   ctx.add<double>("CGRIDMB", 0.0);
+  ctx.add<double>("SGRIDMB", 6.0);
   SeedView sv(ctx);
   auto v = cgridmb->check(make_ta_like_stats(), sv);
   REQUIRE(is_fail(v));
@@ -318,7 +325,10 @@ DataStats scaled_stats(const DataStats &d, double s) {
  * (bump families, Å^-1) or by 4 (Gaussian families, Å^-2), matching the
  * units the metadata declares. Before the fix the bump families declared
  * Å^-1 but returned 0.25/s^2 .. 25/s^2 (D2) and 0.25/w^2 .. 9/w^2 (DM), so
- * doubling the distances divided their bounds by 4. */
+ * doubling the distances divided their bounds by 4. The DM_Poly families
+ * follow their radial basis: DM_PS_SQ (blip) Å^-1, DM_GPS_SQ (Gaussian)
+ * Å^-2; before that fix DM_PS_SQ declared the Gaussian's Å^-2 and returned
+ * its 0.25/w^2 .. 9/w^2 for a blip width. */
 TEST_CASE("Suggested width bounds scale with the units of the width coordinate",
           "[unified-dm][metadata]") {
   const DataStats base = make_ta_like_stats();
@@ -330,7 +340,9 @@ TEST_CASE("Suggested width bounds scale with the units of the width coordinate",
                           Family{"D2_Blip5", "SGRID2B", "Å^-1", 1},
                           Family{"DM_Blip", "SGRIDMB", "Å^-1", 1},
                           Family{"D2_BP", "SGRID2B", "Å^-2", 2},
-                          Family{"DM_EAD", "SGRIDMB", "Å^-2", 2}}) {
+                          Family{"DM_EAD", "SGRIDMB", "Å^-2", 2},
+                          Family{"DM_PS_SQ", "SGRIDMB", "Å^-1", 1},
+                          Family{"DM_GPS_SQ", "SGRIDMB", "Å^-2", 2}}) {
     CAPTURE(f.label);
     std::unique_ptr<D_Base> d(tadah::core::factory<D_Base>(f.label));
     auto meta = d->meta();
@@ -347,5 +359,94 @@ TEST_CASE("Suggested width bounds scale with the units of the width coordinate",
     const double factor = std::pow(2.0, f.power);
     REQUIRE(b2.first == Approx(b1.first / factor).epsilon(1e-12));
     REQUIRE(b2.second == Approx(b1.second / factor).epsilon(1e-12));
+  }
+}
+
+// ----------------------------------------------------------------
+// The reach of a radial density channel. A density sums its radial
+// function over the neighbours within its cutoff, so a channel is judged
+// by what it gives at the neighbour distances of the data, not by where
+// its centre lies: a Gaussian exp(-SGRIDMB (r - CGRIDMB)^2) misses them
+// when it is below 1e-6 (the floor of the ρ-collapse check) at every
+// distance from r_min to the smaller of r_max and RCUTMB, and a blip
+// b(SGRIDMB (r - CGRIDMB)) when its support, |r - CGRIDMB| < 2/SGRIDMB,
+// holds none of them.
+// ----------------------------------------------------------------
+
+namespace {
+
+/* The CGRIDMB check of the descriptor @p label on make_ta_like_stats()
+ * (r_min 1.61, r_max 6.5) for one channel: centre @p c, width @p eta,
+ * RCUTMB 5.6. */
+HealthVerdict reach_verdict(const std::string &label, double c, double eta) {
+  std::unique_ptr<D_Base> d(tadah::core::factory<D_Base>(label));
+  auto meta = d->meta();
+  REQUIRE(meta.has_value());
+  const ParamMeta *centre = nullptr;
+  for (const auto &p : meta->params)
+    if (p.key == "CGRIDMB") centre = &p;
+  REQUIRE(centre != nullptr);
+  REQUIRE(static_cast<bool>(centre->check));
+  Context ctx;
+  ctx.add<double>("CGRIDMB", c);
+  ctx.add<double>("SGRIDMB", eta);
+  ctx.add<double>("RCUTMB", 5.6);
+  SeedView sv(ctx);
+  return centre->check(make_ta_like_stats(), sv);
+}
+
+}  // namespace
+
+/* Pins: for the Gaussian densities (DM_mBlipEnv, DM_EAD, DM_mRLR, DM_GPS_SQ,
+ * DM_GOW_SQ) the CGRIDMB check passes a centre at the origin whose width
+ * reaches the neighbours (CGRIDMB 0, SGRIDMB 0.2: exp(-0.2 * 1.61^2) = 0.6,
+ * the Ta seed of the HPO tests) and a centre beyond the cutoff whose tail
+ * reaches them (CGRIDMB 8, SGRIDMB 0.2: 0.32 at RCUTMB 5.6), and fails a
+ * narrow Gaussian at the origin (SGRIDMB 6: 1.8e-7 at r_min) and a centre
+ * far outside (CGRIDMB 30), each message naming CGRIDMB and SGRIDMB.
+ * Before the fix: CGRIDMB 0 and 8 failed whatever the width ("CGRIDMB=0.000000
+ * is outside the dataset's r_ij range [...] -- ρ will be ~0 for every atom";
+ * the centre alone was compared with [r_min, r_max]), and no message named
+ * SGRIDMB. */
+TEST_CASE("Density reach: a Gaussian channel fails only when it is below "
+          "1e-6 at every neighbour distance",
+          "[metadata][density_reach]") {
+  for (const char *label :
+       {"DM_mBlipEnv", "DM_EAD", "DM_mRLR", "DM_GPS_SQ", "DM_GOW_SQ"}) {
+    CAPTURE(label);
+    CHECK(is_ok(reach_verdict(label, 0.0, 0.2)));
+    CHECK(is_ok(reach_verdict(label, 8.0, 0.2)));
+    for (const auto &[c, eta] : {std::pair{0.0, 6.0}, std::pair{30.0, 0.2}}) {
+      CAPTURE(c, eta);
+      const HealthVerdict v = reach_verdict(label, c, eta);
+      CHECK(is_fail(v));
+      CHECK(verdict_message(v).find("CGRIDMB") != std::string::npos);
+      CHECK(verdict_message(v).find("SGRIDMB") != std::string::npos);
+    }
+  }
+}
+
+/* Pins: for the blip densities (DM_Blip, DM_PS_SQ, DM_OW_SQ) the CGRIDMB
+ * check passes a centre below r_min whose support reaches it (CGRIDMB 1,
+ * SGRIDMB 1: |r - 1| < 2 holds 1.61 to 3) and one inside the data (CGRIDMB
+ * 3), and fails a blip at the origin whose support ends before r_min
+ * (SGRIDMB 2: |r| < 1) and one centred far outside (CGRIDMB 30), each
+ * message naming CGRIDMB and SGRIDMB.
+ * Before the fix: CGRIDMB 1 failed (below r_min 1.61, its support
+ * ignored), and no message named SGRIDMB. */
+TEST_CASE("Density reach: a blip channel fails only when its support holds "
+          "no neighbour distance",
+          "[metadata][density_reach]") {
+  for (const char *label : {"DM_Blip", "DM_PS_SQ", "DM_OW_SQ"}) {
+    CAPTURE(label);
+    CHECK(is_ok(reach_verdict(label, 1.0, 1.0)));
+    CHECK(is_ok(reach_verdict(label, 3.0, 1.0)));
+    for (const auto &[c, eta] : {std::pair{0.0, 2.0}, std::pair{30.0, 1.0}}) {
+      CAPTURE(c, eta);
+      const HealthVerdict v = reach_verdict(label, c, eta);
+      CHECK(is_fail(v));
+      CHECK(verdict_message(v).find("CGRIDMB") != std::string::npos);
+      CHECK(verdict_message(v).find("SGRIDMB") != std::string::npos);
+    }
   }
 }
