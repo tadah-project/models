@@ -171,20 +171,20 @@ TEST_CASE("OALGO 3: the WARNING of an M of 0 or less names the threshold 0",
 }
 
 /* Pins: OALGO 3 at LAMBDA 0 with M 0, -1 or 1e-300 keeps a singular
- * value of 1e-200 (1e-200 times the largest, 1), whose square is below the
- * smallest double: its coefficient, 1e-200 / (1e-200)^2, is not finite,
- * and the fit is refused, the message naming the OALGO line, the singular
- * value, that a LAMBDA above 0 keeps the coefficient finite and that an M
- * of at least 1e-200 leaves the direction out, as the default does ("...
- * OALGO 3 0 ... keeps a singular direction of the design matrix of
- * singular value 1e-200 ... a rank threshold M (OALGO's second value) of at
- * least 1e-200 ... (OALGO 3 1e-8, the default, does)"). With M 1e-8 the
- * direction is left out and the coefficients are (1, 0).
- * Before the fix: the message said only that a positive M leaves such
- * directions out, which M 1e-300 is, and not that a LAMBDA above 0 keeps
- * the coefficient finite (and, before the refusal, the fit returned the
- * coefficient inf, or nan, without a word, and tadah train wrote it into
- * the potential, "WEIGHTS -inf inf", which no command could then read). */
+ * value of 1e-200 (1e-200 times the largest, 1), whose square underflows
+ * to 0 in double precision: its coefficient, 1e-200 / (1e-200)^2, is not
+ * finite, and the fit is refused, the message naming the OALGO line, the
+ * singular value, that a LAMBDA above 0 keeps the coefficient finite and
+ * that an M of at least 1e-200 leaves the direction out, as the default M
+ * of OALGO 3 does ("... OALGO 3 0 ... keeps a singular direction of the
+ * design matrix of singular value 1e-200, whose square underflows to 0 in
+ * double precision ... a rank threshold M (OALGO's second value) of at
+ * least 1e-200 ... (OALGO 3 with its default M, 1e-8, does)"). With M 1e-8
+ * the direction is left out and the coefficients are (1, 0).
+ * Before the fix: the message said that the square was "below the smallest
+ * double" (the smallest double is the most negative one) and ended "(OALGO
+ * 3 1e-8, the default, does)", which reads as if OALGO 3 1e-8 were the
+ * default of OALGO, which is 1. */
 TEST_CASE("OALGO 3: a kept singular direction that gives coefficients that "
           "are not finite is refused",
           "[oalgo3][rank_threshold][nonfinite]") {
@@ -199,10 +199,12 @@ TEST_CASE("OALGO 3: a kept singular direction that gives coefficients that "
       INFO(what);
       CHECK(what.find("OALGO 3 " + M + ":") == 0);
       CHECK(what.find("not finite") != std::string::npos);
-      CHECK(what.find("singular value 1e-200") != std::string::npos);
+      CHECK(what.find("singular value 1e-200, whose square underflows to "
+                      "0 in double precision, so that its coefficient is "
+                      "not finite at LAMBDA 0") != std::string::npos);
       CHECK(what.find("LAMBDA above 0") != std::string::npos);
       CHECK(what.find("at least 1e-200") != std::string::npos);
-      CHECK(what.find("(OALGO 3 1e-8, the default, does)") !=
+      CHECK(what.find("(OALGO 3 with its default M, 1e-8, does)") !=
             std::string::npos);
     }
   }
@@ -247,7 +249,7 @@ std::string overflow_refusal(const std::string &oalgo,
 }  // namespace
 
 /* Pins: coefficients that are not finite for another reason than a kept
- * singular value whose square is below the smallest double -- here the
+ * singular value whose square underflows to 0 -- here the
  * targets, 1.5e308 on rows 1 and 2, overflow the solve, whose singular
  * values are sqrt(2) and 1 -- are refused under OALGO 3 with the message
  * of every OALGO, which names no singular direction: OALGO 3 1e-8 at
