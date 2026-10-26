@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <cmath>
 #include <memory>
+#include <sstream>
 
 using namespace tadah::models;
 using tadah::core::Context;
@@ -234,6 +235,12 @@ TEST_CASE("DM_mBlipEnv per-param check rejects out-of-range CGRIDMB") {
   REQUIRE(verdict_message(v).find("ρ") != std::string::npos);
 }
 
+/* Pins: without a seed centre (no CGRIDMB) the CGRIDMB suggestion of
+ * DM_mBlipEnv is the first KDE peak +- its FWHM, 2.56 to 3.16.
+ * Before the fix: passes as well (a pin; the case read the seed's CGRIDMB
+ * 0.5, which got the first-peak range too: the seed's centre was not
+ * read, and a centre of 0.5 now gets a range about it, as the case below
+ * pins). */
 TEST_CASE("DM_mBlipEnv suggester places CGRIDMB on the first KDE peak") {
   DM_mEAD<F_mEnv<Cut_SinInv>> d;
   auto m = d.meta();
@@ -245,6 +252,7 @@ TEST_CASE("DM_mBlipEnv suggester places CGRIDMB on the first KDE peak") {
   REQUIRE(static_cast<bool>(cgridmb->suggest));
 
   Context ctx = make_context_with_optim_keys();
+  ctx.remove("CGRIDMB");
   SeedView sv(ctx);
   auto bracket = cgridmb->suggest(make_ta_like_stats(), sv, -1);
   // Peak at 2.86, fwhm 0.30 -> bracket [2.56, 3.16]
@@ -449,4 +457,99 @@ TEST_CASE("Density reach: a blip channel fails only when its support holds "
       CHECK(verdict_message(v).find("SGRIDMB") != std::string::npos);
     }
   }
+}
+
+// ----------------------------------------------------------------
+// The suggested ranges of a Gaussian channel whose seed centre is not at
+// the origin: the centre is searched about the seed's own centre, with the
+// width of the neighbour shell nearest to it.
+// ----------------------------------------------------------------
+
+namespace {
+
+/* Neighbour distances with three shells, at 2.86 A (FWHM 0.3), 3.30 A
+ * (FWHM 0.24) and 4.67 A (FWHM 0.36); r_min 2.25 A, r_max 6.5 A. */
+DataStats three_shell_stats() {
+  DataStats d = make_ta_like_stats();
+  auto &pp = d.per_pair[0];
+  pp.r_min = 2.25;
+  tadah::core::stats::KdePeak a, b, c;
+  a.position = 2.86;
+  a.density = 1.0;
+  a.fwhm = 0.30;
+  b.position = 3.30;
+  b.density = 0.7;
+  b.fwhm = 0.24;
+  c.position = 4.67;
+  c.density = 0.5;
+  c.fwhm = 0.36;
+  pp.r_peaks = {a, b, c};
+  return d;
+}
+
+const ParamMeta *param_of(const DescriptorMeta &m, const char *key) {
+  for (const auto &p : m.params)
+    if (p.key == key) return &p;
+  return nullptr;
+}
+
+}  // namespace
+
+/* Pins: for a Gaussian channel of DM_EAD whose seed centre is not 0, the
+ * CGRIDMB suggestion is the seed's centre +- the FWHM of the neighbour
+ * shell nearest to it, its low end not below r_min and its high end not
+ * above RCUTMB unless the seed's centre is (then the range ends at the
+ * centre): on three_shell_stats() with CGRIDMB 1 2.9 3.3 4.7 5.9 (SGRIDMB
+ * 4, RCUTMB 5.6) the ranges are 1 to 1.3, 2.6 to 3.2, 3.06 to 3.54, 4.34
+ * to 5.06 and 5.54 to 5.9, each holding its seed's centre, and each
+ * rationale names the seed's centre and the nearest shell; the SGRIDMB
+ * suggestion of an entry is 0.25/w^2 to 9/w^2 with w the FWHM of that
+ * shell (4.7: w = 0.36, 1.929 to 69.44), its rationale naming the shell.
+ * Before the fix: every centre got the first shell's range, 2.56 to 3.16
+ * (the first peak +- its FWHM), which holds none of the seed's centres but
+ * 2.9, and every width that of the first shell (2.78 to 100), each
+ * rationale naming the first neighbour shell. */
+TEST_CASE("Gaussian density suggestions are centred on the seed's centre",
+          "[metadata][density_reach][suggest]") {
+  std::unique_ptr<D_Base> d(tadah::core::factory<D_Base>("DM_EAD"));
+  const auto meta = d->meta();
+  REQUIRE(meta.has_value());
+  const ParamMeta *centre = param_of(*meta, "CGRIDMB");
+  const ParamMeta *width = param_of(*meta, "SGRIDMB");
+  REQUIRE(centre != nullptr);
+  REQUIRE(width != nullptr);
+  Context ctx;
+  ctx.add("CGRIDMB", "1 2.9 3.3 4.7 5.9");
+  ctx.add("SGRIDMB", "4 4 4 4 4");
+  ctx.add<double>("RCUTMB", 5.6);
+  const SeedView sv(ctx);
+  const DataStats data = three_shell_stats();
+  struct Want { double c, lo, hi, shell; };
+  const Want wants[] = {{1.0, 1.0, 1.3, 2.86},
+                        {2.9, 2.6, 3.2, 2.86},
+                        {3.3, 3.06, 3.54, 3.30},
+                        {4.7, 4.34, 5.06, 4.67},
+                        {5.9, 5.54, 5.9, 4.67}};
+  for (int i = 0; i < 5; ++i) {
+    const Want &w = wants[i];
+    CAPTURE(i, w.c);
+    const BoundSuggestion s = centre->suggest(data, sv, i);
+    INFO(s.rationale);
+    CHECK_FALSE(s.none);
+    CHECK(s.first == Approx(w.lo).epsilon(1e-12));
+    CHECK(s.second == Approx(w.hi).epsilon(1e-12));
+    CHECK(s.first <= w.c);
+    CHECK(s.second >= w.c);
+    std::ostringstream shell;
+    shell << w.shell;
+    CHECK(s.rationale.find("seed's centre") != std::string::npos);
+    CHECK(s.rationale.find("nearest") != std::string::npos);
+    CHECK(s.rationale.find(shell.str()) != std::string::npos);
+  }
+  const BoundSuggestion sw = width->suggest(data, sv, 3);
+  INFO(sw.rationale);
+  CHECK(sw.first == Approx(0.25 / (0.36 * 0.36)).epsilon(1e-12));
+  CHECK(sw.second == Approx(9.0 / (0.36 * 0.36)).epsilon(1e-12));
+  CHECK(sw.rationale.find("nearest") != std::string::npos);
+  CHECK(sw.rationale.find("4.67") != std::string::npos);
 }

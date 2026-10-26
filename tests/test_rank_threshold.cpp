@@ -170,20 +170,25 @@ TEST_CASE("OALGO 3: the WARNING of an M of 0 or less names the threshold 0",
   }
 }
 
-/* Pins: OALGO 3 with M 0 or -1 and LAMBDA 0 keeps a singular value of
- * 1e-200, whose square is below the smallest double: its coefficient,
- * 1e-200 / (1e-200)^2, is not finite, and the fit is refused, the message
- * naming the OALGO line, the singular value and that a positive M leaves
- * it out ("... OALGO 3 0 keeps a singular direction of the design matrix
- * of singular value 1e-200 ..."). With M 1e-8 the direction is left out
- * and the coefficients are (1, 0).
- * Before the fix: the fit returned the coefficient inf (or nan) without a
- * word, and tadah train wrote it into the potential ("WEIGHTS -inf inf"),
- * which no command could then read. */
+/* Pins: OALGO 3 at LAMBDA 0 with M 0, -1 or 1e-300 keeps a singular
+ * value of 1e-200 (1e-200 times the largest, 1), whose square is below the
+ * smallest double: its coefficient, 1e-200 / (1e-200)^2, is not finite,
+ * and the fit is refused, the message naming the OALGO line, the singular
+ * value, that a LAMBDA above 0 keeps the coefficient finite and that an M
+ * of at least 1e-200 leaves the direction out, as the default does ("...
+ * OALGO 3 0 ... keeps a singular direction of the design matrix of
+ * singular value 1e-200 ... a rank threshold M (OALGO's second value) of at
+ * least 1e-200 ... (OALGO 3 1e-8, the default, does)"). With M 1e-8 the
+ * direction is left out and the coefficients are (1, 0).
+ * Before the fix: the message said only that a positive M leaves such
+ * directions out, which M 1e-300 is, and not that a LAMBDA above 0 keeps
+ * the coefficient finite (and, before the refusal, the fit returned the
+ * coefficient inf, or nan, without a word, and tadah train wrote it into
+ * the potential, "WEIGHTS -inf inf", which no command could then read). */
 TEST_CASE("OALGO 3: a kept singular direction that gives coefficients that "
           "are not finite is refused",
           "[oalgo3][rank_threshold][nonfinite]") {
-  for (const std::string M : {"0", "-1"}) {
+  for (const std::string M : {"0", "-1", "1e-300"}) {
     DYNAMIC_SECTION("OALGO 3 " << M) {
       std::string what;
       try {
@@ -192,14 +197,87 @@ TEST_CASE("OALGO 3: a kept singular direction that gives coefficients that "
         what = e.what();
       }
       INFO(what);
-      CHECK(what.find("OALGO 3 " + M) != std::string::npos);
+      CHECK(what.find("OALGO 3 " + M + ":") == 0);
       CHECK(what.find("not finite") != std::string::npos);
-      CHECK(what.find("1e-200") != std::string::npos);
-      CHECK(what.find("positive M") != std::string::npos);
+      CHECK(what.find("singular value 1e-200") != std::string::npos);
+      CHECK(what.find("LAMBDA above 0") != std::string::npos);
+      CHECK(what.find("at least 1e-200") != std::string::npos);
+      CHECK(what.find("(OALGO 3 1e-8, the default, does)") !=
+            std::string::npos);
     }
   }
   const t_type w = fit(3, "1e-8", 1e-200);
   REQUIRE(w.size() == 2);
   CHECK(w[0] == Approx(1.0).epsilon(1e-12));
   CHECK(w[1] == 0.0);
+}
+
+namespace {
+
+/* What a fit with OALGO @p oalgo and LAMBDA @p lambda refuses ("" when it
+ * fits) of the design matrix rows (1, 0), (1, 0) and (0, 1) with the
+ * targets 1.5e308, 1.5e308 and 1, and the two ridge-augmentation rows of
+ * the DesignMatrix layout: U^T T, the targets on the first singular
+ * direction (singular value sqrt(2)), overflows. */
+std::string overflow_refusal(const std::string &oalgo,
+                             const std::string &lambda) {
+  Context c;
+  c.add("LAMBDA", lambda);
+  c.add("OALGO", oalgo);
+  phi_type Phi(5, 2);
+  Phi.set_zero();
+  Phi(0, 0) = 1.0;
+  Phi(1, 0) = 1.0;
+  Phi(2, 1) = 1.0;
+  t_type T(5);
+  T[0] = 1.5e308;
+  T[1] = 1.5e308;
+  T[2] = 1.0;
+  T[3] = 0.0;
+  T[4] = 0.0;
+  t_type w;
+  try {
+    LinearRegressor::train(c, Phi, T, w);
+  } catch (const std::runtime_error &e) {
+    return e.what();
+  }
+  return "";
+}
+
+}  // namespace
+
+/* Pins: coefficients that are not finite for another reason than a kept
+ * singular value whose square is below the smallest double -- here the
+ * targets, 1.5e308 on rows 1 and 2, overflow the solve, whose singular
+ * values are sqrt(2) and 1 -- are refused under OALGO 3 with the message
+ * of every OALGO, which names no singular direction: OALGO 3 1e-8 at
+ * LAMBDA 0.001 and at LAMBDA 0 gives "OALGO 3 1e-8: the solve gave
+ * coefficients that are not finite (nan or inf; the first is coefficient
+ * ... of 2). No coefficients were fitted.", as OALGO 4 does ("OALGO 4: the
+ * solve gave ...").
+ * Before the fix: under OALGO 3 the message always added that the solve
+ * keeps a singular direction of singular value 1 whose square is below
+ * the smallest double at LAMBDA 0 and that a positive M leaves such
+ * directions out: none of it true here (LAMBDA 0.001, M 1e-8, 1 squared is
+ * 1). */
+TEST_CASE("OALGO 3: coefficients that are not finite for another reason "
+          "are refused without naming a singular direction",
+          "[oalgo3][rank_threshold][nonfinite]") {
+  const std::string tail = "). No coefficients were fitted.";
+  for (const char *lambda : {"0.001", "0"}) {
+    DYNAMIC_SECTION("LAMBDA " << lambda) {
+      for (const std::string oalgo : {"3 1e-8", "4"}) {
+        const std::string what = overflow_refusal(oalgo, lambda);
+        INFO("OALGO " << oalgo << ": " << what);
+        CHECK(what.find("OALGO " + oalgo + ": the solve gave coefficients "
+                        "that are not finite (nan or inf; the first is "
+                        "coefficient ") == 0);
+        REQUIRE(what.size() >= tail.size());
+        CHECK(what.compare(what.size() - tail.size(), tail.size(), tail) ==
+              0);
+        CHECK(what.find("singular") == std::string::npos);
+        CHECK(what.find("positive M") == std::string::npos);
+      }
+    }
+  }
 }
