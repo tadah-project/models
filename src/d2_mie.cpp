@@ -281,8 +281,9 @@ std::optional<DescriptorMeta> D2_MIE::meta() const {
   // Suggester defaults span the typical literature range [6, 24] —
   // wide enough to cover Buckingham-like and harder cores.
   p_n.suggest = [](const DataStats&, const SeedView&, int)
-      -> std::pair<double, double> {
-    return std::make_pair(6.0, 24.0);
+      -> BoundSuggestion {
+    return BoundSuggestion::fixed_range(
+        6.0, 24.0, "fixed range: the typical span of Mie repulsive exponents");
   };
   dm.params.push_back(std::move(p_n));
 
@@ -299,8 +300,9 @@ std::optional<DescriptorMeta> D2_MIE::meta() const {
   p_m.crit    = Criticality::Recommended;
   p_m.scope   = PairScope::Global;
   p_m.suggest = [](const DataStats&, const SeedView&, int)
-      -> std::pair<double, double> {
-    return std::make_pair(2.0, 12.0);
+      -> BoundSuggestion {
+    return BoundSuggestion::fixed_range(
+        2.0, 12.0, "fixed range: the typical span of Mie attractive exponents");
   };
   dm.params.push_back(std::move(p_m));
 

@@ -4,6 +4,7 @@
 #include <tadah/models/descriptors/dm/dm_mEAD.h>
 #include <tadah/models/descriptors/dm/dm_impl_utils.h>
 #include <tadah/models/descriptors/d_basis_functions.h>
+#include <tadah/models/descriptors/density_reach.h>
 #include <tadah/models/descriptors/warn_once.h>
 
 constexpr std::size_t MAX_GRID = 64;
@@ -1149,9 +1150,7 @@ bool DM_mEAD<F>::calc_dXijdri_dtheta(
 template <typename F>
 std::optional<DescriptorMeta> DM_mEAD<F>::meta() const {
   using DataStats = tadah::core::stats::DataStats;
-  static constexpr std::size_t I_P10 = tadah::core::stats::IDX_P10;
   static constexpr std::size_t I_P50 = tadah::core::stats::IDX_P50;
-  static constexpr std::size_t I_P90 = tadah::core::stats::IDX_P90;
   static constexpr std::size_t I_P99 = tadah::core::stats::IDX_P99;
 
   DescriptorMeta dm;
@@ -1194,37 +1193,13 @@ std::optional<DescriptorMeta> DM_mEAD<F>::meta() const {
   p_cgrid.arg_pos  = 0;
   p_cgrid.scale    = Scale::Distance;
   p_cgrid.units    = "Å";
-  p_cgrid.role     = "GTO centre r_s. Must lie within dataset r_ij range or ρ collapses.";
+  p_cgrid.role     = "GTO centre r_s of exp(-SGRIDMB (r - CGRIDMB)^2). A GTO below 1e-6 at every neighbour distance collapses ρ.";
   p_cgrid.hard.lo  = 0.0;
   p_cgrid.crit     = Criticality::Critical;
   p_cgrid.scope    = PairScope::PerElementPair;
-  p_cgrid.suggest  = [](const DataStats& d, const SeedView&, int) {
-    if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
-    const auto& pp = d.per_pair[0];
-    if (!pp.r_peaks.empty()) {
-      const double mu = pp.r_peaks[0].position;
-      const double w  = pp.r_peaks[0].fwhm > 0
-                          ? pp.r_peaks[0].fwhm
-                          : 0.2 * mu;
-      return std::make_pair(std::max(0.0, mu - w), mu + w);
-    }
-    return std::make_pair(pp.r_percentiles[I_P10],
-                          pp.r_percentiles[I_P90]);
-  };
-  p_cgrid.check    = [](const DataStats& d, const SeedView& s) -> HealthVerdict {
-    if (!s.contains("CGRIDMB")) return HealthOk{};
-    if (d.per_pair.empty()) return HealthOk{};
-    const std::size_t n = s.size("CGRIDMB");
-    for (std::size_t i = 0; i < n; ++i) {
-      double mu;
-      try { mu = s.get<double>("CGRIDMB", i); } catch (...) { continue; }
-      const auto& pp = d.per_pair[0];
-      if (mu < pp.r_min || mu > pp.r_max)
-        return HealthFail{"CGRIDMB[" + std::to_string(i) +
-                          "]=" + std::to_string(mu) +
-                          " is outside dataset r_ij range — ρ will collapse."};
-    }
-    return HealthOk{};
+  p_cgrid.suggest  = gaussian_centre_suggestion;
+  p_cgrid.check    = [](const DataStats& d, const SeedView& s) {
+    return radial_reach_check(d, s, BasisKind::Gaussian);
   };
   dm.params.push_back(std::move(p_cgrid));
 
@@ -1237,14 +1212,7 @@ std::optional<DescriptorMeta> DM_mEAD<F>::meta() const {
   p_sgrid.hard.lo  = 1.0e-6;
   p_sgrid.crit     = Criticality::Critical;
   p_sgrid.scope    = PairScope::Global;
-  p_sgrid.suggest  = [](const DataStats& d, const SeedView&, int) {
-    if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
-    const auto& pp = d.per_pair[0];
-    const double w = pp.r_peaks.empty()
-                       ? (pp.r_percentiles[I_P90] - pp.r_percentiles[I_P10])
-                       : (pp.r_peaks[0].fwhm > 0 ? pp.r_peaks[0].fwhm : 0.5);
-    return std::make_pair(0.25 / (w * w), 9.0 / (w * w));
-  };
+  p_sgrid.suggest  = gaussian_width_suggestion;
   dm.params.push_back(std::move(p_sgrid));
 
   dm.cross_param_checks.push_back(

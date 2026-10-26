@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <tadah/core/context.h>
@@ -163,6 +164,55 @@ private:
             " holds a value that is not finite (nan or inf) at row " +
             std::to_string(i + 1) + " (of " + rows +
             "); no weights were fitted");
+  }
+
+  /* Refuses coefficients of a solve that are not finite (nan or inf),
+   * naming the OALGO line and the first such coefficient (its weight, when
+   * FIXINDEX pins some): a fit never returns them, and tadah train would
+   * write them into a potential no command reads. Under OALGO 3 the
+   * message gives the smallest singular value the solve keeps, a direction
+   * whose square is below the smallest double (rank threshold M 0 or less,
+   * LAMBDA 0) gives an infinite coefficient, and a positive M leaves such
+   * directions out. @p svd is the SVD of the OALGO 3 solve, null for the
+   * others. */
+  static void require_finite_weights(const tadah::core::Context &context,
+                                     const tadah::core::t_type &weights,
+                                     const Layout &L,
+                                     tadah::models::SVD *svd = nullptr,
+                                     double rcond = 0.0) {
+    size_t bad = weights.size();
+    for (size_t j = 0; j < weights.size(); ++j)
+      if (!finite_bits(weights[j])) {
+        bad = j;
+        break;
+      }
+    if (bad == weights.size()) return;
+    std::string line = "OALGO";
+    for (const std::string &v : context("OALGO")) line += " " + v;
+    const bool pins = L.pinned(weights.size()) > 0;
+    std::string msg =
+        line + ": the solve gave coefficients that are not finite (nan or "
+        "inf; the first is coefficient " + std::to_string(bad + 1) + " of " +
+        std::to_string(weights.size()) +
+        (pins ? ", weight " + std::to_string(weight_of(bad + 1, L)) : "") +
+        ")";
+    if (svd) {
+      const double *S = svd->getS();
+      const int k = std::min(svd->rows(), svd->cols());
+      const double thresh = OLS::pseudoinverse_threshold(S, k, rcond);
+      double smallest = 0.0;
+      for (int i = 0; i < k; ++i)
+        if (S[i] > thresh && (smallest == 0.0 || S[i] < smallest))
+          smallest = S[i];
+      std::ostringstream value;
+      value << smallest;
+      msg += ": it keeps a singular direction of the design matrix of "
+             "singular value " + value.str() + ", whose coefficient is not "
+             "finite (its square is below the smallest double at LAMBDA "
+             "0); a positive M, OALGO's second value (OALGO 3 1e-8, the "
+             "default), leaves such directions out";
+    }
+    throw std::runtime_error(msg + ". No coefficients were fitted.");
   }
 
   static std::string oalgo_name(int oalgo) {
@@ -496,7 +546,10 @@ private:
    *         its data rows and one ridge row per column, or another number
    *         of column weights) or an intercept column past its columns.
    * @throws std::runtime_error for a value of Phi or T that is not finite
-   *         (every OALGO), and under OALGO 2 and 4 for a design matrix
+   *         (every OALGO), for coefficients of the solve that are not
+   *         finite (require_finite_weights(); under OALGO 3 with M 0 or
+   *         less and LAMBDA 0, a kept singular value whose square is below
+   *         the smallest double), and under OALGO 2 and 4 for a design matrix
    *         whose non-zero data rows (a data row that is zero in every
    *         column, such as a row of priority 0, adds nothing to the rank)
    *         and, with LAMBDA > 0, ridge rows cannot give it full column
@@ -568,12 +621,14 @@ public:
     }
     if (oalgo == 1) {
       ols.solve(Phi, T, weights, rcond, tadah::models::Algorithm::GELSD);
+      require_finite_weights(context, weights, layout);
     } else if (oalgo == 2) {
       try {
         ols.solve(Phi, T, weights, rcond, tadah::models::Algorithm::GELS);
       } catch (const RankDeficientError &e) {
         throw_rank_deficient(2, e, Phi, layout, lambda, nonzero, n_bias);
       }
+      require_finite_weights(context, weights, layout);
     } else if (oalgo == 3) {
       // The SVD path applies a uniform ridge across all singular values;
       // there is no per-column penalty, so it cannot leave the intercept
@@ -600,6 +655,7 @@ public:
 
       ols.solveWithPseudoinverse(Phi.rows(), Phi.cols(), T, weights,
                                  svd.getSVDWorkspace(), rcond, lambda);
+      require_finite_weights(context, weights, layout, &svd, rcond);
       const std::size_t n_dropped = dropped_directions(svd, rcond);
       // The threshold as OLS::pseudoinverse_threshold sets it: rcond
       // times the largest singular value, 0 for an rcond of 0 or less.
@@ -621,6 +677,7 @@ public:
       } catch (const RankDeficientError &e) {
         throw_rank_deficient(4, e, Phi, layout, lambda, nonzero, n_bias);
       }
+      require_finite_weights(context, weights, layout);
     } else {
       throw std::runtime_error("Unsupported OALGO: " + std::to_string(oalgo));
     }
@@ -754,6 +811,7 @@ public:
                         nonzero_data_rows(Phi, layout));
     tadah::models::OLS ols(workspaceManager);
     ols.solveAndCacheFactor(Phi, T, weights, factor, n_bias);
+    require_finite_weights(context, weights, layout);
   }
 
   /// Convenience overload using a temporary workspace manager.

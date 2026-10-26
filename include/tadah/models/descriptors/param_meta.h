@@ -7,7 +7,7 @@
 // DescriptorMeta from its overridden `D_Base::meta() const`. The
 // HPO bound-validation pipeline reads this metadata to:
 //
-//   * Suggest data-driven OPTIM bounds (BoundSuggester).
+//   * Suggest OPTIM bounds from the data and the seed (BoundSuggester).
 //   * Diagnose degenerate parameter combinations (HealthCheck).
 //   * Flag missing OPTIM blocks on Critical hyperparameters.
 //   * Predict design-matrix column counts before construction.
@@ -162,6 +162,47 @@ class SeedView {
 //  Closures
 // ---------------------------------------------------------------------
 
+/** \brief A suggested OPTIM range of one parameter entry and how it was
+ *  obtained: `first` is the low end and `second` the high end, as in the
+ *  `(lo, hi)` pair it extends (a suggester may return the pair alone).
+ *
+ *  - `rationale`: the form the range assumes and the statistics it comes
+ *    from; empty when the suggester gives none (the framework then states
+ *    the scale and the role of the parameter);
+ *  - `fixed`: the range is a fixed one, not derived from the data (the
+ *    statistic it needs is absent), and `rationale` says why;
+ *  - `none`: no OPTIM line is suggested for the entry (a radial centre at
+ *    the origin, whose width alone sets its reach), and `rationale` says
+ *    why; the range is then empty.
+ */
+struct BoundSuggestion : std::pair<double, double> {
+  std::string rationale{};
+  bool fixed = false;
+  bool none = false;
+
+  BoundSuggestion() : std::pair<double, double>(0.0, 0.0) {}
+  BoundSuggestion(double lo, double hi, std::string why = {})
+      : std::pair<double, double>(lo, hi), rationale(std::move(why)) {}
+  /** The range alone, without a rationale (implicit: a suggester that
+   *  returns a pair gives this). */
+  BoundSuggestion(const std::pair<double, double>& range)
+      : std::pair<double, double>(range) {}
+
+  /** A fixed range, not derived from the data: @p why says so. */
+  static BoundSuggestion fixed_range(double lo, double hi, std::string why) {
+    BoundSuggestion s(lo, hi, std::move(why));
+    s.fixed = true;
+    return s;
+  }
+  /** No OPTIM line for the entry: @p why says why. */
+  static BoundSuggestion no_row(std::string why) {
+    BoundSuggestion s;
+    s.rationale = std::move(why);
+    s.none = true;
+    return s;
+  }
+};
+
 /** \brief Suggest a `(lo, hi)` bound from data + seed.
  *
  *  arg_pos: -1 for scalar params; 0..n-1 for vector entries
@@ -170,9 +211,10 @@ class SeedView {
  *  Closures are written to read DataStats — never to embed magic
  *  numbers. The only constants permitted in a suggester body are
  *  small structural ones (e.g. "double the FWHM") that are documented
- *  at the declaration site.
+ *  at the declaration site. A range that does not come from the data
+ *  is returned as BoundSuggestion::fixed_range, with the reason.
  */
-using BoundSuggester = std::function<std::pair<double, double>(
+using BoundSuggester = std::function<BoundSuggestion(
     const tadah::core::stats::DataStats&,
     const SeedView&,
     int arg_pos)>;

@@ -369,11 +369,15 @@ std::optional<DescriptorMeta> D2_Blip::meta() const {
   p_sgrid.hard.lo  = 1.0e-6;
   p_sgrid.crit     = Criticality::Recommended;
   p_sgrid.scope    = PairScope::Global;
-  p_sgrid.suggest  = [](const DataStats& d, const SeedView&, int) {
+  p_sgrid.suggest  = [](const DataStats& d, const SeedView&,
+                         int) -> BoundSuggestion {
     if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
     const auto& pp = d.per_pair[0];
     const double spread = pp.r_percentiles[I_P90] - pp.r_percentiles[I_P10];
-    if (spread <= 0.0) return std::make_pair(0.1, 1.0);
+    if (spread <= 0.0)
+      return BoundSuggestion::fixed_range(
+          0.1, 1.0, "fixed range: the neighbour distances have no spread "
+                    "to take a width of the bump from");
     // eta in [1 / spread, 10 / spread] (inverse distance): the blip's
     // support half-width 2/eta runs from 2 spread (broad enough to cover
     // r_ij p10..p90) down to spread/5 (narrow).

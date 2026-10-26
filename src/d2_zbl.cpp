@@ -368,8 +368,9 @@ std::optional<DescriptorMeta> D2_ZBL::meta() const {
   p_a0.crit    = Criticality::Optional;
   p_a0.scope   = PairScope::Global;
   p_a0.suggest = [](const DataStats&, const SeedView&, int)
-      -> std::pair<double, double> {
-    return std::make_pair(0.265, 0.795);   // ±50 % of default 0.5292 Å
+      -> BoundSuggestion {
+    return BoundSuggestion::fixed_range(   // ±50 % of default 0.5292 Å
+        0.265, 0.795, "fixed range: +-50 % of the Bohr radius, the default");
   };
   dm.params.push_back(std::move(p_a0));
 
@@ -384,8 +385,9 @@ std::optional<DescriptorMeta> D2_ZBL::meta() const {
   p_s0.crit    = Criticality::Optional;
   p_s0.scope   = PairScope::Global;
   p_s0.suggest = [](const DataStats&, const SeedView&, int)
-      -> std::pair<double, double> {
-    return std::make_pair(0.443, 1.328);   // ±50 % of default 0.88534
+      -> BoundSuggestion {
+    return BoundSuggestion::fixed_range(   // ±50 % of default 0.88534
+        0.443, 1.328, "fixed range: +-50 % of the default 0.88534");
   };
   dm.params.push_back(std::move(p_s0));
 
@@ -400,8 +402,9 @@ std::optional<DescriptorMeta> D2_ZBL::meta() const {
   p_p0.crit    = Criticality::Optional;
   p_p0.scope   = PairScope::Global;
   p_p0.suggest = [](const DataStats&, const SeedView&, int)
-      -> std::pair<double, double> {
-    return std::make_pair(0.115, 0.345);
+      -> BoundSuggestion {
+    return BoundSuggestion::fixed_range(0.115, 0.345,
+                                        "fixed range: +-50 % of the default 0.23");
   };
   dm.params.push_back(std::move(p_p0));
 
@@ -416,8 +419,9 @@ std::optional<DescriptorMeta> D2_ZBL::meta() const {
   p_p1.crit    = Criticality::Optional;
   p_p1.scope   = PairScope::Global;
   p_p1.suggest = [](const DataStats&, const SeedView&, int)
-      -> std::pair<double, double> {
-    return std::make_pair(0.115, 0.345);
+      -> BoundSuggestion {
+    return BoundSuggestion::fixed_range(0.115, 0.345,
+                                        "fixed range: +-50 % of the default 0.23");
   };
   dm.params.push_back(std::move(p_p1));
 
