@@ -774,9 +774,24 @@ TEST_CASE_METHOD(DensityFixture, "rhoform: normalise_rhoform_key (writers)",
   }
 }
 
+/* Pins: check_rhoform_precedence, for an engine that merges a run's
+ * configuration over a potential (tadah refit --edit with -c): the
+ * potential's form, or the same form in the configuration (any case), is
+ * accepted; another form in the configuration is refused, "RHOFORM
+ * conflict: pot.tadah declares RHOFORM SIGNED and the configuration file
+ * sets RHOFORM MONOTONE. RHOFORM is a property of the potential (...): the
+ * potential file sets it, not the configuration file."; a DM_REAM potential
+ * without the key is refused, "pot.tadah: the RHOFORM of the configuration
+ * file does not apply (...); the RHOFORM line belongs in pot.tadah.", with
+ * the migration text, and so it is without a configuration key; without a
+ * DM_REAM block a key on either side is ignored.
+ * Before the fix: the messages said "... but the task configuration sets
+ * RHOFORM MONOTONE ... edit the potential file instead." and "pot.tadah:
+ * the task configuration's RHOFORM does not apply (...); add the RHOFORM
+ * line to pot.tadah.": the two message checks fail. */
 TEST_CASE_METHOD(DensityFixture,
-                 "rhoform: check_rhoform_precedence (engines merging a task "
-                 "over a potential)", "[ream][rhoform][helpers]") {
+                 "rhoform: check_rhoform_precedence (engines merging a "
+                 "configuration over a potential)", "[ream][rhoform][helpers]") {
   const Context with = ream_ctx(layout(BasisKind::Blip5, true), "SIGNED", "Cut_Dummy");
   const Context without = ream_ctx(layout(BasisKind::Blip5, true), "", "Cut_Dummy");
   Context task_none;
@@ -789,13 +804,19 @@ TEST_CASE_METHOD(DensityFixture,
   REQUIRE_NOTHROW(check_rhoform_precedence(with, task_signed, "pot.tadah"));
   CHECK_THROWS_WITH(check_rhoform_precedence(with, task_mono, "pot.tadah"),
                     Contains("RHOFORM conflict: pot.tadah declares RHOFORM "
-                             "SIGNED but the task configuration sets RHOFORM "
-                             "MONOTONE"));
-  // a key-less DM_REAM potential cannot borrow the task's form, and the
-  // message says the task's key was not used
+                             "SIGNED and the configuration file sets RHOFORM "
+                             "MONOTONE. RHOFORM is a property of the "
+                             "potential (its density amplitudes were fitted "
+                             "in that form): the potential file sets it, not "
+                             "the configuration file."));
+  // a key-less DM_REAM potential cannot borrow the configuration's form,
+  // and the message says the configuration's key was not used
   CHECK_THROWS_WITH(check_rhoform_precedence(without, task_signed, "pot.tadah"),
-                    Contains("pot.tadah: the task configuration's RHOFORM "
-                             "does not apply") &&
+                    Contains("pot.tadah: the RHOFORM of the configuration "
+                             "file does not apply (the form belongs to the "
+                             "potential, whose density amplitudes were fitted "
+                             "in it); the RHOFORM line belongs in "
+                             "pot.tadah.") &&
                         Contains("DM_REAM: RHOFORM is required"));
   CHECK_THROWS_WITH(check_rhoform_precedence(without, task_none, "pot.tadah"),
                     Contains("pot.tadah: DM_REAM: RHOFORM is required"));

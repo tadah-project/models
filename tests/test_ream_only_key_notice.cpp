@@ -108,7 +108,8 @@ TEST_CASE("EMBF0 and RHOFORM without a DM_REAM block: one stderr notice per "
     // two loads of the potential (every model is built by DC_Selector)
     { tadah::models::DC_Selector first(pot); }
     { tadah::models::DC_Selector second(pot); }
-    // the engines that merge a task over a potential (predict, analysis)
+    // the engines that merge a configuration over a potential (refit
+    // --edit, analysis bfunc)
     tadah::models::check_embf0_precedence(pot, task, "pot.tadah");
     tadah::models::check_rhoform_precedence(pot, task, "pot.tadah");
     // the writers drop both keys
@@ -132,10 +133,16 @@ TEST_CASE("EMBF0 and RHOFORM without a DM_REAM block: one stderr notice per "
   CHECK(count_of(out, "RHOFORM") == 0);
 }
 
-TEST_CASE("A task EMBF0 or RHOFORM over a potential without a DM_REAM block "
-          "is reported like one in the potential",
+/* Pins: an EMBF0 or RHOFORM of a run's configuration over a potential
+ * without a DM_REAM block gives the one notice per key and process of a
+ * key without effect, as one in the potential does.
+ * Before the fix: passes as well (a pin; the test was named for a task's
+ * keys, which a TASK section of a task file gave). */
+TEST_CASE("An EMBF0 or RHOFORM of a configuration over a potential without "
+          "a DM_REAM block is reported like one in the potential",
           "[embf0][rhoform][key_notice]") {
-  // The task keys alone (the potential has neither): still the one notice.
+  // The configuration's keys alone (the potential has neither): still the
+  // one notice.
   Context pot = pair_potential();
   Context task;
   task.add("EMBF0", "FREE");
