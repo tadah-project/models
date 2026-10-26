@@ -1,4 +1,6 @@
 #include <tadah/models/descriptors/dm/dm_all.h>
+#include <tadah/models/descriptors/density_reach.h>
+#include <tadah/core/number_format.h>
 #include <tadah/core/stats/data_stats.h>
 #include <algorithm>
 namespace tadah {
@@ -8,18 +10,20 @@ namespace models {
 // Specialisation of DM_mEAD<F>::meta() for the F_mEnv<Cut_SinInv>
 // instantiation registered as "DM_mBlipEnv".
 //
-// This descriptor fails silently when its radial GTO centre lies outside
-// the data's neighbour distances: every density ρ collapses to zero and
-// its design-matrix block is empty. The metadata captures every parameter that the descriptor reads from
-// Context, with bound suggesters anchored to dataset percentiles and
-// KDE peaks, and a cross-parameter ρ-collapse health check.
+// This descriptor fails silently when its radial GTO reaches none of the
+// data's neighbour distances (a narrow GTO, or a centre far from the
+// neighbours): every density ρ collapses to zero and its design-matrix
+// block is empty. The metadata captures every parameter that the
+// descriptor reads from Context, with bound suggesters that read the seed
+// and are anchored to dataset percentiles and KDE peaks, the reach check of
+// the GTO (radial_reach_check) and a cross-parameter ρ-collapse health
+// check.
 // ----------------------------------------------------------------------
 template<>
 std::optional<DescriptorMeta>
 DM_mEAD<F_mEnv<Cut_SinInv>>::meta() const {
   using DataStats = tadah::core::stats::DataStats;
   static constexpr std::size_t I_P1   = tadah::core::stats::IDX_P1;
-  static constexpr std::size_t I_P5   = tadah::core::stats::IDX_P5;
   static constexpr std::size_t I_P10  = tadah::core::stats::IDX_P10;
   static constexpr std::size_t I_P50  = tadah::core::stats::IDX_P50;
   static constexpr std::size_t I_P90  = tadah::core::stats::IDX_P90;
@@ -50,40 +54,20 @@ DM_mEAD<F_mEnv<Cut_SinInv>>::meta() const {
   };
   dm.params.push_back(std::move(p_rcut));
 
-  // CGRIDMB — radial GTO centre; a bad fixed value collapses ρ.
+  // CGRIDMB — radial GTO centre; a GTO that reaches no neighbour collapses ρ.
   ParamMeta p_cgrid;
   p_cgrid.key      = "CGRIDMB";
   p_cgrid.arg_pos  = -1;            // DM_mBlipEnv requires cgrid size 1
   p_cgrid.scale    = Scale::Distance;
   p_cgrid.units    = "Å";
-  p_cgrid.role     = "Centre of the radial GTO. Must lie in the data's "
-                     "neighbour-distance support; otherwise ρ collapses.";
+  p_cgrid.role     = "Centre of the radial GTO exp(-SGRIDMB (r - CGRIDMB)^2). "
+                     "A GTO below 1e-6 at every neighbour distance collapses ρ.";
   p_cgrid.hard.lo  = 0.0;
   p_cgrid.crit     = Criticality::Critical;
   p_cgrid.scope    = PairScope::PerElementPair;
-  p_cgrid.suggest  = [](const DataStats& d, const SeedView&, int) {
-    if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
-    const auto& pp = d.per_pair[0];
-    if (!pp.r_peaks.empty()) {
-      const auto& pk = pp.r_peaks.front();
-      return std::make_pair(std::max(0.0, pk.position - pk.fwhm),
-                            pk.position + pk.fwhm);
-    }
-    return std::make_pair(pp.r_percentiles[I_P5],
-                          pp.r_percentiles[I_P10]);
-  };
-  p_cgrid.check    = [](const DataStats& d, const SeedView& s) -> HealthVerdict {
-    if (!s.contains("CGRIDMB") || d.per_pair.empty()) return HealthOk{};
-    const auto& pp = d.per_pair[0];
-    const double mu = s.get<double>("CGRIDMB", 0);
-    if (mu < pp.r_min || mu > pp.r_max) {
-      return HealthFail{"CGRIDMB=" + std::to_string(mu) +
-                        " is outside the dataset's r_ij range [" +
-                        std::to_string(pp.r_min) + "," +
-                        std::to_string(pp.r_max) +
-                        "] — ρ will be ~0 for every atom."};
-    }
-    return HealthOk{};
+  p_cgrid.suggest  = gaussian_centre_suggestion;
+  p_cgrid.check    = [](const DataStats& d, const SeedView& s) {
+    return radial_reach_check(d, s, BasisKind::Gaussian);
   };
   dm.params.push_back(std::move(p_cgrid));
 
@@ -98,15 +82,7 @@ DM_mEAD<F_mEnv<Cut_SinInv>>::meta() const {
   p_sgrid.hard.lo  = 1.0e-6;
   p_sgrid.crit     = Criticality::Critical;
   p_sgrid.scope    = PairScope::Global;
-  p_sgrid.suggest  = [](const DataStats& d, const SeedView&, int) {
-    if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
-    const auto& pp = d.per_pair[0];
-    double w = pp.r_percentiles[I_P90] - pp.r_percentiles[I_P10];
-    if (!pp.r_peaks.empty()) w = pp.r_peaks[0].fwhm;
-    if (!(w > 0.0)) return std::make_pair(0.1, 1.0);
-    return std::make_pair(0.25 / (w * w),
-                          9.0  / (w * w));
-  };
+  p_sgrid.suggest  = gaussian_width_suggestion;
   dm.params.push_back(std::move(p_sgrid));
 
   // RCUTENV — inverse-cutoff envelope on ρ (Cut_SinInv).
@@ -122,13 +98,15 @@ DM_mEAD<F_mEnv<Cut_SinInv>>::meta() const {
   p_renv.hard.lo  = 1.0e-6;
   p_renv.crit     = Criticality::Recommended;
   p_renv.scope    = PairScope::Global;
-  p_renv.suggest  = [self](const DataStats& d, const SeedView&, int) {
+  p_renv.suggest  = [self](const DataStats& d, const SeedView&,
+                            int) -> BoundSuggestion {
     auto it = d.rho_percentiles_per_descriptor.find(self);
-    if (it == d.rho_percentiles_per_descriptor.end()) {
-      return std::make_pair(0.5, 5.0);          // fall-back; suggester logs notice
-    }
+    if (it == d.rho_percentiles_per_descriptor.end())
+      return BoundSuggestion::fixed_range(
+          0.5, 5.0, "fixed range: the statistics have no densities ρ");
     const auto& rho = it->second;
-    return std::make_pair(rho[I_P10], rho[I_P90]);
+    return BoundSuggestion(rho[I_P10], rho[I_P90],
+                           "the 10th to 90th percentiles of ρ");
   };
   dm.params.push_back(std::move(p_renv));
 
@@ -141,13 +119,15 @@ DM_mEAD<F_mEnv<Cut_SinInv>>::meta() const {
   p_cemb.role     = "i-th embedding-blip centre in ρ-space.";
   p_cemb.crit     = Criticality::Recommended;
   p_cemb.scope    = PairScope::Global;
-  p_cemb.suggest  = [self](const DataStats& d, const SeedView&, int) {
+  p_cemb.suggest  = [self](const DataStats& d, const SeedView&,
+                            int) -> BoundSuggestion {
     auto it = d.rho_percentiles_per_descriptor.find(self);
-    if (it == d.rho_percentiles_per_descriptor.end()) {
-      return std::make_pair(1.0, 10.0);
-    }
+    if (it == d.rho_percentiles_per_descriptor.end())
+      return BoundSuggestion::fixed_range(
+          1.0, 10.0, "fixed range: the statistics have no densities ρ");
     const auto& rho = it->second;
-    return std::make_pair(rho[I_P10], rho[I_P90]);
+    return BoundSuggestion(rho[I_P10], rho[I_P90],
+                           "the 10th to 90th percentiles of ρ");
   };
   dm.params.push_back(std::move(p_cemb));
 
@@ -162,25 +142,37 @@ DM_mEAD<F_mEnv<Cut_SinInv>>::meta() const {
   p_semb.hard.lo  = 1.0e-6;
   p_semb.crit     = Criticality::Recommended;
   p_semb.scope    = PairScope::Global;
-  p_semb.suggest  = [self](const DataStats& d, const SeedView& s, int) {
+  p_semb.suggest  = [self](const DataStats& d, const SeedView& s,
+                            int) -> BoundSuggestion {
     if (!s.contains("CEMBFUNC") || s.size("CEMBFUNC") < 2) {
-      // Fallback: small range based on rho data if available.
+      // Without two seed centres: from the spread of ρ, when known.
       auto it = d.rho_percentiles_per_descriptor.find(self);
       if (it != d.rho_percentiles_per_descriptor.end()) {
         const double w = it->second[I_P90] - it->second[I_P10];
-        if (w > 0) return std::make_pair(0.5 / w, 8.0 / w);
+        if (w > 0)
+          return BoundSuggestion(0.5 / w, 8.0 / w,
+                                 "0.5/w to 8/w with w the spread from the "
+                                 "10th to the 90th percentile of ρ");
       }
-      return std::make_pair(0.5, 4.0);
+      return BoundSuggestion::fixed_range(
+          0.5, 4.0, "fixed range: the seed has fewer than two CEMBFUNC "
+                    "centres and the statistics have no densities ρ");
     }
     auto v = s.vec("CEMBFUNC");
     const double mu_lo = *std::min_element(v.begin(), v.end());
     const double mu_hi = *std::max_element(v.begin(), v.end());
     const double n     = static_cast<double>(v.size());
     const double d_mu  = (mu_hi - mu_lo) / std::max(1.0, n - 1.0);
-    if (!(d_mu > 0.0)) return std::make_pair(0.5, 4.0);
-    // Half-overlap (η ≈ 1/Δμ) anchored at the centre of the range.
-    return std::make_pair(0.25 / d_mu,
-                          4.0  / d_mu);
+    if (!(d_mu > 0.0))
+      return BoundSuggestion::fixed_range(
+          0.5, 4.0, "fixed range: the seed's CEMBFUNC centres coincide");
+    // Half-overlap (η ≈ 1/Δμ) anchored at the centre of the range: the
+    // seed's centres, not the data, give this range.
+    return BoundSuggestion::fixed_range(
+        0.25 / d_mu, 4.0 / d_mu,
+        "fixed range: 0.25/d to 4/d with d = " +
+            tadah::core::format_roundtrip(d_mu) +
+            " the spacing of the seed's CEMBFUNC centres, not the data");
   };
   dm.params.push_back(std::move(p_semb));
 
@@ -190,11 +182,11 @@ DM_mEAD<F_mEnv<Cut_SinInv>>::meta() const {
       auto it = d.rho_percentiles_per_descriptor.find(self);
       if (it == d.rho_percentiles_per_descriptor.end()) return HealthOk{};
       const auto& rho = it->second;
-      if (rho[I_P99] < 1.0e-6) {
+      if (rho[I_P99] < kDensityReachFloor) {
         return HealthFail{
-          "ρ collapses to ≤ 1e-6 for 99% of atoms — radial GTO does not "
-          "overlap the neighbour shells. Move CGRIDMB into the data's "
-          "r_ij range, or widen SGRIDMB."};
+          "ρ collapses to ≤ 1e-6 for 99% of atoms: the radial GTO does not "
+          "reach the neighbour shells (a centre CGRIDMB nearer the "
+          "neighbours, or a smaller SGRIDMB, reaches them)."};
       }
       const double denom = (rho[I_P1] > 0) ? rho[I_P1] : 1.0e-30;
       if (rho[I_P99] / denom < 1.05) {

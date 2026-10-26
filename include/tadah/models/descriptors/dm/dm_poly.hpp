@@ -5,6 +5,7 @@
 #include <tadah/models/descriptors/dm/dm_impl_utils.h>
 #include <tadah/models/descriptors/warn_once.h>
 #include <tadah/models/descriptors/dm/radial_policies.h>
+#include <tadah/models/descriptors/density_reach.h>
 
 #include <stdexcept>
 #include <type_traits>
@@ -465,9 +466,9 @@ template <typename ChannelFn, typename RadialBasis, typename AggMode>
 std::optional<DescriptorMeta>
 DM_Poly<ChannelFn, RadialBasis, AggMode>::meta() const {
   using DataStats = tadah::core::stats::DataStats;
-  static constexpr std::size_t I_P10 = tadah::core::stats::IDX_P10;
+  [[maybe_unused]] static constexpr std::size_t I_P10 = tadah::core::stats::IDX_P10;
   static constexpr std::size_t I_P50 = tadah::core::stats::IDX_P50;
-  static constexpr std::size_t I_P90 = tadah::core::stats::IDX_P90;
+  [[maybe_unused]] static constexpr std::size_t I_P90 = tadah::core::stats::IDX_P90;
   static constexpr std::size_t I_P99 = tadah::core::stats::IDX_P99;
 
   DescriptorMeta dm;
@@ -509,56 +510,79 @@ DM_Poly<ChannelFn, RadialBasis, AggMode>::meta() const {
   p_cgrid.arg_pos  = 0;
   p_cgrid.scale    = Scale::Distance;
   p_cgrid.units    = "Å";
-  p_cgrid.role     = "Radial centre. Must lie within dataset r_ij range.";
+  p_cgrid.role     = RadialBasis::kind == BasisKind::Gaussian
+      ? "Centre of the radial GTO exp(-SGRIDMB (r - CGRIDMB)^2). A GTO below "
+        "1e-6 at every neighbour distance collapses ρ."
+      : "Centre of the radial blip b(SGRIDMB (r - CGRIDMB)). A blip whose "
+        "support holds no neighbour distance collapses ρ.";
   p_cgrid.hard.lo  = 0.0;
   p_cgrid.crit     = Criticality::Critical;
   p_cgrid.scope    = PairScope::PerElementPair;
-  p_cgrid.suggest  = [](const DataStats& d, const SeedView&, int) {
-    if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
-    const auto& pp = d.per_pair[0];
-    if (!pp.r_peaks.empty()) {
-      const double mu = pp.r_peaks[0].position;
-      const double w  = pp.r_peaks[0].fwhm > 0 ? pp.r_peaks[0].fwhm
-                                               : 0.2 * mu;
-      return std::make_pair(std::max(0.0, mu - w), mu + w);
-    }
-    return std::make_pair(pp.r_percentiles[I_P10],
-                          pp.r_percentiles[I_P90]);
-  };
-  p_cgrid.check    = [](const DataStats& d, const SeedView& s) -> HealthVerdict {
-    if (!s.contains("CGRIDMB")) return HealthOk{};
-    if (d.per_pair.empty()) return HealthOk{};
-    const std::size_t n = s.size("CGRIDMB");
-    for (std::size_t i = 0; i < n; ++i) {
-      double mu;
-      try { mu = s.get<double>("CGRIDMB", i); } catch (...) { continue; }
+  if constexpr (RadialBasis::kind == BasisKind::Gaussian) {
+    p_cgrid.suggest = gaussian_centre_suggestion;
+  } else {
+    p_cgrid.suggest = [](const DataStats& d, const SeedView&,
+                         int) -> BoundSuggestion {
+      if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
       const auto& pp = d.per_pair[0];
-      if (mu < pp.r_min || mu > pp.r_max)
-        return HealthFail{"CGRIDMB[" + std::to_string(i) +
-                          "]=" + std::to_string(mu) +
-                          " is outside dataset r_ij range — ρ will collapse."};
-    }
-    return HealthOk{};
+      if (!pp.r_peaks.empty()) {
+        const double mu = pp.r_peaks[0].position;
+        const double w  = pp.r_peaks[0].fwhm > 0 ? pp.r_peaks[0].fwhm
+                                                 : 0.2 * mu;
+        return BoundSuggestion(std::max(0.0, mu - w), mu + w,
+                               "blip b(SGRIDMB (r - CGRIDMB)) centred on "
+                               "the first neighbour shell: its peak +- its "
+                               "FWHM");
+      }
+      return BoundSuggestion(pp.r_percentiles[I_P10],
+                             pp.r_percentiles[I_P90],
+                             "blip b(SGRIDMB (r - CGRIDMB)): the 10th to "
+                             "90th percentiles of the neighbour distances "
+                             "(no peak found)");
+    };
+  }
+  p_cgrid.check    = [](const DataStats& d, const SeedView& s) {
+    return radial_reach_check(d, s, RadialBasis::kind);
   };
   dm.params.push_back(std::move(p_cgrid));
 
+  // The width of the radial basis: eta of exp(-eta (r - c)^2) (Å^-2) for
+  // the Gaussian, eta of b(eta (r - c)) (Å^-1, support |r - c| < 2/eta)
+  // for the blip.
+  constexpr bool gaussian = RadialBasis::kind == BasisKind::Gaussian;
   ParamMeta p_sgrid;
   p_sgrid.key      = "SGRIDMB";
   p_sgrid.arg_pos  = 0;
-  p_sgrid.scale    = Scale::InverseDistanceSq;
-  p_sgrid.units    = "Å^-2";
-  p_sgrid.role     = "Inverse Gaussian width η.";
+  p_sgrid.scale    = gaussian ? Scale::InverseDistanceSq : Scale::InverseDistance;
+  p_sgrid.units    = gaussian ? "Å^-2" : "Å^-1";
+  p_sgrid.role     = gaussian
+      ? "Inverse Gaussian width η of exp(-η (r - CGRIDMB)^2)."
+      : "Inverse width η of the blip b(η (r - CGRIDMB)), whose support is "
+        "|r - CGRIDMB| < 2/η.";
   p_sgrid.hard.lo  = 1.0e-6;
   p_sgrid.crit     = Criticality::Critical;
   p_sgrid.scope    = PairScope::Global;
-  p_sgrid.suggest  = [](const DataStats& d, const SeedView&, int) {
-    if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
-    const auto& pp = d.per_pair[0];
-    const double w = pp.r_peaks.empty()
-                       ? (pp.r_percentiles[I_P90] - pp.r_percentiles[I_P10])
-                       : (pp.r_peaks[0].fwhm > 0 ? pp.r_peaks[0].fwhm : 0.5);
-    return std::make_pair(0.25 / (w * w), 9.0 / (w * w));
-  };
+  if constexpr (gaussian) {
+    p_sgrid.suggest = gaussian_width_suggestion;
+  } else {
+    p_sgrid.suggest = [](const DataStats& d, const SeedView&,
+                         int) -> BoundSuggestion {
+      if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
+      const auto& pp = d.per_pair[0];
+      double w = pp.r_percentiles[I_P90] - pp.r_percentiles[I_P10];
+      if (!pp.r_peaks.empty()) w = pp.r_peaks[0].fwhm;
+      if (!(w > 0.0))
+        return BoundSuggestion::fixed_range(
+            0.1, 1.0, "fixed range: the neighbour distances have no spread "
+                      "to take a width of the blip from");
+      // eta in [1 / w, 6 / w]: the support half-width 2/eta runs from 2 w
+      // down to w/3 of the first peak's width (as DM_Blip's).
+      return BoundSuggestion(1.0 / w, 6.0 / w,
+                             "blip b(SGRIDMB (r - CGRIDMB)): its support "
+                             "half-width 2/SGRIDMB from 2 w down to w/3, "
+                             "with w the FWHM of the first neighbour shell");
+    };
+  }
   dm.params.push_back(std::move(p_sgrid));
 
   dm.cross_param_checks.push_back(

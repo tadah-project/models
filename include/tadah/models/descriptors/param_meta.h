@@ -7,7 +7,7 @@
 // DescriptorMeta from its overridden `D_Base::meta() const`. The
 // HPO bound-validation pipeline reads this metadata to:
 //
-//   * Suggest data-driven OPTIM bounds (BoundSuggester).
+//   * Suggest OPTIM bounds from the data and the seed (BoundSuggester).
 //   * Diagnose degenerate parameter combinations (HealthCheck).
 //   * Flag missing OPTIM blocks on Critical hyperparameters.
 //   * Predict design-matrix column counts before construction.
@@ -17,6 +17,7 @@
 
 #include <cstddef>
 #include <functional>
+#include <map>
 #include <optional>
 #include <string>
 #include <utility>
@@ -104,12 +105,30 @@ inline std::string verdict_message(const HealthVerdict& v) {
  *  metadata closures access to the current parameter values without
  *  allowing mutation.
  *
- *  Constructed implicitly from a `const Context&`; the underlying
- *  Context must outlive the SeedView.
+ *  Constructed from a `const Context&`; the underlying Context must
+ *  outlive the SeedView.
  */
 class SeedView {
  public:
   explicit SeedView(const tadah::core::Context& c) : ctx_(&c) {}
+  /** \brief A view of @p c, the context of one descriptor of a joined
+   *  TYPE2B or TYPEMB line (D_mJoin::parse_context()): its values of a key
+   *  @p k come after @p first_entries.at(k) values of that key in the
+   *  configuration, those of the descriptors before it on the line, so
+   *  that a message numbers an entry as an OPTIM line of the
+   *  configuration does (entry_number()). */
+  SeedView(const tadah::core::Context& c,
+           std::map<std::string, std::size_t> first_entries)
+      : ctx_(&c), first_(std::move(first_entries)) {}
+
+  /** \brief The 1-based number of value @p i of @p key in the
+   *  configuration, as an OPTIM line names it: @p i + 1, after the values
+   *  of the key that come before the view's own (none but for the view of
+   *  a joined line's descriptor). */
+  std::size_t entry_number(const std::string& key, std::size_t i) const {
+    const auto it = first_.find(key);
+    return (it == first_.end() ? 0 : it->second) + i + 1;
+  }
 
   template <typename T>
   T get(const std::string& key) const {
@@ -156,11 +175,53 @@ class SeedView {
 
  private:
   const tadah::core::Context* ctx_;
+  std::map<std::string, std::size_t> first_;
 };
 
 // ---------------------------------------------------------------------
 //  Closures
 // ---------------------------------------------------------------------
+
+/** \brief A suggested OPTIM range of one parameter entry and how it was
+ *  obtained: `first` is the low end and `second` the high end, as in the
+ *  `(lo, hi)` pair it extends (a suggester may return the pair alone).
+ *
+ *  - `rationale`: the form the range assumes and the statistics it comes
+ *    from; empty when the suggester gives none (the framework then states
+ *    the scale and the role of the parameter);
+ *  - `fixed`: the range is a fixed one, not derived from the data (the
+ *    statistic it needs is absent), and `rationale` says why;
+ *  - `none`: no OPTIM line is suggested for the entry (a radial centre at
+ *    the origin, whose width alone sets its reach), and `rationale` says
+ *    why; the range is then empty.
+ */
+struct BoundSuggestion : std::pair<double, double> {
+  std::string rationale{};
+  bool fixed = false;
+  bool none = false;
+
+  BoundSuggestion() : std::pair<double, double>(0.0, 0.0) {}
+  BoundSuggestion(double lo, double hi, std::string why = {})
+      : std::pair<double, double>(lo, hi), rationale(std::move(why)) {}
+  /** The range alone, without a rationale (implicit: a suggester that
+   *  returns a pair gives this). */
+  BoundSuggestion(const std::pair<double, double>& range)
+      : std::pair<double, double>(range) {}
+
+  /** A fixed range, not derived from the data: @p why says so. */
+  static BoundSuggestion fixed_range(double lo, double hi, std::string why) {
+    BoundSuggestion s(lo, hi, std::move(why));
+    s.fixed = true;
+    return s;
+  }
+  /** No OPTIM line for the entry: @p why says why. */
+  static BoundSuggestion no_row(std::string why) {
+    BoundSuggestion s;
+    s.rationale = std::move(why);
+    s.none = true;
+    return s;
+  }
+};
 
 /** \brief Suggest a `(lo, hi)` bound from data + seed.
  *
@@ -170,9 +231,10 @@ class SeedView {
  *  Closures are written to read DataStats — never to embed magic
  *  numbers. The only constants permitted in a suggester body are
  *  small structural ones (e.g. "double the FWHM") that are documented
- *  at the declaration site.
+ *  at the declaration site. A range that does not come from the data
+ *  is returned as BoundSuggestion::fixed_range, with the reason.
  */
-using BoundSuggester = std::function<std::pair<double, double>(
+using BoundSuggester = std::function<BoundSuggestion(
     const tadah::core::stats::DataStats&,
     const SeedView&,
     int arg_pos)>;

@@ -2,6 +2,7 @@
 #include <tadah/models/descriptors/dm/dm_blip.h>
 #include <tadah/models/descriptors/dm/dm_impl_utils.h>
 #include <tadah/models/descriptors/d_basis_functions.h>
+#include <tadah/models/descriptors/density_reach.h>
 
 #include <vector>
 #include <stdexcept>
@@ -536,7 +537,6 @@ std::optional<DescriptorMeta> DM_Blip::meta() const {
   static constexpr std::size_t I_P50 = tadah::core::stats::IDX_P50;
   static constexpr std::size_t I_P90 = tadah::core::stats::IDX_P90;
   static constexpr std::size_t I_P99 = tadah::core::stats::IDX_P99;
-  static constexpr std::size_t I_P1  = tadah::core::stats::IDX_P1;
 
   DescriptorMeta dm;
   dm.label = "DM_Blip";
@@ -569,36 +569,30 @@ std::optional<DescriptorMeta> DM_Blip::meta() const {
   p_cgrid.arg_pos  = 0;
   p_cgrid.scale    = Scale::Distance;
   p_cgrid.units    = "Å";
-  p_cgrid.role     = "Centre of the i-th MB radial blip. "
-                     "Must lie within the dataset r_ij range or ρ collapses.";
+  p_cgrid.role     = "Centre of the i-th MB radial blip "
+                     "b(SGRIDMB (r - CGRIDMB)). A blip whose support holds no "
+                     "neighbour distance collapses ρ.";
   p_cgrid.hard.lo  = 0.0;
   p_cgrid.crit     = Criticality::Critical;
   p_cgrid.scope    = PairScope::PerElementPair;
-  p_cgrid.suggest  = [](const DataStats& d, const SeedView&, int) {
+  p_cgrid.suggest  = [](const DataStats& d, const SeedView&,
+                         int) -> BoundSuggestion {
     if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
     const auto& pp = d.per_pair[0];
     if (!pp.r_peaks.empty()) {
       const auto& pk = pp.r_peaks.front();
-      return std::make_pair(std::max(0.0, pk.position - pk.fwhm),
-                            pk.position + pk.fwhm);
+      return BoundSuggestion(std::max(0.0, pk.position - pk.fwhm),
+                             pk.position + pk.fwhm,
+                             "blip b(SGRIDMB (r - CGRIDMB)) centred on the "
+                             "first neighbour shell: its peak +- its FWHM");
     }
-    return std::make_pair(pp.r_percentiles[I_P10],
-                          pp.r_percentiles[I_P50]);
+    return BoundSuggestion(pp.r_percentiles[I_P10], pp.r_percentiles[I_P50],
+                           "blip b(SGRIDMB (r - CGRIDMB)): the 10th "
+                           "percentile to the median of the neighbour "
+                           "distances (no peak found)");
   };
-  p_cgrid.check    = [](const DataStats& d, const SeedView& s) -> HealthVerdict {
-    if (!s.contains("CGRIDMB") || d.per_pair.empty()) return HealthOk{};
-    const auto& pp = d.per_pair[0];
-    const std::size_t n = s.size("CGRIDMB");
-    for (std::size_t i = 0; i < n; ++i) {
-      const double mu = s.get<double>("CGRIDMB", i);
-      if (mu < pp.r_min || mu > pp.r_max) {
-        return HealthFail{"CGRIDMB[" + std::to_string(i) + "]=" +
-                          std::to_string(mu) +
-                          " is outside the dataset's r_ij range — "
-                          "ρ will be ~0 for every atom."};
-      }
-    }
-    return HealthOk{};
+  p_cgrid.check    = [](const DataStats& d, const SeedView& s) {
+    return radial_reach_check(d, s, BasisKind::Blip);
   };
   dm.params.push_back(std::move(p_cgrid));
 
@@ -613,15 +607,22 @@ std::optional<DescriptorMeta> DM_Blip::meta() const {
   p_sgrid.hard.lo  = 1.0e-6;
   p_sgrid.crit     = Criticality::Critical;
   p_sgrid.scope    = PairScope::Global;
-  p_sgrid.suggest  = [](const DataStats& d, const SeedView&, int) {
+  p_sgrid.suggest  = [](const DataStats& d, const SeedView&,
+                         int) -> BoundSuggestion {
     if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
     const auto& pp = d.per_pair[0];
     double w = pp.r_percentiles[I_P90] - pp.r_percentiles[I_P10];
     if (!pp.r_peaks.empty()) w = pp.r_peaks[0].fwhm;
-    if (!(w > 0.0)) return std::make_pair(0.1, 1.0);
+    if (!(w > 0.0))
+      return BoundSuggestion::fixed_range(
+          0.1, 1.0, "fixed range: the neighbour distances have no spread "
+                    "to take a width of the blip from");
     // eta in [1 / w, 6 / w] (inverse distance): the blip's support
     // half-width 2/eta runs from 2 w down to w/3 of the first peak's width.
-    return std::make_pair(1.0 / w, 6.0 / w);
+    return BoundSuggestion(1.0 / w, 6.0 / w,
+                           "blip b(SGRIDMB (r - CGRIDMB)): its support "
+                           "half-width 2/SGRIDMB from 2 w down to w/3, with "
+                           "w the FWHM of the first neighbour shell");
   };
   dm.params.push_back(std::move(p_sgrid));
 
@@ -640,9 +641,9 @@ std::optional<DescriptorMeta> DM_Blip::meta() const {
       auto it = d.rho_percentiles_per_descriptor.find(self);
       if (it == d.rho_percentiles_per_descriptor.end()) return HealthOk{};
       const auto& rho = it->second;
-      if (rho[I_P99] < 1.0e-6)
-        return HealthFail{"ρ collapses to ≤ 1e-6 for 99% of atoms — "
-                          "MB radial GTOs do not overlap the data's r_ij range."};
+      if (rho[I_P99] < kDensityReachFloor)
+        return HealthFail{"ρ collapses to ≤ 1e-6 for 99% of atoms: the MB "
+                          "radial blips do not reach the neighbour shells."};
       const double ratio_p1 = rho[tadah::core::stats::IDX_P1];
       const double ratio_denom = ratio_p1 > 0 ? ratio_p1 : 1.0e-30;
       if (rho[I_P99] / ratio_denom < 1.05)

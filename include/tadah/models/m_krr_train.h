@@ -260,7 +260,10 @@ public:
         if (M_KRR_Core<Kern>::is_verbose()) std::cout << "tadah::core::Matrix condition number: " << condition_number(K) << std::endl;
 
         if (M_KRR_Core<Kern>::is_verbose()) std::cout << "Solving..." << std::flush;
-        //double rcond = context.template size("LAMBDA")==2 ? context.template get<double>("LAMBDA",1) : 1e-8;
+        // The one solve of implementation 2: Cholesky of K + LAMBDA sigma^2
+        // I. It reads no OALGO; a configuration with an OALGO other than
+        // the default is refused before the fit (MLIP
+        // refuse_what_krr_implementation2_ignores).
         weights = solve_posv(K, T);
         if (M_KRR_Core<Kern>::is_verbose()) std::cout << "Done" << std::endl;
 

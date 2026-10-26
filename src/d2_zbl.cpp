@@ -312,10 +312,11 @@ double D2_ZBL::screening_length(int Zi, int Zj) const {
 // list "D2_ZBL a0 s0 p0 p1 ELEM_i ELEM_j".
 //
 // arg_pos in ParamMeta matches the runtime arg_pos seen by
-// calc_dDdtheta — that's i+1 where i is the config-index set true in
-// omap.opt by HPOTargets::ui_offset (which counts numeric tokens). So
-// arg_pos = 2..5 here, NOT the user-facing OPTIM (n) of 1..4 — the
-// leading "D2_ZBL" string token shifts the count by one.
+// calc_dDdtheta: the value at index arg_pos - 1 of the descriptor's
+// TYPE2B line, so arg_pos = 2..5 here (the leading "D2_ZBL" token is
+// index 0). They have no bound suggester: tadah hpo searches no value of
+// a TYPE2B line (it refuses OPTIM TYPE2B), and tadah analysis
+// suggest_bounds gives each a row without an OPTIM line.
 // ----------------------------------------------------------------
 std::optional<DescriptorMeta> D2_ZBL::meta() const {
   using DataStats = tadah::core::stats::DataStats;
@@ -367,10 +368,6 @@ std::optional<DescriptorMeta> D2_ZBL::meta() const {
   p_a0.hard.lo = 1.0e-6;
   p_a0.crit    = Criticality::Optional;
   p_a0.scope   = PairScope::Global;
-  p_a0.suggest = [](const DataStats&, const SeedView&, int)
-      -> std::pair<double, double> {
-    return std::make_pair(0.265, 0.795);   // ±50 % of default 0.5292 Å
-  };
   dm.params.push_back(std::move(p_a0));
 
   // s0 — dimensionless screening multiplier (default 0.88534).
@@ -383,10 +380,6 @@ std::optional<DescriptorMeta> D2_ZBL::meta() const {
   p_s0.hard.lo = 1.0e-6;
   p_s0.crit    = Criticality::Optional;
   p_s0.scope   = PairScope::Global;
-  p_s0.suggest = [](const DataStats&, const SeedView&, int)
-      -> std::pair<double, double> {
-    return std::make_pair(0.443, 1.328);   // ±50 % of default 0.88534
-  };
   dm.params.push_back(std::move(p_s0));
 
   // p0 — exponent on Z_i in the screening-length denominator (default 0.23).
@@ -399,10 +392,6 @@ std::optional<DescriptorMeta> D2_ZBL::meta() const {
   p_p0.hard.lo = 1.0e-6;
   p_p0.crit    = Criticality::Optional;
   p_p0.scope   = PairScope::Global;
-  p_p0.suggest = [](const DataStats&, const SeedView&, int)
-      -> std::pair<double, double> {
-    return std::make_pair(0.115, 0.345);
-  };
   dm.params.push_back(std::move(p_p0));
 
   // p1 — exponent on Z_j in the screening-length denominator (default 0.23).
@@ -415,10 +404,6 @@ std::optional<DescriptorMeta> D2_ZBL::meta() const {
   p_p1.hard.lo = 1.0e-6;
   p_p1.crit    = Criticality::Optional;
   p_p1.scope   = PairScope::Global;
-  p_p1.suggest = [](const DataStats&, const SeedView&, int)
-      -> std::pair<double, double> {
-    return std::make_pair(0.115, 0.345);
-  };
   dm.params.push_back(std::move(p_p1));
 
   dm.expected_columns = [](const SeedView&) -> std::size_t { return 1; };
