@@ -270,17 +270,6 @@ void D2_Blip5::init() {
   keys.push_back("SGRID2B");
   nparams=2;
 }
-bool D2_Blip5::reinit(const tadah::core::Context& ctx) {
-  const size_t old_s = s;
-  get_grid(ctx, "CGRID2B", cgrid);
-  get_grid(ctx, "SGRID2B", sgrid);
-  s = cgrid.size();
-  if (fcut) fcut->set_rcut(ctx.get<double>("RCUT2BMAX"));
-  warn_if_bump_support_beyond_rcut("D2_Blip5", "CGRID2B", "RCUT2B", cgrid,
-                                   sgrid, BasisKind::Blip5);
-  return s != old_s;
-}
-
 std::optional<DescriptorMeta> D2_Blip5::meta() const {
   using DataStats = tadah::core::stats::DataStats;
   static constexpr std::size_t I_P10 = tadah::core::stats::IDX_P10;

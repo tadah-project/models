@@ -44,7 +44,7 @@ private:
   std::string lab="D2_Knot5";
   tadah::core::v_type cgrid;
   tadah::core::v_type dgrid;  ///< optional per-atom degree 3|5 (empty = all 5)
-  /** Last-resort guard (ctor + reinit): a knot beyond rcut is
+  /** Last-resort guard (ctor): a knot beyond rcut is
    *  hard-truncated by the cutoff — warn, once per process
    *  (log_warning_once), with both values as the shortest text that reads
    *  back to them. Every command sets RCUT2B to the largest knot on a
@@ -127,7 +127,6 @@ public:
 
   std::string label() const override;
   void init() override;
-  bool reinit(const tadah::core::Context& ctx) override;
   std::optional<DescriptorMeta> meta() const override;
   std::optional<BasisKind> basis_kind() const override { return BasisKind::Knot5; }
 };

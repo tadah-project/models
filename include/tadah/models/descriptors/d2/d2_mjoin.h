@@ -66,7 +66,6 @@ public:
 
   void set_fidx(size_t fidx_) override;
   void init() override;
-  bool reinit(const tadah::core::Context& ctx) override;
   /** Value @p i of the cutoff key is the i-th joined descriptor's: its
    *  answer for its value 0, "" past the last descriptor. */
   std::string cutoff_fixed_by(std::size_t i) const override;

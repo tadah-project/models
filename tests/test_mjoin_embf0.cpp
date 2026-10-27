@@ -1,8 +1,8 @@
 /* EMBF0 through DM_mJoin: the DM_REAM children of a joined many-body
  * descriptor read copies of the parent context, so the one global EMBF0 key
- * (absent = ZERO) reaches every DM_REAM block, in the constructor and in
- * reinit(). DM_mJoin forwards embf0_mode() and sums raw_embedding_f0() over
- * its children, each indexing its own block of the full weight vector.
+ * (absent = ZERO) reaches every DM_REAM block in the constructor. DM_mJoin
+ * forwards embf0_mode() and sums raw_embedding_f0() over its children, each
+ * indexing its own block of the full weight vector.
  */
 
 #include "catch2/catch.hpp"
@@ -169,8 +169,8 @@ TEST_CASE_METHOD(MjoinEmbf0Fixture,
 
 TEST_CASE_METHOD(MjoinEmbf0Fixture,
                  "DM_mJoin: a parent EMBF0 reaches every DM_REAM child in "
-                 "the ctor and in reinit",
-                 "[mjoin][embf0][reinit]") {
+                 "the ctor",
+                 "[mjoin][embf0]") {
   const Context cz = make_mjoin_ctx(nullptr);
   const Context cf = make_mjoin_ctx("FREE");
 
@@ -180,23 +180,15 @@ TEST_CASE_METHOD(MjoinEmbf0Fixture,
     dm.set_fidx(0);
     check_ream_blocks_at_zero(dm, EmbF0Mode::Free);
   }
-  SECTION("reinit ZERO -> FREE -> ZERO") {
+  SECTION("ctor, no EMBF0 (ZERO)") {
     Context c = cz;
     DM_mJoin dm(c);
     dm.set_fidx(0);
     check_ream_blocks_at_zero(dm, EmbF0Mode::Zero);
-    REQUIRE_FALSE(dm.reinit(cf));
-    dm.set_fidx(0);
-    check_ream_blocks_at_zero(dm, EmbF0Mode::Free);
-    REQUIRE_FALSE(dm.reinit(cz));
-    dm.set_fidx(0);
-    check_ream_blocks_at_zero(dm, EmbF0Mode::Zero);
   }
-  SECTION("reinit FREE -> explicit ZERO") {
-    Context c = cf;
+  SECTION("ctor, explicit ZERO") {
+    Context c = make_mjoin_ctx("ZERO");
     DM_mJoin dm(c);
-    dm.set_fidx(0);
-    REQUIRE_FALSE(dm.reinit(make_mjoin_ctx("ZERO")));
     dm.set_fidx(0);
     check_ream_blocks_at_zero(dm, EmbF0Mode::Zero);
   }

@@ -249,18 +249,6 @@ void D2_Knot5::init() {
   data_keys.push_back("KDEG2B");
   nparams = 2;
 }
-bool D2_Knot5::reinit(const tadah::core::Context& ctx) {
-  const size_t old_s = s;
-  get_grid(ctx, "CGRID2B", cgrid);
-  dgrid.clear();
-  if (ctx.contains("KDEG2B") && ctx.size("KDEG2B") > 0)
-    get_grid(ctx, "KDEG2B", dgrid);
-  s = cgrid.size();
-  if (fcut) fcut->set_rcut(ctx.get<double>("RCUT2BMAX"));
-  warn_if_knots_beyond_rcut();
-  return s != old_s;
-}
-
 std::optional<DescriptorMeta> D2_Knot5::meta() const {
   using DataStats = tadah::core::stats::DataStats;
   static constexpr std::size_t I_P99 = tadah::core::stats::IDX_P99;

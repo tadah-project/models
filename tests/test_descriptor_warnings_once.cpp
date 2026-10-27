@@ -222,14 +222,19 @@ TEST_CASE("DM_REAM warns once per process of a density knot past RCUTMB",
 
 /* Pins: three DC_Selectors built from a DM_mBlipEnv configuration with
  * Lmax 1 (a DM_mEAD descriptor whose channel function is not F_SQ) log the
- * warning "the channel function is not F_SQ, so the descriptor is not
- * rotationally invariant for L>0 (the DM_PS_ descriptors are)" exactly once
- * between them (check_logged_once).
+ * warning "DM_mEAD: the channel function is not F_SQ, so the descriptor
+ * is not rotationally invariant for L>0 (the DM_PS_ descriptors are). Its
+ * stress is not the strain derivative of the energy (the virial is not
+ * symmetric)." exactly once between them (check_logged_once).
  * Before the fix: "channel function is not F_SQ — descriptor
  * is NOT rotationally invariant for L>0. Use DM_PS_* descriptors instead."
  * (no occurrence of the pinned text).
  * Before the fix: three times, once per descriptor object (a tadah hpo
- * run printed it once per evaluation). */
+ * run printed it once per evaluation). Before the stress clause was added:
+ * the warning did not mention the stress. Before the warning was
+ * reordered: "... NOT rotationally invariant for L>0. Use DM_PS_*
+ * descriptors instead. The stress is then not the strain derivative ...",
+ * whose "then" read as if it followed from the remedy. */
 TEST_CASE("DM_mEAD warns once per process of a channel that is not "
           "rotationally invariant",
           "[descriptor][warn_once]") {
@@ -245,9 +250,11 @@ TEST_CASE("DM_mEAD warns once per process of a channel that is not "
   CoutCapture out;
   for (int k = 0; k < 3; ++k) tadah::models::DC_Selector s(c);
   check_logged_once(out.str(),
-                    "the channel function is not F_SQ, so the descriptor is "
-                    "not rotationally invariant for L>0 (the DM_PS_ "
-                    "descriptors are)",
+                    "DM_mEAD: the channel function is not F_SQ, so the "
+                    "descriptor is not rotationally invariant for L>0 (the "
+                    "DM_PS_ descriptors are). Its stress is not the strain "
+                    "derivative of the energy (the virial is not "
+                    "symmetric).",
                     key, before);
 }
 
@@ -255,11 +262,16 @@ TEST_CASE("DM_mEAD warns once per process of a channel that is not "
  * Lmax 1 (a DM_Poly descriptor, OrbitalWise, whose channel function is not
  * F_SQ) log the warning "DM_Poly (OrbitalWise): the channel function is
  * not F_SQ, so the descriptor is not rotationally invariant for L>0 (the
- * PowerSpectrum mode is)" exactly once between them (check_logged_once).
+ * PowerSpectrum mode is). Its stress is not the strain derivative of the
+ * energy (the virial is not symmetric)." exactly once between them
+ * (check_logged_once).
  * Before the fix: "DM_Poly (OrbitalWise): channel function is
  * not F_SQ — descriptor is NOT rotationally invariant for L>0. Use
  * PowerSpectrum mode." (no occurrence of the pinned text).
- * Before the fix: three times, once per descriptor object. */
+ * Before the fix: three times, once per descriptor object. Before the
+ * stress clause was added: the warning did not mention the stress. Before
+ * the warning was reordered: "... Use PowerSpectrum mode. The stress is
+ * then not the strain derivative ...". */
 TEST_CASE("DM_Poly OrbitalWise warns once per process of a channel that is "
           "not rotationally invariant",
           "[descriptor][warn_once]") {
@@ -276,7 +288,9 @@ TEST_CASE("DM_Poly OrbitalWise warns once per process of a channel that is "
   check_logged_once(out.str(),
                     "DM_Poly (OrbitalWise): the channel function is not F_SQ, "
                     "so the descriptor is not rotationally invariant for L>0 "
-                    "(the PowerSpectrum mode is)",
+                    "(the PowerSpectrum mode is). Its stress is not the "
+                    "strain derivative of the energy (the virial is not "
+                    "symmetric).",
                     key, before);
 }
 

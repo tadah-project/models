@@ -65,7 +65,7 @@ D_mJoin::~D_mJoin() {}
 // Lossless: each value is written as its shortest round-trip text, so the
 // sub-descriptor contexts see bit-identical grids. (A fixed NUMERIC-decimal
 // rendering here used to round every expanded grid value, and flush values
-// below 10^-NUMERIC to zero, on every mJoin construction and reinit.)
+// below 10^-NUMERIC to zero, on every mJoin construction.)
 std::vector<std::string> convert_to_strings(const tadah::core::v_type& vec) {
   std::vector<std::string> result;
   result.reserve(vec.size());

@@ -18,7 +18,6 @@ public:
   explicit DM_Embed(const core::Context &);
   void init() override;
   std::string label() const override { return "DM_Embed"; }
-  bool reinit(const core::Context &) override;
   const EmbedEvaluator &evaluator() const { return *evaluator_; }
   void init_rhoi(core::rho_type &) override;
   void calc_rho(int, int, double, double, const core::Vec3d &, core::rho_type &,

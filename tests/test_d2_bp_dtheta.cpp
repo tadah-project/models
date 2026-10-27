@@ -3,7 +3,7 @@
 // Layer-1 parity tests for the closed-form analytical derivatives of
 // D2_BP with respect to its hyperparameters. For each (theta_name,
 // arg_pos) the analytical dD/d theta is compared against a central-
-// difference reference computed by reinit-ing the descriptor with a
+// difference reference computed by building the descriptor from a
 // perturbed Context.
 
 #include "catch2/catch.hpp"

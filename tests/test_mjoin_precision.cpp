@@ -3,7 +3,7 @@
  *
  * D_mJoin::parse_context() used to re-render every CGRID/SGRID/CEMBFUNC/
  * SEMBFUNC/AMPGRIDMB/KDEG* value with a fixed NUMERIC (default 12) number of
- * DECIMALS, on every construction and every reinit(). Two grid values closer
+ * DECIMALS, on every construction. Two grid values closer
  * than 1e-12 collapsed to the same number, values below 1e-12 became 0, and
  * a small HPO step on a grid was invisible to the descriptor. The call also
  * inserted a NUMERIC key into the caller's context (and from there into every
@@ -197,50 +197,3 @@ TEST_CASE_METHOD(MjoinPrecisionFixture,
   CHECK_FALSE(ctxm.has_stored("NUMERIC"));
 }
 
-TEST_CASE_METHOD(MjoinPrecisionFixture,
-                 "D2_mJoin reinit sees a 3e-13 grid change",
-                 "[mjoin][precision][reinit]") {
-  const Context ctx1 = make_d2_ctx({kG1, 1.7, 2.3});
-  const Context ctx2 = make_d2_ctx({kG2, 1.7, 2.3});
-  const double r = 1.2;
-
-  D2_mJoin d(ctx1);
-  d.set_fidx(0);
-  const auto v1 = eval_d2(d, r);
-
-  d.reinit(ctx2);
-  d.set_fidx(0);
-  const auto v2 = eval_d2(d, r);
-
-  D2_mJoin fresh(ctx2);
-  fresh.set_fidx(0);
-  const auto v3 = eval_d2(fresh, r);
-
-  REQUIRE(v1.size() == 3);
-  CHECK(v2[0] != v1[0]);           // the perturbed basis function moved
-  CHECK(mj_bits(v2[1]) == mj_bits(v1[1]));
-  CHECK(bitwise_equal(v2, v3));    // reinit == fresh construction, bitwise
-}
-
-TEST_CASE_METHOD(MjoinPrecisionFixture,
-                 "DM_mJoin reinit sees a 3e-13 grid change",
-                 "[mjoin][precision][reinit]") {
-  const Context ctx1 = make_dm_ctx({kG1, 1.7, 2.3});
-  const Context ctx2 = make_dm_ctx({kG2, 1.7, 2.3});
-
-  DM_mJoin d(ctx1);
-  d.set_fidx(0);
-  const auto v1 = eval_dm(d);
-
-  d.reinit(ctx2);
-  d.set_fidx(0);
-  const auto v2 = eval_dm(d);
-
-  DM_mJoin fresh(ctx2);
-  fresh.set_fidx(0);
-  const auto v3 = eval_dm(fresh);
-
-  REQUIRE(v1.size() == 3);
-  CHECK(v2[0] != v1[0]);
-  CHECK(bitwise_equal(v2, v3));
-}
