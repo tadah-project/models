@@ -24,6 +24,7 @@
 #include <tadah/models/descriptors/d2/d2_mjoin.h>
 #include <tadah/models/descriptors/dm/dm_eam.h>
 #include <tadah/models/descriptors/dm/dm_mjoin.h>
+#include <tadah/models/dc_selector.h>
 #include <tadah/models/eam/eam_setfl_io.h>
 
 #include <cstdio>
@@ -560,4 +561,75 @@ TEST_CASE("D2_EAM evaluates the setfl file as it is when it is built",
   CHECK(second != first);
   CHECK(second == other_path);
   CHECK(first_again == first);
+}
+
+/* Pins: a model built from a potential with D2_EAM and DM_EAM (one SETFL)
+ * and WATOM 2.5 -- a pair weight that no descriptor of it reads -- gives
+ * one notice (core::report_ignored_key_once, captured here as pair_style
+ * tadah captures it): "Key WATOM (2.5) is ignored: no descriptor of the
+ * potential reads it (D2_EAM and DM_EAM take their pair and density
+ * functions from the SETFL file, unweighted); ...", and its descriptors
+ * evaluate as with WATOM 1 (the pair term at 2.86 A, bit for bit). WATOM 1
+ * and a D2_LJ potential with WATOM 2.5 give no notice of WATOM.
+ * Before the fix: no notice: the WATOM line was accepted without a word. */
+TEST_CASE("A D2_EAM and DM_EAM potential with a WATOM other than 1 loads "
+          "with a notice that no descriptor reads it",
+          "[D2][DM][eam][watom]") {
+  tadah::core::PeriodicTable::initialize();
+  auto eam = [](const std::string &watom) {
+    Context c = d2_context("0");
+    c.remove("INITMB");
+    c.add("INITMB", "true");
+    c.add("TYPEMB", "DM_EAM");
+    c.add("TYPEMB", "0");
+    c.add("TYPEMB", "Ta");
+    c.add("TYPEMB", "Ta");
+    c.add("RCUTMB", kSetflRcut);
+    c.add("RCTYPE2B", "Cut_Dummy");
+    c.add("RCTYPEMB", "Cut_Dummy");
+    c.add("WATOM", watom);
+    return c;
+  };
+  auto watom_notices = [](const tadah::core::IgnoredKeyNoticeCapture &cap) {
+    std::size_t n = 0;
+    for (const auto &s : cap.notices())
+      if (s.find("WATOM") != std::string::npos) ++n;
+    return n;
+  };
+  double aed_w = 0, aed_1 = 0;
+  {
+    tadah::core::IgnoredKeyNoticeCapture cap;
+    Context c = eam("2.5");
+    tadah::models::DC_Selector s(c);
+    INFO("notices: " << cap.notices().size());
+    CHECK(watom_notices(cap) == 1u);
+    bool named = false;
+    for (const auto &n : cap.notices())
+      named = named || (n.find("Key WATOM (2.5) is ignored: no descriptor "
+                               "of the potential reads it") == 0 &&
+                        n.find("D2_EAM and DM_EAM") != std::string::npos);
+    CHECK(named);
+    aed_w = d2_eam_aed(c, 2.86);
+  }
+  {
+    tadah::core::IgnoredKeyNoticeCapture cap;
+    Context c = eam("1");
+    tadah::models::DC_Selector s(c);
+    CHECK(watom_notices(cap) == 0u);
+    aed_1 = d2_eam_aed(c, 2.86);
+  }
+  CHECK(aed_w == aed_1);
+  {
+    tadah::core::IgnoredKeyNoticeCapture cap;
+    Context c;
+    c.add("ATOM", "Ta");
+    c.remove("INIT2B");
+    c.add("INIT2B", "true");
+    c.add("TYPE2B", "D2_LJ Ta Ta");
+    c.add("RCTYPE2B", "Cut_Cos");
+    c.add("RCUT2B", 5.0);
+    c.add("WATOM", "2.5");
+    tadah::models::DC_Selector s(c);
+    CHECK(watom_notices(cap) == 0u);
+  }
 }

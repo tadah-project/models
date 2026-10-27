@@ -155,51 +155,5 @@ std::string DM_mJoin::cutoff_fixed_by(std::size_t i) const {
   return i < ds.size() ? ds[i]->cutoff_fixed_by(0) : std::string();
 }
 
-bool DM_mJoin::reinit(const tadah::core::Context& ctx) {
-  if(!ctx.blocks("DESCRIPTOR").empty()) {
-    auto copy=ctx;resolve_embed_blocks(copy);
-    DM_mJoin candidate(copy);
-    candidate.set_fidx(fidx);candidate.set_rfidx(rfidx);candidate.set_drfidx(rfidx+candidate.rhoisize);
-    const bool changed=s!=candidate.s || rhoisize!=candidate.rhoisize || rhoipsize!=candidate.rhoipsize;
-    std::unique_ptr<Cut_Base> cutoff(new Cut_Dummy(copy.get<double>("RCUTMBMAX")));
-    ds.swap(candidate.ds);contexts.swap(candidate.contexts);
-    std::swap(s,candidate.s);std::swap(rhoisize,candidate.rhoisize);std::swap(rhoipsize,candidate.rhoipsize);
-    drfidx=rfidx+rhoisize;set_fcut(cutoff.release(),true);
-    return changed;
-  }
-  // Re-derive per-child sub-contexts from the updated master context.
-  // Copy ctx because expand_grids may add default keys to the context.
-  // Note: contexts[0] is the first child (DM_mJoin itself is filtered by parse_context).
-  tadah::core::Context ctx_copy = ctx;
-  contexts = D_mJoin::parse_context(ctx_copy, "TYPEMB");
-  D_mJoin::expand_grids(ctx_copy, contexts, "TYPEMB");
-  // Update the outer (container-level) fcut with the global RCUTMBMAX.
-  // This is used by DescriptorsCalc::calc_rho() as the MB prefilter.
-  if (fcut) fcut->set_rcut(ctx.get<double>("RCUTMBMAX"));
-  bool any_changed = false;
-  for (size_t i = 0; i < ds.size(); ++i)
-    any_changed |= ds[i]->reinit(contexts[i]);
-  // The sizes are the children's sums, as the constructor adds them: a
-  // child's descriptor or density may have changed size.
-  const size_t old_s = s, old_rhoisize = rhoisize, old_rhoipsize = rhoipsize;
-  s = 0;
-  rhoisize = 0;
-  rhoipsize = 0;
-  for (auto d : ds) {
-    s += d->size();
-    rhoisize += d->rhoi_size();
-    rhoipsize += d->rhoip_size();
-  }
-  // Place the children again from this descriptor's first indices, with
-  // F'(rho) after the whole density, as the constructor places them (a
-  // child's reinit may also have moved its own F'(rho)).
-  set_fidx(fidx);
-  set_rfidx(rfidx);
-  set_drfidx(rfidx + rhoisize);
-  return any_changed || s != old_s || rhoisize != old_rhoisize ||
-         rhoipsize != old_rhoipsize;
-}
-
-
 } // namespace models
 } // namespace tadah

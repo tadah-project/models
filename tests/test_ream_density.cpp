@@ -7,7 +7,7 @@
  *     value/deriv bitwise.
  *  3. The guarantees, with tolerance: NONNEG rho >= 0; MONOTONE rho >= 0,
  *     non-increasing, and rhobar(a) non-increasing on bcc/fcc/hcp.
- *  4. Validation messages and the reinit strong exception guarantee.
+ *  4. Validation messages.
  *  5. The rhoform.h helpers (parse, stored/require, normalise, precedence,
  *     cutoff whitelist, OPTIM lower bound) and the key contract (an absent
  *     RHOFORM is never materialised).
@@ -453,7 +453,7 @@ TEST_CASE_METHOD(DensityFixture,
 }
 
 // ---------------------------------------------------------------------------
-//  4. validation and the reinit strong guarantee
+//  4. validation
 // ---------------------------------------------------------------------------
 
 TEST_CASE_METHOD(DensityFixture, "DM_REAM: RHOFORM is mandatory",
@@ -629,49 +629,30 @@ TEST_CASE_METHOD(DensityFixture, "DM_REAM: density form validation messages",
   }
 }
 
+/* Pins: the DM_REAM constructor refuses RHOFORM NONNEG with negative amplitudes and a
+ * context without RHOFORM (DensityFormError), a zero entry in SEMBFUNC
+ * ("zero entry in SEMBFUNC"); RHOFORM NONNEG with non-negative amplitudes
+ * builds a NONNEG density. A caller with a new context builds a new
+ * descriptor, and these checks apply.
+ * Before the fix: passes as well (a pin of the constructor's checks). */
 TEST_CASE_METHOD(DensityFixture,
-                 "DM_REAM::reinit: a failing context leaves the descriptor "
-                 "unchanged (strong guarantee)",
+                 "DM_REAM: the constructor refuses a context whose density "
+                 "form or embedding it cannot evaluate",
                  "[ream][rhoform][validation]") {
-  const int Z = PeriodicTable::find_by_symbol("Ta").Z;
-  const Layout L = layout(BasisKind::Blip5, false);
-  Context good = ream_ctx(L, "SIGNED", "Cut_Cos");
-  DM_REAM dm(good);
-  auto snapshot = [&]() {
-    std::vector<std::uint64_t> out;
-    for (int i = 1; i <= 50; ++i) {
-      const double r = kRcut * i / 50.0;
-      double v, d;
-      dm.eam_density(Z, Z, r, v, d);
-      out.push_back(bits(v));
-      out.push_back(bits(d));
-      out.push_back(bits(dm.pair_density(Z, Z, r)));
-    }
-    out.push_back(dm.size());
-    return out;
-  };
-  const auto before = snapshot();
-
-  Context neg = ream_ctx(L, "NONNEG", "Cut_Cos");    // negative amplitudes
-  CHECK_THROWS_AS(dm.reinit(neg), DensityFormError);
-  CHECK(snapshot() == before);
-  CHECK(dm.density().form == RhoForm::Signed);
+  Context neg = ream_ctx(layout(BasisKind::Blip5, false), "NONNEG", "Cut_Cos");
+  CHECK_THROWS_AS(DM_REAM(neg), DensityFormError);
 
   Context keyless = ream_ctx(layout(BasisKind::Blip5, true), "", "Cut_Cos");
-  CHECK_THROWS_AS(dm.reinit(keyless), DensityFormError);
-  CHECK(snapshot() == before);
+  CHECK_THROWS_AS(DM_REAM(keyless), DensityFormError);
 
   Context bad_emb = ream_ctx(layout(BasisKind::Blip5, true), "SIGNED", "Cut_Cos");
   bad_emb.remove("SEMBFUNC");
   bad_emb.add("SEMBFUNC", "1.0 0.0 1.0");
-  CHECK_THROWS_WITH(dm.reinit(bad_emb), Contains("zero entry in SEMBFUNC"));
-  CHECK(snapshot() == before);
+  CHECK_THROWS_WITH(DM_REAM(bad_emb), Contains("zero entry in SEMBFUNC"));
 
-  // a valid reinit takes effect
   Context pos = ream_ctx(layout(BasisKind::Blip5, true), "NONNEG", "Cut_Cos");
-  CHECK_FALSE(dm.reinit(pos));
+  DM_REAM dm(pos);
   CHECK(dm.density().form == RhoForm::NonNeg);
-  CHECK(snapshot() != before);
 }
 
 // ---------------------------------------------------------------------------

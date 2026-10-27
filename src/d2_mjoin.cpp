@@ -56,8 +56,8 @@ std::string D2_mJoin::label() const {
 }
 
 void D2_mJoin::set_fidx(size_t fidx_) {
-  // Its own first index too: reinit() places the children from it again,
-  // and DescriptorsCalc expands the two-body force rows from get_fidx().
+  // Its own first index too: DescriptorsCalc expands the two-body force
+  // rows from get_fidx().
   fidx = fidx_;
   ds[0]->set_fidx(fidx_);
   size_t s = 0;
@@ -75,26 +75,6 @@ void D2_mJoin::init() {
 }
 std::string D2_mJoin::cutoff_fixed_by(std::size_t i) const {
   return i < ds.size() ? ds[i]->cutoff_fixed_by(0) : std::string();
-}
-
-bool D2_mJoin::reinit(const tadah::core::Context& ctx) {
-  // Re-derive per-child sub-contexts from the updated master context.
-  // Copy ctx because expand_grids may add default keys to the context.
-  tadah::core::Context ctx_copy = ctx;
-  contexts = D_mJoin::parse_context(ctx_copy, "TYPE2B");
-  D_mJoin::expand_grids(ctx_copy, contexts, "TYPE2B");
-  // Update the outer (container-level) fcut with the global RCUT2BMAX.
-  // This is used by DescriptorsCalc::calc() as the 2B prefilter.
-  if (fcut) fcut->set_rcut(ctx.get<double>("RCUT2BMAX"));
-  bool any_changed = false;
-  for (size_t i = 0; i < ds.size(); ++i)
-    any_changed |= ds[i]->reinit(contexts[i]);
-  // Recompute aggregated size from children (always, not just when changed).
-  s = 0;
-  for (auto d : ds) s += d->size();
-  // Re-propagate fidx offsets so each child writes to the correct aed slot.
-  if (any_changed) set_fidx(fidx);
-  return any_changed;
 }
 
 } // namespace models

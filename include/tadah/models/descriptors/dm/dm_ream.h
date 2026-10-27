@@ -52,18 +52,16 @@ namespace models {
  *    lattice density rhobar(a) is non-increasing on every lattice.
  *    \f$\partial\rho/\partial a_n = W S_n f_c\f$ is non-local: an
  *    amplitude moves the density everywhere inside its bump's outer edge.
- * The form is validated in the constructor and in every reinit() (after
- * the basis code, before the embedding): amplitudes, centres and widths
- * (every entry finite under the positive forms), cutoff and the WATOM pair
- * weights (read from the context). reinit() has the strong
- * exception guarantee: a context that fails validation leaves the
- * descriptor unchanged. The density itself is evaluated by one ReamDensity
+ * The form is validated in the constructor (after the basis code, before
+ * the embedding): amplitudes, centres and widths (every entry finite under
+ * the positive forms), cutoff and the WATOM pair weights (read from the
+ * context). The density itself is evaluated by one ReamDensity
  * (ream_density.h), which calc_rho, the force descriptors, eam_density and
  * pair_density all delegate to.
  *
  * Embedding reference (key \ref EMBF0, a property of the potential):
  *  - `EMBF0 ZERO` (default): \f$\tilde g_m(\rho) = g_m(\rho) - g_m(0)\f$, with
- *    \f$g_m(0)\f$ computed in the constructor and in every reinit() from the
+ *    \f$g_m(0)\f$ computed in the constructor from the
  *    CEMBFUNC/SEMBFUNC/KDEGEMB values actually evaluated. Hence
  *    \f$F(0) = 0\f$ exactly for any weights: an isolated atom has zero
  *    embedding energy by construction (exactly 0.0: rho == 0 short-circuits).
@@ -145,7 +143,7 @@ private:
    *  density, embedding, EMBF0), validates them (density form and WATOM
    *  pair weights included) and computes the embedding reference; the
    *  members change only after every check has passed (strong exception
-   *  guarantee). Ctor and every reinit(). */
+   *  guarantee). Called by the constructor. */
   void load(const tadah::core::Context &ctx);
 
   // embedding reference (EMBF0): ZERO subtracts g_m(0) from every embedding
@@ -166,7 +164,7 @@ private:
                                   tadah::core::v_type &g0a,
                                   tadah::core::v_type &g0e);
 
-  /** Last-resort guard (ctor + reinit), knot family only: a density knot
+  /** Last-resort guard (ctor), knot family only: a density knot
    *  beyond rcut is silently hard-truncated by Cut_Dummy — warn, once per
    *  process (log_warning_once). The
    *  honest fixes live at the command level (refit/edit/hpo derive RCUTMB
@@ -211,7 +209,6 @@ public:
     tadah::core::rho_type& rho,
     const double scale=1) const override;
   void init() override;
-  bool reinit(const tadah::core::Context& ctx) override;
   std::optional<DescriptorMeta> meta() const override;
   std::optional<BasisKind> basis_kind() const override { return basis; }
   std::size_t component_basis_size(const std::string &) const override;

@@ -55,7 +55,8 @@ DM_Poly<ChannelFn, RadialBasis, AggMode>::DM_Poly(const tadah::core::Context& ct
         label() + " (OrbitalWise): channel not rotationally invariant for L>0",
         label() + " (OrbitalWise): the channel function is not F_SQ, so the "
         "descriptor is not rotationally invariant for L>0 (the PowerSpectrum "
-        "mode is)");
+        "mode is). Its stress is not the strain derivative of the energy (the "
+        "virial is not symmetric).");
   }
   odim     = emb.output_dim();
   const std::size_t ng = cgrid.size();
@@ -410,28 +411,6 @@ void DM_Poly<ChannelFn, RadialBasis, AggMode>::init()
   context_keys_required =
       !context_keys.empty() && !ChannelFn::context_keys_optional;
   nparams = 2 + 1;
-}
-
-template <typename ChannelFn, typename RadialBasis, typename AggMode>
-bool DM_Poly<ChannelFn, RadialBasis, AggMode>::reinit(const tadah::core::Context& ctx)
-{
-  const size_t old_s = s;
-  get_grid(ctx, "CGRIDMB", cgrid);
-  get_grid(ctx, "SGRIDMB", sgrid);
-  Lmax = ctx.get<int>("TYPEMB", 1);
-  // rc must be updated before gen_atomic_orbitals: fac[][] depends on rc
-  rc = ctx.get<double>("RCUTMBMAX");
-  if (fcut) fcut->set_rcut(rc);
-  // Re-construct embedding function (re-reads its keys, e.g. CEMBFUNC/SEMBFUNC)
-  emb = ChannelFn(ctx, cgrid.size(), sgrid.size());
-  odim     = emb.output_dim();
-  const std::size_t ng = cgrid.size();
-  const std::size_t norbs = gen_atomic_orbitals(Lmax);
-  s         = odim * static_cast<size_t>(Lmax + 1);
-  rhoisize  = norbs * ng;
-  rhoipsize = norbs * odim;
-  set_drfidx(rhoisize);
-  return s != old_s;
 }
 
 template <typename ChannelFn, typename RadialBasis, typename AggMode>

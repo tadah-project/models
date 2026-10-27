@@ -36,23 +36,6 @@ DM_Embed::DM_Embed(const core::Context &c) : DM_Base(c) {
            true);
   init_for_atoms(spec.pairs);
 }
-bool DM_Embed::reinit(const core::Context &c) {
-  auto spec = select_spec(c, evaluator_->spec().id);
-  if (spec.pairs != evaluator_->spec().pairs)
-    throw std::runtime_error(
-        "DM_Embed: reinit cannot change discrete element pairs");
-  auto evaluator = std::make_unique<EmbedEvaluator>(spec);
-  double radius = spec.radius;
-  std::unique_ptr<Cut_Base> cutoff(core::factory<Cut_Base, double &>(
-      spec.cutoff == "NONE" ? "Cut_Dummy" : spec.cutoff, radius));
-  const auto old = s;
-  // Everything that validates or allocates has succeeded before state changes.
-  evaluator_.swap(evaluator);
-  set_fcut(cutoff.release(), true);
-  s = spec.embedding.centres.size();
-  rhoipsize = s;
-  return s != old;
-}
 std::size_t DM_Embed::component_basis_size(const std::string &channel) const {
   if (core::to_upper(channel) == "DENSITY")
     return evaluator_->spec().density.centres.size();

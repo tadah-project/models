@@ -493,25 +493,5 @@ std::optional<DescriptorMeta> DM_REAM::meta() const {
   return dm;
 }
 
-bool DM_REAM::reinit(const tadah::core::Context& ctx) {
-  const std::size_t old_s = s;
-  // Everything that can throw runs before any member changes (strong
-  // exception guarantee): the new cutoff radius, then load().
-  double rcut = 0.0;
-  if (fcut) {
-    rcut = ctx.get<double>("RCUTMBMAX");
-    fcut->test_rcut(rcut);
-  }
-  load(ctx);   // unconditional: CEMBFUNC/SEMBFUNC may move (EMBF0 reference)
-  s         = cemb.size();
-  rhoisize  = 1;
-  rhoipsize = s;
-  if (fcut) fcut->set_rcut(rcut);
-  warn_if_knots_beyond_rcut();
-  warn_if_bump_support_beyond_rcut("DM_REAM", "CGRIDMB", "RCUTMB", dens_.crho,
-                                   dens_.srho, basis);
-  return s != old_s;
-}
-
 } // namespace models
 } // namespace tadah

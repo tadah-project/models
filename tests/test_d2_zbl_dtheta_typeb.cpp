@@ -35,8 +35,8 @@ using tadah::models::D2_ZBL;
 struct TestFixture { TestFixture() { PeriodicTable::initialize(); } };
 
 // All four screening params supplied as concrete numerics — sentinel
-// -1 would skip reinit() (and we'd silently FD against the hardcoded
-// defaults). Caller is responsible for choosing values inside HPO
+// -1 would select the hardcoded defaults (and we'd silently FD against
+// them). Caller is responsible for choosing values inside HPO
 // bound conventions (>0).
 Context make_zbl_context_explicit(const std::string& elem,
                                   double rcut,
