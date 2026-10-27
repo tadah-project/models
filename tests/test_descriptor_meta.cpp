@@ -1331,8 +1331,8 @@ TEST_CASE("The checks and suggestions name the element pairs of the "
  *  - CGRIDMB 2.78 with SGRIDMB 3000 on Ta Ta W W, 0.08 A from the (Ta, Ta)
  *    distances and from the (W, W) ones and reaching neither: "... is below
  *    1e-6 at every (Ta, Ta) neighbour distance within RCUTMB = 3.5 (2.86 to
- *    3.5 Å) and at every (W, W) one (2.5 to 2.7 Å), so ρ is ~0 for every
- *    atom (...)";
+ *    3.5 Å) and at every (W, W) one (2.5 to 2.7 Å), so its channel of ρ is
+ *    ~0 for every atom (...)";
  *  - the CGRIDMB check of DM_Blip, CGRIDMB 3.1, SGRIDMB 10 (a support 0.2
  *    A wide each side), on Ta Ta W W: "... the support of the blip, |r -
  *    CGRIDMB| < 2/SGRIDMB = 0.2 Å, holds no (W, W) neighbour distance
@@ -1345,7 +1345,10 @@ TEST_CASE("The checks and suggestions name the element pairs of the "
  * AUDIT error trained descriptors that are 0 for every Ta atom.
  * Before a pair with * stood for the element pairs of the data it matches:
  * Ta * at 2.6 gave no finding, the pair (Ta, *) judged as one pair, by the
- * (Ta, Ta) and (Ta, W) distances together (from 2.4 A). */
+ * (Ta, Ta) and (Ta, W) distances together (from 2.4 A).
+ * Before the message named the channel's part of ρ, a channel that reaches
+ * no pair said "..., so ρ is ~0 for every atom (...)", which reads as the
+ * whole density, whatever the other channels reach. */
 TEST_CASE("Each element pair of a descriptor's line is judged on its own",
           "[metadata][density_reach][line_pairs]") {
   auto meta_of = [](const char *label) {
@@ -1413,8 +1416,9 @@ TEST_CASE("Each element pair of a descriptor's line is judged on its own",
         "FAIL CGRIDMB(1) = 2.78 with SGRIDMB(1) = 3000: the Gaussian "
         "exp(-SGRIDMB (r - CGRIDMB)^2) is below 1e-6 at every (Ta, Ta) "
         "neighbour distance within RCUTMB = 3.5 (2.86 to 3.5 Å) and at every "
-        "(W, W) one (2.5 to 2.7 Å), so ρ is ~0 for every atom (a smaller "
-        "SGRIDMB, or a centre nearer the neighbours, reaches them).");
+        "(W, W) one (2.5 to 2.7 Å), so its channel of ρ is ~0 for every atom "
+        "(a smaller SGRIDMB, or a centre nearer the neighbours, reaches "
+        "them).");
   CHECK(channel("DM_Blip", "3.1", "10") ==
         "FAIL CGRIDMB(1) = 3.1 with SGRIDMB(1) = 10: the support of the "
         "blip, |r - CGRIDMB| < 2/SGRIDMB = 0.2 Å, holds no (W, W) neighbour "
@@ -1547,8 +1551,8 @@ TEST_CASE("A pair of a descriptor's line with * stands for each element pair "
 }
 
 /* Pins: the channels of a many-body density are judged together: a channel
- * fails when it reaches no pair of the descriptor's line (its part of ρ is
- * 0 for every atom), and a pair of the line fails when no channel reaches
+ * fails when it reaches no pair of the descriptor's line (its channel of ρ
+ * is 0 for every atom), and a pair of the line fails when no channel reaches
  * it (ρ gets nothing from it); a channel that misses one pair while another
  * channel reaches that pair is no finding. On the Ta-W-W data
  * (ta_w_ww_stats()), the line Ta Ta W W:
@@ -1566,8 +1570,8 @@ TEST_CASE("A pair of a descriptor's line with * stands for each element pair "
  *    channel reaching no pair: "FAIL CGRIDMB(3) = 9 with SGRIDMB(3) = 10:
  *    the support of the blip, |r - CGRIDMB| < 2/SGRIDMB = 0.2 Å, holds no
  *    (Ta, Ta) neighbour distance within RCUTMB = 3.5 (2.86 to 3.5 Å) and no
- *    (W, W) one (2.5 to 2.7 Å), so ρ is 0 for every atom (a smaller SGRIDMB
- *    widens the support).".
+ *    (W, W) one (2.5 to 2.7 Å), so its channel of ρ is 0 for every atom (a
+ *    smaller SGRIDMB widens the support).".
  * Before the fix: each channel was judged by each pair on its own, and the
  * first channel that missed a pair failed, whatever the other channels
  * reached: the grid 2.4 to 4.2 failed at its first channel ("FAIL
@@ -1576,7 +1580,10 @@ TEST_CASE("A pair of a descriptor's line with * stands for each element pair "
  * gets nothing from the (Ta, Ta) pairs of atoms ..."), and so did the other
  * two grids ("FAIL CGRIDMB(1) = 3.1 with SGRIDMB(1) = 100: the Gaussian
  * ... (W, W) ...", "FAIL CGRIDMB(1) = 2.6 with SGRIDMB(1) = 10: ... (Ta,
- * Ta) ..."). */
+ * Ta) ...").
+ * Before the message named the channel's part of ρ, the third channel said
+ * "..., so ρ is 0 for every atom (...)", although the first two reach the
+ * (W, W) and (Ta, Ta) distances and ρ is not 0. */
 TEST_CASE("The channels of a density are judged together on each element "
           "pair of its line",
           "[metadata][density_reach][line_pairs]") {
@@ -1605,8 +1612,8 @@ TEST_CASE("The channels of a density are judged together on each element "
         "FAIL CGRIDMB(3) = 9 with SGRIDMB(3) = 10: the support of the blip, "
         "|r - CGRIDMB| < 2/SGRIDMB = 0.2 Å, holds no (Ta, Ta) neighbour "
         "distance within RCUTMB = 3.5 (2.86 to 3.5 Å) and no (W, W) one (2.5 "
-        "to 2.7 Å), so ρ is 0 for every atom (a smaller SGRIDMB widens the "
-        "support).");
+        "to 2.7 Å), so its channel of ρ is 0 for every atom (a smaller "
+        "SGRIDMB widens the support).");
 }
 
 /* Pins: the cutoff of every registered descriptor (each RCUT2B and RCUTMB
