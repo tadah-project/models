@@ -803,16 +803,20 @@ TEST_CASE("Every cutoff is compared with the smallest neighbour distance of "
  * first element pair of the statistics (DataStats sorts per_pair by element
  * pair): on Ta-W data (ta_w_stats(), the (Ta, Ta) pairs first)
  *  - the cutoff suggestion of every descriptor that has one names "the
- *    99th percentile of the Ta-Ta neighbour distances";
+ *    99th percentile of the (Ta, Ta) neighbour distances";
  *  - for DM_EAD and DM_Blip, a centre at 2.9 A gets a CGRIDMB and an
- *    SGRIDMB suggestion naming "the Ta-Ta neighbour shell nearest to it",
- *    and a seed without CGRIDMB a CGRIDMB suggestion naming "the first
- *    Ta-Ta neighbour shell" and an SGRIDMB suggestion naming "Ta-Ta";
+ *    SGRIDMB suggestion naming "the (Ta, Ta) neighbour shell nearest to
+ *    it", and a seed without CGRIDMB a CGRIDMB suggestion naming "the first
+ *    (Ta, Ta) neighbour shell" and an SGRIDMB suggestion naming "(Ta, Ta)";
  *  - DM_EAD's Gaussian at the origin gets an SGRIDMB suggestion naming the
- *    Ta-Ta neighbour distances its width is taken from.
+ *    (Ta, Ta) neighbour distances its width is taken from.
+ * A pair is named as the checks and the rows without an OPTIM line name it
+ * ("no (Ta, Ta) pair of atoms").
  * Before the fix: each of these rationales named "the neighbour distances"
  * or "the neighbour shell" alone, while the check of a cutoff reads every
- * element pair. */
+ * element pair.
+ * Before the fix of the notation: the rationales named the pair "Ta-Ta"
+ * ("the 99th percentile of the (Ta, Ta) neighbour distances"). */
 TEST_CASE("A suggestion names the element pair whose distances it comes "
           "from",
           "[metadata][density_reach][suggest]") {
@@ -832,7 +836,7 @@ TEST_CASE("A suggestion names the element pair whose distances it comes "
       const BoundSuggestion s = pm.suggest(data, SeedView(seed), -1);
       INFO(s.rationale);
       CHECK(s.rationale.find(
-                "the 99th percentile of the Ta-Ta neighbour distances") !=
+                "the 99th percentile of the (Ta, Ta) neighbour distances") !=
             std::string::npos);
     }
   }
@@ -854,21 +858,21 @@ TEST_CASE("A suggestion names the element pair whose distances it comes "
     const SeedView sv(seeded);
     const BoundSuggestion c1 = centre->suggest(data, sv, 1);
     INFO("CGRIDMB(2): " << c1.rationale);
-    CHECK(c1.rationale.find("the Ta-Ta neighbour shell nearest to it") !=
+    CHECK(c1.rationale.find("the (Ta, Ta) neighbour shell nearest to it") !=
           std::string::npos);
     const BoundSuggestion w1 = width->suggest(data, sv, 1);
     INFO("SGRIDMB(2): " << w1.rationale);
-    CHECK(w1.rationale.find("the Ta-Ta neighbour shell nearest to it") !=
+    CHECK(w1.rationale.find("the (Ta, Ta) neighbour shell nearest to it") !=
           std::string::npos);
     Context bare;
     bare.add<double>("RCUTMB", 5.6);
     const BoundSuggestion c0 = centre->suggest(data, SeedView(bare), 0);
     INFO("CGRIDMB without a seed: " << c0.rationale);
-    CHECK(c0.rationale.find("the first Ta-Ta neighbour shell") !=
+    CHECK(c0.rationale.find("the first (Ta, Ta) neighbour shell") !=
           std::string::npos);
     const BoundSuggestion w0 = width->suggest(data, SeedView(bare), 0);
     INFO("SGRIDMB without a seed: " << w0.rationale);
-    CHECK(w0.rationale.find("Ta-Ta") != std::string::npos);
+    CHECK(w0.rationale.find("(Ta, Ta)") != std::string::npos);
   }
 
   std::unique_ptr<D_Base> ead(tadah::core::factory<D_Base>("DM_EAD"));
@@ -883,7 +887,7 @@ TEST_CASE("A suggestion names the element pair whose distances it comes "
   const BoundSuggestion w = width->suggest(data, SeedView(origin), 0);
   INFO("SGRIDMB at the origin: " << w.rationale);
   CHECK_FALSE(w.none);
-  CHECK(w.rationale.find("Ta-Ta neighbour distances") != std::string::npos);
+  CHECK(w.rationale.find("(Ta, Ta) neighbour distances") != std::string::npos);
 }
 
 /* Pins: every Critical parameter of every registered descriptor has a
