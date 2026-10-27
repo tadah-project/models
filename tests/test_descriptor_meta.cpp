@@ -730,3 +730,69 @@ TEST_CASE("Every cutoff fails when it holds no neighbour distance, and its "
   }
   CHECK(cutoffs > 10u);
 }
+
+namespace {
+
+/* make_ta_like_stats() on Ta-W data: the (Ta, Ta) pairs first (DataStats
+ * sorts per_pair by element pair), from r_min 2.86 A, then the (Ta, W)
+ * pairs, from 2.4 A. */
+DataStats ta_w_stats() {
+  DataStats d = make_ta_like_stats();
+  d.elements = {"Ta", "W"};
+  PerPairStats tata = d.per_pair[0];
+  tata.r_min = 2.86;
+  PerPairStats taw = d.per_pair[0];
+  taw.elements = {"Ta", "W"};
+  taw.r_min = 2.4;
+  d.per_pair = {tata, taw};
+  return d;
+}
+
+}  // namespace
+
+/* Pins: the check of every cutoff (RCUT2B, RCUTMB) of every registered
+ * descriptor compares the cutoff with the smallest neighbour distance of
+ * every element pair of the data: on Ta-W data whose (Ta, Ta) pairs, the
+ * first element pair, start at 2.86 A and whose (Ta, W) pairs start at
+ * 2.4 A (ta_w_stats()), a cutoff of 2.6 A passes, as it holds the (Ta, W)
+ * pairs from 2.4 A, and a cutoff of 2.3 A fails, its message naming 2.4 A,
+ * the smallest neighbour distance of the dataset. The check does not read
+ * the element pairs of the descriptor's line: a (Ta, Ta) descriptor whose
+ * cutoff holds (Ta, W) pairs alone passes as well, and no FAIL finding,
+ * which AUDIT error turns into a refusal, is given for a cutoff that holds
+ * a pair of the data.
+ * Before the fix: each check compared the cutoff with r_min of the first
+ * element pair, 2.86 A: the cutoff of 2.6 A failed ("RCUT2B=2.600000 is
+ * below the dataset r_min=2.860000 ...") and the message of 2.3 A named
+ * 2.86, not 2.4; D2_Knot5, DM_REAM, DM_Blip and DM_mBlipEnv had no cutoff
+ * check. */
+TEST_CASE("Every cutoff is compared with the smallest neighbour distance of "
+          "every element pair",
+          "[metadata][density_reach][cutoff]") {
+  const DataStats data = ta_w_stats();
+  std::size_t cutoffs = 0;
+  for (const auto &label : tadah::core::Registry<D_Base>::names()) {
+    std::unique_ptr<D_Base> d(tadah::core::factory<D_Base>(label));
+    const auto meta = d->meta();
+    if (!meta.has_value()) continue;
+    for (const auto &pm : meta->params) {
+      if (pm.key != "RCUT2B" && pm.key != "RCUTMB") continue;
+      ++cutoffs;
+      CAPTURE(label, pm.key);
+      CHECK(static_cast<bool>(pm.check));
+      if (!pm.check) continue;
+      Context between;
+      between.add<double>(pm.key, 2.6);
+      const HealthVerdict v_between = pm.check(data, SeedView(between));
+      INFO("2.6 A: " << verdict_message(v_between));
+      CHECK(is_ok(v_between));
+      Context below;
+      below.add<double>(pm.key, 2.3);
+      const HealthVerdict v_below = pm.check(data, SeedView(below));
+      INFO("2.3 A: " << verdict_message(v_below));
+      CHECK(is_fail(v_below));
+      CHECK(verdict_message(v_below).find("(2.4 Å)") != std::string::npos);
+    }
+  }
+  CHECK(cutoffs > 10u);
+}
