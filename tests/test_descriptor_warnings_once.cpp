@@ -209,8 +209,12 @@ TEST_CASE("DM_REAM warns once per process of a density knot past RCUTMB",
 
 /* Pins: three DC_Selectors built from a DM_mBlipEnv configuration with
  * Lmax 1 (a DM_mEAD descriptor whose channel function is not F_SQ) log the
- * warning "channel function is not F_SQ — descriptor is NOT rotationally
- * invariant for L>0" exactly once between them (check_logged_once).
+ * warning "the channel function is not F_SQ, so the descriptor is not
+ * rotationally invariant for L>0 (the DM_PS_ descriptors are)" exactly once
+ * between them (check_logged_once).
+ * Before the fix: "channel function is not F_SQ — descriptor
+ * is NOT rotationally invariant for L>0. Use DM_PS_* descriptors instead."
+ * (no occurrence of the pinned text).
  * Before the fix: three times, once per descriptor object (a tadah hpo
  * run printed it once per evaluation). */
 TEST_CASE("DM_mEAD warns once per process of a channel that is not "
@@ -227,13 +231,21 @@ TEST_CASE("DM_mEAD warns once per process of a channel that is not "
   const bool before = tadah::models::warning_logged_once(key);
   CoutCapture out;
   for (int k = 0; k < 3; ++k) tadah::models::DC_Selector s(c);
-  check_logged_once(out.str(), "rotationally invariant for L>0", key, before);
+  check_logged_once(out.str(),
+                    "the channel function is not F_SQ, so the descriptor is "
+                    "not rotationally invariant for L>0 (the DM_PS_ "
+                    "descriptors are)",
+                    key, before);
 }
 
 /* Pins: three DC_Selectors built from a DM_OW_SQRT configuration with
  * Lmax 1 (a DM_Poly descriptor, OrbitalWise, whose channel function is not
- * F_SQ) log the warning "DM_Poly (OrbitalWise): channel function is not
- * F_SQ ..." exactly once between them (check_logged_once).
+ * F_SQ) log the warning "DM_Poly (OrbitalWise): the channel function is
+ * not F_SQ, so the descriptor is not rotationally invariant for L>0 (the
+ * PowerSpectrum mode is)" exactly once between them (check_logged_once).
+ * Before the fix: "DM_Poly (OrbitalWise): channel function is
+ * not F_SQ — descriptor is NOT rotationally invariant for L>0. Use
+ * PowerSpectrum mode." (no occurrence of the pinned text).
  * Before the fix: three times, once per descriptor object. */
 TEST_CASE("DM_Poly OrbitalWise warns once per process of a channel that is "
           "not rotationally invariant",
@@ -248,8 +260,11 @@ TEST_CASE("DM_Poly OrbitalWise warns once per process of a channel that is "
   const bool before = tadah::models::warning_logged_once(key);
   CoutCapture out;
   for (int k = 0; k < 3; ++k) tadah::models::DC_Selector s(c);
-  check_logged_once(out.str(), "DM_Poly (OrbitalWise): channel function is "
-                    "not F_SQ", key, before);
+  check_logged_once(out.str(),
+                    "DM_Poly (OrbitalWise): the channel function is not F_SQ, "
+                    "so the descriptor is not rotationally invariant for L>0 "
+                    "(the PowerSpectrum mode is)",
+                    key, before);
 }
 
 /* Pins: log_warning_once called while the Logger hides WARNINGs (level

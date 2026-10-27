@@ -283,6 +283,34 @@ TEST_CASE("eam_lattice require_crystal_on_grid: the crystal's nearest "
       Catch::Contains("crystal usable for the faithfulness self-test"));
 }
 
+/* Pins: the refusal of a setfl header without a crystal the self-test can
+ * use gives a0 as its shortest round-trip text and says where the crystal
+ * comes from: "tadah refit: the EAM header does not specify a crystal
+ * usable for the faithfulness self-test (lattice='NONE', a0=0). The
+ * self-test needs one of fcc, bcc and hcp and a positive lattice constant,
+ * which the element line of the setfl file (`<Z> <mass> <a0> <lattice>`)
+ * gives: the ground-state lattice, fcc, bcc or hcp in place of a
+ * placeholder such as NONE, and the equilibrium lattice constant." (a0
+ * 2.5e-7 is "2.5e-07").
+ * Before the fix: a0 printed by std::to_string ("a0=0.000000"), and the
+ * message ended "Edit the element line of the setfl file (...): set the
+ * ground-state lattice (e.g. change 'NONE' to 'fcc', 'bcc' or 'hcp') and
+ * the equilibrium lattice constant.". */
+TEST_CASE("require_crystal says where the crystal of the self-test comes "
+          "from",
+          "[eam_lattice]") {
+  CHECK_THROWS_WITH(
+      eam_lattice::require_crystal("NONE", 0.0),
+      "tadah refit: the EAM header does not specify a crystal usable for "
+      "the faithfulness self-test (lattice='NONE', a0=0). The self-test "
+      "needs one of fcc, bcc and hcp and a positive lattice constant, which "
+      "the element line of the setfl file (`<Z> <mass> <a0> <lattice>`) "
+      "gives: the ground-state lattice, fcc, bcc or hcp in place of a "
+      "placeholder such as NONE, and the equilibrium lattice constant.");
+  CHECK_THROWS_WITH(eam_lattice::require_crystal("", 2.5e-7),
+                    Catch::Contains("(lattice='<missing>', a0=2.5e-07)"));
+}
+
 /* Pins: neighbour_distances(lattice, a, rcut) enumerates a cube of
  * ceil(rcut / a) + 1 cells each way (a the cell's shortest edge for bcc
  * and fcc) with an int index, and refuses a cube that index cannot reach

@@ -279,9 +279,9 @@ TEST_CASE("D2_EAM built with INIT2B false takes its one parameter",
 /* Pins: D2_EAM refuses an RCUT2B other than the cutoff of its setfl file,
  * smaller (3) or larger (7), with an error that names the descriptor, the
  * key and both values, and the file:
- *   D2_EAM: RCUT2B 3 differs from the cutoff 5.58190742024 of the setfl
- *   file 'tests_data/eam.alloy' (SETFL); set RCUT2B to the file's cutoff,
- *   5.58190742024.
+ *   D2_EAM: RCUT2B 3 differs from the cutoff 5.58190742024 of the setfl file
+ *   'tests_data/eam.alloy' (SETFL); the RCUT2B of D2_EAM is the file's
+ *   cutoff, 5.58190742024.
  * The context keeps RCUT2B as it was (3). With the file's cutoff and
  * RCTYPE2B Cut_Dummy the descriptor builds, evaluates with that cutoff
  * (get_rcut()) and leaves RCUT2B as given. Inside a D2_mJoin the D2_EAM
@@ -291,7 +291,9 @@ TEST_CASE("D2_EAM built with INIT2B false takes its one parameter",
  * cutoff"), after its cutoff function had been built from the configured
  * value: get_rcut() was 3 while RCUT2B read 5.58190742024, the value a
  * potential file records, so the saved potential was not the fitted model.
- * CHECK_THROWS_WITH failed and RCUT2B read 5.58190742024, not 3. */
+ * CHECK_THROWS_WITH failed and RCUT2B read 5.58190742024, not 3.
+ * Before the fix that states the rule: the refusal ended "(SETFL); set RCUT2B
+ * to the file's cutoff, 5.58190742024.", an instruction: the checks fail. */
 TEST_CASE("D2_EAM refuses an RCUT2B other than its setfl file's cutoff",
           "[D2][eam][cutoff]") {
   tadah::core::PeriodicTable::initialize();
@@ -307,8 +309,8 @@ TEST_CASE("D2_EAM refuses an RCUT2B other than its setfl file's cutoff",
         D2_EAM(c),
         "D2_EAM: RCUT2B " + v +
             " differs from the cutoff 5.58190742024 of the setfl file "
-            "'tests_data/eam.alloy' (SETFL); set RCUT2B to the file's "
-            "cutoff, 5.58190742024.");
+            "'tests_data/eam.alloy' (SETFL); the RCUT2B of D2_EAM is the "
+            "file's cutoff, 5.58190742024.");
     CHECK(c.get<double>("RCUT2B") == rc);
   }
 
@@ -340,14 +342,16 @@ TEST_CASE("D2_EAM refuses an RCUT2B other than its setfl file's cutoff",
 }
 
 /* Pins: the same for DM_EAM and RCUTMB:
- *   DM_EAM: RCUTMB 3 differs from the cutoff 5.58190742024 of the setfl
- *   file 'tests_data/eam.alloy' (SETFL); set RCUTMB to the file's cutoff,
- *   5.58190742024.
+ *   DM_EAM: RCUTMB 3 differs from the cutoff 5.58190742024 of the setfl file
+ *   'tests_data/eam.alloy' (SETFL); the RCUTMB of DM_EAM is the file's
+ *   cutoff, 5.58190742024.
  * for 3 and 7; RCUTMB is left as it was; the file's cutoff with RCTYPEMB
  * Cut_Dummy builds and evaluates with that cutoff.
  * Before the fix: none was refused; RCUTMB was replaced in the context with
  * the file's cutoff while get_rcut() kept the configured one, so
- * CHECK_THROWS_WITH failed and RCUTMB read 5.58190742024. */
+ * CHECK_THROWS_WITH failed and RCUTMB read 5.58190742024.
+ * Before the fix that states the rule: the refusal ended "(SETFL); set RCUTMB
+ * to the file's cutoff, 5.58190742024.", an instruction: the checks fail. */
 TEST_CASE("DM_EAM refuses an RCUTMB other than its setfl file's cutoff",
           "[DM][eam][cutoff]") {
   tadah::core::PeriodicTable::initialize();
@@ -363,8 +367,8 @@ TEST_CASE("DM_EAM refuses an RCUTMB other than its setfl file's cutoff",
         DM_EAM(c),
         "DM_EAM: RCUTMB " + v +
             " differs from the cutoff 5.58190742024 of the setfl file "
-            "'tests_data/eam.alloy' (SETFL); set RCUTMB to the file's "
-            "cutoff, 5.58190742024.");
+            "'tests_data/eam.alloy' (SETFL); the RCUTMB of DM_EAM is the "
+            "file's cutoff, 5.58190742024.");
     CHECK(c.get<double>("RCUTMB") == rc);
   }
 
