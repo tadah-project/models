@@ -54,7 +54,9 @@ DM_Poly<ChannelFn, RadialBasis, AggMode>::DM_Poly(const tadah::core::Context& ct
       log_warning_once(
         label() + " (OrbitalWise): channel not rotationally invariant for L>0",
         label() + " (OrbitalWise): channel function is not F_SQ — descriptor"
-        " is NOT rotationally invariant for L>0. Use PowerSpectrum mode.");
+        " is NOT rotationally invariant for L>0. Use PowerSpectrum mode."
+        " The stress is then not the strain derivative of the energy (the"
+        " virial is not symmetric).");
   }
   odim     = emb.output_dim();
   const std::size_t ng = cgrid.size();

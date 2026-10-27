@@ -87,7 +87,9 @@ template <typename F>
       log_warning_once(
         label() + ": channel not rotationally invariant for L>0",
         label() + ": channel function is not F_SQ — descriptor is NOT"
-        " rotationally invariant for L>0. Use DM_PS_* descriptors instead.");
+        " rotationally invariant for L>0. Use DM_PS_* descriptors instead."
+        " The stress is then not the strain derivative of the energy (the"
+        " virial is not symmetric).");
   }
 
   odim = emb.output_dim();
