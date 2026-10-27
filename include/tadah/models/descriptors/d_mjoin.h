@@ -1,6 +1,7 @@
 #ifndef D_MJOIN_H
 #define D_MJOIN_H
 #include <tadah/core/context.h>
+#include <string>
 #include <vector>
 
 namespace tadah {
@@ -86,6 +87,38 @@ public:
    *  descriptors do not read, as a joined line's does.
    */
   static void check_single_lines(const tadah::core::Context &c);
+
+  /** \brief The check of a potential that a command trains from: @p c is
+   *  the configuration that the command @p command (its blueprint task
+   *  name: "train", "hpo", "analysis.suggest_bounds") reads from its
+   *  configuration file (-c), with the lines of its keys
+   *  (core::Context::key_lines()).
+   *
+   *  A potential has one line for each key of its descriptors, and its
+   *  D2_mJoin or DM_mJoin line as one line per descriptor, each starting
+   *  with the descriptor's name. The keys of the TYPE2B and TYPEMB lines
+   *  are judged, those parse_context() reads: the TYPE key, its RCTYPE and
+   *  RCUT keys and the list keys of the line's type (CGRID, SGRID and KDEG;
+   *  AMPGRIDMB, CEMBFUNC and SEMBFUNC). Such a key set on two lines or more
+   *  of one potential file (core::KeyLine::potential, of one source) is
+   *  refused, naming the key, its lines and @p command ("Key RCUT2B is set
+   *  on line 6 of copy.tadah and on line 10 of copy.tadah, lines of one
+   *  potential (a file with WEIGHTS): tadah train reads a key of a
+   *  potential's descriptors from the line the potential has for it, and a
+   *  potential's value is changed by editing its line in a copy of the
+   *  potential (...)"), unless the key is the TYPE key and its lines there
+   *  are the lines of a joined line (its first value names D2_mJoin or
+   *  DM_mJoin, and each later line starts with a descriptor's name). The
+   *  values of one line that the descriptors do not take (a potential of
+   *  tadah 1.5.0) are not refused: parse_context() reports them, and a
+   *  potential read for prediction is read so too. Keys without lines
+   *  (values the program set) are not judged.
+   *  \throws std::runtime_error for such a key;
+   *  \throws std::invalid_argument for an empty @p command;
+   *  \throws std::logic_error when the lines of the TYPE key do not give
+   *  its values. */
+  static void check_potential_lines(const tadah::core::Context &c,
+                                    const std::string &command);
 
   static void expand_grids(tadah::core::Context &c, std::vector<tadah::core::Context> &contexts, std::string type_str);
 

@@ -300,8 +300,8 @@ std::optional<DescriptorMeta> D2_Knot5::meta() const {
   p_cgrid.hard.lo  = 0.0;
   p_cgrid.crit     = Criticality::Recommended;
   p_cgrid.scope    = PairScope::PerElementPair;
-  p_cgrid.suggest  = [](const DataStats& d, const SeedView&, int) -> BoundSuggestion {
-    if (d.per_pair.empty()) return no_pair_suggestion();
+  p_cgrid.suggest  = [](const DataStats& d, const SeedView& s, int) -> BoundSuggestion {
+    if (d.per_pair.empty()) return no_pair_suggestion(s);
     const auto& pp = d.per_pair[0];
     return std::make_pair(0.0, pp.r_percentiles[I_P99]);
   };

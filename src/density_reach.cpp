@@ -29,9 +29,22 @@ std::string seed_num(double v) { return tadah::core::format_roundtrip(v); }
 /* The element pair of @p pp as a rationale names it ("Ta-Ta"): a range
  * taken from the shells, peaks or percentiles of the distances is taken
  * from those of the first element pair of the statistics (DataStats sorts
- * per_pair by element pair). */
+ * per_pair by element pair), which tadah analysis suggest_bounds gives one
+ * element pair of the descriptor's line at a time. */
 std::string pair_name(const tadah::core::stats::PerPairStats &pp) {
   return pp.elements.first + "-" + pp.elements.second;
+}
+
+/* " (Ta, Ta)", " (Ta, Ta) or (W, W)": the element pairs of the line of the
+ * descriptor of @p s (SeedView::line_pairs()) as a message names them
+ * before "pair of atoms" or "neighbour distance", whose statistics the
+ * caller gives; empty for a view without them, or a line that names every
+ * pair. */
+std::string of_pairs(const SeedView &s) {
+  const LinePairs *p = s.line_pairs();
+  if (p == nullptr) return {};
+  const std::string t = p->text();
+  return t.empty() ? t : " " + t;
 }
 
 /* "KEY(n)" for value @p i of @p key of @p s, n its 1-based number in the
@@ -114,7 +127,7 @@ std::string form(BasisKind kind, bool origin) {
  * (gaussian_centre_suggestion, blip_centre_suggestion). */
 BoundSuggestion centre_suggestion(const DataStats &d, const SeedView &s,
                                   int arg_pos, BasisKind kind) {
-  if (d.per_pair.empty()) return no_pair_suggestion();
+  if (d.per_pair.empty()) return no_pair_suggestion(s);
   double c = 0.0;
   const bool seeded = seed_centre(s, arg_pos, c);
   if (seeded && c == 0.0)
@@ -164,7 +177,7 @@ BoundSuggestion centre_suggestion(const DataStats &d, const SeedView &s,
  * (gaussian_width_suggestion, blip_width_suggestion). */
 BoundSuggestion width_suggestion(const DataStats &d, const SeedView &s,
                                  int arg_pos, BasisKind kind) {
-  if (d.per_pair.empty()) return no_pair_suggestion();
+  if (d.per_pair.empty()) return no_pair_suggestion(s);
   const bool gaussian = kind == BasisKind::Gaussian;
   const auto &pp = d.per_pair[0];
   double c = 0.0;
@@ -265,16 +278,17 @@ BoundSuggestion width_suggestion(const DataStats &d, const SeedView &s,
 
 }  // namespace
 
-BoundSuggestion no_pair_suggestion() {
+BoundSuggestion no_pair_suggestion(const SeedView &s) {
   return BoundSuggestion::no_row(
-      "no pair of atoms of the data lies within the reach of the neighbour "
-      "statistics (" + num(kCutoffSearchReach) + " times the largest cutoff "
-      "of the seed): no distance to take a range from");
+      "no" + of_pairs(s) + " pair of atoms of the data lies within the reach "
+      "of the neighbour statistics (" + num(kCutoffSearchReach) +
+      " times the largest cutoff of the seed): no distance to take a range "
+      "from");
 }
 
-BoundSuggestion cutoff_suggestion(const DataStats &d, const SeedView &,
+BoundSuggestion cutoff_suggestion(const DataStats &d, const SeedView &s,
                                   int) {
-  if (d.per_pair.empty()) return no_pair_suggestion();
+  if (d.per_pair.empty()) return no_pair_suggestion(s);
   using tadah::core::stats::IDX_P50;
   using tadah::core::stats::IDX_P99;
   const auto &pp = d.per_pair[0];
@@ -303,17 +317,18 @@ HealthVerdict cutoff_reach_check(const DataStats &d, const SeedView &s,
                                  const std::string &key) {
   if (!s.contains(key) || d.n_atoms == 0) return HealthOk{};
   const double rc = s.get<double>(key);
+  const std::string pairs = of_pairs(s);
   if (d.per_pair.empty())
-    return HealthFail{key + " = " + seed_num(rc) +
-                      ": no pair of atoms of the dataset lies within it, so "
-                      "the descriptor sums over no neighbour and is 0 for "
-                      "every atom."};
+    return HealthFail{key + " = " + seed_num(rc) + ": no" + pairs +
+                      " pair of atoms of the dataset lies within it, so the "
+                      "descriptor sums over no neighbour and is 0 for every "
+                      "atom."};
   const NeighbourRange range = neighbour_range(d, rc);
   if (!range.empty) return HealthOk{};
-  return HealthFail{key + " = " + seed_num(rc) +
-                    " is below the smallest neighbour distance of the "
-                    "dataset (" + num(range.lo) + " Å): the descriptor sums "
-                    "over no neighbour and is 0 for every atom."};
+  return HealthFail{key + " = " + seed_num(rc) + " is below the smallest" +
+                    pairs + " neighbour distance of the dataset (" +
+                    num(range.lo) + " Å): the descriptor sums over no "
+                    "neighbour and is 0 for every atom."};
 }
 
 NeighbourRange neighbour_range(const DataStats &d, double rcut) {
@@ -352,17 +367,18 @@ HealthVerdict radial_reach_check(const DataStats &d, const SeedView &s,
   const NeighbourRange range = neighbour_range(d, rcut);
   const std::string within =
       has_cut ? "within RCUTMB = " + seed_num(rcut) : "of the dataset";
+  const std::string pairs = of_pairs(s);
   if (range.empty) {
     // An RCUTMB below every neighbour distance, or data without a pair
     // within it: the check of the cutoff (cutoff_reach_check) gives the
     // finding, once.
     if (has_cut) return HealthOk{};
-    return HealthFail{"the dataset has no pair of atoms: ρ is 0 for every "
-                      "atom."};
+    return HealthFail{"the dataset has no" + pairs +
+                      " pair of atoms: ρ is 0 for every atom."};
   }
-  const std::string distances = "every neighbour distance " + within + " (" +
-                                num(range.lo) + " to " + num(range.hi) +
-                                " Å)";
+  const std::string distances = "every" + pairs + " neighbour distance " +
+                                within + " (" + num(range.lo) + " to " +
+                                num(range.hi) + " Å)";
   const std::size_t n = s.size("CGRIDMB");
   const std::size_t widths = s.contains("SGRIDMB") ? s.size("SGRIDMB") : 0;
   for (std::size_t i = 0; i < n; ++i) {
@@ -390,10 +406,10 @@ HealthVerdict radial_reach_check(const DataStats &d, const SeedView &s,
     const double half = 2.0 / eta;  // b(eta (r - c)) is 0 for |r - c| >= 2/eta
     if (dist < half) continue;
     return HealthFail{channel + ": the support of the blip, |r - CGRIDMB| < "
-                      "2/SGRIDMB = " + num(half) + " Å, holds no neighbour "
-                      "distance " + within + " (" + num(range.lo) + " to " +
-                      num(range.hi) + " Å), so ρ is 0 for every atom (a "
-                      "smaller SGRIDMB widens the support)."};
+                      "2/SGRIDMB = " + num(half) + " Å, holds no" + pairs +
+                      " neighbour distance " + within + " (" + num(range.lo) +
+                      " to " + num(range.hi) + " Å), so ρ is 0 for every "
+                      "atom (a smaller SGRIDMB widens the support)."};
   }
   return HealthOk{};
 }

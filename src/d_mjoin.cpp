@@ -172,6 +172,71 @@ void D_mJoin::check_single_lines(const tadah::core::Context &c) {
     parse_context(c, type_str);
   }
 }
+void D_mJoin::check_potential_lines(const tadah::core::Context &c,
+                                    const std::string &command) {
+  if (command.empty())
+    throw std::invalid_argument(
+        "D_mJoin::check_potential_lines: no command named");
+  for (const std::string type_str : {"TYPE2B", "TYPEMB"}) {
+    if (!c.has_stored(type_str)) continue;
+    const std::string sfx = type_str.substr(type_str.size() - 2);
+    const std::string prefix = type_str == "TYPE2B" ? "D2_" : "DM_";
+    std::vector<std::string> keys = {type_str, "RC" + type_str, "RCUT" + sfx};
+    for (const auto &k : list_keys_of(type_str)) keys.push_back(k);
+    for (const auto &key : keys) {
+      const std::vector<tadah::core::KeyLine> lines = c.key_lines(key);
+      // The lines of each potential file, by the order of the lines.
+      std::map<std::string, std::vector<std::size_t>> of_file;
+      for (std::size_t i = 0; i < lines.size(); ++i)
+        if (lines[i].potential) of_file[lines[i].source].push_back(i);
+      for (const auto &[source, at] : of_file) {
+        if (at.size() < 2) continue;
+        // A joined TYPE line: written with one line per descriptor, each
+        // starting with the descriptor's name, after the line that names
+        // the join. The lines give the key its values in line order.
+        if (key == type_str) {
+          std::vector<std::string> values(c.size(key));
+          c.get(key, values);
+          std::vector<std::size_t> first(lines.size(), 0);
+          std::size_t n = 0;
+          for (std::size_t i = 0; i < lines.size(); ++i) {
+            first[i] = n;
+            n += lines[i].values;
+          }
+          if (n != values.size())
+            throw std::logic_error(
+                "D_mJoin::check_potential_lines: the lines of " + key +
+                " give " + std::to_string(n) + " values, and it has " +
+                std::to_string(values.size()));
+          bool joined_layout =
+              lines[at[0]].values > 0 &&
+              values[first[at[0]]].find("mJoin") != std::string::npos;
+          for (std::size_t k = 1; k < at.size() && joined_layout; ++k)
+            joined_layout = lines[at[k]].values > 0 &&
+                            values[first[at[k]]].rfind(prefix, 0) == 0;
+          if (joined_layout) continue;
+        }
+        std::string on;
+        for (std::size_t k = 0; k < at.size(); ++k)
+          on += (k == 0 ? "" : k + 1 == at.size() ? " and on " : ", on ") +
+                lines[at[k]].where;
+        throw std::runtime_error(
+            "Key " + key + " is set on " + on +
+            ", lines of one potential (a file with WEIGHTS): " +
+            tadah::core::task_command_words(command) +
+            " reads a key of a potential's descriptors from the line the "
+            "potential has for it" +
+            (key == type_str ? " (a " + prefix + "mJoin line has one line "
+                               "per descriptor, each starting with the "
+                               "descriptor's name)"
+                             : std::string()) +
+            ", and a potential's value is changed by editing its line in a "
+            "copy of the potential (the Training page of the documentation, "
+            "Retraining from a potential)");
+      }
+    }
+  }
+}
 void D_mJoin::expand_grids(tadah::core::Context &c, std::vector<tadah::core::Context> &contexts,std::string type_str) {
   if (type_str=="TYPE2B") {
     c.remove("CGRID2B"); c.remove("SGRID2B");

@@ -24,6 +24,14 @@
 // tadah analysis suggest_bounds takes the neighbour statistics up to
 // kCutoffSearchReach times the largest cutoff of the seed, so that the range
 // of a cutoff (cutoff_suggestion) can reach past the seed's.
+//
+// A descriptor sums over the neighbours of the element pairs its TYPE2B or
+// TYPEMB line names (LinePairs): its checks are given the statistics of
+// those pairs (the pre-flight audit, tadah analysis check_bounds), and its
+// suggestions those of one of them at a time (tadah analysis
+// suggest_bounds). Their messages name the pairs of the line when the view
+// of the seed has them (SeedView::line_pairs()): "the smallest (Ta, Ta)
+// neighbour distance of the dataset".
 
 #include <string>
 
@@ -47,8 +55,10 @@ inline constexpr double kCutoffSearchReach = 1.25;
 /** \brief The suggestion of a parameter whose range the neighbour
  *  distances give, for data with no pair of atoms within the reach of the
  *  statistics: no OPTIM line (BoundSuggestion::no_row), its rationale
- *  saying so. */
-BoundSuggestion no_pair_suggestion();
+ *  saying so and naming the element pairs of the line of @p s ("no (W, W)
+ *  pair of atoms of the data ..."; "no pair of atoms ..." for a view
+ *  without them). */
+BoundSuggestion no_pair_suggestion(const SeedView &s);
 
 /** \brief The OPTIM range of a cutoff (RCUT2B, RCUTMB): from 1.05 times the
  *  second peak of the neighbour distances of the first element pair of
@@ -56,15 +66,19 @@ BoundSuggestion no_pair_suggestion();
  *  their 99th percentile) to their 99th percentile, the distances taken up
  *  to the reach of the statistics (kCutoffSearchReach times the largest
  *  cutoff of the seed); no_pair_suggestion() without a pair. The rationale
- *  names the form, the element pair ("Ta-Ta") and the statistics. */
+ *  names the form, the element pair ("Ta-Ta") and the statistics. tadah
+ *  analysis suggest_bounds gives it the statistics of one element pair of
+ *  the descriptor's line at a time. */
 BoundSuggestion cutoff_suggestion(const tadah::core::stats::DataStats &d,
                                   const SeedView &s, int arg_pos);
 
 /** \brief The check of the cutoff @p key (RCUT2B, RCUTMB) of @p s: it fails
  *  when the data have atoms but no pair of them within the cutoff (the
- *  cutoff is below the smallest neighbour distance of every element pair,
- *  or the data have no pair at all: the descriptor sums over no neighbour),
- *  naming the key, its value and the smallest neighbour distance. HealthOk
+ *  cutoff is below the smallest neighbour distance of every element pair
+ *  of @p d, or @p d has no pair at all: the descriptor sums over no
+ *  neighbour), naming the key, its value, the smallest neighbour distance
+ *  and the element pairs of the line of @p s ("the smallest (Ta, Ta)
+ *  neighbour distance"; @p d holds the statistics of those pairs). HealthOk
  *  without the key or without atoms. */
 HealthVerdict cutoff_reach_check(const tadah::core::stats::DataStats &d,
                                  const SeedView &s, const std::string &key);
@@ -95,7 +109,9 @@ double blip_reach_width(double dist);
 
 /** \brief The reach check of the radial channels of a many-body density:
  *  each centre CGRIDMB(i) with its width SGRIDMB(i) and the cutoff RCUTMB
- *  of @p s, against the neighbour distances of @p d (neighbour_range).
+ *  of @p s, against the neighbour distances of @p d (neighbour_range), the
+ *  statistics of the element pairs of the line of @p s, which its messages
+ *  name ("every (W, W) neighbour distance within RCUTMB = 3.5").
  *
  *  A Gaussian channel (@p kind Gaussian, exp(-SGRIDMB (r - CGRIDMB)^2))
  *  fails when it is below kDensityReachFloor at every distance of the
@@ -126,7 +142,7 @@ HealthVerdict radial_reach_check(const tadah::core::stats::DataStats &d,
  *  - without a seed centre: the first peak of the neighbour distances +-
  *    its FWHM, from r_min;
  *  - without peaks: the 10th to 90th percentiles of the distances;
- *  - without a pair: no_pair_suggestion(). */
+ *  - without a pair: no_pair_suggestion(@p s). */
 BoundSuggestion gaussian_centre_suggestion(
     const tadah::core::stats::DataStats &d, const SeedView &s, int arg_pos);
 
@@ -145,7 +161,7 @@ BoundSuggestion gaussian_centre_suggestion(
  *    w the FWHM of the first peak (without peaks, or without a FWHM, the
  *    spread from the 10th to the 90th percentile), a fixed range 0.1 to 1
  *    when the distances have no spread;
- *  - without a pair: no_pair_suggestion(). */
+ *  - without a pair: no_pair_suggestion(@p s). */
 BoundSuggestion gaussian_width_suggestion(
     const tadah::core::stats::DataStats &d, const SeedView &s, int arg_pos);
 
@@ -158,7 +174,7 @@ BoundSuggestion gaussian_width_suggestion(
  *  - without a seed centre: the first peak of the neighbour distances +-
  *    its FWHM, from 0;
  *  - without peaks: the 10th to 90th percentiles of the distances;
- *  - without a pair: no_pair_suggestion(). */
+ *  - without a pair: no_pair_suggestion(@p s). */
 BoundSuggestion blip_centre_suggestion(
     const tadah::core::stats::DataStats &d, const SeedView &s, int arg_pos);
 
@@ -175,7 +191,7 @@ BoundSuggestion blip_centre_suggestion(
  *  - without a seed centre, or without peaks: 1 / w to 6 / w with w the
  *    FWHM of the first peak (without peaks, the spread from the 10th to the
  *    90th percentile), a fixed range 0.1 to 1 when that is not above 0;
- *  - without a pair: no_pair_suggestion(). */
+ *  - without a pair: no_pair_suggestion(@p s). */
 BoundSuggestion blip_width_suggestion(
     const tadah::core::stats::DataStats &d, const SeedView &s, int arg_pos);
 
