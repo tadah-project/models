@@ -194,13 +194,26 @@ std::optional<OptimLowBoundRule> optim_low_bound_rule(
         "every SGRIDMB width > 0 (a radial bump spans [c - w/s, c + w/s]; a "
         "width <= 0 has no support edge)",
         std::string("the DM_REAM ") + basis_name(*basis) + " density basis"};
-  if (k == "SGRID2B" && potedit::bump_channel_halfwidth(ctx, "2B")) {
-    const auto label = ctx.stored_value("TYPE2B", 0);
-    return OptimLowBoundRule{
-        true,
+  if (k == "SGRID2B") {
+    const char *requirement =
         "every SGRID2B width > 0 (a radial bump spans [c - w/s, c + w/s]; a "
-        "width <= 0 has no support edge)",
-        "the " + label.value_or("TYPE2B") + " pair basis"};
+        "width <= 0 has no support edge)";
+    if (potedit::bump_channel_halfwidth(ctx, "2B")) {
+      const auto label = ctx.stored_value("TYPE2B", 0);
+      return OptimLowBoundRule{
+          true, requirement, "the " + label.value_or("TYPE2B") + " pair basis"};
+    }
+    // a D2_mJoin: its first D2_Blip or D2_Blip5 descriptor holds every
+    // SGRID2B entry, as a bump DM_REAM child of a DM_mJoin holds every
+    // SGRIDMB entry (optim_rule_basis)
+    const auto line = ctx.stored_value("TYPE2B", 0);
+    if (line && *line == "D2_mJoin")
+      for (const auto &child : D_mJoin::parse_context(ctx, "TYPE2B"))
+        if (potedit::bump_channel_halfwidth(child, "2B"))
+          return OptimLowBoundRule{
+              true, requirement,
+              "the " + child.stored_value("TYPE2B", 0).value_or("TYPE2B") +
+                  " pair basis of the D2_mJoin line"};
   }
   return std::nullopt;
 }

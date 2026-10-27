@@ -174,7 +174,9 @@ std::optional<BasisKind> optim_rule_basis(const tadah::core::Context &ctx);
  *  radial bump channel, every width > 0 in every form -- SGRIDMB of a
  *  DM_REAM Blip or Blip5 density (optim_rule_basis, so a DM_mJoin's
  *  DM_REAM children count) and SGRID2B of a D2_Blip or D2_Blip5 pair term
- *  (potedit::bump_channel_halfwidth): a bump spans [c - w/s, c + w/s], and
+ *  (potedit::bump_channel_halfwidth), or of a D2_mJoin with such a
+ *  descriptor (every SGRID2B entry of the line, as a DM_mJoin's bump
+ *  density holds every SGRIDMB entry): a bump spans [c - w/s, c + w/s], and
  *  a width s <= 0 has no support edge, so no bump-support rule can hold it
  *  inside the cutoff. tadah hpo refuses such a
  *  box and such a seed width at startup; tadah analysis check_bounds
