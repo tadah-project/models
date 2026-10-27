@@ -247,3 +247,29 @@ TEST_CASE("inert keys: a long line is named by its first values, and the "
   CHECK(inert_keys_refusal(lines, "tadah train") ==
         "tadah train: " + inert_keys_text(lines, false));
 }
+
+/* Pins: with InertKeyRules::watom_never_read set (a fit that writes its own
+ * WATOM, as tadah refit writes WATOM 1), WATOM with a value other than 1 is
+ * a line that changes nothing whatever the descriptor lines say, with that
+ * reason: WATOM 2.5 beside D2_LJ is named ("WATOM 2.5 (line 8 of <file>):
+ * tadah refit writes WATOM 1"); WATOM 1 is not.
+ * Before the fix: does not compile (no watom_never_read). */
+TEST_CASE("inert keys: a fit that writes its own WATOM refuses another",
+          "[inert_keys][watom]") {
+  tadah::core::PeriodicTable::initialize();
+  const ScratchDir dir;
+  Quiet quiet;
+  InertKeyRules refit;
+  refit.ream_keys = false;
+  refit.watom_never_read = "tadah refit writes WATOM 1";
+  const std::string path =
+      dir.write_file("refit.train", std::string(kLj) + "WATOM 2.5\n");
+  const std::string what =
+      refusal(CoreUserConfigParser().parse(path), refit);
+  INFO("refusal: " << what);
+  CHECK_THAT(what, Catch::Contains("WATOM 2.5 (line 8 of " + path +
+                                   "): tadah refit writes WATOM 1"));
+  const std::string one =
+      dir.write_file("refit1.train", std::string(kLj) + "WATOM 1\n");
+  CHECK(refusal(CoreUserConfigParser().parse(one), refit).empty());
+}
