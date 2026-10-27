@@ -271,6 +271,7 @@ std::optional<DescriptorMeta> D2_Knot5::meta() const {
   p_rcut.crit     = Criticality::Critical;
   p_rcut.scope    = PairScope::Global;
   p_rcut.suggest  = cutoff_suggestion;
+  p_rcut.reach_each_pair = true;
   p_rcut.check    = [](const DataStats& d, const SeedView& s) {
     return cutoff_reach_check(d, s, "RCUT2B");
   };
@@ -288,8 +289,8 @@ std::optional<DescriptorMeta> D2_Knot5::meta() const {
   p_cgrid.hard.lo  = 0.0;
   p_cgrid.crit     = Criticality::Recommended;
   p_cgrid.scope    = PairScope::PerElementPair;
-  p_cgrid.suggest  = [](const DataStats& d, const SeedView&, int) -> BoundSuggestion {
-    if (d.per_pair.empty()) return no_pair_suggestion();
+  p_cgrid.suggest  = [](const DataStats& d, const SeedView& s, int) -> BoundSuggestion {
+    if (d.per_pair.empty()) return no_pair_suggestion(s);
     const auto& pp = d.per_pair[0];
     return std::make_pair(0.0, pp.r_percentiles[I_P99]);
   };

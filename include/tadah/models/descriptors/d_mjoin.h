@@ -1,6 +1,7 @@
 #ifndef D_MJOIN_H
 #define D_MJOIN_H
 #include <tadah/core/context.h>
+#include <string>
 #include <vector>
 
 namespace tadah {
@@ -86,6 +87,53 @@ public:
    *  descriptors do not read, as a joined line's does.
    */
   static void check_single_lines(const tadah::core::Context &c);
+
+  /** \brief The check of a potential that a command reads with -c: @p c is
+   *  the configuration that the command @p command (its blueprint task
+   *  name: "train", "hpo", "analysis.suggest_bounds") reads from its
+   *  configuration file (-c), with the lines of its keys
+   *  (core::Context::key_lines()).
+   *
+   *  A potential has one line for each key of its descriptors, and its
+   *  TYPE2B and TYPEMB keys as tadah writes them: lines one after another
+   *  (only comments and blank lines between them, core::KeyLine::ordinal),
+   *  a new line at each descriptor's name and at each DESCRIPTOR block's ID
+   *  (a D2_mJoin or DM_mJoin key as a line with the name of the join, then
+   *  one line per descriptor it joins; core::Context::written_line_sizes()).
+   *  The keys of the TYPE2B and TYPEMB lines are judged, those
+   *  parse_context() reads: the TYPE key, its RCTYPE and RCUT keys and the
+   *  list keys of the line's type (CGRID, SGRID and KDEG; AMPGRIDMB,
+   *  CEMBFUNC and SEMBFUNC). Such a key set on two lines or more of one
+   *  potential file (core::KeyLine::potential, of one source) is refused,
+   *  naming the key, its lines and @p command ("Key RCUT2B is set on line 6
+   *  of copy.tadah and on line 10 of copy.tadah, lines of one potential (a
+   *  file with WEIGHTS): tadah train reads a key of a potential's
+   *  descriptors from the line the potential has for it, and a potential's
+   *  value is changed by editing its line in a copy of the potential
+   *  (...)"), unless the key is the TYPE key and its lines there are the
+   *  lines tadah writes for their values. A TYPE key whose first lines that
+   *  follow one another are those tadah writes is refused naming the lines
+   *  after them ("Line 12 of jtype.tadah is a TYPE2B line of a potential (a
+   *  file with WEIGHTS) outside its TYPE2B lines (lines 4 to 6): tadah
+   *  train reads the TYPE2B key of a potential from the lines tadah writes
+   *  for it, which follow one another, a new line at each descriptor's
+   *  name, and a potential's value is changed by editing its line in a copy
+   *  of the potential (...)"); any other is refused naming every line ("Key
+   *  TYPE2B is set on line 4 of ... and on line 5 of ..., lines of one
+   *  potential (a file with WEIGHTS): tadah train reads the TYPE2B key of a
+   *  potential from the lines tadah writes for it, ..."). A TYPEMB key that
+   *  names a DESCRIPTOR block adds "and at each DESCRIPTOR block's ID
+   *  (@ta)", with its first block's ID. The values of one line that the
+   *  descriptors do not take (a potential of Tadah! 1.5.0) are not refused:
+   *  parse_context() reports them, and a potential read for prediction is
+   *  read with the values of all its lines. Keys without lines (values the
+   *  program set) are not judged.
+   *  \throws std::runtime_error for such a key;
+   *  \throws std::invalid_argument for an empty @p command;
+   *  \throws std::logic_error when the lines of the TYPE key do not give
+   *  its values. */
+  static void check_potential_lines(const tadah::core::Context &c,
+                                    const std::string &command);
 
   static void expand_grids(tadah::core::Context &c, std::vector<tadah::core::Context> &contexts, std::string type_str);
 

@@ -26,6 +26,7 @@
 
 #include <tadah/core/context.h>
 #include <tadah/models/descriptors/dm/embed_spec.h>
+#include <tadah/models/descriptors/line_pairs.h>
 #include <tadah/core/stats/data_stats.h>
 
 namespace tadah {
@@ -120,6 +121,22 @@ class SeedView {
   SeedView(const tadah::core::Context& c,
            std::map<std::string, std::size_t> first_entries)
       : ctx_(&c), first_(std::move(first_entries)) {}
+  /** \brief A view of @p c for the descriptor whose TYPE2B or TYPEMB line
+   *  names the element pairs @p pairs (D_Base::get_init_atoms()), its
+   *  entries numbered after @p first_entries as above. The statistics its
+   *  checks and suggestions are given are those of these pairs
+   *  (LinePairs::stats()), and their messages name them (line_pairs()). */
+  SeedView(const tadah::core::Context& c,
+           std::map<std::string, std::size_t> first_entries, LinePairs pairs)
+      : ctx_(&c), first_(std::move(first_entries)), pairs_(std::move(pairs)) {}
+
+  /** \brief The element pairs of the descriptor's line when the view has
+   *  them; nullptr for a view without them (the statistics it is given are
+   *  then those of every element pair of the data, as the caller gives
+   *  them, and a message names no pair). */
+  const LinePairs* line_pairs() const {
+    return pairs_ ? &*pairs_ : nullptr;
+  }
 
   /** \brief The 1-based number of value @p i of @p key in the
    *  configuration, as an OPTIM line names it: @p i + 1, after the values
@@ -176,6 +193,7 @@ class SeedView {
  private:
   const tadah::core::Context* ctx_;
   std::map<std::string, std::size_t> first_;
+  std::optional<LinePairs> pairs_;
 };
 
 // ---------------------------------------------------------------------
@@ -229,7 +247,12 @@ struct BoundSuggestion : std::pair<double, double> {
  *  arg_pos: -1 for scalar params; 0..n-1 for vector entries
  *  (the framework calls the suggester per vector entry). A suggester never
  *  returns a range of zero width: without a range from the data it returns
- *  BoundSuggestion::no_row with the reason.
+ *  BoundSuggestion::no_row with the reason. tadah analysis suggest_bounds
+ *  calls it with the statistics of one element pair of the descriptor's
+ *  line at a time (LinePairs::stats(), SeedView::line_pairs()) and takes
+ *  the range that holds the range of each, or, for a parameter marked
+ *  ParamMeta::reach_each_pair (a cutoff), the range from the largest low
+ *  end of their ranges to the largest high end.
  *
  *  Closures are written to read DataStats — never to embed magic
  *  numbers. The only constants permitted in a suggester body are
@@ -243,7 +266,12 @@ using BoundSuggester = std::function<BoundSuggestion(
     int arg_pos)>;
 
 /** \brief Validate (or warn about) a parameter or parameter combination
- *  given the seed and the data.
+ *  given the seed and the data: the pre-flight audit gives it the
+ *  statistics of the element pairs of the descriptor's line
+ *  (LinePairs::stats(), SeedView::line_pairs()), and a check of the reach
+ *  of a cutoff or of the channels of a density judges each element pair
+ *  the line stands for on its own (cutoff_reach_check(),
+ *  radial_reach_check()).
  */
 using HealthCheck = std::function<HealthVerdict(
     const tadah::core::stats::DataStats&,
@@ -284,6 +312,14 @@ struct ParamMeta {
 
   BoundSuggester suggest{};
   HealthCheck    check{};
+  /** Whether each value of the parameter must reach each element pair of
+   *  the descriptor's line, as the check of a cutoff judges it
+   *  (cutoff_reach_check()): every RCUT2B and RCUTMB. For a line of
+   *  several pairs, tadah analysis suggest_bounds then suggests the range
+   *  from the largest low end of the ranges of its pairs to the largest
+   *  high end, so that each value in it reaches each pair; for any other
+   *  parameter, the range that holds the range of each pair. */
+  bool           reach_each_pair{false};
 
   /** Per-parameter aggregate thresholds used by the per-iter health
    *  monitor. All have rationale-bearing defaults; descriptors

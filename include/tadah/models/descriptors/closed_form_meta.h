@@ -61,6 +61,7 @@ inline DescriptorMeta make_closed_form_meta(
   p_rcut.check = [ck](const DataStats& d, const SeedView& s) {
     return cutoff_reach_check(d, s, ck);
   };
+  p_rcut.reach_each_pair = true;
   dm.params.push_back(std::move(p_rcut));
 
   dm.expected_columns = [](const SeedView&) -> std::size_t { return 1; };

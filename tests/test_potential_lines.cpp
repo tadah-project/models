@@ -671,3 +671,336 @@ TEST_CASE("A TYPE line without its element pairs is refused naming the "
         "TYPE2B D2_Blip: the element types come in pairs, and the line has "
         "3 of them, Ta Ta W");
 }
+
+/* ------------------------------------------------------------------------
+ * A key of a potential's descriptors set on two lines of the potential
+ * file, or TYPE lines other than those tadah writes: a command that reads
+ * the potential with -c (tadah train, tadah hpo, tadah refit and the
+ * analysis commands; the blueprint name of the command given) refuses it,
+ * naming the lines; a potential read for prediction is read with the
+ * values of all its lines, with the WARNING of values its descriptors do
+ * not take.
+ * ---------------------------------------------------------------------- */
+namespace {
+
+/* What D_mJoin::check_potential_lines(@p c, @p command) throws; empty when
+ * it throws nothing. */
+std::string lines_refusal(const Context &c,
+                          const std::string &command = "TRAIN") {
+  try {
+    D_mJoin::check_potential_lines(c, command);
+  } catch (const std::exception &e) {
+    return e.what();
+  }
+  return "";
+}
+
+/* The refusal of @p key set on @p lines (each "line 6 of copy.tadah") of
+ * one potential, read by @p words ("tadah train"). */
+std::string two_lines(const std::string &key,
+                      const std::vector<std::string> &lines,
+                      const std::string &words = "tadah train") {
+  std::string on;
+  for (std::size_t i = 0; i < lines.size(); ++i)
+    on += (i == 0 ? "" : i + 1 == lines.size() ? " and on " : ", on ") +
+          lines[i];
+  return "Key " + key + " is set on " + on +
+         ", lines of one potential (a file with WEIGHTS): " + words +
+         " reads a key of a potential's descriptors from the line the "
+         "potential has for it, and a potential's value is changed by "
+         "editing its line in a copy of the potential (the Training page of "
+         "the documentation, Retraining from a potential)";
+}
+
+/* How the refusal of a TYPE key @p key, read by @p words, says that a
+ * potential has its lines: those tadah writes, which follow one another, a
+ * new line at each descriptor's name and, when the key names a DESCRIPTOR
+ * block (@p block, "@ta"), at each block's ID. */
+std::string type_rule(const std::string &key, const std::string &words,
+                      const std::string &block) {
+  return words + " reads the " + key +
+         " key of a potential from the lines tadah writes for it, which "
+         "follow one another, a new line at each descriptor's name" +
+         (block.empty() ? std::string()
+                        : " and at each DESCRIPTOR block's ID (" + block +
+                              ")") +
+         ", and a potential's value is changed by editing its line in a copy "
+         "of the potential (the Training page of the documentation, "
+         "Retraining from a potential)";
+}
+
+/* The refusal of the TYPE key @p key of a potential whose first lines,
+ * @p written ("lines 4 to 6"), are as tadah writes them, and whose lines
+ * @p outside (each "line 12 of jtype.tadah") are outside them, read by
+ * @p words. */
+std::string outside_lines(const std::string &key,
+                          const std::vector<std::string> &outside,
+                          const std::string &written,
+                          const std::string &words = "tadah train",
+                          const std::string &block = "") {
+  std::string on;
+  for (std::size_t i = 0; i < outside.size(); ++i)
+    on += (i == 0 ? "" : i + 1 == outside.size() ? " and " : ", ") +
+          outside[i];
+  on[0] = 'L';
+  const bool one = written.rfind("line ", 0) == 0;
+  return on +
+         (outside.size() == 1 ? " is a " + key + " line"
+                              : " are " + key + " lines") +
+         " of a potential (a file with WEIGHTS) outside its " + key +
+         (one ? " line (" : " lines (") + written +
+         "): " + type_rule(key, words, block);
+}
+
+/* The refusal of the TYPE key @p key set on @p lines of one potential whose
+ * first lines are not those tadah writes, read by @p words. */
+std::string type_lines(const std::string &key,
+                       const std::vector<std::string> &lines,
+                       const std::string &words = "tadah train",
+                       const std::string &block = "") {
+  std::string on;
+  for (std::size_t i = 0; i < lines.size(); ++i)
+    on += (i == 0 ? "" : i + 1 == lines.size() ? " and on " : ", on ") +
+          lines[i];
+  return "Key " + key + " is set on " + on +
+         ", lines of one potential (a file with WEIGHTS): " +
+         type_rule(key, words, block);
+}
+
+/* A DM_Embed block of the ID @p id, of PAIRS Ta Ta. */
+std::string embed_block(const std::string &id) {
+  return "DESCRIPTOR " + id + " DM_Embed\n"
+         "  PAIRS Ta Ta\n"
+         "  DENSITY\n"
+         "    BASIS Blip5\n"
+         "    FORM NONNEG\n"
+         "    CENTRES 1.0 2.5 4.0\n"
+         "    ETA 1.5 1.5 1.5\n"
+         "    AMPLITUDES 0.4 0.2 0.1\n"
+         "    CUTOFF\n"
+         "      TYPE Cut_Poly\n"
+         "      RADIUS 5.0\n"
+         "    ENDCUTOFF\n"
+         "  ENDDENSITY\n"
+         "  EMBEDDING\n"
+         "    BASIS Gaussian\n"
+         "    CENTRES 0.0 0.5 1.0 1.5\n"
+         "    WIDTHS 0.5 0.5 0.5 0.5\n"
+         "    REFERENCE ZERO\n"
+         "  ENDEMBEDDING\n"
+         "ENDDESCRIPTOR\n";
+}
+
+/* A potential of the TYPEMB lines @p typemb, which start on line 4, and
+ * the DM_Embed blocks of the IDs @p ids. By default a DM_Embed block
+ * placed before a DM_Blip descriptor, its TYPEMB lines 4 and 5 as tadah
+ * writes them: "TYPEMB @ta" then "TYPEMB DM_Blip 0 1 1 Ta Ta". The keys of
+ * the descriptor (RCTYPEMB, RCUTMB 4.5, CGRIDMB 2.8, SGRIDMB 1) follow
+ * when @p descriptor. */
+std::string block_potential(
+    const std::string &typemb = "TYPEMB @ta\nTYPEMB DM_Blip 0 1 1 Ta Ta\n",
+    const std::vector<std::string> &ids = {"ta"}, bool descriptor = true) {
+  std::string pot = "ATOM Ta\n"
+                    "INIT2B false\n"
+                    "INITMB true\n" +
+                    typemb;
+  if (descriptor)
+    pot += "RCTYPEMB Cut_Cos\n"
+           "RCUTMB 4.5\n"
+           "CGRIDMB 2.8\n"
+           "SGRIDMB 1\n";
+  for (const auto &id : ids) pot += embed_block(id);
+  return pot + "WEIGHTS 0.1 0.2 0.3 0.4 0.5\n";
+}
+
+/* The number of lines of @p text. */
+std::size_t line_count(const std::string &text) {
+  return static_cast<std::size_t>(
+      std::count(text.begin(), text.end(), '\n'));
+}
+
+}  // namespace
+
+/* Pins: a copy of the single D2_Blip potential (RCUT2B 5 on line 6) with
+ * "RCUT2B 6" appended (line 10):
+ *  - D_mJoin::check_potential_lines refuses it for tadah train ("Key RCUT2B
+ *    is set on line 6 of <copy> and on line 10 of <copy>, lines of one
+ *    potential (a file with WEIGHTS): tadah train reads a key of a
+ *    potential's descriptors from the line the potential has for it, and a
+ *    potential's value is changed by editing its line in a copy of the
+ *    potential (the Training page of the documentation, Retraining from a
+ *    potential)"), and for tadah hpo naming tadah hpo;
+ *  - included with CONFIG by run.train, the lines name the CONFIG line;
+ *  - a model built from it for prediction (DC_Selector) loads, with the
+ *    WARNING "Part of RCUT2B (5) is ignored: TYPE2B D2_Blip takes one RCUT2B
+ *    value, and its cutoff is the largest, 6; ...";
+ *  - "RCUT2B 5 6" on its one line (a potential of tadah 1.5.0), the D2_mJoin
+ *    potential with its three TYPE2B lines (4 to 6), with RCUT2B 5.3 4.5 6
+ *    on one line, a training configuration (no WEIGHTS) with two RCUT2B
+ *    lines (refused by its count, test above) and a potential with two
+ *    DBFILE lines (a key of no descriptor) pass the check;
+ *  - the TYPE lines tadah writes, a new line at each descriptor's name and
+ *    at each DESCRIPTOR block's ID, pass the check: "TYPEMB @ta" then
+ *    "TYPEMB DM_Blip 0 1 1 Ta Ta" (a block placed before a descriptor),
+ *    "TYPEMB DM_EAD 0 1 1 Ta Ta" then "TYPEMB @ta" (after it), and "TYPEMB
+ *    @ta" then "TYPEMB @tb" (two blocks);
+ *  - a comment line and a blank line between the TYPE2B lines of the
+ *    D2_mJoin potential, and a comment between its TYPEMB lines "@ta" and
+ *    "DM_Blip 0 1 1 Ta Ta", pass the check;
+ *  - a TYPE line outside the first lines of the key, which are as tadah
+ *    writes them, is refused, naming it and those lines and saying how a
+ *    potential has its TYPE lines ("Line 12 of <file> is a TYPE2B line of a
+ *    potential (a file with WEIGHTS) outside its TYPE2B lines (lines 4 to
+ *    6): tadah train reads the TYPE2B key of a potential from the lines
+ *    tadah writes for it, which follow one another, a new line at each
+ *    descriptor's name, and a potential's value is changed by editing its
+ *    line in a copy of the potential (...)"): "TYPE2B D2_Blip 2 2 Ta W"
+ *    appended to the single potential (line 10, outside line 4), "W Ta W"
+ *    (a line that starts with no descriptor) and "D2_LJ Ta Ta" (a
+ *    descriptor) appended to the D2_mJoin potential (line 12), its D2_BP
+ *    line moved below the RCTYPE2B line (line 7, outside lines 4 and 5),
+ *    and "TYPEMB DM_EAD 0 1 1 Ta Ta" appended to the potential of a block,
+ *    whose refusal adds "and at each DESCRIPTOR block's ID (@ta)";
+ *  - TYPE lines one after another that are not those tadah writes, "TYPE2B
+ *    W Ta W" inserted below the TYPE2B line of the single potential (lines
+ *    4 and 5), are refused naming both ("Key TYPE2B is set on line 4 of
+ *    <file> and on line 5 of <file>, lines of one potential (a file with
+ *    WEIGHTS): tadah train reads the TYPE2B key of a potential from the
+ *    lines tadah writes for it, ...");
+ *  - a CGRIDMB line appended to the single DM_EAD potential (CGRIDMB on
+ *    line 7) is refused, naming both lines.
+ * Before the fix: does not compile (no D_mJoin::check_potential_lines): a
+ * training command read the copy as the 1.5.0 potentials whose one line
+ * has values its descriptors do not take, with the WARNING, and trained a
+ * cutoff of 6.
+ * Before the fix of the TYPE lines (the check accepted lines of a TYPE key
+ * whose first value named D2_mJoin or DM_mJoin and whose later lines each
+ * started with a descriptor's name, wherever they were): "D2_LJ Ta Ta"
+ * appended at line 12 and the D2_BP line moved below RCTYPE2B passed the
+ * check, and "TYPEMB @ta"
+ * then "TYPEMB DM_Blip 0 1 1 Ta Ta", which tadah writes, was refused as two
+ * lines of TYPEMB ("Key TYPEMB is set on line 4 of <file> and on line 5 of
+ * <file>, ... (a DM_mJoin line has one line per descriptor, each starting
+ * with the descriptor's name), ..."); every refusal of a TYPE key said "(a
+ * D2_mJoin line has one line per descriptor, each starting with the
+ * descriptor's name)".
+ * Before the fix of the block IDs, the key lines and the refusal of a TYPE
+ * line: "TYPEMB DM_EAD 0 1 1 Ta Ta" then "TYPEMB @ta", "TYPEMB @ta" then
+ * "TYPEMB @tb", and the TYPE lines with a comment or a blank line between
+ * them were refused as two lines of the key; a refusal of a TYPE key named
+ * every line of the key ("Key TYPE2B is set on line 4 of <file>, on line 5
+ * ..., on line 6 ... and on line 12 of <file>, ...: tadah train reads a key
+ * of a potential's descriptors from the line the potential has for it (the
+ * TYPE2B lines of a potential follow one another, a new line at each
+ * descriptor's name, as tadah writes them), ..."). */
+TEST_CASE("A key of a descriptor set on two lines of one potential file is "
+          "refused by a command that trains from it",
+          "[D_mJoin][potential][potential_lines][retrain]") {
+  Scratch dir;
+  const std::string copy =
+      dir.write("copy.tadah", std::string(kSingle2B) + "RCUT2B 6\n");
+  SECTION("an RCUT2B line appended to a copy") {
+    CHECK(lines_refusal(parsed(copy)) ==
+          two_lines("RCUT2B", {"line 6 of " + copy, "line 10 of " + copy}));
+    CHECK(lines_refusal(parsed(copy), "HPO") ==
+          two_lines("RCUT2B", {"line 6 of " + copy, "line 10 of " + copy},
+                    "tadah hpo"));
+    IgnoredKeyNoticeCapture cap;
+    CHECK(load_refusal(parsed(copy)).empty());
+    CHECK(cap.notices() ==
+          std::vector<std::string>{
+              "Part of RCUT2B (5) is ignored: TYPE2B D2_Blip takes one RCUT2B "
+              "value, and its cutoff is the largest, 6; the potential works "
+              "unchanged with RCUT2B 6 alone"});
+  }
+  SECTION("the copy included with CONFIG") {
+    const std::string run =
+        dir.write("run.train", "DBFILE db.tadah\nCONFIG " + copy + "\n");
+    const std::string by = " (CONFIG on line 2 of " + run + ")";
+    CHECK(lines_refusal(parsed(run)) ==
+          two_lines("RCUT2B",
+                    {"line 6 of " + copy + by, "line 10 of " + copy + by}));
+  }
+  SECTION("what a potential writes, a configuration and other keys") {
+    std::string old = kSingle2B;
+    old.replace(old.find("RCUT2B 5\n"), 9, "RCUT2B 5 6\n");
+    CHECK(lines_refusal(parsed(dir.write("old.tadah", old))).empty());
+    CHECK(lines_refusal(parsed(dir.write("j.tadah", joined_2b()))).empty());
+    CHECK(lines_refusal(parsed(dir.write("jo.tadah", joined_2b(true))))
+              .empty());
+    std::string config = kSingle2B;
+    config.erase(config.find("WEIGHTS"));
+    CHECK(lines_refusal(parsed(dir.write("two.train",
+                                         config + "RCUT2B 6\n")))
+              .empty());
+    CHECK(lines_refusal(parsed(dir.write(
+              "db.tadah", std::string(kSingle2B) +
+                              "DBFILE a.tadah\nDBFILE b.tadah\n")))
+              .empty());
+  }
+  SECTION("the TYPE lines tadah writes for blocks and descriptors") {
+    CHECK(lines_refusal(parsed(dir.write("block.tadah", block_potential())))
+              .empty());
+    CHECK(lines_refusal(parsed(dir.write(
+              "after.tadah",
+              block_potential("TYPEMB DM_EAD 0 1 1 Ta Ta\nTYPEMB @ta\n"))))
+              .empty());
+    CHECK(lines_refusal(parsed(dir.write(
+              "two.tadah", block_potential("TYPEMB @ta\nTYPEMB @tb\n",
+                                           {"ta", "tb"}, false))))
+              .empty());
+  }
+  SECTION("comments and blank lines between the TYPE lines") {
+    std::string commented = joined_2b();
+    commented.insert(commented.find("TYPE2B D2_Blip"), "# the Blip part\n");
+    commented.insert(commented.find("TYPE2B D2_BP"), "\n");
+    CHECK(lines_refusal(parsed(dir.write("comment.tadah", commented)))
+              .empty());
+    CHECK(lines_refusal(parsed(dir.write(
+              "mbcomment.tadah",
+              block_potential("TYPEMB @ta\n  # the descriptor\n"
+                              "TYPEMB DM_Blip 0 1 1 Ta Ta\n"))))
+              .empty());
+  }
+  SECTION("a TYPE line appended") {
+    const std::string single =
+        dir.write("type.tadah",
+                  std::string(kSingle2B) + "TYPE2B D2_Blip 2 2 Ta W\n");
+    CHECK(lines_refusal(parsed(single)) ==
+          outside_lines("TYPE2B", {"line 10 of " + single}, "line 4"));
+    for (const char *line : {"TYPE2B W Ta W\n", "TYPE2B D2_LJ Ta Ta\n"}) {
+      const std::string joined =
+          dir.write("jtype.tadah", joined_2b() + line);
+      CAPTURE(line);
+      CHECK(lines_refusal(parsed(joined)) ==
+            outside_lines("TYPE2B", {"line 12 of " + joined}, "lines 4 to 6"));
+    }
+    const std::string block = block_potential();
+    const std::string mb = dir.write(
+        "mbtype.tadah", block + "TYPEMB DM_EAD 0 1 1 Ta Ta\n");
+    CHECK(lines_refusal(parsed(mb)) ==
+          outside_lines("TYPEMB",
+                        {"line " + std::to_string(line_count(block) + 1) +
+                         " of " + mb},
+                        "lines 4 and 5", "tadah train", "@ta"));
+  }
+  SECTION("TYPE2B lines tadah does not write") {
+    std::string moved = joined_2b();
+    moved.erase(moved.find("TYPE2B D2_BP 2 2 Ta Ta\n"), 23);
+    moved.insert(moved.find("RCUT2B"), "TYPE2B D2_BP 2 2 Ta Ta\n");
+    const std::string apart = dir.write("apart.tadah", moved);
+    CHECK(lines_refusal(parsed(apart)) ==
+          outside_lines("TYPE2B", {"line 7 of " + apart}, "lines 4 and 5"));
+    std::string split = kSingle2B;
+    split.insert(split.find("RCTYPE2B"), "TYPE2B W Ta W\n");
+    const std::string next = dir.write("next.tadah", split);
+    CHECK(lines_refusal(parsed(next)) ==
+          type_lines("TYPE2B", {"line 4 of " + next, "line 5 of " + next}));
+  }
+  SECTION("a CGRIDMB line appended") {
+    const std::string mb =
+        dir.write("mb.tadah", std::string(kSingleMB) + "CGRIDMB 4\n");
+    CHECK(lines_refusal(parsed(mb)) ==
+          two_lines("CGRIDMB", {"line 7 of " + mb, "line 10 of " + mb}));
+  }
+}

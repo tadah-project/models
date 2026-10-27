@@ -1,4 +1,5 @@
 #include "tadah/core/registry.h"
+#include <cctype>
 #include <cstddef>
 #include <iostream>
 #include <map>
@@ -170,6 +171,129 @@ void D_mJoin::check_single_lines(const tadah::core::Context &c) {
     if (c.get<std::string>(type_str, 0).find("mJoin") != std::string::npos)
       continue;  // D2_mJoin and DM_mJoin split their own lines
     parse_context(c, type_str);
+  }
+}
+void D_mJoin::check_potential_lines(const tadah::core::Context &c,
+                                    const std::string &command) {
+  if (command.empty())
+    throw std::invalid_argument(
+        "D_mJoin::check_potential_lines: no command named");
+  const std::string tail =
+      ", and a potential's value is changed by editing its line in a copy of "
+      "the potential (the Training page of the documentation, Retraining "
+      "from a potential)";
+  for (const std::string type_str : {"TYPE2B", "TYPEMB"}) {
+    if (!c.has_stored(type_str)) continue;
+    const std::string sfx = type_str.substr(type_str.size() - 2);
+    std::vector<std::string> keys = {type_str, "RC" + type_str, "RCUT" + sfx};
+    for (const auto &k : list_keys_of(type_str)) keys.push_back(k);
+    for (const auto &key : keys) {
+      const std::vector<tadah::core::KeyLine> lines = c.key_lines(key);
+      // The lines of each potential file, by the order of the lines.
+      std::map<std::string, std::vector<std::size_t>> of_file;
+      for (std::size_t i = 0; i < lines.size(); ++i)
+        if (lines[i].potential) of_file[lines[i].source].push_back(i);
+      for (const auto &[source, at] : of_file) {
+        if (at.size() < 2) continue;
+        std::string on;
+        for (std::size_t k = 0; k < at.size(); ++k)
+          on += (k == 0 ? "" : k + 1 == at.size() ? " and on " : ", on ") +
+                lines[at[k]].where;
+        if (key != type_str)
+          throw std::runtime_error(
+              "Key " + key + " is set on " + on +
+              ", lines of one potential (a file with WEIGHTS): " +
+              tadah::core::task_command_words(command) +
+              " reads a key of a potential's descriptors from the line the "
+              "potential has for it" +
+              tail);
+        // The TYPE key of a potential as tadah writes it: lines one after
+        // another (only comments and blank lines between them,
+        // core::KeyLine::ordinal), a new line at each descriptor's name and
+        // at each DESCRIPTOR block's ID (D2_mJoin, then a line per
+        // descriptor; TYPEMB @ta on a line of its own), the lines
+        // Context::written_line_sizes() gives for their values. The lines
+        // give the key its values in line order.
+        std::vector<std::string> values(c.size(key));
+        c.get(key, values);
+        std::vector<std::size_t> first(lines.size(), 0);
+        std::size_t n = 0;
+        for (std::size_t i = 0; i < lines.size(); ++i) {
+          first[i] = n;
+          n += lines[i].values;
+        }
+        if (n != values.size())
+          throw std::logic_error(
+              "D_mJoin::check_potential_lines: the lines of " + key +
+              " give " + std::to_string(n) + " values, and it has " +
+              std::to_string(values.size()));
+        // The first lines of the file's key that follow one another.
+        std::size_t run = 1;
+        while (run < at.size() &&
+               lines[at[run]].ordinal == lines[at[run - 1]].ordinal + 1)
+          ++run;
+        // Whether the file's lines at[0, m) are those tadah writes for
+        // their values.
+        auto as_written = [&](std::size_t m) {
+          std::vector<std::string> own;
+          for (std::size_t k = 0; k < m; ++k) {
+            const std::size_t i = at[k];
+            own.insert(own.end(),
+                       values.begin() + static_cast<std::ptrdiff_t>(first[i]),
+                       values.begin() + static_cast<std::ptrdiff_t>(
+                                            first[i] + lines[i].values));
+          }
+          const std::vector<std::size_t> written =
+              c.written_line_sizes(key, own);
+          if (written.size() != m) return false;
+          for (std::size_t k = 0; k < m; ++k)
+            if (lines[at[k]].values != written[k]) return false;
+          return true;
+        };
+        const bool first_written = as_written(run);
+        if (run == at.size() && first_written) continue;
+        // How a potential has its TYPE lines, with the ID of the first
+        // DESCRIPTOR block that the key names as an example.
+        std::string block;
+        for (const auto &v : values)
+          if (!v.empty() && v.front() == '@') {
+            block = v;
+            break;
+          }
+        const std::string rule =
+            tadah::core::task_command_words(command) + " reads the " + key +
+            " key of a potential from the lines tadah writes for it, which "
+            "follow one another, a new line at each descriptor's name" +
+            (block.empty() ? std::string()
+                           : " and at each DESCRIPTOR block's ID (" + block +
+                                 ")") +
+            tail;
+        if (!first_written)
+          throw std::runtime_error(
+              "Key " + key + " is set on " + on +
+              ", lines of one potential (a file with WEIGHTS): " + rule);
+        // The first lines are as tadah writes them: the lines after them
+        // are outside them.
+        std::string outside;
+        for (std::size_t k = run; k < at.size(); ++k)
+          outside += (k == run ? "" : k + 1 == at.size() ? " and " : ", ") +
+                     lines[at[k]].where;
+        outside[0] = static_cast<char>(
+            std::toupper(static_cast<unsigned char>(outside[0])));
+        const std::size_t from = lines[at[0]].line;
+        const std::size_t to = lines[at[run - 1]].line;
+        const std::string written =
+            run == 1 ? "line " + std::to_string(from)
+                     : "lines " + std::to_string(from) +
+                           (run == 2 ? " and " : " to ") + std::to_string(to);
+        throw std::runtime_error(
+            outside +
+            (at.size() - run == 1 ? " is a " + key + " line"
+                                  : " are " + key + " lines") +
+            " of a potential (a file with WEIGHTS) outside its " + key +
+            (run == 1 ? " line (" : " lines (") + written + "): " + rule);
+      }
+    }
   }
 }
 void D_mJoin::expand_grids(tadah::core::Context &c, std::vector<tadah::core::Context> &contexts,std::string type_str) {

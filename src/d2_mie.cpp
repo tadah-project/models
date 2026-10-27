@@ -240,6 +240,7 @@ std::optional<DescriptorMeta> D2_MIE::meta() const {
   p_rcut.crit     = Criticality::Critical;
   p_rcut.scope    = PairScope::Global;
   p_rcut.suggest = cutoff_suggestion;
+  p_rcut.reach_each_pair = true;
   p_rcut.check = [](const DataStats& d, const SeedView& s) {
     return cutoff_reach_check(d, s, "RCUT2B");
   };

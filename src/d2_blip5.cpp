@@ -290,6 +290,7 @@ std::optional<DescriptorMeta> D2_Blip5::meta() const {
   p_rcut.crit     = Criticality::Critical;
   p_rcut.scope    = PairScope::Global;
   p_rcut.suggest = cutoff_suggestion;
+  p_rcut.reach_each_pair = true;
   p_rcut.check = [](const DataStats& d, const SeedView& s) {
     return cutoff_reach_check(d, s, "RCUT2B");
   };
@@ -305,8 +306,8 @@ std::optional<DescriptorMeta> D2_Blip5::meta() const {
   p_cgrid.hard.lo  = 0.0;
   p_cgrid.crit     = Criticality::Recommended;
   p_cgrid.scope    = PairScope::PerElementPair;
-  p_cgrid.suggest  = [](const DataStats& d, const SeedView&, int) -> BoundSuggestion {
-    if (d.per_pair.empty()) return no_pair_suggestion();
+  p_cgrid.suggest  = [](const DataStats& d, const SeedView& s, int) -> BoundSuggestion {
+    if (d.per_pair.empty()) return no_pair_suggestion(s);
     const auto& pp = d.per_pair[0];
     // Spread CGRID2B[i] uniformly between 0 and the data's r_ij p99.
     return std::make_pair(0.0, pp.r_percentiles[I_P99]);
@@ -326,9 +327,9 @@ std::optional<DescriptorMeta> D2_Blip5::meta() const {
   p_sgrid.hard.lo  = 1.0e-6;
   p_sgrid.crit     = Criticality::Recommended;
   p_sgrid.scope    = PairScope::Global;
-  p_sgrid.suggest  = [](const DataStats& d, const SeedView&,
+  p_sgrid.suggest  = [](const DataStats& d, const SeedView& s,
                          int) -> BoundSuggestion {
-    if (d.per_pair.empty()) return no_pair_suggestion();
+    if (d.per_pair.empty()) return no_pair_suggestion(s);
     const auto& pp = d.per_pair[0];
     const double spread = pp.r_percentiles[I_P90] - pp.r_percentiles[I_P10];
     if (spread <= 0.0)

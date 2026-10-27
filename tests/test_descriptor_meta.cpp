@@ -756,11 +756,12 @@ DataStats ta_w_stats() {
  * first element pair, start at 2.86 A and whose (Ta, W) pairs start at
  * 2.4 A (ta_w_stats()), a cutoff of 2.6 A passes, as it holds the (Ta, W)
  * pairs from 2.4 A, and a cutoff of 2.3 A fails, its message naming 2.4 A,
- * the smallest neighbour distance of the dataset. The check does not read
- * the element pairs of the descriptor's line: a (Ta, Ta) descriptor whose
- * cutoff holds (Ta, W) pairs alone passes as well, and no FAIL finding,
- * which AUDIT error turns into a refusal, is given for a cutoff that holds
- * a pair of the data.
+ * the smallest neighbour distance of the dataset. The check judges the
+ * statistics it is given, every element pair of them, and a view without
+ * the element pairs of the descriptor's line names no pair: its callers
+ * give it the statistics of those pairs (LinePairs::stats(), the next
+ * cases), so no FAIL finding, which AUDIT error turns into a refusal, is
+ * given for a cutoff that holds a pair the descriptor sums over.
  * Before the fix: each check compared the cutoff with r_min of the first
  * element pair, 2.86 A: the cutoff of 2.6 A failed ("RCUT2B=2.600000 is
  * below the dataset r_min=2.860000 ...") and the message of 2.3 A named
@@ -802,16 +803,20 @@ TEST_CASE("Every cutoff is compared with the smallest neighbour distance of "
  * first element pair of the statistics (DataStats sorts per_pair by element
  * pair): on Ta-W data (ta_w_stats(), the (Ta, Ta) pairs first)
  *  - the cutoff suggestion of every descriptor that has one names "the
- *    99th percentile of the Ta-Ta neighbour distances";
+ *    99th percentile of the (Ta, Ta) neighbour distances";
  *  - for DM_EAD and DM_Blip, a centre at 2.9 A gets a CGRIDMB and an
- *    SGRIDMB suggestion naming "the Ta-Ta neighbour shell nearest to it",
- *    and a seed without CGRIDMB a CGRIDMB suggestion naming "the first
- *    Ta-Ta neighbour shell" and an SGRIDMB suggestion naming "Ta-Ta";
+ *    SGRIDMB suggestion naming "the (Ta, Ta) neighbour shell nearest to
+ *    it", and a seed without CGRIDMB a CGRIDMB suggestion naming "the first
+ *    (Ta, Ta) neighbour shell" and an SGRIDMB suggestion naming "(Ta, Ta)";
  *  - DM_EAD's Gaussian at the origin gets an SGRIDMB suggestion naming the
- *    Ta-Ta neighbour distances its width is taken from.
+ *    (Ta, Ta) neighbour distances its width is taken from.
+ * A pair is named as the checks and the rows without an OPTIM line name it
+ * ("no (Ta, Ta) pair of atoms").
  * Before the fix: each of these rationales named "the neighbour distances"
  * or "the neighbour shell" alone, while the check of a cutoff reads every
- * element pair. */
+ * element pair.
+ * Before the fix of the notation: the rationales named the pair "Ta-Ta"
+ * ("the 99th percentile of the (Ta, Ta) neighbour distances"). */
 TEST_CASE("A suggestion names the element pair whose distances it comes "
           "from",
           "[metadata][density_reach][suggest]") {
@@ -831,7 +836,7 @@ TEST_CASE("A suggestion names the element pair whose distances it comes "
       const BoundSuggestion s = pm.suggest(data, SeedView(seed), -1);
       INFO(s.rationale);
       CHECK(s.rationale.find(
-                "the 99th percentile of the Ta-Ta neighbour distances") !=
+                "the 99th percentile of the (Ta, Ta) neighbour distances") !=
             std::string::npos);
     }
   }
@@ -853,21 +858,21 @@ TEST_CASE("A suggestion names the element pair whose distances it comes "
     const SeedView sv(seeded);
     const BoundSuggestion c1 = centre->suggest(data, sv, 1);
     INFO("CGRIDMB(2): " << c1.rationale);
-    CHECK(c1.rationale.find("the Ta-Ta neighbour shell nearest to it") !=
+    CHECK(c1.rationale.find("the (Ta, Ta) neighbour shell nearest to it") !=
           std::string::npos);
     const BoundSuggestion w1 = width->suggest(data, sv, 1);
     INFO("SGRIDMB(2): " << w1.rationale);
-    CHECK(w1.rationale.find("the Ta-Ta neighbour shell nearest to it") !=
+    CHECK(w1.rationale.find("the (Ta, Ta) neighbour shell nearest to it") !=
           std::string::npos);
     Context bare;
     bare.add<double>("RCUTMB", 5.6);
     const BoundSuggestion c0 = centre->suggest(data, SeedView(bare), 0);
     INFO("CGRIDMB without a seed: " << c0.rationale);
-    CHECK(c0.rationale.find("the first Ta-Ta neighbour shell") !=
+    CHECK(c0.rationale.find("the first (Ta, Ta) neighbour shell") !=
           std::string::npos);
     const BoundSuggestion w0 = width->suggest(data, SeedView(bare), 0);
     INFO("SGRIDMB without a seed: " << w0.rationale);
-    CHECK(w0.rationale.find("Ta-Ta") != std::string::npos);
+    CHECK(w0.rationale.find("(Ta, Ta)") != std::string::npos);
   }
 
   std::unique_ptr<D_Base> ead(tadah::core::factory<D_Base>("DM_EAD"));
@@ -882,7 +887,7 @@ TEST_CASE("A suggestion names the element pair whose distances it comes "
   const BoundSuggestion w = width->suggest(data, SeedView(origin), 0);
   INFO("SGRIDMB at the origin: " << w.rationale);
   CHECK_FALSE(w.none);
-  CHECK(w.rationale.find("Ta-Ta neighbour distances") != std::string::npos);
+  CHECK(w.rationale.find("(Ta, Ta) neighbour distances") != std::string::npos);
 }
 
 /* Pins: every Critical parameter of every registered descriptor has a
@@ -1093,4 +1098,549 @@ TEST_CASE("The health checks print the seed's values as written",
   REQUIRE(fails.size() == 1u);
   CHECK(fails[0] ==
         "D2_MIE needs n > m for a finite prefactor (got n = 6, m = 12).");
+}
+
+// ----------------------------------------------------------------
+// The element pairs of a descriptor's line: a descriptor sums over the
+// neighbours of the element pairs its TYPE2B or TYPEMB line names, and its
+// checks and suggestions are given the statistics of those pairs.
+// ----------------------------------------------------------------
+
+#include <tadah/models/descriptors/density_reach.h>
+#include <tadah/models/descriptors/line_pairs.h>
+
+#include <stdexcept>
+
+namespace {
+
+/* ta_w_stats() with (W, W) pairs too, from r_min 2.5 A to r_max 2.7 A; the
+ * (Ta, Ta) pairs run from 2.86 A to 6.5 A and the (Ta, W) pairs from 2.4
+ * A. */
+DataStats ta_w_ww_stats() {
+  DataStats d = ta_w_stats();
+  PerPairStats ww = d.per_pair[0];
+  ww.elements = {"W", "W"};
+  ww.r_min = 2.5;
+  ww.r_max = 2.7;
+  d.per_pair.push_back(ww);
+  return d;
+}
+
+/* The element pairs of each per_pair entry of @p d, "Ta-W", in order. */
+std::vector<std::string> pair_names(const DataStats &d) {
+  std::vector<std::string> out;
+  for (const auto &pp : d.per_pair)
+    out.push_back(pp.elements.first + "-" + pp.elements.second);
+  return out;
+}
+
+}  // namespace
+
+/* Pins: the element pairs of a descriptor's line (LinePairs, from the
+ * element tokens of the line, D_Base::get_init_atoms()):
+ *  - "Ta Ta Ta W" names (Ta, Ta) and (Ta, W), each in either order, and not
+ *    (W, W); its text is "(Ta, Ta) or (Ta, W)"; stats() of the Ta-W-W data
+ *    (ta_w_ww_stats()) keeps the Ta-Ta and Ta-W entries alone, in their
+ *    order, with the other fields (n_atoms 1000, elements Ta W);
+ *  - "W Ta" names (Ta, W), its text "(W, Ta)", as the line writes it;
+ *  - "Ta Ta Ta Ta" is "(Ta, Ta)", once;
+ *  - "Ta *" names every pair with Ta, (Ta, Ta) and (Ta, W) of the data, its
+ *    text "(Ta, *)"; "* *" names every pair (every()), its text empty (a
+ *    message then names no pair), and stats() keeps every entry;
+ *  - no token names no pair, its text empty, and stats() keeps none;
+ *  - an odd number of tokens, "Ta Ta W", is refused (std::invalid_argument)
+ *    naming them, as a descriptor's line is refused ("the element types
+ *    of a descriptor's line come in pairs, and the line has 3 of them, Ta
+ *    Ta W").
+ * Before the fix: does not compile (no LinePairs: every check and
+ * suggestion read the statistics of every element pair of the data, or of
+ * the first). */
+TEST_CASE("The element pairs of a descriptor's line select its neighbour "
+          "statistics",
+          "[metadata][density_reach][line_pairs]") {
+  const DataStats data = ta_w_ww_stats();
+  const LinePairs two({"Ta", "Ta", "Ta", "W"});
+  CHECK(two.names("Ta", "Ta"));
+  CHECK(two.names("Ta", "W"));
+  CHECK(two.names("W", "Ta"));
+  CHECK_FALSE(two.names("W", "W"));
+  CHECK_FALSE(two.every());
+  CHECK(two.text() == "(Ta, Ta) or (Ta, W)");
+  const DataStats kept = two.stats(data);
+  CHECK(pair_names(kept) == std::vector<std::string>{"Ta-Ta", "Ta-W"});
+  CHECK(kept.n_atoms == 1000u);
+  CHECK(kept.elements == std::vector<std::string>{"Ta", "W"});
+
+  const LinePairs reversed({"W", "Ta"});
+  CHECK(reversed.names("Ta", "W"));
+  CHECK(reversed.text() == "(W, Ta)");
+  CHECK(pair_names(reversed.stats(data)) == std::vector<std::string>{"Ta-W"});
+
+  CHECK(LinePairs({"Ta", "Ta", "Ta", "Ta"}).text() == "(Ta, Ta)");
+
+  const LinePairs with_ta({"Ta", "*"});
+  CHECK(with_ta.names("Ta", "W"));
+  CHECK(with_ta.names("W", "Ta"));
+  CHECK_FALSE(with_ta.names("W", "W"));
+  CHECK(with_ta.text() == "(Ta, *)");
+  CHECK(pair_names(with_ta.stats(data)) ==
+        std::vector<std::string>{"Ta-Ta", "Ta-W"});
+
+  const LinePairs every({"*", "*"});
+  CHECK(every.every());
+  CHECK(every.names("W", "W"));
+  CHECK(every.text().empty());
+  CHECK(pair_names(every.stats(data)) ==
+        std::vector<std::string>{"Ta-Ta", "Ta-W", "W-W"});
+
+  const LinePairs none(std::vector<std::string>{});
+  CHECK_FALSE(none.names("Ta", "Ta"));
+  CHECK(none.text().empty());
+  CHECK(none.stats(data).per_pair.empty());
+
+  try {
+    LinePairs odd({"Ta", "Ta", "W"});
+    FAIL("an odd number of element tokens was accepted");
+  } catch (const std::invalid_argument &e) {
+    CHECK(std::string(e.what()) ==
+          "the element types of a descriptor's line come in pairs, and the "
+          "line has 3 of them, Ta Ta W");
+  }
+}
+
+/* Pins: given the statistics of the element pairs of its line
+ * (LinePairs::stats()) and a view of the seed with those pairs, a check and
+ * a suggestion name them:
+ *  - the cutoff check of D2_Blip, RCUT2B 2.6 on the (Ta, Ta) pairs of the
+ *    Ta-W-W data (from 2.86 A): "RCUT2B = 2.6 is below the smallest (Ta,
+ *    Ta) neighbour distance of the dataset (2.86 Å): ..."; on (Ta, Ta) or
+ *    (W, W), RCUT2B 2.45: "... smallest (Ta, Ta) or (W, W) neighbour
+ *    distance of the dataset (2.5 Å) ...";
+ *  - on (W, W) of the Ta-W data, which has none: "RCUT2B = 2.6: no (W, W)
+ *    pair of atoms of the dataset lies within it, ...";
+ *  - the CGRIDMB check of DM_EAD (CGRIDMB 3.1, SGRIDMB 100, RCUTMB 3.5) on
+ *    the (W, W) pairs (2.5 to 2.7 A): "... below 1e-6 at every (W, W)
+ *    neighbour distance within RCUTMB = 3.5 (2.5 to 2.7 Å) ...";
+ *  - the cutoff suggestion of D2_Blip on (W, W) of the Ta-W data: no OPTIM
+ *    line, "no (W, W) pair of atoms of the data lies within the reach of
+ *    the neighbour statistics ...";
+ *  - a view without the pairs keeps the words of the data as a whole: "no
+ *    pair of atoms of the dataset lies within it".
+ * Before the fix: does not compile (no LinePairs, and SeedView takes no
+ * element pairs). */
+TEST_CASE("The checks and suggestions name the element pairs of the "
+          "descriptor's line",
+          "[metadata][density_reach][line_pairs]") {
+  auto meta_of = [](const char *label) {
+    std::unique_ptr<D_Base> d(tadah::core::factory<D_Base>(label));
+    const auto meta = d->meta();
+    REQUIRE(meta.has_value());
+    return *meta;
+  };
+  const DescriptorMeta blip = meta_of("D2_Blip");
+  const ParamMeta *rcut = param_of(blip, "RCUT2B");
+  REQUIRE(rcut != nullptr);
+  REQUIRE(static_cast<bool>(rcut->check));
+  REQUIRE(static_cast<bool>(rcut->suggest));
+  const DataStats data = ta_w_ww_stats();
+
+  Context cut;
+  cut.add("RCUT2B", "2.6");
+  const LinePairs tata({"Ta", "Ta"});
+  const std::string below = verdict_message(
+      rcut->check(tata.stats(data), SeedView(cut, {}, tata)));
+  CHECK(below ==
+        "RCUT2B = 2.6 is below the smallest (Ta, Ta) neighbour distance of "
+        "the dataset (2.86 Å): the descriptor sums over no neighbour and is "
+        "0 for every atom.");
+
+  Context near;
+  near.add("RCUT2B", "2.45");
+  const LinePairs both({"Ta", "Ta", "W", "W"});
+  const std::string two = verdict_message(
+      rcut->check(both.stats(data), SeedView(near, {}, both)));
+  CHECK(two ==
+        "RCUT2B = 2.45 is below the smallest (Ta, Ta) or (W, W) neighbour "
+        "distance of the dataset (2.5 Å): the descriptor sums over no "
+        "neighbour and is 0 for every atom.");
+
+  const LinePairs ww({"W", "W"});
+  const std::string none = verdict_message(
+      rcut->check(ww.stats(ta_w_stats()), SeedView(cut, {}, ww)));
+  CHECK(none ==
+        "RCUT2B = 2.6: no (W, W) pair of atoms of the dataset lies within "
+        "it, so the descriptor sums over no neighbour and is 0 for every "
+        "atom.");
+
+  const DescriptorMeta ead = meta_of("DM_EAD");
+  const ParamMeta *centre = param_of(ead, "CGRIDMB");
+  REQUIRE(centre != nullptr);
+  REQUIRE(static_cast<bool>(centre->check));
+  Context grid;
+  grid.add("CGRIDMB", "3.1");
+  grid.add("SGRIDMB", "100");
+  grid.add("RCUTMB", "3.5");
+  const std::string reach = verdict_message(
+      centre->check(ww.stats(data), SeedView(grid, {}, ww)));
+  CHECK(reach.find("is below 1e-6 at every (W, W) neighbour distance "
+                   "within RCUTMB = 3.5 (2.5 to 2.7 Å)") != std::string::npos);
+
+  Context seed;
+  seed.add("RCUT2B", "5.6");
+  const BoundSuggestion s =
+      rcut->suggest(ww.stats(ta_w_stats()), SeedView(seed, {}, ww), -1);
+  CHECK(s.none);
+  CHECK(s.rationale.rfind("no (W, W) pair of atoms of the data lies within "
+                          "the reach of the neighbour statistics", 0) == 0);
+
+  const std::string whole = verdict_message(
+      rcut->check(no_pair_stats(), SeedView(cut)));
+  CHECK(whole.rfind("RCUT2B = 2.6: no pair of atoms of the dataset lies "
+                    "within it", 0) == 0);
+}
+
+/* Pins: the checks of a descriptor whose line names several element pairs
+ * judge each pair of the line on its own, by the statistics of the element
+ * pairs of the data it names, on the Ta-W-W data (ta_w_ww_stats(): (Ta,
+ * Ta) from 2.86 to 6.5 A, (Ta, W) from 2.4 A, (W, W) from 2.5 to 2.7 A):
+ *  - the cutoff check of D2_Blip, RCUT2B 2.6, on the line Ta Ta W W: a
+ *    FAIL, "RCUT2B = 2.6 is below the smallest (Ta, Ta) neighbour distance
+ *    of the dataset (2.86 Å): the (Ta, Ta) pair adds nothing to the
+ *    descriptor, which sums over its other element pairs alone.";
+ *  - on Ta Ta Mo Mo W W at 2.6, the data having no (Mo, Mo) pair: "RCUT2B
+ *    = 2.6 is below the smallest (Ta, Ta) neighbour distance of the dataset
+ *    (2.86 Å) and holds no (Mo, Mo) pair of atoms of the dataset: the (Ta,
+ *    Ta) and (Mo, Mo) pairs add nothing to the descriptor, which sums over
+ *    its other element pairs alone.";
+ *  - on Ta Ta W W at 2.45, below every pair of the line: the FAIL of the
+ *    line as a whole, "... below the smallest (Ta, Ta) or (W, W) neighbour
+ *    distance of the dataset (2.5 Å): the descriptor sums over no neighbour
+ *    and is 0 for every atom." (a pin);
+ *  - on Ta * at 2.6: the FAIL of Ta Ta W W at 2.6, "RCUT2B = 2.6 is below
+ *    the smallest (Ta, Ta) neighbour distance of the dataset (2.86 Å): the
+ *    (Ta, Ta) pair adds nothing to the descriptor, ...", the pair (Ta, *)
+ *    standing for the (Ta, Ta) and (Ta, W) pairs of the data, each judged
+ *    on its own;
+ *  - the CGRIDMB check of DM_EAD, CGRIDMB 3.1, SGRIDMB 100, RCUTMB 3.5, on
+ *    Ta Ta W W, the channel reaching the (Ta, Ta) distances and not the (W,
+ *    W) ones: "CGRIDMB(1) = 3.1 with SGRIDMB(1) = 100: the Gaussian
+ *    exp(-SGRIDMB (r - CGRIDMB)^2) is below 1e-6 at every (W, W) neighbour
+ *    distance within RCUTMB = 3.5 (2.5 to 2.7 Å), so ρ gets nothing from
+ *    the (W, W) pairs of atoms (a smaller SGRIDMB, or a centre nearer the
+ *    neighbours, reaches them).";
+ *  - CGRIDMB 2.78 with SGRIDMB 3000 on Ta Ta W W, 0.08 A from the (Ta, Ta)
+ *    distances and from the (W, W) ones and reaching neither: "... is below
+ *    1e-6 at every (Ta, Ta) neighbour distance within RCUTMB = 3.5 (2.86 to
+ *    3.5 Å) and at every (W, W) one (2.5 to 2.7 Å), so its channel of ρ is
+ *    ~0 for every atom (...)";
+ *  - the CGRIDMB check of DM_Blip, CGRIDMB 3.1, SGRIDMB 10 (a support 0.2
+ *    A wide each side), on Ta Ta W W: "... the support of the blip, |r -
+ *    CGRIDMB| < 2/SGRIDMB = 0.2 Å, holds no (W, W) neighbour distance
+ *    within RCUTMB = 3.5 (2.5 to 2.7 Å), so ρ gets nothing from the (W, W)
+ *    pairs of atoms (a smaller SGRIDMB widens the support).".
+ * Before the fix: the pairs of a line were judged together, by the
+ * smallest and the largest of their distances: none of the five FAILs was
+ * given (RCUT2B 2.6 holds the (W, W) distances; the channels at 3.1 reach
+ * the (Ta, Ta) ones; the range 2.5 to 3.5 A holds the centre 2.78), and
+ * AUDIT error trained descriptors that are 0 for every Ta atom.
+ * Before a pair with * stood for the element pairs of the data it matches:
+ * Ta * at 2.6 gave no finding, the pair (Ta, *) judged as one pair, by the
+ * (Ta, Ta) and (Ta, W) distances together (from 2.4 A).
+ * Before the message named the channel's part of ρ, a channel that reaches
+ * no pair said "..., so ρ is ~0 for every atom (...)", which reads as the
+ * whole density, whatever the other channels reach. */
+TEST_CASE("Each element pair of a descriptor's line is judged on its own",
+          "[metadata][density_reach][line_pairs]") {
+  auto meta_of = [](const char *label) {
+    std::unique_ptr<D_Base> d(tadah::core::factory<D_Base>(label));
+    const auto meta = d->meta();
+    REQUIRE(meta.has_value());
+    return *meta;
+  };
+  const DataStats data = ta_w_ww_stats();
+  const DescriptorMeta blip = meta_of("D2_Blip");
+  const ParamMeta *rcut = param_of(blip, "RCUT2B");
+  REQUIRE(rcut != nullptr);
+  REQUIRE(static_cast<bool>(rcut->check));
+  auto cutoff = [&](const std::string &rc,
+                    const std::vector<std::string> &tokens) {
+    Context c;
+    c.add("RCUT2B", rc);
+    const LinePairs pairs(tokens);
+    const HealthVerdict v = rcut->check(pairs.stats(data),
+                                        SeedView(c, {}, pairs));
+    return std::string(is_fail(v) ? "FAIL " : is_warn(v) ? "WARN " : "") +
+           verdict_message(v);
+  };
+  CHECK(cutoff("2.6", {"Ta", "Ta", "W", "W"}) ==
+        "FAIL RCUT2B = 2.6 is below the smallest (Ta, Ta) neighbour distance "
+        "of the dataset (2.86 Å): the (Ta, Ta) pair adds nothing to the "
+        "descriptor, which sums over its other element pairs alone.");
+  CHECK(cutoff("2.6", {"Ta", "Ta", "Mo", "Mo", "W", "W"}) ==
+        "FAIL RCUT2B = 2.6 is below the smallest (Ta, Ta) neighbour distance "
+        "of the dataset (2.86 Å) and holds no (Mo, Mo) pair of atoms of the "
+        "dataset: the (Ta, Ta) and (Mo, Mo) pairs add nothing to the "
+        "descriptor, which sums over its other element pairs alone.");
+  CHECK(cutoff("2.45", {"Ta", "Ta", "W", "W"}) ==
+        "FAIL RCUT2B = 2.45 is below the smallest (Ta, Ta) or (W, W) "
+        "neighbour distance of the dataset (2.5 Å): the descriptor sums over "
+        "no neighbour and is 0 for every atom.");
+  CHECK(cutoff("2.6", {"Ta", "*"}) ==
+        "FAIL RCUT2B = 2.6 is below the smallest (Ta, Ta) neighbour distance "
+        "of the dataset (2.86 Å): the (Ta, Ta) pair adds nothing to the "
+        "descriptor, which sums over its other element pairs alone.");
+
+  auto channel = [&](const char *label, const std::string &c,
+                     const std::string &s) {
+    const DescriptorMeta m = meta_of(label);
+    const ParamMeta *centre = param_of(m, "CGRIDMB");
+    REQUIRE(centre != nullptr);
+    REQUIRE(static_cast<bool>(centre->check));
+    Context grid;
+    grid.add("CGRIDMB", c);
+    grid.add("SGRIDMB", s);
+    grid.add("RCUTMB", "3.5");
+    const LinePairs pairs({"Ta", "Ta", "W", "W"});
+    const HealthVerdict v = centre->check(pairs.stats(data),
+                                          SeedView(grid, {}, pairs));
+    return std::string(is_fail(v) ? "FAIL " : is_warn(v) ? "WARN " : "") +
+           verdict_message(v);
+  };
+  CHECK(channel("DM_EAD", "3.1", "100") ==
+        "FAIL CGRIDMB(1) = 3.1 with SGRIDMB(1) = 100: the Gaussian "
+        "exp(-SGRIDMB (r - CGRIDMB)^2) is below 1e-6 at every (W, W) "
+        "neighbour distance within RCUTMB = 3.5 (2.5 to 2.7 Å), so ρ gets "
+        "nothing from the (W, W) pairs of atoms (a smaller SGRIDMB, or a "
+        "centre nearer the neighbours, reaches them).");
+  CHECK(channel("DM_EAD", "2.78", "3000") ==
+        "FAIL CGRIDMB(1) = 2.78 with SGRIDMB(1) = 3000: the Gaussian "
+        "exp(-SGRIDMB (r - CGRIDMB)^2) is below 1e-6 at every (Ta, Ta) "
+        "neighbour distance within RCUTMB = 3.5 (2.86 to 3.5 Å) and at every "
+        "(W, W) one (2.5 to 2.7 Å), so its channel of ρ is ~0 for every atom "
+        "(a smaller SGRIDMB, or a centre nearer the neighbours, reaches "
+        "them).");
+  CHECK(channel("DM_Blip", "3.1", "10") ==
+        "FAIL CGRIDMB(1) = 3.1 with SGRIDMB(1) = 10: the support of the "
+        "blip, |r - CGRIDMB| < 2/SGRIDMB = 0.2 Å, holds no (W, W) neighbour "
+        "distance within RCUTMB = 3.5 (2.5 to 2.7 Å), so ρ gets nothing from "
+        "the (W, W) pairs of atoms (a smaller SGRIDMB widens the support).");
+}
+
+namespace {
+
+/* The verdict of the check of @p key of the descriptor @p label on @p data,
+ * for the seed @p seed and the line of element tokens @p tokens:
+ * "FAIL <message>", "WARN <message>", or empty. */
+std::string line_verdict(const char *label, const char *key,
+                         const DataStats &data, const Context &seed,
+                         const std::vector<std::string> &tokens) {
+  std::unique_ptr<D_Base> d(tadah::core::factory<D_Base>(label));
+  const auto meta = d->meta();
+  REQUIRE(meta.has_value());
+  const ParamMeta *p = param_of(*meta, key);
+  REQUIRE(p != nullptr);
+  REQUIRE(static_cast<bool>(p->check));
+  const LinePairs pairs(tokens);
+  const HealthVerdict v = p->check(pairs.stats(data), SeedView(seed, {}, pairs));
+  return std::string(is_fail(v) ? "FAIL " : is_warn(v) ? "WARN " : "") +
+         verdict_message(v);
+}
+
+}  // namespace
+
+/* Pins: a pair of a descriptor's line written with "*" stands for each
+ * element pair it matches, of the elements of the data and those the line
+ * names, each judged on its own, as the descriptor sums over each of them:
+ * the verdict is that of the line that names those pairs, on the Ta-W-W
+ * data (ta_w_ww_stats(): (Ta, Ta) from 2.86 A, (Ta, W) from 2.4 A, (W, W)
+ * from 2.5 to 2.7 A):
+ *  - the cutoff check of D2_Blip, RCUT2B 2.6, on Ta * and on Ta Ta Ta W:
+ *    "FAIL RCUT2B = 2.6 is below the smallest (Ta, Ta) neighbour distance
+ *    of the dataset (2.86 Å): the (Ta, Ta) pair adds nothing to the
+ *    descriptor, which sums over its other element pairs alone.";
+ *  - RCUT2B 2.45 on * * and on Ta Ta Ta W W W: "FAIL RCUT2B = 2.45 is below
+ *    the smallest (Ta, Ta) neighbour distance of the dataset (2.86 Å) and
+ *    the smallest (W, W) one (2.5 Å): the (Ta, Ta) and (W, W) pairs add
+ *    nothing to the descriptor, which sums over its other element pairs
+ *    alone.";
+ *  - RCUT2B 2.45 on * * with statistics taken up to 2.45 A, which hold the
+ *    (Ta, W) pairs alone and list the elements Ta and W: "FAIL RCUT2B =
+ *    2.45 holds no (Ta, Ta) or (W, W) pair of atoms of the dataset: the
+ *    (Ta, Ta) and (W, W) pairs add nothing to the descriptor, which sums
+ *    over its other element pairs alone." (the elements of the data give
+ *    the pairs * stands for, whether the statistics hold their distances or
+ *    not);
+ *  - RCUT2B 5 on Ta Ta Mo * and on Ta Ta Mo Mo Mo Ta Mo W, the data having
+ *    no Mo atom: "FAIL RCUT2B = 5 holds no (Mo, Mo), (Mo, Ta) or (Mo, W)
+ *    pair of atoms of the dataset: the (Mo, Mo), (Mo, Ta) and (Mo, W) pairs
+ *    add nothing to the descriptor, which sums over its other element pairs
+ *    alone." (an element the line names is one * stands for);
+ *  - the CGRIDMB check of DM_EAD, CGRIDMB 3.1, SGRIDMB 100, RCUTMB 3.5, on
+ *    * * and on Ta Ta Ta W W W: "FAIL CGRIDMB(1) = 3.1 with SGRIDMB(1) =
+ *    100: the Gaussian exp(-SGRIDMB (r - CGRIDMB)^2) is below 1e-6 at every
+ *    (W, W) neighbour distance within RCUTMB = 3.5 (2.5 to 2.7 Å), so ρ
+ *    gets nothing from the (W, W) pairs of atoms (a smaller SGRIDMB, or a
+ *    centre nearer the neighbours, reaches them).".
+ * Before the fix: a pair with * was judged as one pair, by the distances of
+ * every pair it matches together, from 2.4 A: Ta * at 2.6, * * at 2.45 and
+ * the channel of * * gave no finding, the lines that name the pairs a FAIL;
+ * and two pairs below the cutoff were named each with its own clause, "...
+ * (2.86 Å) and is below the smallest (W, W) neighbour distance of the
+ * dataset (2.5 Å): ...".
+ * Before * stood for the elements the line names: Ta Ta Mo * at 5 gave no
+ * finding, the pair (Mo, *) standing for no pair, as Mo is no element of
+ * the data. */
+TEST_CASE("A pair of a descriptor's line with * stands for each element pair "
+          "it matches",
+          "[metadata][density_reach][line_pairs]") {
+  const DataStats data = ta_w_ww_stats();
+  auto cutoff = [&](const char *rc, const std::vector<std::string> &tokens,
+                    const DataStats &d) {
+    Context c;
+    c.add("RCUT2B", rc);
+    return line_verdict("D2_Blip", "RCUT2B", d, c, tokens);
+  };
+  const std::string ta_ta =
+      "FAIL RCUT2B = 2.6 is below the smallest (Ta, Ta) neighbour distance "
+      "of the dataset (2.86 Å): the (Ta, Ta) pair adds nothing to the "
+      "descriptor, which sums over its other element pairs alone.";
+  CHECK(cutoff("2.6", {"Ta", "*"}, data) == ta_ta);
+  CHECK(cutoff("2.6", {"Ta", "Ta", "Ta", "W"}, data) == ta_ta);
+  const std::string both =
+      "FAIL RCUT2B = 2.45 is below the smallest (Ta, Ta) neighbour distance "
+      "of the dataset (2.86 Å) and the smallest (W, W) one (2.5 Å): the (Ta, "
+      "Ta) and (W, W) pairs add nothing to the descriptor, which sums over "
+      "its other element pairs alone.";
+  CHECK(cutoff("2.45", {"*", "*"}, data) == both);
+  CHECK(cutoff("2.45", {"Ta", "Ta", "Ta", "W", "W", "W"}, data) == both);
+
+  DataStats within = data;
+  within.per_pair.erase(
+      std::remove_if(within.per_pair.begin(), within.per_pair.end(),
+                     [](const PerPairStats &pp) {
+                       return pp.elements.first == pp.elements.second;
+                     }),
+      within.per_pair.end());
+  REQUIRE(within.per_pair.size() == 1u);
+  REQUIRE(within.elements == std::vector<std::string>{"Ta", "W"});
+  CHECK(cutoff("2.45", {"*", "*"}, within) ==
+        "FAIL RCUT2B = 2.45 holds no (Ta, Ta) or (W, W) pair of atoms of the "
+        "dataset: the (Ta, Ta) and (W, W) pairs add nothing to the "
+        "descriptor, which sums over its other element pairs alone.");
+  const std::string mo =
+      "FAIL RCUT2B = 5 holds no (Mo, Mo), (Mo, Ta) or (Mo, W) pair of atoms "
+      "of the dataset: the (Mo, Mo), (Mo, Ta) and (Mo, W) pairs add nothing "
+      "to the descriptor, which sums over its other element pairs alone.";
+  CHECK(cutoff("5", {"Ta", "Ta", "Mo", "*"}, data) == mo);
+  CHECK(cutoff("5", {"Ta", "Ta", "Mo", "Mo", "Mo", "Ta", "Mo", "W"}, data) ==
+        mo);
+
+  Context grid;
+  grid.add("CGRIDMB", "3.1");
+  grid.add("SGRIDMB", "100");
+  grid.add("RCUTMB", "3.5");
+  const std::string ww =
+      "FAIL CGRIDMB(1) = 3.1 with SGRIDMB(1) = 100: the Gaussian "
+      "exp(-SGRIDMB (r - CGRIDMB)^2) is below 1e-6 at every (W, W) neighbour "
+      "distance within RCUTMB = 3.5 (2.5 to 2.7 Å), so ρ gets nothing from "
+      "the (W, W) pairs of atoms (a smaller SGRIDMB, or a centre nearer the "
+      "neighbours, reaches them).";
+  CHECK(line_verdict("DM_EAD", "CGRIDMB", data, grid, {"*", "*"}) == ww);
+  CHECK(line_verdict("DM_EAD", "CGRIDMB", data, grid,
+                     {"Ta", "Ta", "Ta", "W", "W", "W"}) == ww);
+}
+
+/* Pins: the channels of a many-body density are judged together: a channel
+ * fails when it reaches no pair of the descriptor's line (its channel of ρ
+ * is 0 for every atom), and a pair of the line fails when no channel reaches
+ * it (ρ gets nothing from it); a channel that misses one pair while another
+ * channel reaches that pair is no finding. On the Ta-W-W data
+ * (ta_w_ww_stats()), the line Ta Ta W W:
+ *  - DM_Blip, CGRIDMB 2.4 3.0 3.6 4.2, SGRIDMB 5 5 5 5 (supports 0.4 A
+ *    wide each side), RCUTMB 4.5: no finding, the first channel reaching
+ *    the (W, W) distances and the second the (Ta, Ta) ones;
+ *  - DM_EAD, CGRIDMB 3.1 3.3, SGRIDMB 100 100, RCUTMB 3.5, both channels
+ *    below 1e-6 at every (W, W) distance: "FAIL the channels CGRIDMB(1) and
+ *    CGRIDMB(2) with their widths SGRIDMB(1) and SGRIDMB(2): each Gaussian
+ *    exp(-SGRIDMB (r - CGRIDMB)^2) is below 1e-6 at every (W, W) neighbour
+ *    distance within RCUTMB = 3.5 (2.5 to 2.7 Å), so ρ gets nothing from
+ *    the (W, W) pairs of atoms (a smaller SGRIDMB, or a centre nearer the
+ *    neighbours, reaches them).";
+ *  - DM_Blip, CGRIDMB 2.6 3.1 9, SGRIDMB 10 10 10, RCUTMB 3.5, the third
+ *    channel reaching no pair: "FAIL CGRIDMB(3) = 9 with SGRIDMB(3) = 10:
+ *    the support of the blip, |r - CGRIDMB| < 2/SGRIDMB = 0.2 Å, holds no
+ *    (Ta, Ta) neighbour distance within RCUTMB = 3.5 (2.86 to 3.5 Å) and no
+ *    (W, W) one (2.5 to 2.7 Å), so its channel of ρ is 0 for every atom (a
+ *    smaller SGRIDMB widens the support).".
+ * Before the fix: each channel was judged by each pair on its own, and the
+ * first channel that missed a pair failed, whatever the other channels
+ * reached: the grid 2.4 to 4.2 failed at its first channel ("FAIL
+ * CGRIDMB(1) = 2.4 with SGRIDMB(1) = 5: the support of the blip, ... holds
+ * no (Ta, Ta) neighbour distance within RCUTMB = 4.5 (2.86 to 4.5 Å), so ρ
+ * gets nothing from the (Ta, Ta) pairs of atoms ..."), and so did the other
+ * two grids ("FAIL CGRIDMB(1) = 3.1 with SGRIDMB(1) = 100: the Gaussian
+ * ... (W, W) ...", "FAIL CGRIDMB(1) = 2.6 with SGRIDMB(1) = 10: ... (Ta,
+ * Ta) ...").
+ * Before the message named the channel's part of ρ, the third channel said
+ * "..., so ρ is 0 for every atom (...)", although the first two reach the
+ * (W, W) and (Ta, Ta) distances and ρ is not 0. */
+TEST_CASE("The channels of a density are judged together on each element "
+          "pair of its line",
+          "[metadata][density_reach][line_pairs]") {
+  const DataStats data = ta_w_ww_stats();
+  const std::vector<std::string> line = {"Ta", "Ta", "W", "W"};
+  auto grid = [](const char *c, const char *s, const char *rc) {
+    Context g;
+    g.add("CGRIDMB", c);
+    g.add("SGRIDMB", s);
+    g.add("RCUTMB", rc);
+    return g;
+  };
+  CHECK(line_verdict("DM_Blip", "CGRIDMB", data,
+                     grid("2.4 3.0 3.6 4.2", "5 5 5 5", "4.5"), line) ==
+        std::string());
+  CHECK(line_verdict("DM_EAD", "CGRIDMB", data,
+                     grid("3.1 3.3", "100 100", "3.5"), line) ==
+        "FAIL the channels CGRIDMB(1) and CGRIDMB(2) with their widths "
+        "SGRIDMB(1) and SGRIDMB(2): each Gaussian exp(-SGRIDMB (r - "
+        "CGRIDMB)^2) is below 1e-6 at every (W, W) neighbour distance within "
+        "RCUTMB = 3.5 (2.5 to 2.7 Å), so ρ gets nothing from the (W, W) "
+        "pairs of atoms (a smaller SGRIDMB, or a centre nearer the "
+        "neighbours, reaches them).");
+  CHECK(line_verdict("DM_Blip", "CGRIDMB", data,
+                     grid("2.6 3.1 9", "10 10 10", "3.5"), line) ==
+        "FAIL CGRIDMB(3) = 9 with SGRIDMB(3) = 10: the support of the blip, "
+        "|r - CGRIDMB| < 2/SGRIDMB = 0.2 Å, holds no (Ta, Ta) neighbour "
+        "distance within RCUTMB = 3.5 (2.86 to 3.5 Å) and no (W, W) one (2.5 "
+        "to 2.7 Å), so its channel of ρ is 0 for every atom (a smaller "
+        "SGRIDMB widens the support).");
+}
+
+/* Pins: the cutoff of every registered descriptor (each RCUT2B and RCUTMB
+ * parameter of its metadata) is marked to reach each element pair of the
+ * descriptor's line (ParamMeta::reach_each_pair), as its check judges each
+ * pair at the cutoff (cutoff_reach_check()), and no other parameter is:
+ * tadah analysis suggest_bounds (Tadah.MLIP) then suggests, for a line of
+ * several pairs, a cutoff range whose every value reaches each pair.
+ * Before the fix: does not compile (no ParamMeta::reach_each_pair): the
+ * range of every parameter of a line of several pairs held the range of
+ * each pair, so that a cutoff range began at the smallest low end of the
+ * pairs' ranges, which can lie below every distance of another pair of the
+ * line, where the check of the cutoff fails. */
+TEST_CASE("The cutoff of every descriptor is marked to reach each element "
+          "pair of its line",
+          "[metadata][suggest][cutoff][line_pairs]") {
+  std::size_t cutoffs = 0;
+  for (const auto &label : tadah::core::Registry<D_Base>::names()) {
+    std::unique_ptr<D_Base> d(tadah::core::factory<D_Base>(label));
+    const auto meta = d->meta();
+    if (!meta.has_value()) continue;
+    for (const auto &pm : meta->params) {
+      const bool cutoff = pm.key == "RCUT2B" || pm.key == "RCUTMB";
+      CAPTURE(label, pm.key);
+      CHECK(pm.reach_each_pair == cutoff);
+      if (cutoff) ++cutoffs;
+    }
+  }
+  CHECK(cutoffs > 10u);
 }
