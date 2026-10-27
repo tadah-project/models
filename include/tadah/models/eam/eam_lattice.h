@@ -102,10 +102,10 @@ inline void require_crystal_on_grid(const std::string &lattice, double a0,
         l + " crystal " + core::format_roundtrip(nn) + " A apart, at or "
         "beyond the table's cutoff, rcut = " + core::format_roundtrip(rcut) +
         " A, and LAMMPS (pair_style eam/alloy) counts a pair only below "
-        "rcut: the crystal has no interaction in LAMMPS. Edit the element "
-        "line of the setfl file (`<Z> <mass> <a0> <lattice>`): set the "
-        "equilibrium lattice constant, in Angstrom (a value in picometres "
-        "is 100 times the value in Angstrom).");
+        "rcut: the crystal has no interaction in LAMMPS. The a0 of the "
+        "element line of the setfl file (`<Z> <mass> <a0> <lattice>`) is "
+        "the equilibrium lattice constant in Angstrom (a value in "
+        "picometres is 100 times the value in Angstrom).");
   const double r = reach_distance(l, a0, reach_smin);
   if (r >= dr) return;
   throw std::runtime_error(
@@ -115,9 +115,9 @@ inline void require_crystal_on_grid(const std::string &lattice, double a0,
       "strongest compression the refit tests (a/a0 = REFIT_REACH_SMIN " +
       core::format_roundtrip(reach_smin) + "), less than the step of the "
       "table's radial grid, dr = " + core::format_roundtrip(dr) + " A: the "
-      "table describes no pair distance of that crystal. Edit the element "
-      "line of the setfl file (`<Z> <mass> <a0> <lattice>`): set the "
-      "equilibrium lattice constant, in Angstrom.");
+      "table describes no pair distance of that crystal. The a0 of the "
+      "element line of the setfl file (`<Z> <mass> <a0> <lattice>`) is the "
+      "equilibrium lattice constant in Angstrom.");
 }
 
 /** All neighbour distances (one central atom) up to \p rcut, d <= rcut (a

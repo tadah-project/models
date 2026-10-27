@@ -252,7 +252,7 @@ private:
     const std::string data =
         "or with more data (structures, FORCE or STRESS rows).";
     if (!(lambda > 0))
-      return " The fit is made with OALGO 1 (DGELSD) or OALGO 3 (SVD), which "
+      return " A fit is possible with OALGO 1 (DGELSD) or OALGO 3 (SVD), which "
              "give the minimum-norm weights, with LAMBDA > 0 (a ridge penalty "
              "makes every column it penalises full rank; it does not "
              "penalise the intercept columns of BIAS), " + data;
@@ -266,7 +266,7 @@ private:
       algos = n_bias == 0 ? "OALGO 1 (DGELSD) or 3 (SVD)"
                           : "OALGO 1 (DGELSD), which gives the minimum-norm "
                             "weights";
-    return " The fit is made with " + algos + ", with a larger LAMBDA (the "
+    return " A fit is possible with " + algos + ", with a larger LAMBDA (the "
            "ridge penalty makes every column it penalises full rank and "
            "better conditioned" +
            (n_bias == 0 ? std::string()
@@ -341,7 +341,7 @@ private:
            "weights are not unique.";
     // With LAMBDA > 0 the intercept columns are short of rows: a larger
     // LAMBDA, OALGO 2 or 4 and OALGO 3 (which refuses them) do not help.
-    msg += ridge ? " The fit is made with OALGO 1 (DGELSD), which gives the "
+    msg += ridge ? " A fit is possible with OALGO 1 (DGELSD), which gives the "
                    "minimum-norm weights, or with more structures."
                  : remedies(oalgo, lambda, bias);
     throw std::runtime_error(msg);
@@ -527,8 +527,8 @@ public:
     throw std::runtime_error(
         "OALGO=3 (SVD with uniform ridge) does not support intercept "
         "exclusion from regularisation. The model has " + n +
-        " intercept column(s) (BIAS=true with ATOM) and LAMBDA != 0: use "
-        "OALGO=1, 2 or 4 instead.");
+        " intercept column(s) (BIAS=true with ATOM) and LAMBDA != 0; OALGO "
+        "1, 2 or 4 fits such a model with LAMBDA != 0.");
   }
 
 private:

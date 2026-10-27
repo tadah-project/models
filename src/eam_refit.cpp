@@ -51,7 +51,7 @@ EAMRefit::EAMRefit(const EAMSetflIO &eam, const EAMRefitConfig &cfg)
     if (family_ == BasisKind::Knot5)
       throw DensityFormError(
           "EAMRefit: RHOFORM MONOTONE is not defined for the knot family "
-          "(basis " + cfg_.basis + "): use RHOFORM NONNEG: " +
+          "(basis " + cfg_.basis + "); RHOFORM NONNEG fits it: " +
           monotone_knot_refusal_text() + ".");
     if (!rhoform_cutoff_whitelisted(cfg_.rctype))
       throw DensityFormError(
