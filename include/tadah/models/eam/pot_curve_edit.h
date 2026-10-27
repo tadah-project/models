@@ -41,6 +41,7 @@
 #include <vector>
 
 #include <tadah/core/context.h>
+#include <tadah/core/logger.h>
 #include <tadah/models/descriptors/basis_kind.h>
 #include <tadah/models/descriptors/dm/embf0.h>
 #include <tadah/models/descriptors/dm/rhoform.h>
@@ -179,6 +180,19 @@ std::optional<double> derived_knot_rcut(const core::Context &ctx,
  *  from train/predict/hpo on that file until it is re-written). Bump
  *  channels are never modified. Returns true if anything changed. */
 bool normalize_knot_rcut(core::Context &ctx, const std::string &who);
+
+/** \brief One message of normalize_knot_rcut: its level (WARNING or INFO)
+ *  and its text, which the logging form prints. */
+struct KnotRcutNote {
+  core::LogLevel level = core::LogLevel::INFO;
+  std::string text;
+};
+
+/** \brief normalize_knot_rcut that appends its messages to @p notes instead
+ *  of logging them, for a caller that reports them itself (tadah hpo writes
+ *  them to its journal). */
+bool normalize_knot_rcut(core::Context &ctx, const std::string &who,
+                         std::vector<KnotRcutNote> &notes);
 
 /** \brief Support half-width w of a BUMP channel, from the pot Context alone:
  *  bump k spans [c_k - w/eta_k, c_k + w/eta_k]. suffix is "2B" (TYPE2B

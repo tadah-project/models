@@ -480,6 +480,14 @@ std::optional<double> derived_knot_rcut(const core::Context &ctx,
 }
 
 bool normalize_knot_rcut(core::Context &ctx, const std::string &who) {
+  std::vector<KnotRcutNote> notes;
+  const bool changed = normalize_knot_rcut(ctx, who, notes);
+  for (const auto &n : notes) core::Logger::instance().log(n.level, n.text);
+  return changed;
+}
+
+bool normalize_knot_rcut(core::Context &ctx, const std::string &who,
+                         std::vector<KnotRcutNote> &notes) {
   bool changed = false;
   for (const char *sfx : {"2B", "MB"}) {
     const auto derived = derived_knot_rcut(ctx, sfx);
@@ -539,10 +547,9 @@ bool normalize_knot_rcut(core::Context &ctx, const std::string &who) {
           << "tadah train, tadah refit --edit or tadah hpo (best_pot.tadah) "
           << "carries the derived value.";
     }
-    core::Logger::instance().log(
-        (mismatch || smooth_note) ? core::LogLevel::WARNING
-                                  : core::LogLevel::INFO,
-        msg.str());
+    notes.push_back({(mismatch || smooth_note) ? core::LogLevel::WARNING
+                                               : core::LogLevel::INFO,
+                     msg.str()});
     ctx.remove(key);
     ctx.add(key, *derived);
     changed = true;
