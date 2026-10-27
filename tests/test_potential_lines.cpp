@@ -439,3 +439,104 @@ TEST_CASE("The refusal of a count of a training configuration names the "
           "set on line 7 and on line 9: TYPE2B D2_Blip 2 2 Ta Ta");
   }
 }
+
+/* Pins: a refusal of a descriptor of a TYPE line read from a file ends with
+ * the lines of the TYPE key, as an error of a line names it: " (TYPE2B on
+ * line 4 of <file>)", every line of a D2_mJoin, " (TYPE2B on line 1 of
+ * <inc> (CONFIG on line 1 of <run>), on line 2 of <inc> (CONFIG on line 1
+ * of <run>) and on line 3 of <inc> (CONFIG on line 1 of <run>))":
+ *  - a list key the descriptor's SIZE asks for that no line sets ("TYPE2B
+ *    D2_Blip takes 2 CGRID2B values and 2 SGRID2B values, but CGRID2B and
+ *    SGRID2B are not set: TYPE2B D2_Blip 2 2 Ta Ta"), alone on its line and
+ *    in a D2_mJoin of an included file;
+ *  - a SIZE too large for the program ("...: parameter 1, the number of
+ *    CGRID2B values, is too large: 99999999999999999999");
+ *  - a SIZE that is not a whole number ("TYPE2B D2_Blip takes 2 parameters
+ *    before its element pairs; parameter 2, the number of SGRID2B values,
+ *    must be a non-negative integer, not \"Ta\": TYPE2B D2_Blip 2 Ta Ta").
+ * Before the fix: each refusal ended at the quoted TYPE line, naming
+ * neither its line nor its file. */
+TEST_CASE("A refusal of a descriptor of a TYPE line names the lines of the "
+          "TYPE key",
+          "[D_mJoin][config_include][type_lines]") {
+  Scratch dir;
+  const std::string head = "ATOM Ta\nINIT2B true\nINITMB false\n";
+  const std::string cut = "RCTYPE2B Cut_Cos\nRCUT2B 5\n";
+  SECTION("a list key not set") {
+    const std::string one =
+        dir.write("one.train", head + "TYPE2B D2_Blip 2 2 Ta Ta\n" + cut);
+    CHECK(refusal(parsed(one)) ==
+          "TYPE2B D2_Blip takes 2 CGRID2B values and 2 SGRID2B values, but "
+          "CGRID2B and SGRID2B are not set: TYPE2B D2_Blip 2 2 Ta Ta "
+          "(TYPE2B on line 4 of " + one + ")");
+  }
+  SECTION("a list key not set, in a D2_mJoin of an included file") {
+    const std::string inc = dir.write(
+        "inc.train", "TYPE2B D2_mJoin\nTYPE2B D2_Blip 2 2 Ta Ta\n"
+                     "TYPE2B D2_BP 2 2 Ta Ta\n"
+                     "RCTYPE2B Cut_Cos Cut_Cos\nRCUT2B 5 5\n");
+    const std::string run =
+        dir.write("run.train", "CONFIG " + inc + "\n" + head);
+    const std::string by = " (CONFIG on line 1 of " + run + ")";
+    CHECK(refusal(parsed(run)) ==
+          "TYPE2B D2_Blip takes 2 CGRID2B values and 2 SGRID2B values, but "
+          "CGRID2B and SGRID2B are not set: TYPE2B D2_Blip 2 2 Ta Ta "
+          "(TYPE2B on line 1 of " + inc + by + ", on line 2 of " + inc +
+              by + " and on line 3 of " + inc + by + ")");
+  }
+  SECTION("a SIZE too large") {
+    const std::string big = dir.write(
+        "big.train",
+        head + "TYPE2B D2_Blip 99999999999999999999 2 Ta Ta\n" + cut);
+    CHECK(refusal(parsed(big)) ==
+          "TYPE2B D2_Blip 99999999999999999999 2 Ta Ta: parameter 1, the "
+          "number of CGRID2B values, is too large: 99999999999999999999 "
+          "(TYPE2B on line 4 of " + big + ")");
+  }
+  SECTION("a SIZE that is not a whole number") {
+    const std::string word = dir.write(
+        "word.train", head + "TYPE2B D2_Blip 2 Ta Ta\n" + cut +
+                          "CGRID2B 1 2\nSGRID2B 1 1\n");
+    CHECK(refusal(parsed(word)) ==
+          "TYPE2B D2_Blip takes 2 parameters before its element pairs; "
+          "parameter 2, the number of SGRID2B values, must be a non-negative "
+          "integer, not \"Ta\": TYPE2B D2_Blip 2 Ta Ta (TYPE2B on line 4 of " +
+              word + ")");
+  }
+}
+
+/* Pins: a TYPE line a program builds without element pairs, or with an odd
+ * number of element types, is refused naming the descriptor, impersonally:
+ * "TYPE2B D2_Blip: the line names no element types; a TYPE2B line ends
+ * with its element pairs, such as Ta Ta" and "TYPE2B D2_Blip: the element
+ * types come in pairs, and the line has 3 of them, Ta Ta W" (a context of
+ * no file: no line is named). The parser of a configuration file refuses
+ * such a line first (the TYPE2B schema).
+ * Before the fix: "Error: No element types specified. Please provide
+ * element types for this calculator. For example: ..." and "Error: Element
+ * types must be provided in pairs. Ensure each element is paired
+ * correctly. ...". */
+TEST_CASE("A TYPE line without its element pairs is refused naming the "
+          "descriptor",
+          "[D_mJoin][type_lines]") {
+  auto built = [](const std::vector<std::string> &type) {
+    Context c;
+    c.add("ATOM", "Ta");
+    c.add("INIT2B", "true");
+    c.add("INITMB", "false");
+    for (const auto &t : type) c.add("TYPE2B", t);
+    c.add("RCTYPE2B", "Cut_Cos");
+    c.add("RCUT2B", "5");
+    c.add("CGRID2B", "1");
+    c.add("CGRID2B", "2");
+    c.add("SGRID2B", "1");
+    c.add("SGRID2B", "1");
+    return c;
+  };
+  CHECK(refusal(built({"D2_Blip", "2", "2"})) ==
+        "TYPE2B D2_Blip: the line names no element types; a TYPE2B line "
+        "ends with its element pairs, such as Ta Ta");
+  CHECK(refusal(built({"D2_Blip", "2", "2", "Ta", "Ta", "W"})) ==
+        "TYPE2B D2_Blip: the element types come in pairs, and the line has "
+        "3 of them, Ta Ta W");
+}
