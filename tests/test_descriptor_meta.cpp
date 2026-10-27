@@ -1298,3 +1298,117 @@ TEST_CASE("The checks and suggestions name the element pairs of the "
   CHECK(whole.rfind("RCUT2B = 2.6: no pair of atoms of the dataset lies "
                     "within it", 0) == 0);
 }
+
+/* Pins: the checks of a descriptor whose line names several element pairs
+ * judge each pair of the line on its own, by the statistics of the element
+ * pairs of the data it names, on the Ta-W-W data (ta_w_ww_stats(): (Ta,
+ * Ta) from 2.86 to 6.5 A, (Ta, W) from 2.4 A, (W, W) from 2.5 to 2.7 A):
+ *  - the cutoff check of D2_Blip, RCUT2B 2.6, on the line Ta Ta W W: a
+ *    FAIL, "RCUT2B = 2.6 is below the smallest (Ta, Ta) neighbour distance
+ *    of the dataset (2.86 Å): the (Ta, Ta) pair adds nothing to the
+ *    descriptor, which sums over its other element pairs alone.";
+ *  - on Ta Ta Mo Mo W W at 2.6, the data having no (Mo, Mo) pair: "RCUT2B
+ *    = 2.6 is below the smallest (Ta, Ta) neighbour distance of the dataset
+ *    (2.86 Å) and holds no (Mo, Mo) pair of atoms of the dataset: the (Ta,
+ *    Ta) and (Mo, Mo) pairs add nothing to the descriptor, which sums over
+ *    its other element pairs alone.";
+ *  - on Ta Ta W W at 2.45, below every pair of the line: the FAIL of the
+ *    line as a whole, "... below the smallest (Ta, Ta) or (W, W) neighbour
+ *    distance of the dataset (2.5 Å): the descriptor sums over no neighbour
+ *    and is 0 for every atom." (a pin);
+ *  - on Ta * at 2.6: no finding, the pair (Ta, *) judged as one pair, by
+ *    the (Ta, Ta) and (Ta, W) distances together (from 2.4 A) (a pin);
+ *  - the CGRIDMB check of DM_EAD, CGRIDMB 3.1, SGRIDMB 100, RCUTMB 3.5, on
+ *    Ta Ta W W, the channel reaching the (Ta, Ta) distances and not the (W,
+ *    W) ones: "CGRIDMB(1) = 3.1 with SGRIDMB(1) = 100: the Gaussian
+ *    exp(-SGRIDMB (r - CGRIDMB)^2) is below 1e-6 at every (W, W) neighbour
+ *    distance within RCUTMB = 3.5 (2.5 to 2.7 Å), so ρ gets nothing from
+ *    the (W, W) pairs of atoms (a smaller SGRIDMB, or a centre nearer the
+ *    neighbours, reaches them).";
+ *  - CGRIDMB 2.78 with SGRIDMB 3000 on Ta Ta W W, 0.08 A from the (Ta, Ta)
+ *    distances and from the (W, W) ones and reaching neither: "... is below
+ *    1e-6 at every (Ta, Ta) neighbour distance within RCUTMB = 3.5 (2.86 to
+ *    3.5 Å) and at every (W, W) one (2.5 to 2.7 Å), so ρ is ~0 for every
+ *    atom (...)";
+ *  - the CGRIDMB check of DM_Blip, CGRIDMB 3.1, SGRIDMB 10 (a support 0.2
+ *    A wide each side), on Ta Ta W W: "... the support of the blip, |r -
+ *    CGRIDMB| < 2/SGRIDMB = 0.2 Å, holds no (W, W) neighbour distance
+ *    within RCUTMB = 3.5 (2.5 to 2.7 Å), so ρ gets nothing from the (W, W)
+ *    pairs of atoms (a smaller SGRIDMB widens the support).".
+ * Before the fix: the pairs of a line were judged together, by the
+ * smallest and the largest of their distances: none of the five FAILs was
+ * given (RCUT2B 2.6 holds the (W, W) distances; the channels at 3.1 reach
+ * the (Ta, Ta) ones; the range 2.5 to 3.5 A holds the centre 2.78), and
+ * AUDIT error trained descriptors that are 0 for every Ta atom. */
+TEST_CASE("Each element pair of a descriptor's line is judged on its own",
+          "[metadata][density_reach][line_pairs]") {
+  auto meta_of = [](const char *label) {
+    std::unique_ptr<D_Base> d(tadah::core::factory<D_Base>(label));
+    const auto meta = d->meta();
+    REQUIRE(meta.has_value());
+    return *meta;
+  };
+  const DataStats data = ta_w_ww_stats();
+  const DescriptorMeta blip = meta_of("D2_Blip");
+  const ParamMeta *rcut = param_of(blip, "RCUT2B");
+  REQUIRE(rcut != nullptr);
+  REQUIRE(static_cast<bool>(rcut->check));
+  auto cutoff = [&](const std::string &rc,
+                    const std::vector<std::string> &tokens) {
+    Context c;
+    c.add("RCUT2B", rc);
+    const LinePairs pairs(tokens);
+    const HealthVerdict v = rcut->check(pairs.stats(data),
+                                        SeedView(c, {}, pairs));
+    return std::string(is_fail(v) ? "FAIL " : is_warn(v) ? "WARN " : "") +
+           verdict_message(v);
+  };
+  CHECK(cutoff("2.6", {"Ta", "Ta", "W", "W"}) ==
+        "FAIL RCUT2B = 2.6 is below the smallest (Ta, Ta) neighbour distance "
+        "of the dataset (2.86 Å): the (Ta, Ta) pair adds nothing to the "
+        "descriptor, which sums over its other element pairs alone.");
+  CHECK(cutoff("2.6", {"Ta", "Ta", "Mo", "Mo", "W", "W"}) ==
+        "FAIL RCUT2B = 2.6 is below the smallest (Ta, Ta) neighbour distance "
+        "of the dataset (2.86 Å) and holds no (Mo, Mo) pair of atoms of the "
+        "dataset: the (Ta, Ta) and (Mo, Mo) pairs add nothing to the "
+        "descriptor, which sums over its other element pairs alone.");
+  CHECK(cutoff("2.45", {"Ta", "Ta", "W", "W"}) ==
+        "FAIL RCUT2B = 2.45 is below the smallest (Ta, Ta) or (W, W) "
+        "neighbour distance of the dataset (2.5 Å): the descriptor sums over "
+        "no neighbour and is 0 for every atom.");
+  CHECK(cutoff("2.6", {"Ta", "*"}).empty());
+
+  auto channel = [&](const char *label, const std::string &c,
+                     const std::string &s) {
+    const DescriptorMeta m = meta_of(label);
+    const ParamMeta *centre = param_of(m, "CGRIDMB");
+    REQUIRE(centre != nullptr);
+    REQUIRE(static_cast<bool>(centre->check));
+    Context grid;
+    grid.add("CGRIDMB", c);
+    grid.add("SGRIDMB", s);
+    grid.add("RCUTMB", "3.5");
+    const LinePairs pairs({"Ta", "Ta", "W", "W"});
+    const HealthVerdict v = centre->check(pairs.stats(data),
+                                          SeedView(grid, {}, pairs));
+    return std::string(is_fail(v) ? "FAIL " : is_warn(v) ? "WARN " : "") +
+           verdict_message(v);
+  };
+  CHECK(channel("DM_EAD", "3.1", "100") ==
+        "FAIL CGRIDMB(1) = 3.1 with SGRIDMB(1) = 100: the Gaussian "
+        "exp(-SGRIDMB (r - CGRIDMB)^2) is below 1e-6 at every (W, W) "
+        "neighbour distance within RCUTMB = 3.5 (2.5 to 2.7 Å), so ρ gets "
+        "nothing from the (W, W) pairs of atoms (a smaller SGRIDMB, or a "
+        "centre nearer the neighbours, reaches them).");
+  CHECK(channel("DM_EAD", "2.78", "3000") ==
+        "FAIL CGRIDMB(1) = 2.78 with SGRIDMB(1) = 3000: the Gaussian "
+        "exp(-SGRIDMB (r - CGRIDMB)^2) is below 1e-6 at every (Ta, Ta) "
+        "neighbour distance within RCUTMB = 3.5 (2.86 to 3.5 Å) and at every "
+        "(W, W) one (2.5 to 2.7 Å), so ρ is ~0 for every atom (a smaller "
+        "SGRIDMB, or a centre nearer the neighbours, reaches them).");
+  CHECK(channel("DM_Blip", "3.1", "10") ==
+        "FAIL CGRIDMB(1) = 3.1 with SGRIDMB(1) = 10: the support of the "
+        "blip, |r - CGRIDMB| < 2/SGRIDMB = 0.2 Å, holds no (W, W) neighbour "
+        "distance within RCUTMB = 3.5 (2.5 to 2.7 Å), so ρ gets nothing from "
+        "the (W, W) pairs of atoms (a smaller SGRIDMB widens the support).");
+}
