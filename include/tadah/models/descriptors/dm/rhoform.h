@@ -4,6 +4,7 @@
 #include <tadah/core/context.h>
 #include <tadah/models/descriptors/basis_kind.h>
 #include <tadah/models/descriptors/dm/embf0.h>
+#include <cstddef>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -174,14 +175,29 @@ std::optional<BasisKind> optim_rule_basis(const tadah::core::Context &ctx);
  *  radial bump channel, every width > 0 in every form -- SGRIDMB of a
  *  DM_REAM Blip or Blip5 density (optim_rule_basis, so a DM_mJoin's
  *  DM_REAM children count) and SGRID2B of a D2_Blip or D2_Blip5 pair term
- *  (potedit::bump_channel_halfwidth): a bump spans [c - w/s, c + w/s], and
- *  a width s <= 0 has no support edge, so no bump-support rule can hold it
- *  inside the cutoff. tadah hpo refuses such a
- *  box and such a seed width at startup; tadah analysis check_bounds
- *  reports it. Throws the migration text (require_rhoform) for a DM_REAM
- *  configuration without RHOFORM. */
+ *  (potedit::bump_channel_halfwidth), or of such a descriptor of a
+ *  D2_mJoin line (the rule of its entries, "the D2_Blip pair basis of the
+ *  D2_mJoin line requires each of its SGRID2B widths > 0": the entry form
+ *  below says whose entry an entry is): a bump spans [c - w/s, c + w/s],
+ *  and a width s <= 0 has no support edge, so no bump-support rule can
+ *  hold it inside the cutoff. tadah hpo refuses such a box and such a seed
+ *  width at startup; tadah analysis check_bounds reports it. Throws the
+ *  migration text (require_rhoform) for a DM_REAM configuration without
+ *  RHOFORM. */
 std::optional<OptimLowBoundRule> optim_low_bound_rule(
     const std::string &key, const tadah::core::Context &ctx);
+
+/** The rule of entry @p entry (0-based, as the values of the key are
+ *  numbered, a grid generator counting as the values it makes) of @p key:
+ *  on a D2_mJoin line, the rule of the descriptor whose SGRID2B entry it
+ *  is (none for a D2_BP's, as for a line of one D2_BP; none past the
+ *  line's values); else optim_low_bound_rule(key, ctx), which holds every
+ *  entry (a DM_mJoin's bump density holds every SGRIDMB entry). The rule
+ *  tadah hpo, at an OPTIM box and at startup, and tadah analysis
+ *  check_bounds apply to a value. */
+std::optional<OptimLowBoundRule> optim_low_bound_rule(
+    const std::string &key, const tadah::core::Context &ctx,
+    std::size_t entry);
 
 }  // namespace models
 }  // namespace tadah
