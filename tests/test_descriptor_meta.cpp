@@ -1445,10 +1445,11 @@ std::string line_verdict(const char *label, const char *key,
 }  // namespace
 
 /* Pins: a pair of a descriptor's line written with "*" stands for each
- * element pair of the data it matches, each judged on its own, as the
- * descriptor sums over each of them: the verdict is that of the line that
- * names those pairs, on the Ta-W-W data (ta_w_ww_stats(): (Ta, Ta) from
- * 2.86 A, (Ta, W) from 2.4 A, (W, W) from 2.5 to 2.7 A):
+ * element pair it matches, of the elements of the data and those the line
+ * names, each judged on its own, as the descriptor sums over each of them:
+ * the verdict is that of the line that names those pairs, on the Ta-W-W
+ * data (ta_w_ww_stats(): (Ta, Ta) from 2.86 A, (Ta, W) from 2.4 A, (W, W)
+ * from 2.5 to 2.7 A):
  *  - the cutoff check of D2_Blip, RCUT2B 2.6, on Ta * and on Ta Ta Ta W:
  *    "FAIL RCUT2B = 2.6 is below the smallest (Ta, Ta) neighbour distance
  *    of the dataset (2.86 Å): the (Ta, Ta) pair adds nothing to the
@@ -1465,6 +1466,11 @@ std::string line_verdict(const char *label, const char *key,
  *    over its other element pairs alone." (the elements of the data give
  *    the pairs * stands for, whether the statistics hold their distances or
  *    not);
+ *  - RCUT2B 5 on Ta Ta Mo * and on Ta Ta Mo Mo Mo Ta Mo W, the data having
+ *    no Mo atom: "FAIL RCUT2B = 5 holds no (Mo, Mo), (Mo, Ta) or (Mo, W)
+ *    pair of atoms of the dataset: the (Mo, Mo), (Mo, Ta) and (Mo, W) pairs
+ *    add nothing to the descriptor, which sums over its other element pairs
+ *    alone." (an element the line names is one * stands for);
  *  - the CGRIDMB check of DM_EAD, CGRIDMB 3.1, SGRIDMB 100, RCUTMB 3.5, on
  *    * * and on Ta Ta Ta W W W: "FAIL CGRIDMB(1) = 3.1 with SGRIDMB(1) =
  *    100: the Gaussian exp(-SGRIDMB (r - CGRIDMB)^2) is below 1e-6 at every
@@ -1476,9 +1482,12 @@ std::string line_verdict(const char *label, const char *key,
  * the channel of * * gave no finding, the lines that name the pairs a FAIL;
  * and two pairs below the cutoff were named each with its own clause, "...
  * (2.86 Å) and is below the smallest (W, W) neighbour distance of the
- * dataset (2.5 Å): ...". */
+ * dataset (2.5 Å): ...".
+ * Before * stood for the elements the line names: Ta Ta Mo * at 5 gave no
+ * finding, the pair (Mo, *) standing for no pair, as Mo is no element of
+ * the data. */
 TEST_CASE("A pair of a descriptor's line with * stands for each element pair "
-          "of the data it matches",
+          "it matches",
           "[metadata][density_reach][line_pairs]") {
   const DataStats data = ta_w_ww_stats();
   auto cutoff = [&](const char *rc, const std::vector<std::string> &tokens,
@@ -1514,6 +1523,13 @@ TEST_CASE("A pair of a descriptor's line with * stands for each element pair "
         "FAIL RCUT2B = 2.45 holds no (Ta, Ta) or (W, W) pair of atoms of the "
         "dataset: the (Ta, Ta) and (W, W) pairs add nothing to the "
         "descriptor, which sums over its other element pairs alone.");
+  const std::string mo =
+      "FAIL RCUT2B = 5 holds no (Mo, Mo), (Mo, Ta) or (Mo, W) pair of atoms "
+      "of the dataset: the (Mo, Mo), (Mo, Ta) and (Mo, W) pairs add nothing "
+      "to the descriptor, which sums over its other element pairs alone.";
+  CHECK(cutoff("5", {"Ta", "Ta", "Mo", "*"}, data) == mo);
+  CHECK(cutoff("5", {"Ta", "Ta", "Mo", "Mo", "Mo", "Ta", "Mo", "W"}, data) ==
+        mo);
 
   Context grid;
   grid.add("CGRIDMB", "3.1");
