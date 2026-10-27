@@ -56,12 +56,16 @@ struct InertKeyRules {
    *  them itself from a configuration without descriptor lines (tadah
    *  refit, whose potential's density component declares them). */
   bool ream_keys = true;
+  /** When not empty, a fit that writes its own WATOM (tadah refit writes
+   *  WATOM 1): a WATOM with a value other than 1 changes nothing, whatever
+   *  the descriptor lines, for this reason. */
+  std::string watom_never_read;
 };
 
 /** The lines of @p c that change nothing a fit of it gives, in the order:
  *  the deprecated lines (as recorded), EMBF0 and RHOFORM without a DM_REAM
  *  block (@p rules), WATOM with a value other than 1 when no descriptor of
- *  @p c reads it. */
+ *  @p c reads it (or always, with rules.watom_never_read). */
 std::vector<InertKeyLine> inert_key_lines(const core::Context &c,
                                           const InertKeyRules &rules = {});
 

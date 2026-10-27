@@ -173,11 +173,13 @@ std::vector<InertKeyLine> inert_key_lines(const core::Context &c,
           "configuration has none"});
     }
   }
-  if (watom_sets_a_weight(c) && !context_reads_watom(c))
-    out.push_back(InertKeyLine{"WATOM",
-                               key_text("WATOM", stored_tokens(c, "WATOM")),
-                               where_of(c, "WATOM"),
-                               watom_reason(c, "configuration")});
+  if (watom_sets_a_weight(c) &&
+      (!rules.watom_never_read.empty() || !context_reads_watom(c)))
+    out.push_back(InertKeyLine{
+        "WATOM", key_text("WATOM", stored_tokens(c, "WATOM")),
+        where_of(c, "WATOM"),
+        rules.watom_never_read.empty() ? watom_reason(c, "configuration")
+                                       : rules.watom_never_read});
   return out;
 }
 
