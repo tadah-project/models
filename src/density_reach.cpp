@@ -21,6 +21,14 @@ std::string num(double v) {
   return os.str();
 }
 
+/* The element pair of @p pp as a rationale names it ("Ta-Ta"): a range
+ * taken from the shells, peaks or percentiles of the distances is taken
+ * from those of the first element pair of the statistics (DataStats sorts
+ * per_pair by element pair). */
+std::string pair_name(const tadah::core::stats::PerPairStats &pp) {
+  return pp.elements.first + "-" + pp.elements.second;
+}
+
 /* "KEY(n)" for value @p i of @p key of @p s, n its 1-based number in the
  * configuration, as an OPTIM line names an entry (SeedView::entry_number:
  * the entries of a joined line's descriptor follow those of the
@@ -48,18 +56,20 @@ bool nearest_shell(const DataStats &d, double c, double &mu, double &w,
                    std::string &what) {
   const auto &peaks = d.per_pair[0].r_peaks;
   if (peaks.empty()) return false;
+  const std::string pair = pair_name(d.per_pair[0]);
   const auto *best = &peaks.front();
   for (const auto &p : peaks)
     if (std::abs(p.position - c) < std::abs(best->position - c)) best = &p;
   mu = best->position;
   if (best->fwhm > 0.0) {
     w = best->fwhm;
-    what = "the FWHM (" + num(w) + " Å) of the neighbour shell nearest to "
-           "it (" + num(mu) + " Å)";
+    what = "the FWHM (" + num(w) + " Å) of the " + pair +
+           " neighbour shell nearest to it (" + num(mu) + " Å)";
   } else {
     w = 0.2 * mu;
-    what = num(w) + " Å, 0.2 times the distance of the neighbour shell "
-           "nearest to it (" + num(mu) + " Å), which has no FWHM";
+    what = num(w) + " Å, 0.2 times the distance of the " + pair +
+           " neighbour shell nearest to it (" + num(mu) +
+           " Å), which has no FWHM";
   }
   return true;
 }
@@ -69,16 +79,18 @@ bool nearest_shell(const DataStats &d, double c, double &mu, double &w,
  * percentile and the median; @p what names them. */
 void shells(const DataStats &d, double &r1, double &r2, std::string &what) {
   const auto &pp = d.per_pair[0];
+  const std::string pair = pair_name(pp);
   if (pp.r_peaks.size() >= 2) {
     r1 = pp.r_peaks[0].position;
     r2 = pp.r_peaks[1].position;
-    what = "from the first neighbour shell (" + num(r1) +
+    what = "from the first " + pair + " neighbour shell (" + num(r1) +
            " Å) to the second (" + num(r2) + " Å)";
   } else {
     r1 = pp.r_percentiles[tadah::core::stats::IDX_P10];
     r2 = pp.r_percentiles[tadah::core::stats::IDX_P50];
-    what = "from the 10th percentile of the neighbour distances (" +
-           num(r1) + " Å) to their median (" + num(r2) + " Å)";
+    what = "from the 10th percentile of the " + pair +
+           " neighbour distances (" + num(r1) + " Å) to their median (" +
+           num(r2) + " Å)";
   }
 }
 
@@ -127,17 +139,20 @@ BoundSuggestion centre_suggestion(const DataStats &d, const SeedView &s,
     w = pp.r_peaks[0].fwhm > 0.0 ? pp.r_peaks[0].fwhm : 0.2 * mu;
     return BoundSuggestion(
         std::max(gaussian ? pp.r_min : 0.0, mu - w), mu + w,
-        form(kind, false) + " centred on the first neighbour shell: its "
-        "peak (" + num(mu) + " Å) +- " + num(w) + " Å, " +
-            (gaussian ? "from r_min (" + num(pp.r_min) + " Å)"
+        form(kind, false) + " centred on the first " + pair_name(pp) +
+            " neighbour shell: its peak (" + num(mu) + " Å) +- " + num(w) +
+            " Å, " +
+            (gaussian ? "from the smallest " + pair_name(pp) +
+                            " distance (" + num(pp.r_min) + " Å)"
                       : std::string("not below 0")));
   }
   using tadah::core::stats::IDX_P10;
   using tadah::core::stats::IDX_P90;
   return BoundSuggestion(
       pp.r_percentiles[IDX_P10], pp.r_percentiles[IDX_P90],
-      form(kind, false) + " centred on the first neighbour shell: the 10th "
-      "to 90th percentiles of the neighbour distances (no peak found)");
+      form(kind, false) + " centred on the first " + pair_name(pp) +
+          " neighbour shell: the 10th to 90th percentiles of the " +
+          pair_name(pp) + " neighbour distances (no peak found)");
 }
 
 /* The suggestion of the width SGRIDMB(@p arg_pos) of a channel of @p kind
@@ -156,8 +171,9 @@ BoundSuggestion width_suggestion(const DataStats &d, const SeedView &s,
     const double gap = r2 * r2 - r1 * r1;
     if (!(gap > 0.0))
       return BoundSuggestion::no_row(
-          "Gaussian exp(-SGRIDMB r^2) centred at the origin: the neighbour "
-          "distances show no second shell beyond the first");
+          "Gaussian exp(-SGRIDMB r^2) centred at the origin: the " +
+          pair_name(pp) +
+          " neighbour distances show no second shell beyond the first");
     const double lo = std::log(1.0 / 0.9) / gap;
     const double drop = std::log(20.0) / gap;
     const double reach = gaussian_reach_width(pp.r_min);
@@ -166,11 +182,12 @@ BoundSuggestion width_suggestion(const DataStats &d, const SeedView &s,
         "Gaussian exp(-SGRIDMB r^2) centred at the origin (the seed's "
         "CGRIDMB 0): its value drops by a factor of 0.9 to 1/20 " + between;
     if (reach < drop)
-      why += ", up to " + num(reach) + ", where it is 1e-6 at r_min (" +
-             num(pp.r_min) + " Å)";
+      why += ", up to " + num(reach) + ", where it is 1e-6 at the smallest " +
+             pair_name(pp) + " distance (" + num(pp.r_min) + " Å)";
     if (!(lo < hi))
       return BoundSuggestion::no_row(
-          why + ": the widths it allows do not reach r_min");
+          why + ": the widths it allows do not reach the smallest " +
+          pair_name(pp) + " distance");
     return BoundSuggestion(lo, hi, why);
   }
   if (seeded && c == 0.0) {
@@ -218,22 +235,23 @@ BoundSuggestion width_suggestion(const DataStats &d, const SeedView &s,
   using tadah::core::stats::IDX_P90;
   double w = pp.r_percentiles[IDX_P90] - pp.r_percentiles[IDX_P10];
   std::string what = "the spread from the 10th to the 90th percentile of "
-                     "the neighbour distances";
+                     "the " + pair_name(pp) + " neighbour distances";
   if (!pp.r_peaks.empty() && (!gaussian || pp.r_peaks[0].fwhm > 0.0)) {
     w = pp.r_peaks[0].fwhm;
-    what = "the FWHM of the first neighbour shell";
+    what = "the FWHM of the first " + pair_name(pp) + " neighbour shell";
   }
   if (!(w > 0.0))
     return BoundSuggestion::fixed_range(
         0.1, 1.0,
-        std::string("fixed range: the neighbour distances have no spread "
-                    "to take a width of the ") +
+        "fixed range: the " + pair_name(pp) +
+            " neighbour distances have no spread to take a width of the " +
             (gaussian ? "Gaussian" : "blip") + " from");
   if (gaussian)
     return BoundSuggestion(
         0.25 / (w * w), 9.0 / (w * w),
-        form(kind, false) + " centred on the first neighbour shell: "
-        "0.25/w^2 to 9/w^2 with w = " + num(w) + " Å, " + what);
+        form(kind, false) + " centred on the first " + pair_name(pp) +
+            " neighbour shell: 0.25/w^2 to 9/w^2 with w = " + num(w) +
+            " Å, " + what);
   return BoundSuggestion(
       1.0 / w, 6.0 / w,
       form(kind, false) + ": its support half-width 2/SGRIDMB from 2 w down "
@@ -255,23 +273,25 @@ BoundSuggestion cutoff_suggestion(const DataStats &d, const SeedView &,
   using tadah::core::stats::IDX_P50;
   using tadah::core::stats::IDX_P99;
   const auto &pp = d.per_pair[0];
+  const std::string pair = pair_name(pp);
   const double top = pp.r_percentiles[IDX_P99];
   const std::string up_to =
-      "the 99th percentile of the neighbour distances (" + num(top) +
-      " Å), which the statistics take up to " + num(kCutoffSearchReach) +
-      " times the largest cutoff of the seed";
+      "the 99th percentile of the " + pair + " neighbour distances (" +
+      num(top) + " Å), which the statistics take up to " +
+      num(kCutoffSearchReach) + " times the largest cutoff of the seed";
   if (pp.r_peaks.size() >= 2) {
     const double r2 = pp.r_peaks[1].position;
     if (1.05 * r2 < top)
       return BoundSuggestion(1.05 * r2, top,
-                             "a cutoff past the second neighbour shell: from "
-                             "1.05 times its distance (" + num(r2) +
-                                 " Å) to " + up_to);
+                             "a cutoff past the second " + pair +
+                                 " neighbour shell: from 1.05 times its "
+                                 "distance (" + num(r2) + " Å) to " + up_to);
   }
   const double median = pp.r_percentiles[IDX_P50];
   return BoundSuggestion(median, top,
-                         "a cutoff from the median of the neighbour "
-                         "distances (" + num(median) + " Å) to " + up_to);
+                         "a cutoff from the median of the " + pair +
+                             " neighbour distances (" + num(median) +
+                             " Å) to " + up_to);
 }
 
 HealthVerdict cutoff_reach_check(const DataStats &d, const SeedView &s,

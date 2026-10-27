@@ -312,7 +312,7 @@ std::optional<DescriptorMeta> D2_Blip5::meta() const {
   p_cgrid.arg_pos  = 0;
   p_cgrid.scale    = Scale::Distance;
   p_cgrid.units    = "Å";
-  p_cgrid.role     = "Centre of the i-th radial blip (CGRID2B[i]).";
+  p_cgrid.role     = "Centre of the i-th radial blip, CGRID2B (i).";
   p_cgrid.hard.lo  = 0.0;
   p_cgrid.crit     = Criticality::Recommended;
   p_cgrid.scope    = PairScope::PerElementPair;

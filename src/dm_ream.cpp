@@ -404,7 +404,9 @@ std::optional<DescriptorMeta> DM_REAM::meta() const {
   DescriptorMeta dm;
   dm.label = "DM_REAM";
 
-  // RCUTMB — real-space cutoff for the density neighbour sum.
+  // RCUTMB — real-space cutoff for the density neighbour sum. On a line of
+  // a knot DM_REAM alone, tadah hpo derives it from the largest knot, and
+  // tadah analysis suggest_bounds gives that row no OPTIM line (Tadah.MLIP).
   ParamMeta p_rcut;
   p_rcut.key     = "RCUTMB";
   p_rcut.arg_pos = -1;
@@ -420,9 +422,8 @@ std::optional<DescriptorMeta> DM_REAM::meta() const {
   };
   dm.params.push_back(std::move(p_rcut));
 
-  // Density-expansion grids (r-space). Tunable, but the data give no range
-  // for them: `tadah refit` writes OPTIM lines of +-OPTIM_PCT percent about
-  // the values of a DM_REAM potential, and the knot degrees are structure
+  // Density-expansion grids (r-space). Tunable, but the neighbour
+  // distances give no range for them, and the knot degrees are structure
   // data that tadah hpo does not search. Each gets a row without an OPTIM
   // line, saying so.
   auto no_ream_range = [](const std::string& key) {
@@ -431,9 +432,8 @@ std::optional<DescriptorMeta> DM_REAM::meta() const {
           "a knot degree (3 or 5), structure data that tadah hpo does not "
           "search (it refuses OPTIM " + key + ")");
     return BoundSuggestion::no_row(
-        "no range from the data for a value of a DM_REAM grid: tadah refit "
-        "writes an OPTIM line of +-OPTIM_PCT percent about each value of a "
-        "DM_REAM potential");
+        "the neighbour distances give no range for a value of a DM_REAM "
+        "grid");
   };
   auto add_vec = [&dm, no_ream_range](const std::string& key, Scale sc, const std::string& units,
                        const std::string& role, double lo, Criticality crit) {

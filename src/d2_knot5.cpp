@@ -265,6 +265,10 @@ std::optional<DescriptorMeta> D2_Knot5::meta() const {
   dm.label = "D2_Knot5";
 
   // RCUT2B — outer cutoff. Knots at or below rcut vanish smoothly there.
+  // The suggestion of every cutoff: tadah hpo searches the stated cutoff of
+  // a D2_Knot5 on a D2_mJoin line; on a line of D2_Knot5 alone it derives
+  // the cutoff from the largest knot, and tadah analysis suggest_bounds
+  // gives that row no OPTIM line (Tadah.MLIP).
   ParamMeta p_rcut;
   p_rcut.key      = "RCUT2B";
   p_rcut.arg_pos  = -1;
@@ -274,6 +278,7 @@ std::optional<DescriptorMeta> D2_Knot5::meta() const {
   p_rcut.hard.lo  = 0.0;
   p_rcut.crit     = Criticality::Critical;
   p_rcut.scope    = PairScope::Global;
+  p_rcut.suggest  = cutoff_suggestion;
   p_rcut.check    = [](const DataStats& d, const SeedView& s) {
     return cutoff_reach_check(d, s, "RCUT2B");
   };
