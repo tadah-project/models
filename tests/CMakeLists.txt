@@ -71,6 +71,44 @@ else()
                  "tadah.models_ream_goldens_native_link is not built")
 endif()
 
+# tadah.models_ream_goldens_glibc_no_fma. Pins: the DM_REAM goldens (the
+# [ream][rhoform][goldens] cases of test_ream_goldens.cpp) pass with the
+# cos, sin and exp that glibc gives an x86-64 CPU without AVX2 and FMA
+# (GLIBC_TUNABLES=glibc.cpu.hwcaps=-AVX2,-FMA selects them on any x86-64
+# CPU), which round some arguments differently from those of a CPU with
+# AVX2 and FMA, with which the results of ream_goldens_libm.h were
+# recorded. tadah.models_ream_goldens_glibc_no_fma_libm, under the same
+# setting, checks that the C library gives one or more of the recorded
+# results differently, and is Skipped where it gives them all (a glibc that
+# ignores the setting). Added with glibc on x86-64 only, the C library and
+# processor the setting is for.
+# Before the fix: the first fails, and the second passes: the anchor case
+# asked glibc's own cos, sin and exp for the stored goldens bit for bit, and
+# with this setting (glibc 2.43) exp(-0x1.1839f3fdcf5f8p+1) is
+# 0x1.cabf14e03b9b2p-4 against the recorded 0x1.cabf14e03b9b3p-4, so that 8
+# golden values differ ('8 == 0'; the first, Gaussian Cut_Cos signed,
+# calc_rho at r = 0x1.064f765fd8adap+1).
+include(CheckCXXSourceCompiles)
+check_cxx_source_compiles([=[
+#include <cstdlib>
+#if !defined(__x86_64__) || !defined(__GLIBC__) || defined(__UCLIBC__)
+#error "not glibc on x86-64"
+#endif
+int main() { return 0; }
+]=] TADAH_MODELS_TESTS_GLIBC_X86_64)
+if(TADAH_MODELS_TESTS_GLIBC_X86_64)
+  add_test(NAME tadah.models_ream_goldens_glibc_no_fma
+      COMMAND test_models "[ream][rhoform][goldens]" --warn NoTests)
+  add_test(NAME tadah.models_ream_goldens_glibc_no_fma_libm
+      COMMAND test_models "[.ream_goldens_libm]" --warn NoTests)
+  set_tests_properties(tadah.models_ream_goldens_glibc_no_fma
+                       tadah.models_ream_goldens_glibc_no_fma_libm
+      PROPERTIES ENVIRONMENT "GLIBC_TUNABLES=glibc.cpu.hwcaps=-AVX2,-FMA")
+  set_tests_properties(tadah.models_ream_goldens_glibc_no_fma_libm
+      PROPERTIES
+        SKIP_REGULAR_EXPRESSION "${TADAH_TEST_SKIP_REGULAR_EXPRESSION}")
+endif()
+
 # tadah.models_headers (ctest -L headers): every header of include/
 # compiles on its own and twice in a row (cmake-tools'
 # tadah_add_header_check). Before the fix: fails on

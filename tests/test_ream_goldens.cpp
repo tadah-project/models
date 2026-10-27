@@ -22,9 +22,10 @@
  * anchor the frozen copy: bit for bit with glibc, with which they were
  * captured, and with any C library within the bound kLibmBound states.
  */
-#include "catch2/catch.hpp"
+#include "tadah_test_skip.hpp"  // includes catch2/catch.hpp
 #include "ream_density_before_rhoform.h"
 #include "ream_goldens_data.h"
+#include "ream_goldens_libm.h"
 
 #include <tadah/core/context.h>
 #include <tadah/core/core_types.h>
@@ -258,7 +259,59 @@ template <int M> before::Libm moved_libm() {
   return before::Libm{&moved_cos<M>, &moved_sin<M>, &moved_exp<M>};
 }
 
+// The results of one function of ream_goldens_libm.h against @p f, the C
+// library's: the number of arguments at which they differ, and the first.
+std::size_t differing(const ream_goldens_libm::Result *tab, std::size_t n,
+                      double (*f)(double), const char *name,
+                      std::string &first) {
+  std::size_t d = 0;
+  for (std::size_t i = 0; i < n; ++i) {
+    volatile double x = tab[i].x;  // the call happens here, not at compile time
+    const double y = f(x);
+    if (bits(y) == bits(tab[i].y)) continue;
+    ++d;
+    if (first.empty())
+      first = std::string(name) + "(" + hex(tab[i].x) + ") = " + hex(y) +
+              ", recorded " + hex(tab[i].y);
+  }
+  return d;
+}
+
 }  // namespace
+
+/* Pins: the C library this program runs with gives one or more of the
+ * results of cos, sin and exp recorded in ream_goldens_libm.h differently
+ * (the functions the frozen copy calls, before::platform_libm()). Run only
+ * by the CTest entry tadah.models_ream_goldens_glibc_no_fma_libm
+ * (tests/CMakeLists.txt), next to tadah.models_ream_goldens_glibc_no_fma,
+ * which runs the [goldens] cases under the same setting: it shows that
+ * those cases ran with other results than the recorded ones, and is
+ * Skipped where the C library gives every recorded result (the setting
+ * then changed nothing).
+ * Before the fix: new; passes with glibc 2.43 on x86-64 under
+ * GLIBC_TUNABLES=glibc.cpu.hwcaps=-AVX2,-FMA (1 result of 501 differs:
+ * exp(-0x1.1839f3fdcf5f8p+1) = 0x1.cabf14e03b9b2p-4, recorded
+ * 0x1.cabf14e03b9b3p-4), and is Skipped without it. */
+TEST_CASE("DM_REAM goldens: this C library's cos, sin and exp differ from "
+          "the recorded results",
+          "[.ream_goldens_libm]") {
+  namespace lib = ream_goldens_libm;
+  const before::Libm lm = before::platform_libm();
+  const std::size_t ncos = sizeof(lib::kCos) / sizeof(lib::kCos[0]);
+  const std::size_t nsin = sizeof(lib::kSin) / sizeof(lib::kSin[0]);
+  const std::size_t nexp = sizeof(lib::kExp) / sizeof(lib::kExp[0]);
+  std::string first;
+  const std::size_t n = differing(lib::kCos, ncos, lm.cos, "cos", first) +
+                        differing(lib::kSin, nsin, lm.sin, "sin", first) +
+                        differing(lib::kExp, nexp, lm.exp, "exp", first);
+  if (n == 0) {
+    TADAH_SKIP("this C library gives every recorded result of cos, sin and "
+               "exp (" << ncos + nsin + nexp << "): the golden cases run "
+               "with it checked no other results");
+  }
+  SUCCEED(n << " of " << ncos + nsin + nexp
+            << " recorded results differ; the first: " << first);
+}
 
 /* Pins: the frozen copy of the code before RHOFORM, run on this platform,
  * gives every stored golden value (1770 points, 4 values each) within
