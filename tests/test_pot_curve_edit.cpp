@@ -1668,8 +1668,9 @@ TEST_CASE_METHOD(EditFixture,
 
 /* Pins: normalize_knot_rcut derives the cutoff of each knot descriptor of
  * a joined line from its own knots, as that of a line of one knot
- * descriptor, so that tadah train, predict, refit --edit, analysis
- * check_bounds and hpo agree on it: TYPE2B D2_mJoin of D2_Knot5 (knots 2.5
+ * descriptor, so that the fits (tadah train, analysis check_bounds and hpo)
+ * agree on it (a potential keeps its stated cutoffs:
+ * normalize_potential_knot_rcut): TYPE2B D2_mJoin of D2_Knot5 (knots 2.5
  * 3.5 4.5) and D2_Blip with RCUT2B 5.3 5 becomes RCUT2B 4.5 5 (the
  * D2_Blip's 5 kept, RCUT2BMAX 5), with one WARNING naming the descriptor,
  * "test: TYPE2B descriptor 1 (D2_Knot5): RCUT2B 5.3 is above the largest

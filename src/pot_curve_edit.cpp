@@ -530,8 +530,12 @@ KnotRcutNote knot_rcut_note(const core::Context &c, const char *sfx,
   // cutoff the RCUT value enters f_c(r) of every pair, so LAMMPS then
   // differs from train/predict/hpo on that file, even for a sub-1e-9 gap:
   // say so at default visibility. A hard cutoff (Cut_Dummy) past the
-  // largest knot is prediction-exact: no note, INFO stays INFO.
-  const bool smooth_note = have && !channel_cutoff_is_discontinuous(c, sfx);
+  // largest knot is prediction-exact: no note, INFO stays INFO. A
+  // descriptor of a joined line (@p where names it) has no such note:
+  // tadah predict and tadah refit --edit, as LAMMPS, take the cutoff a
+  // potential file states for it (normalize_potential_knot_rcut).
+  const bool smooth_note =
+      have && where.empty() && !channel_cutoff_is_discontinuous(c, sfx);
   if (smooth_note) {
     std::ostringstream gap;
     gap << std::setprecision(2)
@@ -559,17 +563,23 @@ bool joins_descriptors(const core::Context &ctx, const char *sfx) {
     return false;
   return ctx.get<std::string>(type_key, 0).find("mJoin") != std::string::npos;
 }
-}  // namespace
 
-bool normalize_knot_rcut(core::Context &ctx, const std::string &who,
-                         std::vector<KnotRcutNote> &notes) {
+/* normalize_knot_rcut, and with @p joined false normalize_potential_knot_rcut:
+ * a joined line is left as stated. */
+bool normalize_knot_rcut_lines(core::Context &ctx, const std::string &who,
+                               std::vector<KnotRcutNote> &notes,
+                               bool joined) {
   bool changed = false;
   for (const char *sfx : {"2B", "MB"}) {
     const std::string key = std::string("RCUT") + sfx;
     // Exact: every consumer (train, predict, refit --edit, analysis
     // check_bounds, hpo startup and hpo's per-evaluation derivation) must
-    // use the same cutoff, so ANY difference is rewritten.
+    // use the same cutoff, so ANY difference is rewritten (a joined line of
+    // a potential is left as stated, below).
     if (joins_descriptors(ctx, sfx)) {
+      // A potential keeps the cutoffs of its joined line: its coefficients
+      // were fitted with them (every fit before Tadah! 1.6.0 kept them).
+      if (!joined) continue;
       // A joined line: each knot descriptor's own RCUT value, derived from
       // its own knots (D_mJoin::parse_context gives each descriptor its
       // RCUT value and its share of CGRID, in the order of the line).
@@ -621,6 +631,20 @@ bool normalize_knot_rcut(core::Context &ctx, const std::string &who,
     ctx.add(key, *derived);
     changed = true;
   }
+  return changed;
+}
+}  // namespace
+
+bool normalize_knot_rcut(core::Context &ctx, const std::string &who,
+                         std::vector<KnotRcutNote> &notes) {
+  return normalize_knot_rcut_lines(ctx, who, notes, true);
+}
+
+bool normalize_potential_knot_rcut(core::Context &ctx,
+                                   const std::string &who) {
+  std::vector<KnotRcutNote> notes;
+  const bool changed = normalize_knot_rcut_lines(ctx, who, notes, false);
+  for (const auto &n : notes) core::Logger::instance().log(n.level, n.text);
   return changed;
 }
 

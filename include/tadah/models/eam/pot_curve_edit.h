@@ -167,8 +167,9 @@ core::Context rebuild_pot_context(const PotEAMView &v);
 std::optional<double> derived_knot_rcut(const core::Context &ctx,
                                         const std::string &suffix);
 
-/** \brief F2 normalisation shared by every consumer (refit --edit, train,
- *  predict, hpo startup): for each KNOT channel compare the stated
+/** \brief F2 normalisation of a configuration to fit (train, hpo startup,
+ *  analysis check_bounds; a potential evaluated with its coefficients takes
+ *  normalize_potential_knot_rcut): for each KNOT channel compare the stated
  *  RCUT2B/RCUTMB against `derived_knot_rcut` and, whenever they differ at
  *  all (exact comparison), rewrite the key in ctx (RCUT*MAX follows via
  *  Context internal-key derivation), so every consumer uses the same
@@ -180,7 +181,9 @@ std::optional<double> derived_knot_rcut(const core::Context &ctx,
  *  from train/predict/hpo on that file until it is re-written). On a
  *  D2_mJoin or DM_mJoin line each knot descriptor's own RCUT value is
  *  derived from its own knots (D_mJoin::parse_context) and the message
- *  names it ("TYPE2B descriptor 1 (D2_Knot5): "). Bump channels are never
+ *  names it ("TYPE2B descriptor 1 (D2_Knot5): "), without the pair_style
+ *  note (tadah predict, tadah refit --edit and LAMMPS take the cutoffs a
+ *  potential file states for a joined line). Bump channels are never
  *  modified. Returns true if anything changed. */
 bool normalize_knot_rcut(core::Context &ctx, const std::string &who);
 
@@ -196,6 +199,17 @@ struct KnotRcutNote {
  *  them to its journal). */
 bool normalize_knot_rcut(core::Context &ctx, const std::string &who,
                          std::vector<KnotRcutNote> &notes);
+
+/** \brief normalize_knot_rcut for a potential that is evaluated with its
+ *  coefficients (tadah predict, tadah refit --edit): the cutoff of a line
+ *  of one knot descriptor is rewritten as normalize_knot_rcut rewrites it
+ *  (every fit of such a line derives it, so its coefficients were fitted
+ *  with the derived value), and the stated cutoffs of a D2_mJoin or
+ *  DM_mJoin line are kept: its coefficients were fitted with them (every
+ *  fit before Tadah! 1.6.0 kept them; a fit now writes the derived ones),
+ *  and pair_style tadah reads them. Logs as the two-argument form; returns
+ *  true if anything changed. */
+bool normalize_potential_knot_rcut(core::Context &ctx, const std::string &who);
 
 /** \brief Support half-width w of a BUMP channel, from the pot Context alone:
  *  bump k spans [c_k - w/eta_k, c_k + w/eta_k]. suffix is "2B" (TYPE2B
