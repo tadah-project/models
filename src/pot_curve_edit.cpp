@@ -492,11 +492,18 @@ namespace {
  * @p derived and whose stated cutoff is @p stated (@p have: one is stated)
  * under the cutoff @p rctype (its context and suffix @p c, @p sfx), the
  * channel named by @p where ("" for a line of one descriptor, else "TYPE2B
- * descriptor 1 (D2_Knot5): "). */
+ * descriptor 1 (D2_Knot5): ") and, for a descriptor of a joined line, its
+ * entry of RCUT2B or RCUTMB (@p entry, 1-based as an OPTIM line numbers the
+ * whole key; 0 for a line of one descriptor). */
 KnotRcutNote knot_rcut_note(const core::Context &c, const char *sfx,
                             const std::string &who, const std::string &where,
-                            bool have, double stated, double derived) {
+                            std::size_t entry, bool have, double stated,
+                            double derived) {
   const std::string key = std::string("RCUT") + sfx;
+  // The key as the note names it: "RCUT2B (1)" for an entry of a joined
+  // line, which holds the cutoff of each of its descriptors.
+  const std::string key_entry =
+      entry ? key + " (" + std::to_string(entry) + ")" : key;
   // Only a real mismatch is worth a WARNING; a gap within 1e-9 relative
   // (e.g. the ~3e-13 left by the <= 1.5.0 writers, which rounded CGRID to
   // 12 decimals but not RCUT) is fixed at INFO.
@@ -505,14 +512,16 @@ KnotRcutNote knot_rcut_note(const core::Context &c, const char *sfx,
                    1e-9 * std::max(1.0, std::fabs(derived));
   // Shortest exact text: the values may differ in the 13th digit.
   const std::string d_txt = core::format_roundtrip(derived);
-  // The channel whose cutoff this is, as the configuration names it.
+  // The channel whose cutoff this is, as the configuration names it: a
+  // D2_Knot5 of a joined line is one descriptor of its line.
   const std::string channel = std::string(sfx) == "2B"
-                                  ? "a D2_Knot5 line"
+                                  ? (entry ? "a D2_Knot5 descriptor"
+                                           : "a D2_Knot5 line")
                                   : "a knot DM_REAM density";
   const std::string set_by = ", which the CGRID" + std::string(sfx) +
                              " knot positions set.";
   std::ostringstream msg;
-  msg << who << ": " << where << key << " ";
+  msg << who << ": " << where << key_entry << " ";
   if (!have) {
     msg << "is missing: the cutoff of " << channel
         << " is its largest knot, " << d_txt << set_by;
@@ -606,8 +615,9 @@ bool normalize_knot_rcut_lines(core::Context &ctx, const std::string &who,
                 std::string("TYPE") + sfx + " descriptor " +
                 std::to_string(k + 1) + " (" +
                 part.get<std::string>(std::string("TYPE") + sfx, 0) + "): ";
-            notes.push_back(knot_rcut_note(part, sfx, who, where, true,
-                                           part.get<double>(key), *derived));
+            notes.push_back(knot_rcut_note(part, sfx, who, where, at + 1,
+                                           true, part.get<double>(key),
+                                           *derived));
             values[at] = *derived;
           }
         }
@@ -626,7 +636,7 @@ bool normalize_knot_rcut_lines(core::Context &ctx, const std::string &who,
     const double stated = have ? ctx.get<double>(key) : -1.0;
     if (have && stated == *derived) continue;
     notes.push_back(
-        knot_rcut_note(ctx, sfx, who, "", have, stated, *derived));
+        knot_rcut_note(ctx, sfx, who, "", 0, have, stated, *derived));
     ctx.remove(key);
     ctx.add(key, *derived);
     changed = true;
