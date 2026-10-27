@@ -44,10 +44,13 @@ private:
   std::string lab="D2_Knot5";
   tadah::core::v_type cgrid;
   tadah::core::v_type dgrid;  ///< optional per-atom degree 3|5 (empty = all 5)
-  /** Last-resort guard (ctor): a knot beyond rcut is silently
-   *  hard-truncated by Cut_Dummy — warn, once per process
-   *  (log_warning_once). The honest fixes live at the
-   *  command level (refit/edit/hpo derive RCUT2B from the largest knot);
+  /** Last-resort guard (ctor): a knot beyond rcut is
+   *  hard-truncated by the cutoff — warn, once per process
+   *  (log_warning_once), with both values as the shortest text that reads
+   *  back to them. Every command sets RCUT2B to the largest knot on a
+   *  TYPE2B line of D2_Knot5 alone (potedit::normalize_knot_rcut), so the
+   *  warning comes where the stated cutoff is kept: a D2_mJoin line, or a
+   *  program or pair_style tadah that reads a potential file as written;
    *  no auto-raise here because widening fcut without resizing the caller's
    *  neighbour list would not recover the missing pairs. */
   void warn_if_knots_beyond_rcut();

@@ -112,7 +112,7 @@ DM_mEAD<F_mEnv<Cut_SinInv>>::meta() const {
   p_cemb.arg_pos  = 0;
   p_cemb.scale    = Scale::Density;
   p_cemb.units    = "ρ";
-  p_cemb.role     = "i-th embedding-blip centre in ρ-space.";
+  p_cemb.role     = "Centre of the i-th embedding blip in ρ, CEMBFUNC (i).";
   p_cemb.crit     = Criticality::Recommended;
   p_cemb.scope    = PairScope::Global;
   p_cemb.suggest  = [self](const DataStats& d, const SeedView&,
@@ -133,8 +133,8 @@ DM_mEAD<F_mEnv<Cut_SinInv>>::meta() const {
   p_semb.arg_pos  = 0;
   p_semb.scale    = Scale::InverseDensity;
   p_semb.units    = "ρ^-1";
-  p_semb.role     = "i-th embedding-blip width η_p. Support is "
-                    "4/η_p in ρ-units.";
+  p_semb.role     = "Inverse width η_p of the i-th embedding blip, "
+                    "SEMBFUNC (i): its support is 4/η_p wide in ρ.";
   p_semb.hard.lo  = 1.0e-6;
   p_semb.crit     = Criticality::Recommended;
   p_semb.scope    = PairScope::Global;

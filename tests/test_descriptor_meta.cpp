@@ -977,3 +977,120 @@ TEST_CASE("A role text numbers an entry as an OPTIM line does",
     CHECK(centre->role.find("CGRID2B (i)") != std::string::npos);
   }
 }
+
+/* Pins: the role texts of the radial grids, which tadah analysis
+ * suggest_bounds prints beside a range and in the comment of a written
+ * OPTIM block, state the basis and its support as the descriptor computes
+ * it, number the entry as an OPTIM line does, and give no instruction:
+ *  - the inverse width of D2_Blip and of DM_Blip, b(eta (r - c)), has the
+ *    support |r - c| < 2/eta, and that of D2_Blip5, the quintic blip
+ *    b5(eta (r - c)), |r - c| < 3/eta (its half-width, 3, in
+ *    basis_kind.h);
+ *  - the width of D2_BP is eta of the Gaussian exp(-eta (r - c)^2);
+ *  - the knot of D2_Knot5 says that RCUT2B is the largest knot on a TYPE2B
+ *    line of D2_Knot5 alone (on a D2_mJoin line RCUT2B keeps its value);
+ *  - every grid entry (CGRID2B, SGRID2B, CGRIDMB, SGRIDMB, CEMBFUNC,
+ *    SEMBFUNC) of these descriptors and of DM_mBlipEnv is "KEY (i)".
+ * Before the fix: D2_Blip5's width read "whose support is |r - c| <
+ * 2/eta", D2_BP's "Inverse Gaussian width of the i-th radial.", D2_Knot5's
+ * knot ended "keep r_s <= RCUT2B.", and no width, no DM_Blip centre and no
+ * embedding blip of DM_mBlipEnv named its entry; D2_Knot5's knot then said
+ * "the cutoff RCUT2B is the largest knot." without its condition. */
+TEST_CASE("The role texts of the radial grids state their basis and "
+          "support",
+          "[metadata][suggest]") {
+  auto role = [](const char *label, const char *key) {
+    std::unique_ptr<D_Base> d(tadah::core::factory<D_Base>(label));
+    const auto meta = d->meta();
+    REQUIRE(meta.has_value());
+    const ParamMeta *p = param_of(*meta, key);
+    REQUIRE(p != nullptr);
+    return p->role;
+  };
+  const std::string blip = role("D2_Blip", "SGRID2B");
+  const std::string blip5 = role("D2_Blip5", "SGRID2B");
+  const std::string bp = role("D2_BP", "SGRID2B");
+  const std::string knot = role("D2_Knot5", "CGRID2B");
+  const std::string mblip = role("DM_Blip", "SGRIDMB");
+  CAPTURE(blip, blip5, bp, knot, mblip);
+  CHECK(blip.find("b(eta (r - c))") != std::string::npos);
+  CHECK(blip.find("|r - c| < 2/eta") != std::string::npos);
+  CHECK(mblip.find("|r - c| < 2/eta") != std::string::npos);
+  CHECK(blip5.find("b5(eta (r - c))") != std::string::npos);
+  CHECK(blip5.find("|r - c| < 3/eta") != std::string::npos);
+  CHECK(blip5.find("2/eta") == std::string::npos);
+  CHECK(bp.find("exp(-eta (r - c)^2)") != std::string::npos);
+  CHECK(knot ==
+        "Knot position r_s of the i-th truncated power (r_s - r)_+^5, "
+        "CGRID2B (i); on a TYPE2B line of D2_Knot5 alone the cutoff RCUT2B "
+        "is the largest knot.");
+  const std::vector<std::pair<const char *, const char *>> grids = {
+      {"D2_Blip", "CGRID2B"},  {"D2_Blip", "SGRID2B"},
+      {"D2_Blip5", "CGRID2B"}, {"D2_Blip5", "SGRID2B"},
+      {"D2_BP", "CGRID2B"},    {"D2_BP", "SGRID2B"},
+      {"D2_Knot5", "CGRID2B"}, {"DM_Blip", "CGRIDMB"},
+      {"DM_Blip", "SGRIDMB"},  {"DM_mBlipEnv", "CEMBFUNC"},
+      {"DM_mBlipEnv", "SEMBFUNC"}};
+  for (const auto &[label, key] : grids) {
+    const std::string text = role(label, key);
+    CAPTURE(label, key, text);
+    CHECK(text.find(std::string(key) + " (i)") != std::string::npos);
+    CHECK(text.find("keep ") == std::string::npos);
+  }
+}
+
+/* Pins: the health checks print a value of the seed as its shortest
+ * round-trip text: the cutoff check of D2_Blip with RCUT2B 5.61234567 on
+ * data without a pair says "RCUT2B = 5.61234567: no pair of atoms ...", the
+ * CGRIDMB check of DM_EAD with CGRIDMB 3.14159265 and no SGRIDMB says
+ * "CGRIDMB(1) = 3.14159265 has no width SGRIDMB(1): ...", and the check of
+ * D2_MIE 6 12 says "D2_MIE needs n > m for a finite prefactor (got n = 6,
+ * m = 12)."
+ * Before the fix: six significant digits, "RCUT2B = 5.61235" and
+ * "CGRIDMB(1) = 3.14159", and std::to_string, "D2_MIE requires n > m for
+ * finite prefactor (got n=6.000000, m=12.000000)." */
+TEST_CASE("The health checks print the seed's values as written",
+          "[metadata][density_reach][cutoff]") {
+  auto meta_of = [](const char *label) {
+    std::unique_ptr<D_Base> d(tadah::core::factory<D_Base>(label));
+    const auto meta = d->meta();
+    REQUIRE(meta.has_value());
+    return *meta;
+  };
+  const DescriptorMeta blip = meta_of("D2_Blip");
+  const ParamMeta *rcut = param_of(blip, "RCUT2B");
+  REQUIRE(rcut != nullptr);
+  REQUIRE(static_cast<bool>(rcut->check));
+  Context cut;
+  cut.add("RCUT2B", "5.61234567");
+  const std::string no_pair =
+      verdict_message(rcut->check(no_pair_stats(), SeedView(cut)));
+  CHECK(no_pair.rfind("RCUT2B = 5.61234567: no pair of atoms", 0) == 0);
+
+  const DescriptorMeta ead = meta_of("DM_EAD");
+  const ParamMeta *centre = param_of(ead, "CGRIDMB");
+  REQUIRE(centre != nullptr);
+  REQUIRE(static_cast<bool>(centre->check));
+  Context grid;
+  grid.add("CGRIDMB", "3.14159265");
+  const std::string no_width =
+      verdict_message(centre->check(make_ta_like_stats(), SeedView(grid)));
+  CHECK(no_width.rfind("CGRIDMB(1) = 3.14159265 has no width SGRIDMB(1)", 0) ==
+        0);
+
+  const DescriptorMeta mie = meta_of("D2_MIE");
+  Context lines;
+  lines.add("TYPE2B", "D2_MIE");
+  lines.add("TYPE2B", "6");
+  lines.add("TYPE2B", "12");
+  lines.add("TYPE2B", "Ta");
+  lines.add("TYPE2B", "Ta");
+  std::vector<std::string> fails;
+  for (const auto &check : mie.cross_param_checks) {
+    const HealthVerdict v = check(make_ta_like_stats(), SeedView(lines));
+    if (is_fail(v)) fails.push_back(verdict_message(v));
+  }
+  REQUIRE(fails.size() == 1u);
+  CHECK(fails[0] ==
+        "D2_MIE needs n > m for a finite prefactor (got n = 6, m = 12).");
+}

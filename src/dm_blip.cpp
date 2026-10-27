@@ -547,9 +547,10 @@ std::optional<DescriptorMeta> DM_Blip::meta() const {
   p_cgrid.arg_pos  = 0;
   p_cgrid.scale    = Scale::Distance;
   p_cgrid.units    = "Å";
-  p_cgrid.role     = "Centre of the i-th MB radial blip "
-                     "b(SGRIDMB (r - CGRIDMB)). A blip whose support holds no "
-                     "neighbour distance collapses ρ.";
+  p_cgrid.role     = "Centre of the i-th radial blip "
+                     "b(SGRIDMB (r - CGRIDMB)) of the density, CGRIDMB (i). A "
+                     "blip whose support holds no neighbour distance "
+                     "collapses ρ.";
   p_cgrid.hard.lo  = 0.0;
   p_cgrid.crit     = Criticality::Critical;
   p_cgrid.scope    = PairScope::PerElementPair;
@@ -565,8 +566,9 @@ std::optional<DescriptorMeta> DM_Blip::meta() const {
   p_sgrid.arg_pos  = 0;
   p_sgrid.scale    = Scale::InverseDistance;
   p_sgrid.units    = "Å^-1";
-  p_sgrid.role     = "Inverse width eta of the i-th MB radial blip "
-                     "b(eta (r - c)), whose support is |r - c| < 2/eta.";
+  p_sgrid.role     = "Inverse width eta of the i-th radial blip "
+                     "b(eta (r - c)) of the density, SGRIDMB (i), whose "
+                     "support is |r - c| < 2/eta.";
   p_sgrid.hard.lo  = 1.0e-6;
   p_sgrid.crit     = Criticality::Critical;
   p_sgrid.scope    = PairScope::Global;

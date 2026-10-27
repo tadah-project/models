@@ -242,20 +242,20 @@ private:
                       : "OALGO 4 (normal equations, Cholesky)";
   }
 
-  /* What to do about a fit OALGO `oalgo` (2 or 4) cannot make, for its
-   * LAMBDA and its `n_bias` intercept columns. With LAMBDA 0: OALGO 1 or
-   * 3, a ridge or more data. With LAMBDA > 0, which is already a ridge:
-   * OALGO 1 (and, for OALGO 4, OALGO 2, which does not square the
-   * condition number), OALGO 3 only without intercept columns (with them
-   * it refuses LAMBDA != 0), a larger LAMBDA, or more data. */
+  /* What makes a fit OALGO `oalgo` (2 or 4) cannot make, for its LAMBDA
+   * and its `n_bias` intercept columns. With LAMBDA 0: OALGO 1 or 3, a
+   * ridge or more data. With LAMBDA > 0, which is already a ridge: OALGO 1
+   * (and, for OALGO 4, OALGO 2, which does not square the condition
+   * number), OALGO 3 only without intercept columns (with them it refuses
+   * LAMBDA != 0), a larger LAMBDA, or more data. */
   static std::string remedies(int oalgo, double lambda, size_t n_bias) {
     const std::string data =
-        "or more data (structures, FORCE or STRESS rows).";
+        "or with more data (structures, FORCE or STRESS rows).";
     if (!(lambda > 0))
-      return " Use OALGO 1 (DGELSD) or OALGO 3 (SVD), which give the "
-             "minimum-norm weights, LAMBDA > 0 (a ridge penalty makes every "
-             "column it penalises full rank; it does not penalise the "
-             "intercept columns of BIAS), " + data;
+      return " A fit is possible with OALGO 1 (DGELSD) or OALGO 3 (SVD), which "
+             "give the minimum-norm weights, with LAMBDA > 0 (a ridge penalty "
+             "makes every column it penalises full rank; it does not "
+             "penalise the intercept columns of BIAS), " + data;
     std::string algos;
     if (oalgo == 4)
       algos = n_bias == 0 ? "OALGO 1 (DGELSD), 2 (QR) or 3 (SVD), which do "
@@ -266,8 +266,9 @@ private:
       algos = n_bias == 0 ? "OALGO 1 (DGELSD) or 3 (SVD)"
                           : "OALGO 1 (DGELSD), which gives the minimum-norm "
                             "weights";
-    return " Use " + algos + ", a larger LAMBDA (the ridge penalty makes "
-           "every column it penalises full rank and better conditioned" +
+    return " A fit is possible with " + algos + ", with a larger LAMBDA (the "
+           "ridge penalty makes every column it penalises full rank and "
+           "better conditioned" +
            (n_bias == 0 ? std::string()
                         : "; it does not penalise the " +
                               plural(n_bias, "intercept column") + " of BIAS") +
@@ -340,8 +341,8 @@ private:
            "weights are not unique.";
     // With LAMBDA > 0 the intercept columns are short of rows: a larger
     // LAMBDA, OALGO 2 or 4 and OALGO 3 (which refuses them) do not help.
-    msg += ridge ? " Use OALGO 1 (DGELSD), which gives the minimum-norm "
-                   "weights, or more structures."
+    msg += ridge ? " A fit is possible with OALGO 1 (DGELSD), which gives the "
+                   "minimum-norm weights, or with more structures."
                  : remedies(oalgo, lambda, bias);
     throw std::runtime_error(msg);
   }
@@ -526,8 +527,8 @@ public:
     throw std::runtime_error(
         "OALGO=3 (SVD with uniform ridge) does not support intercept "
         "exclusion from regularisation. The model has " + n +
-        " intercept column(s) (BIAS=true with ATOM) and LAMBDA != 0: use "
-        "OALGO=1, 2 or 4 instead.");
+        " intercept column(s) (BIAS=true with ATOM) and LAMBDA != 0; OALGO "
+        "1, 2 or 4 fits such a model with LAMBDA != 0.");
   }
 
 private:
@@ -771,9 +772,13 @@ public:
    * @param workspaceManager  Workspace provider.
    * @throws std::runtime_error, before the factorisation, for what train()
    *         refuses under OALGO 4 before LAPACK runs: a LAMBDA that
-   *         requests nothing (require_lambda_request()), LAMBDA -1, a value
-   *         of Phi or T that is not finite, and fewer non-zero data rows
-   *         than weights (LAMBDA 0) or than intercept columns (LAMBDA > 0).
+   *         requests nothing (require_lambda_request()), a value of Phi or
+   *         T that is not finite, and fewer non-zero data rows than weights
+   *         (LAMBDA 0) or than intercept columns (LAMBDA > 0).
+   * @throws std::logic_error (an internal error of the caller: the fit
+   *         serves an analytical gradient that reuses its factor, which a
+   *         caller asks for with OALGO 4 and a fixed LAMBDA) for an OALGO
+   *         other than 4 and for LAMBDA -1.
    */
   static void train_with_factor(
       tadah::core::Context &context,
@@ -791,23 +796,20 @@ public:
         context.size("OALGO") == 2 ? context.get<double>("OALGO", 1) : 1e-8;
     (void)rcond;  // NormalEquations does not consume rcond.
 
+    // A fit for an analytical gradient that reuses its factor, which a
+    // caller asks for with OALGO 4 and a fixed LAMBDA (tadah hpo builds its
+    // own factor and does not call it): internal errors of the caller.
     if (oalgo != 4) {
-      throw std::runtime_error(
-          "LinearRegressor::train_with_factor requires OALGO=4 "
-          "(NormalEquations); got OALGO=" + std::to_string(oalgo) +
-          ". The IFT chain rule for HPO analytical gradients reuses the "
-          "cached Cholesky factor, which is only produced by the "
-          "NormalEquations path. Use OALGO=4 with GRAD_STRATEGY="
-          "ANALYTICAL/HYBRID, or fall back to GRAD_STRATEGY=NUMERICAL "
-          "with any OALGO.");
+      throw std::logic_error(
+          "internal error: the analytical gradient fits with OALGO 4 (the "
+          "Cholesky normal equations), whose factor it reuses, and was "
+          "given OALGO " + std::to_string(oalgo));
     }
     if (std::abs(lambda + 1) < std::numeric_limits<double>::min()) {
-      throw std::runtime_error(
-          "LinearRegressor::train_with_factor: LAMBDA=-1 (BLR/EA) is "
-          "not supported under analytical gradients. The "
-          "α/β co-optimisation nests inside the solve and changes the "
-          "IFT chain rule. Use a fixed "
-          "LAMBDA >= 0, or GRAD_STRATEGY=NUMERICAL.");
+      throw std::logic_error(
+          "internal error: the analytical gradient fits with a fixed LAMBDA "
+          ">= 0, and was given LAMBDA -1 (the evidence approximation, which "
+          "changes the fit inside the solve)");
     }
     weights.resize(Phi.cols());
 
@@ -869,10 +871,10 @@ public:
                         const tadah::core::t_type &rhs,
                         tadah::core::t_type &sol) {
     if (!f.valid) {
-      throw std::runtime_error(
-          "LinearRegressor::backsolve: FactorHandle is invalid. The "
-          "factor was either never populated or was invalidated (e.g. "
-          "after a descriptor-size change in HPO).");
+      throw std::logic_error(
+          "internal error: the factor of the normal equations of a "
+          "back-substitution is not valid: it was not computed, or the "
+          "descriptor size changed after it was");
     }
     if (f.algo != tadah::models::Algorithm::NormalEquations) {
       throw std::runtime_error(

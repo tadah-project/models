@@ -334,6 +334,19 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
     }
     return out;
   };
+  // " (TYPE2B on line 4 of run.train)", every line of the TYPE key: where a
+  // refusal of a descriptor of the key's lines is (they cannot be told
+  // apart: a line may hold several descriptors), the end of every refusal
+  // below, a count too; empty for values the program set.
+  const std::string type_on = [&] {
+    const std::vector<tadah::core::KeyLine> at = c.key_lines(type_str);
+    if (at.empty()) return std::string();
+    std::string out = " (" + type_str + " on ";
+    for (std::size_t i = 0; i < at.size(); ++i)
+      out += (i == 0 ? "" : i + 1 == at.size() ? " and on " : ", on ") +
+             at[i].where;
+    return out + ")";
+  }();
   const bool joined =
       c.get<std::string>(type_str, 0).find("mJoin") != std::string::npos;
   const std::string label0 = lines.empty() ? "" : lines[0][0];
@@ -391,7 +404,7 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
     throw std::runtime_error(
         type_str + " names " + named + " but " + key + " has " +
         values(have) + set_on(key) + ": each descriptor takes one " + key +
-        " value, in the order of the " + type_str + " lines");
+        " value, in the order of the " + type_str + " lines" + type_on);
   }
 
   std::vector<tadah::core::Context> contexts;
@@ -405,7 +418,12 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
     std::unique_ptr<D_Base> d(tadah::core::factory<D_Base>(token));
     // The line has the descriptor's parameters and its SIZE parameters are
     // integers (else an error naming the line), so they can be read below.
-    const std::vector<std::string> elements = d->element_tokens(type_str, line);
+    std::vector<std::string> elements;
+    try {
+      elements = d->element_tokens(type_str, line);
+    } catch (const std::runtime_error &e) {
+      throw std::runtime_error(e.what() + type_on);
+    }
     std::string text = type_str;
     for (const auto &t : line) text += " " + t;
 
@@ -422,7 +440,7 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
         throw std::runtime_error(
             text + ": parameter " + std::to_string(fparam + k + 1) +
             ", the number of " + all_list_keys[k] + " values, is too large: " +
-            size_token);
+            size_token + type_on);
       }
     }
 
@@ -440,7 +458,7 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
     if (nmissing) {
       throw std::runtime_error(
           type_str + " " + token + " takes " + takes + ", but " + missing +
-          (nmissing == 1 ? " is" : " are") + " not set: " + text);
+          (nmissing == 1 ? " is" : " are") + " not set: " + text + type_on);
     }
 
     tadah::core::Context c1 = c;
@@ -467,7 +485,7 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
             " whole and cannot be joined: a " +
             c.get<std::string>(type_str, 0) + " line gives each descriptor "
             "only its share of a list key; " + token + " can be the only " +
-            type_str + " descriptor");
+            type_str + " descriptor" + type_on);
       }
       if (!joined)
         for (const auto &key : d->context_keys) {
@@ -505,7 +523,7 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
         throw std::runtime_error(where + " takes " + std::to_string(n) + " " +
                                  key + (n == 1 ? " value" : " values") +
                                  ", but " + key + " has " + has +
-                                 set_on(key) + ": " + text);
+                                 set_on(key) + ": " + text + type_on);
       }
       c1.add(type_str, n);
       for (size_t j = 0; j < n; ++j) {
@@ -513,21 +531,24 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
       }
     }
 
-    // the element pairs
-    if (elements.empty()) {
+    // The element pairs (a configuration file's parser refuses a line
+    // without them first: the TYPE key's schema).
+    std::string which = type_str + " " + token;
+    if (lines.size() > 1)
+      which += " (descriptor " + std::to_string(li + 1) + " of " +
+               std::to_string(lines.size()) + ")";
+    if (elements.empty())
       throw std::runtime_error(
-        "Error: No element types specified. "
-        "Please provide element types for this calculator. "
-        "For example: '"+token+" Ti Ti Ti Nb' sets the calculator to compute Ti-Ti and Ti-Nb interactions. "
-        "Token: " + token);
-    }
-
+          which + ": the line names no element types; a " + type_str +
+          " line ends with its element pairs, such as Ta Ta" + type_on);
     if (elements.size() % 2 != 0) {
+      std::string named_types;
+      for (const auto &e : elements)
+        named_types += (named_types.empty() ? "" : " ") + e;
       throw std::runtime_error(
-        "Error: Element types must be provided in pairs. "
-        "Ensure each element is paired correctly. "
-        "For instance, '" + token + " Ti * Nb Zr' means that interactions of Ti with any atom, as well as Nb-Zr, will be computed. "
-        "Token: " + token);
+          which + ": the element types come in pairs, and the line has " +
+          std::to_string(elements.size()) + " of them, " + named_types +
+          type_on);
     }
     for (const auto &e : elements) c1.add(type_str, e);
 
@@ -561,12 +582,12 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
       throw std::runtime_error(type_str + " " + lines[0][0] + " takes " +
                                takes + ", but " + key + " has " +
                                values(given) + set_on(key) + ": " +
-                               last_text);
+                               last_text + type_on);
     throw std::runtime_error(
         type_str + " names " + named + ", which take " + takes + ", but " +
         key + " has " + values(given) + set_on(key) +
         ": each descriptor takes its " + key + " values, in the order of the " +
-        type_str + " lines");
+        type_str + " lines" + type_on);
   }
   return contexts;
 }

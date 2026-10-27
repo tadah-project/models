@@ -938,6 +938,12 @@ TEST_CASE_METHOD(RefitFixture,
   CHECK(rm.rho_stats().maxabs < 1e-2 * rs.rho_stats().maxabs);
 }
 
+/* Pins (the two table pre-checks): a refusal of the table names the
+ * command, "tadah refit: RHOFORM NONNEG cannot fit this table: ...", and
+ * ends with the form that fits it, "RHOFORM SIGNED fits it." ("RHOFORM
+ * NONNEG or SIGNED fits it." for MONOTONE).
+ * Before the fix: "EAMRefit: RHOFORM ... Use RHOFORM SIGNED." and "... Use
+ * RHOFORM NONNEG or SIGNED.", a class name and an instruction. */
 TEST_CASE_METHOD(RefitFixture,
                  "EAMRefit RHOFORM: table pre-checks and form guards",
                  "[refit][rhoform]") {
@@ -960,7 +966,8 @@ TEST_CASE_METHOD(RefitFixture,
           Catch::Contains(std::string("RHOFORM ") + rhoform_name(f) +
                           " cannot fit this table") &&
               Catch::Contains("< 0 at r = 4.29") &&
-              Catch::Contains("Use RHOFORM SIGNED"));
+              Catch::Contains("RHOFORM SIGNED fits it.") &&
+              Catch::StartsWith("tadah refit: RHOFORM "));
     }
     EAMRefit signed_fit(eam, coarse_config("Blip", RhoForm::Signed));
     REQUIRE_NOTHROW(signed_fit.fit());
@@ -981,7 +988,10 @@ TEST_CASE_METHOD(RefitFixture,
                         Catch::Contains("RHOFORM MONOTONE cannot fit this "
                                         "table: the tabulated density rises") &&
                             Catch::Contains("at r = 3.") &&
-                            Catch::Contains("Use RHOFORM NONNEG or SIGNED"));
+                            Catch::Contains("RHOFORM NONNEG or SIGNED fits "
+                                            "it.") &&
+                            Catch::StartsWith("tadah refit: RHOFORM "
+                                              "MONOTONE"));
     EAMRefit nonneg(eam, coarse_config("Blip", RhoForm::NonNeg));
     REQUIRE_NOTHROW(nonneg.fit());
     const tadah::core::Context pot = nonneg.build_pot_context();
@@ -994,10 +1004,13 @@ TEST_CASE_METHOD(RefitFixture,
     eam.build_splines();
     REQUIRE_THROWS_AS(EAMRefit(eam, coarse_config("Knot5", RhoForm::Monotone)),
                       DensityFormError);
+    // The refusal says what fits the knot family, without an instruction
+    // (before the fix: "...: use RHOFORM NONNEG: ...").
     REQUIRE_THROWS_WITH(
         EAMRefit(eam, coarse_config("Knot3", RhoForm::Monotone)),
-        Catch::Contains("not defined for the knot family") &&
-            Catch::Contains("use RHOFORM NONNEG"));
+        "EAMRefit: RHOFORM MONOTONE is not defined for the knot family "
+        "(basis Knot3); RHOFORM NONNEG fits it: a non-negative knot density "
+        "is already non-increasing with a non-increasing cutoff.");
     EAMRefitConfig sininv = coarse_config("Blip5", RhoForm::Monotone);
     sininv.rctype = "Cut_SinInv";
     REQUIRE_THROWS_WITH(EAMRefit(eam, sininv),
@@ -1341,7 +1354,10 @@ TEST_CASE_METHOD(RefitFixture,
  * SIGNED: a configuration with DESCRIPTOR blocks refuses the RHOFORM key.
  * Before the fix the refusal named the DM_REAM key ("RHOFORM NONNEG cannot
  * fit this table ... Use RHOFORM SIGNED"), whose advice a component
- * configuration cannot follow. */
+ * configuration cannot follow.
+ * Before the fix that states the remedy: "EAMRefit: the density component
+ * CU's FORM NONNEG cannot fit this table: ... Use FORM SIGNED in its
+ * DENSITY block.", a class name and an instruction. */
 TEST_CASE_METHOD(RefitFixture,
                  "Component refit form refusal names the component FORM",
                  "[unified-dm][refit][rhoform]") {
@@ -1373,6 +1389,7 @@ TEST_CASE_METHOD(RefitFixture,
       fit.fit(),
       Catch::Contains("the density component CU's FORM NONNEG cannot fit "
                       "this table") &&
-          Catch::Contains("Use FORM SIGNED in its DENSITY block") &&
+          Catch::Contains("FORM SIGNED in its DENSITY block fits it.") &&
+          Catch::StartsWith("tadah refit: the density component CU's FORM") &&
           !Catch::Contains("RHOFORM"));
 }
