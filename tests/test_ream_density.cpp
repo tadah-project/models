@@ -1166,6 +1166,49 @@ TEST_CASE_METHOD(DensityFixture,
       CHECK_FALSE(optim_low_bound_rule("SGRIDMB", c));  // no density
     }
   }
+  /* Pins: a D2_mJoin with a D2_Blip or D2_Blip5 descriptor holds its
+   * SGRID2B widths > 0, as a line of one D2_Blip does, by the rule of the
+   * bump descriptor ("the D2_Blip pair basis of the D2_mJoin line"); every
+   * SGRID2B entry of the line, as a DM_mJoin with a bump DM_REAM density
+   * holds every SGRIDMB entry. A D2_mJoin without a bump descriptor has no
+   * width rule.
+   * Before the fix: no rule for a D2_mJoin (bump_channel_halfwidth reads
+   * the line's first value), so a seed width of -1 and a width box from 0
+   * were accepted. */
+  SECTION("SGRID2B of a D2_mJoin with a D2_Blip or D2_Blip5 descriptor") {
+    for (const char *label : {"D2_Blip", "D2_Blip5"}) {
+      INFO(label);
+      Context c;
+      c.add("ATOM", "Ta");
+      c.add("INIT2B", "true");
+      c.add("INITMB", "false");
+      c.add("TYPE2B",
+            std::string("D2_mJoin D2_BP 2 2 Ta Ta ") + label + " 3 3 Ta Ta");
+      c.add("CGRID2B", "0 0 2.2 3.2 4.2");
+      c.add("SGRID2B", "0.5 1.0 1.0 1.0 1.0");
+      c.add("RCTYPE2B", "Cut_Cos Cut_Cos");
+      c.add("RCUT2B", "5.0 5.0");
+      const auto r = optim_low_bound_rule("SGRID2B", c);
+      REQUIRE(r);
+      CHECK(r->strict);
+      CHECK_FALSE(r->admits(0.0));
+      CHECK(r->admits(0.25));
+      CHECK_THAT(r->requirement, Contains("every SGRID2B width > 0"));
+      CHECK(r->by ==
+            std::string("the ") + label + " pair basis of the D2_mJoin line");
+      CHECK_FALSE(optim_low_bound_rule("CGRID2B", c));
+    }
+    Context c;
+    c.add("ATOM", "Ta");
+    c.add("INIT2B", "true");
+    c.add("INITMB", "false");
+    c.add("TYPE2B", "D2_mJoin D2_BP 2 2 Ta Ta D2_BP 1 1 Ta Ta");
+    c.add("CGRID2B", "0 0 0");
+    c.add("SGRID2B", "0.5 1.0 1.0");
+    c.add("RCTYPE2B", "Cut_Cos Cut_Cos");
+    c.add("RCUT2B", "5.0 5.0");
+    CHECK_FALSE(optim_low_bound_rule("SGRID2B", c));
+  }
   SECTION("a DM_REAM configuration without RHOFORM: the migration text") {
     CHECK_THROWS_WITH(
         optim_low_bound_rule(
