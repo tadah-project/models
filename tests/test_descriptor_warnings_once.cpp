@@ -118,14 +118,23 @@ Context many_body(const std::string &typemb) {
 }  // namespace
 
 /* Pins: three D2_Knot5 descriptors built from one configuration whose
- * largest CGRID2B knot (4.5) lies past RCUT2B (4.0) log the warning "the
- * largest CGRID2B knot ... lies beyond RCUT2B" exactly once between them
- * (none when this process logged it before the case), and the warning is
- * logged in the process afterwards (check_logged_once).
+ * largest CGRID2B knot (4.5) lies past RCUT2B (4.0) log the warning
+ * "D2_Knot5: the largest CGRID2B knot, 4.5, lies beyond RCUT2B, 4, so the
+ * knot functions are cut off at RCUT2B; an RCUT2B at the largest knot
+ * keeps them whole." exactly once between them (none when this process
+ * logged it before the case), and the warning is logged in the process
+ * afterwards (check_logged_once). The warning comes only where tadah keeps
+ * the stated RCUT2B (a D2_mJoin line, or a program or pair_style tadah that
+ * reads a potential file), so it says what the cutoff does and gives the
+ * numbers as written.
  * Before the fix: once per descriptor object, three times (and once per
  * evaluation of a tadah hpo run that builds a model per evaluation). A
  * log_warning_once that logs nothing fails it as well: 0 occurrences and
- * warning_logged_once false. */
+ * warning_logged_once false. The text read "... knot (4.500000) lies beyond
+ * RCUT2B (4.000000) — its contribution is silently hard-truncated at the
+ * cutoff. ...: set RCUT2B to the largest knot (refit/edit/hpo tooling
+ * derives it automatically).", which a D2_mJoin line, where the warning
+ * comes, does not do. */
 TEST_CASE("D2_Knot5 warns once per process of a knot past RCUT2B",
           "[descriptor][warn_once]") {
   tadah::core::PeriodicTable::initialize();
@@ -135,7 +144,11 @@ TEST_CASE("D2_Knot5 warns once per process of a knot past RCUT2B",
   const bool before = tadah::models::warning_logged_once(key);
   CoutCapture out;
   for (int k = 0; k < 3; ++k) tadah::models::D2_Knot5 d(c);
-  check_logged_once(out.str(), "lies beyond RCUT2B", key, before);
+  check_logged_once(out.str(),
+                    "D2_Knot5: the largest CGRID2B knot, 4.5, lies beyond "
+                    "RCUT2B, 4, so the knot functions are cut off at RCUT2B; "
+                    "an RCUT2B at the largest knot keeps them whole.",
+                    key, before);
 }
 
 /* Pins: three D2_Blip descriptors built from one configuration with a

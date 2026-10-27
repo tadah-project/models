@@ -216,7 +216,7 @@ const char *const kZeroRowsFixed =
     "linear molecule along x)";
 
 const char *const kRemedies =
-    " The fit is made with OALGO 1 (DGELSD) or OALGO 3 (SVD), which give the "
+    " A fit is possible with OALGO 1 (DGELSD) or OALGO 3 (SVD), which give the "
     "minimum-norm weights, with LAMBDA > 0 (a ridge penalty makes every "
     "column it penalises full rank; it does not penalise the intercept "
     "columns of BIAS), or with more data (structures, FORCE or STRESS rows).";
@@ -293,7 +293,7 @@ TEST_CASE("LinearRegressor: OALGO 2 and 4 refuse a rank-deficient design "
  *    for 4 weights, OALGO 2 and 4: "... the design matrix has 1 data row for
  *    4 weights, LAMBDA 0.1, which does not penalise its 2 intercept columns:
  *    fewer data rows than intercept columns, so it does not have full column
- *    rank and the least-squares weights are not unique. The fit is made with
+ *    rank and the least-squares weights are not unique. A fit is possible with
  *    OALGO 1 (DGELSD), which gives the minimum-norm weights, or with more
  *    structures.".
  * The refusal does not depend on rounding. With 2 data rows for the 2
@@ -345,9 +345,9 @@ TEST_CASE("LinearRegressor: OALGO 2 and 4 refuse fewer data rows than "
       " cannot fit these 4 weights: the design matrix has 1 data row for 4 "
       "weights, LAMBDA 0.1, which does not penalise its 2 intercept columns: "
       "fewer data rows than intercept columns, so it does not have full "
-      "column rank and the least-squares weights are not unique. The fit is "
-      "made with OALGO 1 (DGELSD), which gives the minimum-norm weights, or "
-      "with more structures.";
+      "column rank and the least-squares weights are not unique. A fit is "
+      "possible with OALGO 1 (DGELSD), which gives the minimum-norm "
+      "weights, or with more structures.";
   for (const char *oalgo : {"2", "4"}) {
     INFO("OALGO " << oalgo);
     Context c = make_ctx(oalgo);
@@ -563,7 +563,7 @@ TEST_CASE("LinearRegressor: with FIXINDEX M_KRR_Train's messages count the "
  *    matrix has 1 data row for 4 weights, LAMBDA 0.1, which does not penalise
  *    its 2 intercept columns: fewer data rows than intercept columns, so it
  *    does not have full column rank and the least-squares weights are not
- *    unique. The fit is made with OALGO 1 (DGELSD), which gives the
+ *    unique. A fit is possible with OALGO 1 (DGELSD), which gives the
  *    minimum-norm weights, or with more structures.";
  *  - with FIXINDEX 1 (Ta's intercept pinned) is fitted (no exception): 1
  *    free intercept column for the 1 data row;
@@ -602,8 +602,9 @@ TEST_CASE("LinearRegressor: with FIXINDEX and BIAS the OALGO 2 and 4 "
       const std::string rest =
           "LAMBDA 0.1, which does not penalise its 2 intercept columns: fewer "
           "data rows than intercept columns, so it does not have full column "
-          "rank and the least-squares weights are not unique. The fit is made "
-          "with OALGO 1 (DGELSD), which gives the minimum-norm weights, or "
+          "rank and the least-squares weights are not unique. A fit is "
+          "possible with OALGO 1 (DGELSD), which gives the minimum-norm "
+          "weights, or "
           "with more structures.";
       const Context c = with_two_species_bias(make_ctx(oalgo));
       CHECK(model_refusal(krr, c, sine_design(1, 4), target(1, 4)) ==
@@ -646,7 +647,7 @@ TEST_CASE("LinearRegressor: with FIXINDEX and BIAS the OALGO 2 and 4 "
  *    for 4 weights, row 2 zero, OALGO 2 and 4: "... the design matrix has 1
  *    non-zero data row of 2 (a data row that is zero ...) for 4 weights,
  *    LAMBDA 0.1, which does not penalise its 2 intercept columns: fewer
- *    non-zero data rows than intercept columns, so ... The fit is made with
+ *    non-zero data rows than intercept columns, so ... A fit is possible with
  *    OALGO 1 (DGELSD), which gives the minimum-norm weights, or with more
  *    structures.";
  *  - 6 data rows for 4 weights whose columns 3 and 4 are zero, rows 5 and 6
@@ -723,9 +724,10 @@ TEST_CASE("LinearRegressor: OALGO 2 and 4 count the non-zero data rows, "
                                             "intercept columns, so it does "
                                             "not have full column rank and "
                                             "the least-squares weights are "
-                                            "not unique. The fit is made with "
-                                            "OALGO 1 (DGELSD), which gives "
-                                            "the minimum-norm weights, or "
+                                            "not unique. A fit is possible "
+                                            "with OALGO 1 (DGELSD), which "
+                                            "gives the minimum-norm weights, "
+                                            "or "
                                             "with more structures.");
   }
 
@@ -854,7 +856,7 @@ TEST_CASE("LinearRegressor: OALGO 2 and 4 count a data row of rounding "
  *    these 2 weights: the matrix Phi^T Phi of the design matrix (4 data rows
  *    for 2 weights, LAMBDA 1e-20) is not positive definite (its leading minor
  *    of order 2 is not), so the design matrix does not have full column rank
- *    or is too ill-conditioned for the normal equations. The fit is made with
+ *    or is too ill-conditioned for the normal equations. A fit is possible with
  *    OALGO 1 (DGELSD), 2 (QR) or 3 (SVD), which do not form Phi^T Phi, with a
  *    larger LAMBDA (the ridge penalty makes every column it penalises full
  *    rank and better conditioned), or with more data (structures, FORCE or
@@ -862,7 +864,7 @@ TEST_CASE("LinearRegressor: OALGO 2 and 4 count a data row of rounding "
  *  - BIAS true with ATOM Ta (intercept column 1 of 3 equal columns), OALGO 4:
  *    "... cannot fit these 3 weights: ... (4 data rows for 3 weights, LAMBDA
  *    1e-20) is not positive definite (its leading minor of order 2 is not),
- *    ... The fit is made with OALGO 1 (DGELSD) or 2 (QR), which do not form
+ *    ... A fit is possible with OALGO 1 (DGELSD) or 2 (QR), which do not form
  *    Phi^T Phi, with a larger LAMBDA (the ridge penalty makes every column it
  *    penalises full rank and better conditioned; it does not penalise the 1
  *    intercept column of BIAS), or with more data (structures, FORCE or
@@ -900,9 +902,9 @@ TEST_CASE("LinearRegressor: with LAMBDA > 0 the OALGO 4 message names the "
   CHECK(fit_refusal(ctx("4", false), ones_design(4, 2), target(4, 2)) ==
         head + "2 weights: the matrix Phi^T Phi of the design matrix (4 data "
                "rows for 2 weights, LAMBDA 1e-20)" + not_pd +
-            " The fit is made with OALGO 1 (DGELSD), 2 (QR) or 3 (SVD), which "
-            "do not form Phi^T Phi, with a larger LAMBDA (the ridge penalty "
-            "makes every column it penalises full rank and better "
+            " A fit is possible with OALGO 1 (DGELSD), 2 (QR) or 3 (SVD), "
+            "which do not form Phi^T Phi, with a larger LAMBDA (the ridge "
+            "penalty makes every column it penalises full rank and better "
             "conditioned), or with more data (structures, FORCE or STRESS "
             "rows).");
   for (const char *oalgo : {"1", "2", "3"}) {
@@ -914,7 +916,7 @@ TEST_CASE("LinearRegressor: with LAMBDA > 0 the OALGO 4 message names the "
   CHECK(fit_refusal(ctx("4", true), ones_design(4, 3), target(4, 3)) ==
         head + "3 weights: the matrix Phi^T Phi of the design matrix (4 data "
                "rows for 3 weights, LAMBDA 1e-20)" + not_pd +
-            " The fit is made with OALGO 1 (DGELSD) or 2 (QR), which do not "
+            " A fit is possible with OALGO 1 (DGELSD) or 2 (QR), which do not "
             "form Phi^T Phi, with a larger LAMBDA (the ridge penalty makes "
             "every column it penalises full rank and better conditioned; it "
             "does not penalise the 1 intercept column of BIAS), or with more "
@@ -927,7 +929,8 @@ TEST_CASE("LinearRegressor: with LAMBDA > 0 the OALGO 4 message names the "
   CHECK(fit_refusal(ctx("3", true), ones_design(4, 3), target(4, 3)) ==
         "OALGO=3 (SVD with uniform ridge) does not support intercept "
         "exclusion from regularisation. The model has 1 intercept column(s) "
-        "(BIAS=true with ATOM) and LAMBDA != 0: use OALGO=1, 2 or 4 instead.");
+        "(BIAS=true with ATOM) and LAMBDA != 0; OALGO 1, 2 or 4 fits such a "
+        "model with LAMBDA != 0.");
 }
 
 /* OALGO 3 penalises every weight alike, so a fit with an intercept column
@@ -970,7 +973,9 @@ TEST_CASE("LinearRegressor: OALGO 3 with LAMBDA -1 and an intercept column "
         "LAMBDA 0 fits with any OALGO, and LAMBDA > 0 with OALGO 1, 2 or 4.");
   const std::string ridge =
       fit_refusal(ctx("1e-3", "3"), ones_design(4, 3), target(4, 3));
-  REQUIRE_THAT(ridge, Catch::Matchers::Contains("use OALGO=1, 2 or 4"));
+  REQUIRE_THAT(ridge, Catch::Matchers::Contains(
+                          "; OALGO 1, 2 or 4 fits such a model with LAMBDA "
+                          "!= 0."));
 
   auto refusal = [](const Context &c, size_t n) {
     try {

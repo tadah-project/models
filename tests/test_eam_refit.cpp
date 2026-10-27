@@ -1004,10 +1004,13 @@ TEST_CASE_METHOD(RefitFixture,
     eam.build_splines();
     REQUIRE_THROWS_AS(EAMRefit(eam, coarse_config("Knot5", RhoForm::Monotone)),
                       DensityFormError);
+    // The refusal says what fits the knot family, without an instruction
+    // (before the fix: "...: use RHOFORM NONNEG: ...").
     REQUIRE_THROWS_WITH(
         EAMRefit(eam, coarse_config("Knot3", RhoForm::Monotone)),
-        Catch::Contains("not defined for the knot family") &&
-            Catch::Contains("use RHOFORM NONNEG"));
+        "EAMRefit: RHOFORM MONOTONE is not defined for the knot family "
+        "(basis Knot3); RHOFORM NONNEG fits it: a non-negative knot density "
+        "is already non-increasing with a non-increasing cutoff.");
     EAMRefitConfig sininv = coarse_config("Blip5", RhoForm::Monotone);
     sininv.rctype = "Cut_SinInv";
     REQUIRE_THROWS_WITH(EAMRefit(eam, sininv),

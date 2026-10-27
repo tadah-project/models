@@ -987,13 +987,15 @@ TEST_CASE("A role text numbers an entry as an OPTIM line does",
  *    b5(eta (r - c)), |r - c| < 3/eta (its half-width, 3, in
  *    basis_kind.h);
  *  - the width of D2_BP is eta of the Gaussian exp(-eta (r - c)^2);
- *  - the knot of D2_Knot5 says that RCUT2B is the largest knot;
+ *  - the knot of D2_Knot5 says that RCUT2B is the largest knot on a TYPE2B
+ *    line of D2_Knot5 alone (on a D2_mJoin line RCUT2B keeps its value);
  *  - every grid entry (CGRID2B, SGRID2B, CGRIDMB, SGRIDMB, CEMBFUNC,
  *    SEMBFUNC) of these descriptors and of DM_mBlipEnv is "KEY (i)".
  * Before the fix: D2_Blip5's width read "whose support is |r - c| <
  * 2/eta", D2_BP's "Inverse Gaussian width of the i-th radial.", D2_Knot5's
  * knot ended "keep r_s <= RCUT2B.", and no width, no DM_Blip centre and no
- * embedding blip of DM_mBlipEnv named its entry. */
+ * embedding blip of DM_mBlipEnv named its entry; D2_Knot5's knot then said
+ * "the cutoff RCUT2B is the largest knot." without its condition. */
 TEST_CASE("The role texts of the radial grids state their basis and "
           "support",
           "[metadata][suggest]") {
@@ -1018,8 +1020,10 @@ TEST_CASE("The role texts of the radial grids state their basis and "
   CHECK(blip5.find("|r - c| < 3/eta") != std::string::npos);
   CHECK(blip5.find("2/eta") == std::string::npos);
   CHECK(bp.find("exp(-eta (r - c)^2)") != std::string::npos);
-  CHECK(knot.find("the cutoff RCUT2B is the largest knot") !=
-        std::string::npos);
+  CHECK(knot ==
+        "Knot position r_s of the i-th truncated power (r_s - r)_+^5, "
+        "CGRID2B (i); on a TYPE2B line of D2_Knot5 alone the cutoff RCUT2B "
+        "is the largest knot.");
   const std::vector<std::pair<const char *, const char *>> grids = {
       {"D2_Blip", "CGRID2B"},  {"D2_Blip", "SGRID2B"},
       {"D2_Blip5", "CGRID2B"}, {"D2_Blip5", "SGRID2B"},
