@@ -291,7 +291,8 @@ std::optional<DescriptorMeta> D2_Knot5::meta() const {
   p_cgrid.scale    = Scale::Distance;
   p_cgrid.units    = "Å";
   p_cgrid.role     = "Knot position r_s of the i-th truncated power "
-                     "(r_s - r)_+^5; keep r_s <= RCUT2B.";
+                     "(r_s - r)_+^5, CGRID2B (i); the cutoff RCUT2B is the "
+                     "largest knot.";
   p_cgrid.hard.lo  = 0.0;
   p_cgrid.crit     = Criticality::Recommended;
   p_cgrid.scope    = PairScope::PerElementPair;
