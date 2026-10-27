@@ -756,11 +756,12 @@ DataStats ta_w_stats() {
  * first element pair, start at 2.86 A and whose (Ta, W) pairs start at
  * 2.4 A (ta_w_stats()), a cutoff of 2.6 A passes, as it holds the (Ta, W)
  * pairs from 2.4 A, and a cutoff of 2.3 A fails, its message naming 2.4 A,
- * the smallest neighbour distance of the dataset. The check does not read
- * the element pairs of the descriptor's line: a (Ta, Ta) descriptor whose
- * cutoff holds (Ta, W) pairs alone passes as well, and no FAIL finding,
- * which AUDIT error turns into a refusal, is given for a cutoff that holds
- * a pair of the data.
+ * the smallest neighbour distance of the dataset. The check judges the
+ * statistics it is given, every element pair of them, and a view without
+ * the element pairs of the descriptor's line names no pair: its callers
+ * give it the statistics of those pairs (LinePairs::stats(), the next
+ * cases), so no FAIL finding, which AUDIT error turns into a refusal, is
+ * given for a cutoff that holds a pair the descriptor sums over.
  * Before the fix: each check compared the cutoff with r_min of the first
  * element pair, 2.86 A: the cutoff of 2.6 A failed ("RCUT2B=2.600000 is
  * below the dataset r_min=2.860000 ...") and the message of 2.3 A named
@@ -1093,4 +1094,203 @@ TEST_CASE("The health checks print the seed's values as written",
   REQUIRE(fails.size() == 1u);
   CHECK(fails[0] ==
         "D2_MIE needs n > m for a finite prefactor (got n = 6, m = 12).");
+}
+
+// ----------------------------------------------------------------
+// The element pairs of a descriptor's line: a descriptor sums over the
+// neighbours of the element pairs its TYPE2B or TYPEMB line names, and its
+// checks and suggestions are given the statistics of those pairs.
+// ----------------------------------------------------------------
+
+#include <tadah/models/descriptors/density_reach.h>
+#include <tadah/models/descriptors/line_pairs.h>
+
+#include <stdexcept>
+
+namespace {
+
+/* ta_w_stats() with (W, W) pairs too, from r_min 2.5 A to r_max 2.7 A; the
+ * (Ta, Ta) pairs run from 2.86 A to 6.5 A and the (Ta, W) pairs from 2.4
+ * A. */
+DataStats ta_w_ww_stats() {
+  DataStats d = ta_w_stats();
+  PerPairStats ww = d.per_pair[0];
+  ww.elements = {"W", "W"};
+  ww.r_min = 2.5;
+  ww.r_max = 2.7;
+  d.per_pair.push_back(ww);
+  return d;
+}
+
+/* The element pairs of each per_pair entry of @p d, "Ta-W", in order. */
+std::vector<std::string> pair_names(const DataStats &d) {
+  std::vector<std::string> out;
+  for (const auto &pp : d.per_pair)
+    out.push_back(pp.elements.first + "-" + pp.elements.second);
+  return out;
+}
+
+}  // namespace
+
+/* Pins: the element pairs of a descriptor's line (LinePairs, from the
+ * element tokens of the line, D_Base::get_init_atoms()):
+ *  - "Ta Ta Ta W" names (Ta, Ta) and (Ta, W), each in either order, and not
+ *    (W, W); its text is "(Ta, Ta) or (Ta, W)"; stats() of the Ta-W-W data
+ *    (ta_w_ww_stats()) keeps the Ta-Ta and Ta-W entries alone, in their
+ *    order, with the other fields (n_atoms 1000, elements Ta W);
+ *  - "W Ta" names (Ta, W), its text "(W, Ta)", as the line writes it;
+ *  - "Ta Ta Ta Ta" is "(Ta, Ta)", once;
+ *  - "Ta *" names every pair with Ta, (Ta, Ta) and (Ta, W) of the data, its
+ *    text "(Ta, *)"; "* *" names every pair (every()), its text empty (a
+ *    message then names no pair), and stats() keeps every entry;
+ *  - no token names no pair, its text empty, and stats() keeps none;
+ *  - an odd number of tokens, "Ta Ta W", is refused (std::invalid_argument)
+ *    naming them, as a descriptor's line is refused ("the element types
+ *    of a descriptor's line come in pairs, and the line has 3 of them, Ta
+ *    Ta W").
+ * Before the fix: does not compile (no LinePairs: every check and
+ * suggestion read the statistics of every element pair of the data, or of
+ * the first). */
+TEST_CASE("The element pairs of a descriptor's line select its neighbour "
+          "statistics",
+          "[metadata][density_reach][line_pairs]") {
+  const DataStats data = ta_w_ww_stats();
+  const LinePairs two({"Ta", "Ta", "Ta", "W"});
+  CHECK(two.names("Ta", "Ta"));
+  CHECK(two.names("Ta", "W"));
+  CHECK(two.names("W", "Ta"));
+  CHECK_FALSE(two.names("W", "W"));
+  CHECK_FALSE(two.every());
+  CHECK(two.text() == "(Ta, Ta) or (Ta, W)");
+  const DataStats kept = two.stats(data);
+  CHECK(pair_names(kept) == std::vector<std::string>{"Ta-Ta", "Ta-W"});
+  CHECK(kept.n_atoms == 1000u);
+  CHECK(kept.elements == std::vector<std::string>{"Ta", "W"});
+
+  const LinePairs reversed({"W", "Ta"});
+  CHECK(reversed.names("Ta", "W"));
+  CHECK(reversed.text() == "(W, Ta)");
+  CHECK(pair_names(reversed.stats(data)) == std::vector<std::string>{"Ta-W"});
+
+  CHECK(LinePairs({"Ta", "Ta", "Ta", "Ta"}).text() == "(Ta, Ta)");
+
+  const LinePairs with_ta({"Ta", "*"});
+  CHECK(with_ta.names("Ta", "W"));
+  CHECK(with_ta.names("W", "Ta"));
+  CHECK_FALSE(with_ta.names("W", "W"));
+  CHECK(with_ta.text() == "(Ta, *)");
+  CHECK(pair_names(with_ta.stats(data)) ==
+        std::vector<std::string>{"Ta-Ta", "Ta-W"});
+
+  const LinePairs every({"*", "*"});
+  CHECK(every.every());
+  CHECK(every.names("W", "W"));
+  CHECK(every.text().empty());
+  CHECK(pair_names(every.stats(data)) ==
+        std::vector<std::string>{"Ta-Ta", "Ta-W", "W-W"});
+
+  const LinePairs none(std::vector<std::string>{});
+  CHECK_FALSE(none.names("Ta", "Ta"));
+  CHECK(none.text().empty());
+  CHECK(none.stats(data).per_pair.empty());
+
+  try {
+    LinePairs odd({"Ta", "Ta", "W"});
+    FAIL("an odd number of element tokens was accepted");
+  } catch (const std::invalid_argument &e) {
+    CHECK(std::string(e.what()) ==
+          "the element types of a descriptor's line come in pairs, and the "
+          "line has 3 of them, Ta Ta W");
+  }
+}
+
+/* Pins: given the statistics of the element pairs of its line
+ * (LinePairs::stats()) and a view of the seed with those pairs, a check and
+ * a suggestion name them:
+ *  - the cutoff check of D2_Blip, RCUT2B 2.6 on the (Ta, Ta) pairs of the
+ *    Ta-W-W data (from 2.86 A): "RCUT2B = 2.6 is below the smallest (Ta,
+ *    Ta) neighbour distance of the dataset (2.86 Å): ..."; on (Ta, Ta) or
+ *    (W, W), RCUT2B 2.45: "... smallest (Ta, Ta) or (W, W) neighbour
+ *    distance of the dataset (2.5 Å) ...";
+ *  - on (W, W) of the Ta-W data, which has none: "RCUT2B = 2.6: no (W, W)
+ *    pair of atoms of the dataset lies within it, ...";
+ *  - the CGRIDMB check of DM_EAD (CGRIDMB 3.1, SGRIDMB 100, RCUTMB 3.5) on
+ *    the (W, W) pairs (2.5 to 2.7 A): "... below 1e-6 at every (W, W)
+ *    neighbour distance within RCUTMB = 3.5 (2.5 to 2.7 Å) ...";
+ *  - the cutoff suggestion of D2_Blip on (W, W) of the Ta-W data: no OPTIM
+ *    line, "no (W, W) pair of atoms of the data lies within the reach of
+ *    the neighbour statistics ...";
+ *  - a view without the pairs keeps the words of the data as a whole: "no
+ *    pair of atoms of the dataset lies within it".
+ * Before the fix: does not compile (no LinePairs, and SeedView takes no
+ * element pairs). */
+TEST_CASE("The checks and suggestions name the element pairs of the "
+          "descriptor's line",
+          "[metadata][density_reach][line_pairs]") {
+  auto meta_of = [](const char *label) {
+    std::unique_ptr<D_Base> d(tadah::core::factory<D_Base>(label));
+    const auto meta = d->meta();
+    REQUIRE(meta.has_value());
+    return *meta;
+  };
+  const DescriptorMeta blip = meta_of("D2_Blip");
+  const ParamMeta *rcut = param_of(blip, "RCUT2B");
+  REQUIRE(rcut != nullptr);
+  REQUIRE(static_cast<bool>(rcut->check));
+  REQUIRE(static_cast<bool>(rcut->suggest));
+  const DataStats data = ta_w_ww_stats();
+
+  Context cut;
+  cut.add("RCUT2B", "2.6");
+  const LinePairs tata({"Ta", "Ta"});
+  const std::string below = verdict_message(
+      rcut->check(tata.stats(data), SeedView(cut, {}, tata)));
+  CHECK(below ==
+        "RCUT2B = 2.6 is below the smallest (Ta, Ta) neighbour distance of "
+        "the dataset (2.86 Å): the descriptor sums over no neighbour and is "
+        "0 for every atom.");
+
+  Context near;
+  near.add("RCUT2B", "2.45");
+  const LinePairs both({"Ta", "Ta", "W", "W"});
+  const std::string two = verdict_message(
+      rcut->check(both.stats(data), SeedView(near, {}, both)));
+  CHECK(two ==
+        "RCUT2B = 2.45 is below the smallest (Ta, Ta) or (W, W) neighbour "
+        "distance of the dataset (2.5 Å): the descriptor sums over no "
+        "neighbour and is 0 for every atom.");
+
+  const LinePairs ww({"W", "W"});
+  const std::string none = verdict_message(
+      rcut->check(ww.stats(ta_w_stats()), SeedView(cut, {}, ww)));
+  CHECK(none ==
+        "RCUT2B = 2.6: no (W, W) pair of atoms of the dataset lies within "
+        "it, so the descriptor sums over no neighbour and is 0 for every "
+        "atom.");
+
+  const DescriptorMeta ead = meta_of("DM_EAD");
+  const ParamMeta *centre = param_of(ead, "CGRIDMB");
+  REQUIRE(centre != nullptr);
+  REQUIRE(static_cast<bool>(centre->check));
+  Context grid;
+  grid.add("CGRIDMB", "3.1");
+  grid.add("SGRIDMB", "100");
+  grid.add("RCUTMB", "3.5");
+  const std::string reach = verdict_message(
+      centre->check(ww.stats(data), SeedView(grid, {}, ww)));
+  CHECK(reach.find("is below 1e-6 at every (W, W) neighbour distance "
+                   "within RCUTMB = 3.5 (2.5 to 2.7 Å)") != std::string::npos);
+
+  Context seed;
+  seed.add("RCUT2B", "5.6");
+  const BoundSuggestion s =
+      rcut->suggest(ww.stats(ta_w_stats()), SeedView(seed, {}, ww), -1);
+  CHECK(s.none);
+  CHECK(s.rationale.rfind("no (W, W) pair of atoms of the data lies within "
+                          "the reach of the neighbour statistics", 0) == 0);
+
+  const std::string whole = verdict_message(
+      rcut->check(no_pair_stats(), SeedView(cut)));
+  CHECK(whole.rfind("RCUT2B = 2.6: no pair of atoms of the dataset lies "
+                    "within it", 0) == 0);
 }

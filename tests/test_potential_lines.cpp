@@ -671,3 +671,152 @@ TEST_CASE("A TYPE line without its element pairs is refused naming the "
         "TYPE2B D2_Blip: the element types come in pairs, and the line has "
         "3 of them, Ta Ta W");
 }
+
+/* ------------------------------------------------------------------------
+ * A key of a potential's descriptors set on two lines of the potential
+ * file: a command that trains from the potential (its configuration file,
+ * -c: tadah train, tadah hpo, tadah refit and the analysis commands; the
+ * blueprint name of the command given) refuses it, naming the lines; a
+ * potential read for prediction keeps the WARNING of values its
+ * descriptors do not take.
+ * ---------------------------------------------------------------------- */
+namespace {
+
+/* What D_mJoin::check_potential_lines(@p c, @p command) throws; empty when
+ * it throws nothing. */
+std::string lines_refusal(const Context &c,
+                          const std::string &command = "TRAIN") {
+  try {
+    D_mJoin::check_potential_lines(c, command);
+  } catch (const std::exception &e) {
+    return e.what();
+  }
+  return "";
+}
+
+/* The refusal of @p key set on @p lines (each "line 6 of copy.tadah") of
+ * one potential, read by @p words ("tadah train"); @p join, for a TYPE key,
+ * the descriptor that joins the descriptors of its line ("D2_mJoin"),
+ * whose line has one line per descriptor. */
+std::string two_lines(const std::string &key,
+                      const std::vector<std::string> &lines,
+                      const std::string &words = "tadah train",
+                      const std::string &join = "") {
+  std::string on;
+  for (std::size_t i = 0; i < lines.size(); ++i)
+    on += (i == 0 ? "" : i + 1 == lines.size() ? " and on " : ", on ") +
+          lines[i];
+  return "Key " + key + " is set on " + on +
+         ", lines of one potential (a file with WEIGHTS): " + words +
+         " reads a key of a potential's descriptors from the line the "
+         "potential has for it" +
+         (join.empty() ? std::string()
+                       : " (a " + join + " line has one line per descriptor, "
+                         "each starting with the descriptor's name)") +
+         ", and a potential's value is changed by editing its line in a copy "
+         "of the potential (the Training page of the documentation, "
+         "Retraining from a potential)";
+}
+
+}  // namespace
+
+/* Pins: a copy of the single D2_Blip potential (RCUT2B 5 on line 6) with
+ * "RCUT2B 6" appended (line 10):
+ *  - D_mJoin::check_potential_lines refuses it for tadah train ("Key RCUT2B
+ *    is set on line 6 of <copy> and on line 10 of <copy>, lines of one
+ *    potential (a file with WEIGHTS): tadah train reads a key of a
+ *    potential's descriptors from the line the potential has for it, and a
+ *    potential's value is changed by editing its line in a copy of the
+ *    potential (the Training page of the documentation, Retraining from a
+ *    potential)"), and for tadah hpo naming tadah hpo;
+ *  - included with CONFIG by run.train, the lines name the CONFIG line;
+ *  - a model built from it for prediction (DC_Selector) loads, with the
+ *    WARNING "Part of RCUT2B (5) is ignored: TYPE2B D2_Blip takes one RCUT2B
+ *    value, and its cutoff is the largest, 6; ...";
+ *  - "RCUT2B 5 6" on its one line (a potential of tadah 1.5.0), the D2_mJoin
+ *    potential with its three TYPE2B lines, with RCUT2B 5.3 4.5 6 on one
+ *    line, and with a TYPE2B line of a descriptor appended (the layout of
+ *    a D2_mJoin line, whose count the descriptors' keys check), a training
+ *    configuration (no WEIGHTS) with two RCUT2B lines (refused by its
+ *    count, test above) and a potential with two DBFILE lines (a key of no
+ *    descriptor) pass the check;
+ *  - a TYPE2B line "D2_Blip 2 2 Ta W" appended to the single potential
+ *    (line 10), and "W Ta W" to the D2_mJoin potential (line 12, a line
+ *    that starts with no descriptor), is refused, naming every TYPE2B line
+ *    and the layout of a D2_mJoin line;
+ *  - a CGRIDMB line appended to the single DM_EAD potential (CGRIDMB on
+ *    line 7) is refused, naming both lines.
+ * Before the fix: does not compile (no D_mJoin::check_potential_lines): a
+ * training command read the copy as the 1.5.0 potentials whose one line
+ * has values its descriptors do not take, with the WARNING, and trained a
+ * cutoff of 6. */
+TEST_CASE("A key of a descriptor set on two lines of one potential file is "
+          "refused by a command that trains from it",
+          "[D_mJoin][potential][potential_lines][retrain]") {
+  Scratch dir;
+  const std::string copy =
+      dir.write("copy.tadah", std::string(kSingle2B) + "RCUT2B 6\n");
+  SECTION("an RCUT2B line appended to a copy") {
+    CHECK(lines_refusal(parsed(copy)) ==
+          two_lines("RCUT2B", {"line 6 of " + copy, "line 10 of " + copy}));
+    CHECK(lines_refusal(parsed(copy), "HPO") ==
+          two_lines("RCUT2B", {"line 6 of " + copy, "line 10 of " + copy},
+                    "tadah hpo"));
+    IgnoredKeyNoticeCapture cap;
+    CHECK(load_refusal(parsed(copy)).empty());
+    CHECK(cap.notices() ==
+          std::vector<std::string>{
+              "Part of RCUT2B (5) is ignored: TYPE2B D2_Blip takes one RCUT2B "
+              "value, and its cutoff is the largest, 6; the potential works "
+              "unchanged with RCUT2B 6 alone"});
+  }
+  SECTION("the copy included with CONFIG") {
+    const std::string run =
+        dir.write("run.train", "DBFILE db.tadah\nCONFIG " + copy + "\n");
+    const std::string by = " (CONFIG on line 2 of " + run + ")";
+    CHECK(lines_refusal(parsed(run)) ==
+          two_lines("RCUT2B",
+                    {"line 6 of " + copy + by, "line 10 of " + copy + by}));
+  }
+  SECTION("what a potential writes, a configuration and other keys") {
+    std::string old = kSingle2B;
+    old.replace(old.find("RCUT2B 5\n"), 9, "RCUT2B 5 6\n");
+    CHECK(lines_refusal(parsed(dir.write("old.tadah", old))).empty());
+    CHECK(lines_refusal(parsed(dir.write("j.tadah", joined_2b()))).empty());
+    CHECK(lines_refusal(parsed(dir.write("jo.tadah", joined_2b(true))))
+              .empty());
+    CHECK(lines_refusal(parsed(dir.write(
+              "jadd.tadah", joined_2b() + "TYPE2B D2_LJ Ta Ta\n")))
+              .empty());
+    std::string config = kSingle2B;
+    config.erase(config.find("WEIGHTS"));
+    CHECK(lines_refusal(parsed(dir.write("two.train",
+                                         config + "RCUT2B 6\n")))
+              .empty());
+    CHECK(lines_refusal(parsed(dir.write(
+              "db.tadah", std::string(kSingle2B) +
+                              "DBFILE a.tadah\nDBFILE b.tadah\n")))
+              .empty());
+  }
+  SECTION("a TYPE2B line appended") {
+    const std::string single =
+        dir.write("type.tadah",
+                  std::string(kSingle2B) + "TYPE2B D2_Blip 2 2 Ta W\n");
+    CHECK(lines_refusal(parsed(single)) ==
+          two_lines("TYPE2B", {"line 4 of " + single, "line 10 of " + single},
+                    "tadah train", "D2_mJoin"));
+    const std::string joined =
+        dir.write("jtype.tadah", joined_2b() + "TYPE2B W Ta W\n");
+    CHECK(lines_refusal(parsed(joined)) ==
+          two_lines("TYPE2B",
+                    {"line 4 of " + joined, "line 5 of " + joined,
+                     "line 6 of " + joined, "line 12 of " + joined},
+                    "tadah train", "D2_mJoin"));
+  }
+  SECTION("a CGRIDMB line appended") {
+    const std::string mb =
+        dir.write("mb.tadah", std::string(kSingleMB) + "CGRIDMB 4\n");
+    CHECK(lines_refusal(parsed(mb)) ==
+          two_lines("CGRIDMB", {"line 7 of " + mb, "line 10 of " + mb}));
+  }
+}
