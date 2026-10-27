@@ -342,7 +342,7 @@ std::optional<DescriptorMeta> D2_Blip::meta() const {
   p_sgrid.scale    = Scale::InverseDistance;
   p_sgrid.units    = "Å^-1";
   p_sgrid.role     = "Inverse width eta of the i-th radial blip b(eta (r - c)), "
-                     "whose support is |r - c| < 2/eta.";
+                     "SGRID2B (i), whose support is |r - c| < 2/eta.";
   // hard: SGRID2B = 0 makes the existing init() throw.
   p_sgrid.hard.lo  = 1.0e-6;
   p_sgrid.crit     = Criticality::Recommended;

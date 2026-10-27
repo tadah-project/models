@@ -1,4 +1,5 @@
 #include <tadah/models/descriptors/density_reach.h>
+#include <tadah/core/number_format.h>
 
 #include <algorithm>
 #include <cmath>
@@ -14,12 +15,16 @@ namespace {
 
 using tadah::core::stats::DataStats;
 
-/* @p v with up to 6 significant digits ("2.85788", "0.2", "30"). */
+/* @p v with up to 6 significant digits ("2.85788", "0.2", "30"): a
+ * statistic of the data or a distance derived from it. */
 std::string num(double v) {
   std::ostringstream os;
   os << v;
   return os.str();
 }
+
+/* A value of the seed as its shortest round-trip text ("5.61234567"). */
+std::string seed_num(double v) { return tadah::core::format_roundtrip(v); }
 
 /* The element pair of @p pp as a rationale names it ("Ta-Ta"): a range
  * taken from the shells, peaks or percentiles of the distances is taken
@@ -128,7 +133,7 @@ BoundSuggestion centre_suggestion(const DataStats &d, const SeedView &s,
     return BoundSuggestion(
         std::max(c - w, std::min(c, range.lo)),
         std::min(c + w, std::max(c, range.hi)),
-        form(kind, false) + " centred on the seed's centre (" + num(c) +
+        form(kind, false) + " centred on the seed's centre (" + seed_num(c) +
             " Å): +- " + width + ", within the neighbour distances " +
             num(range.lo) + " to " + num(range.hi) +
             " Å unless the seed's centre lies outside them");
@@ -202,7 +207,7 @@ BoundSuggestion width_suggestion(const DataStats &d, const SeedView &s,
     if (range.empty)
       return BoundSuggestion::no_row(
           origin + ": no neighbour distance lies within RCUTMB = " +
-          num(rcut) + " Å for it to reach");
+          seed_num(rcut) + " Å for it to reach");
     const std::string farthest =
         has_cut ? "the farthest neighbour distance within RCUTMB (" +
                       num(range.hi) + " Å)"
@@ -223,11 +228,11 @@ BoundSuggestion width_suggestion(const DataStats &d, const SeedView &s,
     if (gaussian)
       return BoundSuggestion(
           0.25 / (wn * wn), 9.0 / (wn * wn),
-          form(kind, false) + " centred on the seed's centre (" + num(c) +
+          form(kind, false) + " centred on the seed's centre (" + seed_num(c) +
               " Å): 0.25/w^2 to 9/w^2 with w " + width);
     return BoundSuggestion(
         1.0 / wn, 6.0 / wn,
-        form(kind, false) + " centred on the seed's centre (" + num(c) +
+        form(kind, false) + " centred on the seed's centre (" + seed_num(c) +
             " Å): its support half-width 2/SGRIDMB from 2 w down to w/3, "
             "with w " + width);
   }
@@ -299,13 +304,13 @@ HealthVerdict cutoff_reach_check(const DataStats &d, const SeedView &s,
   if (!s.contains(key) || d.n_atoms == 0) return HealthOk{};
   const double rc = s.get<double>(key);
   if (d.per_pair.empty())
-    return HealthFail{key + " = " + num(rc) +
+    return HealthFail{key + " = " + seed_num(rc) +
                       ": no pair of atoms of the dataset lies within it, so "
                       "the descriptor sums over no neighbour and is 0 for "
                       "every atom."};
   const NeighbourRange range = neighbour_range(d, rc);
   if (!range.empty) return HealthOk{};
-  return HealthFail{key + " = " + num(rc) +
+  return HealthFail{key + " = " + seed_num(rc) +
                     " is below the smallest neighbour distance of the "
                     "dataset (" + num(range.lo) + " Å): the descriptor sums "
                     "over no neighbour and is 0 for every atom."};
@@ -346,7 +351,7 @@ HealthVerdict radial_reach_check(const DataStats &d, const SeedView &s,
   const double rcut = has_cut ? s.get<double>("RCUTMB") : 0.0;
   const NeighbourRange range = neighbour_range(d, rcut);
   const std::string within =
-      has_cut ? "within RCUTMB = " + num(rcut) : "of the dataset";
+      has_cut ? "within RCUTMB = " + seed_num(rcut) : "of the dataset";
   if (range.empty) {
     // An RCUTMB below every neighbour distance, or data without a pair
     // within it: the check of the cutoff (cutoff_reach_check) gives the
@@ -363,7 +368,7 @@ HealthVerdict radial_reach_check(const DataStats &d, const SeedView &s,
   for (std::size_t i = 0; i < n; ++i) {
     const double c = s.get<double>("CGRIDMB", i);
     if (i >= widths)
-      return HealthFail{entry(s, "CGRIDMB", i) + " = " + num(c) +
+      return HealthFail{entry(s, "CGRIDMB", i) + " = " + seed_num(c) +
                         " has no width " + entry(s, "SGRIDMB", i) +
                         ": the reach of its channel of ρ cannot be judged."};
     const double eta = s.get<double>("SGRIDMB", i);
@@ -371,9 +376,9 @@ HealthVerdict radial_reach_check(const DataStats &d, const SeedView &s,
     // The distance from the centre to the nearest neighbour distance.
     const double dist =
         c < range.lo ? range.lo - c : (c > range.hi ? c - range.hi : 0.0);
-    const std::string channel = entry(s, "CGRIDMB", i) + " = " + num(c) +
-                                " with " + entry(s, "SGRIDMB", i) + " = " +
-                                num(eta);
+    const std::string channel = entry(s, "CGRIDMB", i) + " = " +
+                                seed_num(c) + " with " +
+                                entry(s, "SGRIDMB", i) + " = " + seed_num(eta);
     if (kind == BasisKind::Gaussian) {
       if (!(eta > gaussian_reach_width(dist))) continue;
       return HealthFail{channel +

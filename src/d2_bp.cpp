@@ -314,7 +314,8 @@ std::optional<DescriptorMeta> D2_BP::meta() const {
   p_sgrid.arg_pos  = 0;
   p_sgrid.scale    = Scale::InverseDistanceSq;
   p_sgrid.units    = "Å^-2";
-  p_sgrid.role     = "Inverse Gaussian width of the i-th radial.";
+  p_sgrid.role     = "eta of the i-th radial Gaussian exp(-eta (r - c)^2), "
+                     "SGRID2B (i): an inverse squared width.";
   p_sgrid.hard.lo  = 1.0e-6;
   p_sgrid.crit     = Criticality::Recommended;
   p_sgrid.scope    = PairScope::Global;

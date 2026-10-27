@@ -86,8 +86,8 @@ template <typename F>
     if (Lmax > 0)
       log_warning_once(
         label() + ": channel not rotationally invariant for L>0",
-        label() + ": channel function is not F_SQ — descriptor is NOT"
-        " rotationally invariant for L>0. Use DM_PS_* descriptors instead.");
+        label() + ": the channel function is not F_SQ, so the descriptor is "
+        "not rotationally invariant for L>0 (the DM_PS_ descriptors are)");
   }
 
   odim = emb.output_dim();

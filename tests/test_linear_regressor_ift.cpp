@@ -370,6 +370,15 @@ TEST_CASE("IFT chain-rule under ridge regression (lambda > 0)",
     }
 }
 
+/* Pins: train_with_factor, a fit of the C++ API that hands its caller the
+ * Cholesky factor for an analytical gradient (tadah hpo builds its own
+ * factor and does not call it), refuses OALGO 1 with an internal error
+ * (std::logic_error, a caller's error) that says what the fit needs: "internal error: the analytical gradient fits with OALGO 4
+ * (the Cholesky normal equations), whose factor it reuses, and was given
+ * OALGO 1".
+ * Before the fix: std::runtime_error "LinearRegressor::train_with_factor
+ * requires OALGO=4 (NormalEquations); got OALGO=1. ... Use OALGO=4 with
+ * GRAD_STRATEGY=ANALYTICAL/HYBRID, or fall back to ...". */
 TEST_CASE("train_with_factor rejects OALGO != 4",
           "[MODELS][ift][validate]")
 {
@@ -383,12 +392,25 @@ TEST_CASE("train_with_factor rejects OALGO != 4",
     Vector w(n);
     tadah::models::FactorHandle factor;
 
+    CHECK_THROWS_AS(
+        tadah::models::LinearRegressor::train_with_factor(
+            ctx, Phi, T, w, factor),
+        std::logic_error);
     CHECK_THROWS_WITH(
         tadah::models::LinearRegressor::train_with_factor(
             ctx, Phi, T, w, factor),
-        Catch::Contains("OALGO=4"));
+        "internal error: the analytical gradient fits with OALGO 4 (the "
+        "Cholesky normal equations), whose factor it reuses, and was given "
+        "OALGO 1");
 }
 
+/* Pins: train_with_factor refuses LAMBDA -1 with an internal error
+ * (std::logic_error): "internal error: the analytical gradient fits with a
+ * fixed LAMBDA >= 0, and was given LAMBDA -1 (the evidence approximation,
+ * which changes the fit inside the solve)".
+ * Before the fix: std::runtime_error "LinearRegressor::train_with_factor:
+ * LAMBDA=-1 (BLR/EA) is not supported under analytical gradients. ... Use
+ * a fixed LAMBDA >= 0, or GRAD_STRATEGY=NUMERICAL.". */
 TEST_CASE("train_with_factor rejects LAMBDA == -1 (BLR)",
           "[MODELS][ift][validate]")
 {
@@ -402,8 +424,14 @@ TEST_CASE("train_with_factor rejects LAMBDA == -1 (BLR)",
     Vector w(n);
     tadah::models::FactorHandle factor;
 
+    CHECK_THROWS_AS(
+        tadah::models::LinearRegressor::train_with_factor(
+            ctx, Phi, T, w, factor),
+        std::logic_error);
     CHECK_THROWS_WITH(
         tadah::models::LinearRegressor::train_with_factor(
             ctx, Phi, T, w, factor),
-        Catch::Contains("BLR") || Catch::Contains("LAMBDA"));
+        "internal error: the analytical gradient fits with a fixed LAMBDA >= "
+        "0, and was given LAMBDA -1 (the evidence approximation, which "
+        "changes the fit inside the solve)");
 }

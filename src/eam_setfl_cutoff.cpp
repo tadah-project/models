@@ -19,8 +19,9 @@ void require_setfl_cutoff(const tadah::core::Context &c,
     throw std::runtime_error(
         label + ": " + rcut_key + " " + format_roundtrip(v) +
         " differs from the cutoff " + format_roundtrip(rc) +
-        " of the setfl file '" + eam.path() + "' (SETFL); set " + rcut_key +
-        " to the file's cutoff, " + format_roundtrip(rc) + ".");
+        " of the setfl file '" + eam.path() + "' (SETFL); the " + rcut_key +
+        " of " + label + " is the file's cutoff, " + format_roundtrip(rc) +
+        ".");
   }
 }
 

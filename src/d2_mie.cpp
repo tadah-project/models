@@ -2,6 +2,7 @@
 #include <tadah/models/descriptors/d2/d2_mie.h>
 #include <tadah/models/descriptors/param_meta.h>
 #include <tadah/core/stats/data_stats.h>
+#include <tadah/core/number_format.h>
 #include <cmath>
 #include <tadah/models/descriptors/density_reach.h>
 namespace tadah {
@@ -288,9 +289,9 @@ std::optional<DescriptorMeta> D2_MIE::meta() const {
       const double m = s.get<double>("TYPE2B", 2);
       if (n == -1 || m == -1) return HealthOk{};
       if (n <= m)
-        return HealthFail{"D2_MIE requires n > m for finite prefactor "
-                          "(got n=" + std::to_string(n) +
-                          ", m=" + std::to_string(m) + ")."};
+        return HealthFail{"D2_MIE needs n > m for a finite prefactor (got "
+                          "n = " + tadah::core::format_roundtrip(n) +
+                          ", m = " + tadah::core::format_roundtrip(m) + ")."};
       return HealthOk{};
     });
 

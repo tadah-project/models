@@ -117,9 +117,9 @@ TEST_CASE("eam_lattice require_crystal", "[eam_lattice]") {
  * a0 = 1e-323 A, puts the nearest neighbours of the fcc crystal 0 A apart
  * at the strongest compression the refit tests (a/a0 = REFIT_REACH_SMIN
  * 0.1), less than the step of the table's radial grid, dr = 0.0125313 A:
- * the table describes no pair distance of that crystal. Edit the element
- * line of the setfl file (`<Z> <mass> <a0> <lattice>`): set the
- * equilibrium lattice constant, in Angstrom."; real crystals (Cu, Fe, Ti
+ * the table describes no pair distance of that crystal. The a0 of the element
+ * line of the setfl file (`<Z> <mass> <a0> <lattice>`) is the equilibrium
+ * lattice constant in Angstrom."; real crystals (Cu, Fe, Ti
  * at REFIT_REACH_SMIN 0.1 to 1) pass. The gate also takes the table's
  * cutoff, rcut, whose rule the next test pins: every crystal here has its
  * nearest neighbours below the rcut it is given (5 A, or 1 A for the
@@ -127,7 +127,9 @@ TEST_CASE("eam_lattice require_crystal", "[eam_lattice]") {
  * without it.
  * Before the fix: neither function exists (the crystal gate was
  * require_crystal alone, a known lattice and a0 > 0): the test does not
- * compile. */
+ * compile. The message then ended "Edit the element line of the setfl file
+ * (...): set the equilibrium lattice constant, in Angstrom.", an
+ * instruction. */
 TEST_CASE("eam_lattice require_crystal_on_grid: the crystal's nearest "
           "neighbours at REFIT_REACH_SMIN at least the table's dr apart",
           "[eam_lattice]") {
@@ -170,9 +172,9 @@ TEST_CASE("eam_lattice require_crystal_on_grid: the crystal's nearest "
       "crystal 0.012499999999999999 A apart at the strongest compression "
       "the refit tests (a/a0 = REFIT_REACH_SMIN 1), less than the step of "
       "the table's radial grid, dr = 0.0125 A: the table describes no pair "
-      "distance of that crystal. Edit the element line of the setfl file "
-      "(`<Z> <mass> <a0> <lattice>`): set the equilibrium lattice "
-      "constant, in Angstrom.");
+      "distance of that crystal. The a0 of the element line of the setfl file "
+      "(`<Z> <mass> <a0> <lattice>`) is the equilibrium lattice constant "
+      "in Angstrom.");
 
   // a subnormal a0: the distance underflows to 0
   const double tiny = 1e-323;
@@ -185,8 +187,8 @@ TEST_CASE("eam_lattice require_crystal_on_grid: the crystal's nearest "
       "strongest compression the refit tests (a/a0 = REFIT_REACH_SMIN "
       "0.1), less than the step of the table's radial grid, dr = "
       "0.0125313 A: the table describes no pair distance of that crystal. "
-      "Edit the element line of the setfl file (`<Z> <mass> <a0> "
-      "<lattice>`): set the equilibrium lattice constant, in Angstrom.");
+      "The a0 of the element line of the setfl file (`<Z> <mass> <a0> "
+      "<lattice>`) is the equilibrium lattice constant in Angstrom.");
 }
 
 /* Pins: require_crystal_on_grid(lattice, a0, reach_smin, dr, rcut), the
@@ -203,9 +205,9 @@ TEST_CASE("eam_lattice require_crystal_on_grid: the crystal's nearest "
  * A, puts the nearest neighbours of the fcc crystal 255.26554800834364 A
  * apart, at or beyond the table's cutoff, rcut = 5 A, and LAMMPS
  * (pair_style eam/alloy) counts a pair only below rcut: the crystal has no
- * interaction in LAMMPS. Edit the element line of the setfl file (`<Z>
- * <mass> <a0> <lattice>`): set the equilibrium lattice constant, in
- * Angstrom (a value in picometres is 100 times the value in Angstrom)." --
+ * interaction in LAMMPS. The a0 of the element line of the setfl file (`<Z>
+ * <mass> <a0> <lattice>`) is the equilibrium lattice constant in Angstrom
+ * (a value in picometres is 100 times the value in Angstrom)." --
  * before the dr rule, which it passes (its distance at REFIT_REACH_SMIN is
  * 191 A); the boundary is exact: hcp (whose distance is a0) is refused at
  * a0 = rcut, with the same sentence, and passes one ulp below it, and bcc
@@ -215,7 +217,9 @@ TEST_CASE("eam_lattice require_crystal_on_grid: the crystal's nearest "
  * Before the fix: the refusal said "...: the crystal has no pair within
  * the cutoff." (false for tadah, which counts the hcp shell at exactly
  * rcut), so the two exact-text checks fail; the neighbour_distances pin
- * passes as well (a pin of why the text names LAMMPS). */
+ * passes as well (a pin of why the text names LAMMPS). Its last sentence
+ * then read "Edit the element line of the setfl file (...): set the
+ * equilibrium lattice constant, ...", an instruction. */
 TEST_CASE("eam_lattice require_crystal_on_grid: the crystal's nearest "
           "neighbours at a0 below the table's cutoff",
           "[eam_lattice]") {
@@ -226,9 +230,9 @@ TEST_CASE("eam_lattice require_crystal_on_grid: the crystal's nearest "
       "puts the nearest neighbours of the fcc crystal 255.26554800834364 A "
       "apart, at or beyond the table's cutoff, rcut = 5 A, and LAMMPS "
       "(pair_style eam/alloy) counts a pair only below rcut: the crystal has "
-      "no interaction in LAMMPS. Edit the element line of the setfl file "
-      "(`<Z> <mass> <a0> <lattice>`): set the equilibrium lattice constant, "
-      "in Angstrom (a value in picometres is 100 times the value in "
+      "no interaction in LAMMPS. The a0 of the element line of the setfl file "
+      "(`<Z> <mass> <a0> <lattice>`) is the equilibrium lattice constant in "
+      "Angstrom (a value in picometres is 100 times the value in "
       "Angstrom).");
 
   // the boundary: hcp, whose nearest-neighbour distance is a0 itself;
@@ -281,6 +285,34 @@ TEST_CASE("eam_lattice require_crystal_on_grid: the crystal's nearest "
   CHECK_THROWS_WITH(
       eam_lattice::require_crystal_on_grid("NONE", 0.0, 0.75, 0.01, 5.0),
       Catch::Contains("crystal usable for the faithfulness self-test"));
+}
+
+/* Pins: the refusal of a setfl header without a crystal the self-test can
+ * use gives a0 as its shortest round-trip text and says where the crystal
+ * comes from: "tadah refit: the EAM header does not specify a crystal
+ * usable for the faithfulness self-test (lattice='NONE', a0=0). The
+ * self-test needs one of fcc, bcc and hcp and a positive lattice constant,
+ * which the element line of the setfl file (`<Z> <mass> <a0> <lattice>`)
+ * gives: the ground-state lattice, fcc, bcc or hcp in place of a
+ * placeholder such as NONE, and the equilibrium lattice constant." (a0
+ * 2.5e-7 is "2.5e-07").
+ * Before the fix: a0 printed by std::to_string ("a0=0.000000"), and the
+ * message ended "Edit the element line of the setfl file (...): set the
+ * ground-state lattice (e.g. change 'NONE' to 'fcc', 'bcc' or 'hcp') and
+ * the equilibrium lattice constant.". */
+TEST_CASE("require_crystal says where the crystal of the self-test comes "
+          "from",
+          "[eam_lattice]") {
+  CHECK_THROWS_WITH(
+      eam_lattice::require_crystal("NONE", 0.0),
+      "tadah refit: the EAM header does not specify a crystal usable for "
+      "the faithfulness self-test (lattice='NONE', a0=0). The self-test "
+      "needs one of fcc, bcc and hcp and a positive lattice constant, which "
+      "the element line of the setfl file (`<Z> <mass> <a0> <lattice>`) "
+      "gives: the ground-state lattice, fcc, bcc or hcp in place of a "
+      "placeholder such as NONE, and the equilibrium lattice constant.");
+  CHECK_THROWS_WITH(eam_lattice::require_crystal("", 2.5e-7),
+                    Catch::Contains("(lattice='<missing>', a0=2.5e-07)"));
 }
 
 /* Pins: neighbour_distances(lattice, a, rcut) enumerates a cube of

@@ -354,3 +354,29 @@ TEST_CASE("Testing OLS") {
     }
 }
 
+
+/* Pins: OLS::solve refuses an underdetermined system (m < n) for an
+ * algorithm that does not solve one, naming the algorithms that do:
+ * "The chosen algorithm (GELS) does not solve an underdetermined system (m
+ * < n); GELSD and Pseudoinverse do." (std::invalid_argument).
+ * Before the fix: "The chosen algorithm (GELS) is not suitable for
+ * underdetermined systems (m < n). Please use GELSD or Pseudoinverse.". */
+TEST_CASE("OLS refuses an underdetermined system for GELS, naming the "
+          "algorithms that solve one",
+          "[ols]") {
+  using Matrix = Matrix_T<>;
+  using Vector = aed_type;
+  Matrix A(2, 3);
+  for (int i = 0; i < 2; ++i)
+    for (int j = 0; j < 3; ++j) A(i, j) = 1.0 + i + 2.0 * j;
+  Vector B = {1, 2};
+  Vector weights(3);
+  tadah::models::OLS ols;
+  CHECK_THROWS_AS(
+      ols.solve(A, B, weights, 1e-8, tadah::models::Algorithm::GELS),
+      std::invalid_argument);
+  CHECK_THROWS_WITH(
+      ols.solve(A, B, weights, 1e-8, tadah::models::Algorithm::GELS),
+      "The chosen algorithm (GELS) does not solve an underdetermined system "
+      "(m < n); GELSD and Pseudoinverse do.");
+}

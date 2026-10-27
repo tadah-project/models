@@ -51,7 +51,7 @@ EAMRefit::EAMRefit(const EAMSetflIO &eam, const EAMRefitConfig &cfg)
     if (family_ == BasisKind::Knot5)
       throw DensityFormError(
           "EAMRefit: RHOFORM MONOTONE is not defined for the knot family "
-          "(basis " + cfg_.basis + "): use RHOFORM NONNEG: " +
+          "(basis " + cfg_.basis + "); RHOFORM NONNEG fits it: " +
           monotone_knot_refusal_text() + ".");
     if (!rhoform_cutoff_whitelisted(cfg_.rctype))
       throw DensityFormError(
@@ -589,13 +589,13 @@ void EAMRefit::check_rho_table(double win_lo) const {
                            "'s FORM "
                      : "RHOFORM ";
   const auto use = [&](const std::string &forms) {
-    return cfg_.component ? "Use FORM " + forms + " in its DENSITY block."
-                          : "Use RHOFORM " + forms + ".";
+    return cfg_.component ? "FORM " + forms + " in its DENSITY block fits it."
+                          : "RHOFORM " + forms + " fits it.";
   };
   for (const std::size_t i : nodes) {
     if (!(tab[i] < -tol)) continue;
     throw std::runtime_error(
-        "EAMRefit: " + who + form + " cannot fit this table: the "
+        "tadah refit: " + who + form + " cannot fit this table: the "
         "tabulated density is rho = " + tadah::core::format_roundtrip(tab[i]) +
         " < 0 at r = " +
         tadah::core::to_string(static_cast<double>(i) * eam_.dr(), 6) +
@@ -607,7 +607,7 @@ void EAMRefit::check_rho_table(double win_lo) const {
     const std::size_t i = nodes[q], j = nodes[q + 1];
     if (!(tab[j] - tab[i] > tol)) continue;
     throw std::runtime_error(
-        "EAMRefit: " + who + "MONOTONE cannot fit this table: the tabulated "
+        "tadah refit: " + who + "MONOTONE cannot fit this table: the tabulated "
         "density rises from rho = " + tadah::core::format_roundtrip(tab[i]) +
         " at r = " +
         tadah::core::to_string(static_cast<double>(i) * eam_.dr(), 6) +

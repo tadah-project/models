@@ -910,6 +910,13 @@ TEST_CASE_METHOD(EditFixture,
   }
 }
 
+/* Pins: a potential with BIAS true or NORM true is refused, the NORM
+ * refusal saying what a basis edit takes: "pot edit: NORM true is not
+ * supported — the stored normalisation vectors are column-aligned with
+ * WEIGHTS and cannot survive a basis edit; a basis edit takes a potential
+ * fitted with NORM false."
+ * Before the fix: it ended "... cannot survive a basis edit. Set NORM
+ * false." */
 TEST_CASE_METHOD(EditFixture, "potedit: BIAS/NORM potentials are rejected",
                  "[potedit]") {
   Context b = make_pure2b_pot();
@@ -919,7 +926,11 @@ TEST_CASE_METHOD(EditFixture, "potedit: BIAS/NORM potentials are rejected",
   Context n = make_pure2b_pot();
   n.remove("NORM");
   n.add("NORM", "true");
-  REQUIRE_THROWS_WITH(parse_pot_view(n), Catch::Contains("NORM"));
+  REQUIRE_THROWS_WITH(
+      parse_pot_view(n),
+      "pot edit: NORM true is not supported — the stored normalisation "
+      "vectors are column-aligned with WEIGHTS and cannot survive a basis "
+      "edit; a basis edit takes a potential fitted with NORM false.");
 }
 
 TEST_CASE_METHOD(EditFixture,

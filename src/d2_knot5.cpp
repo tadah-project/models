@@ -3,6 +3,7 @@
 #include <tadah/models/descriptors/d_basis_functions.h>
 #include <tadah/models/descriptors/param_meta.h>
 #include <tadah/core/logger.h>
+#include <tadah/core/number_format.h>
 #include <tadah/core/stats/data_stats.h>
 #include <algorithm>
 #include <cstdlib>
@@ -50,14 +51,17 @@ void D2_Knot5::warn_if_knots_beyond_rcut() {
   const double mx = *std::max_element(cgrid.begin(), cgrid.end());
   const double rc = get_rcut();
   if (mx > rc + 1e-12) {
+    // tadah sets RCUT2B to the largest knot on a TYPE2B line of D2_Knot5
+    // alone (potedit::normalize_knot_rcut), so the warning comes where the
+    // stated cutoff is kept: a D2_mJoin line, or a program or pair_style
+    // tadah that reads a potential file as written.
     log_warning_once(
         "D2_Knot5: knot past RCUT2B",
-        "D2_Knot5: the largest CGRID2B knot (" + std::to_string(mx) +
-        ") lies beyond RCUT2B (" + std::to_string(rc) +
-        ") — its contribution is silently hard-truncated at the cutoff. "
-        "The effective cutoff of a knot channel is its largest knot: set "
-        "RCUT2B to the largest knot (refit/edit/hpo tooling derives it "
-        "automatically).");
+        "D2_Knot5: the largest CGRID2B knot, " +
+            tadah::core::format_roundtrip(mx) + ", lies beyond RCUT2B, " +
+            tadah::core::format_roundtrip(rc) +
+            ", so the knot functions are cut off at RCUT2B; an RCUT2B at "
+            "the largest knot keeps them whole.");
   }
 }
 
@@ -291,7 +295,8 @@ std::optional<DescriptorMeta> D2_Knot5::meta() const {
   p_cgrid.scale    = Scale::Distance;
   p_cgrid.units    = "Å";
   p_cgrid.role     = "Knot position r_s of the i-th truncated power "
-                     "(r_s - r)_+^5; keep r_s <= RCUT2B.";
+                     "(r_s - r)_+^5, CGRID2B (i); on a TYPE2B line of "
+                     "D2_Knot5 alone the cutoff RCUT2B is the largest knot.";
   p_cgrid.hard.lo  = 0.0;
   p_cgrid.crit     = Criticality::Recommended;
   p_cgrid.scope    = PairScope::PerElementPair;
