@@ -575,6 +575,67 @@ TEST_CASE_METHOD(EditFixture, "potedit: derived/normalized knot RCUT",
   }
 }
 
+/* Pins: normalize_knot_rcut with a list of notes rewrites the stated
+ * cutoff as the logging form does and hands the caller the message instead
+ * of logging it (tadah hpo journals it as a WARNING of the run): a stale
+ * RCUT2B 5.3 gives one note of level WARNING, "test: RCUT2B 5.3 is above
+ * the largest knot (5): the knot basis vanishes at its largest knot, so the
+ * cutoff of a D2_Knot5 line is 5, which the CGRID2B knot positions set."
+ * (the text the logging form prints), and nothing on standard output; a gap of
+ * 3e-13 one note of level INFO; a consistent cutoff none.
+ * Before the fix: there was no such form (the case does not compile
+ * against the header without it). */
+TEST_CASE_METHOD(EditFixture,
+                 "potedit: normalize_knot_rcut hands its notes to a caller "
+                 "that journals them",
+                 "[potedit][notes]") {
+  auto &log = tadah::core::Logger::instance();
+  const auto old_level = log.getLogLevel();
+  log.setLogLevel(tadah::core::LogLevel::INFO);
+  const auto normalize = [](Context &k, std::vector<KnotRcutNote> &notes,
+                            std::string &printed) {
+    std::ostringstream captured;
+    std::streambuf *old_buf = std::cout.rdbuf(captured.rdbuf());
+    const bool changed = normalize_knot_rcut(k, "test", notes);
+    std::cout.rdbuf(old_buf);
+    printed = captured.str();
+    return changed;
+  };
+  std::string printed;
+  {
+    Context k = make_knot_pot();
+    k.remove("RCUT2B");
+    k.add("RCUT2B", 5.3);
+    std::vector<KnotRcutNote> notes;
+    REQUIRE(normalize(k, notes, printed));
+    CHECK(k.get<double>("RCUT2B") == 5.0);
+    REQUIRE(notes.size() == 1u);
+    CHECK(notes[0].level == tadah::core::LogLevel::WARNING);
+    CHECK(notes[0].text ==
+          "test: RCUT2B 5.3 is above the largest knot (5): the knot basis "
+          "vanishes at its largest knot, so the cutoff of a D2_Knot5 line is "
+          "5, which the CGRID2B knot positions set.");
+    CHECK(printed.empty());
+  }
+  {
+    Context k = make_knot_pot();
+    k.remove("RCUT2B");
+    k.add("RCUT2B", 5.0 + 3e-13);
+    std::vector<KnotRcutNote> notes;
+    REQUIRE(normalize(k, notes, printed));
+    REQUIRE(notes.size() == 1u);
+    CHECK(notes[0].level == tadah::core::LogLevel::INFO);
+    CHECK(printed.empty());
+  }
+  {
+    Context k = make_knot_pot();
+    std::vector<KnotRcutNote> notes;
+    REQUIRE_FALSE(normalize(k, notes, printed));
+    CHECK(notes.empty());
+  }
+  log.setLogLevel(old_level);
+}
+
 TEST_CASE_METHOD(EditFixture,
                  "potedit: normalize_knot_rcut rewrites ANY difference "
                  "exactly, WARNING only above 1e-9 relative",
