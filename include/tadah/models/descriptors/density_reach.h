@@ -27,11 +27,14 @@
 //
 // A descriptor sums over the neighbours of the element pairs its TYPE2B or
 // TYPEMB line names (LinePairs): its checks are given the statistics of
-// those pairs (the pre-flight audit, tadah analysis check_bounds), and its
-// suggestions those of one of them at a time (tadah analysis
-// suggest_bounds). Their messages name the pairs of the line when the view
-// of the seed has them (SeedView::line_pairs()): "the smallest (Ta, Ta)
-// neighbour distance of the dataset".
+// those pairs (the pre-flight audit, tadah analysis check_bounds) and judge
+// each pair of the line on its own, since a pair that a cutoff or a channel
+// does not reach adds nothing to the descriptor whatever the other pairs
+// give (the line Ta Ta W W with a cutoff below every (Ta, Ta) distance is 0
+// for every Ta atom); its suggestions are given those of one of them at a
+// time (tadah analysis suggest_bounds). Their messages name the pairs of the
+// line when the view of the seed has them (SeedView::line_pairs()): "the
+// smallest (Ta, Ta) neighbour distance of the dataset".
 
 #include <string>
 
@@ -72,14 +75,26 @@ BoundSuggestion no_pair_suggestion(const SeedView &s);
 BoundSuggestion cutoff_suggestion(const tadah::core::stats::DataStats &d,
                                   const SeedView &s, int arg_pos);
 
-/** \brief The check of the cutoff @p key (RCUT2B, RCUTMB) of @p s: it fails
- *  when the data have atoms but no pair of them within the cutoff (the
- *  cutoff is below the smallest neighbour distance of every element pair
- *  of @p d, or @p d has no pair at all: the descriptor sums over no
- *  neighbour), naming the key, its value, the smallest neighbour distance
- *  and the element pairs of the line of @p s ("the smallest (Ta, Ta)
- *  neighbour distance"; @p d holds the statistics of those pairs). HealthOk
- *  without the key or without atoms. */
+/** \brief The check of the cutoff @p key (RCUT2B, RCUTMB) of @p s, each
+ *  element pair of the line of @p s (SeedView::line_pairs()) judged on its
+ *  own by the statistics of @p d of the element pairs of the data it names
+ *  (a pair with "*", such as "Ta *", one pair): it fails when the data
+ *  have atoms and a pair of the line has no neighbour distance within the
+ *  cutoff (the cutoff is below its smallest one, or @p d has none of it).
+ *  When no pair of the line has one, the descriptor sums over no neighbour,
+ *  and the message names the key, its value, the smallest neighbour
+ *  distance of the pairs of the line, and the pairs ("RCUT2B = 2.45 is
+ *  below the smallest (Ta, Ta) or (W, W) neighbour distance of the dataset
+ *  (2.5 Å): the descriptor sums over no neighbour and is 0 for every
+ *  atom."); when some do, it names each pair that has none and says that
+ *  these add nothing to the descriptor ("RCUT2B = 2.6 is below the smallest
+ *  (Ta, Ta) neighbour distance of the dataset (2.86 Å): the (Ta, Ta) pair
+ *  adds nothing to the descriptor, which sums over its other element pairs
+ *  alone."; "RCUT2B = 2.6 holds no (Ta, Ta) pair of atoms of the dataset:
+ *  ..." when @p d has none of it, as statistics taken up to the cutoff
+ *  have none beyond it). A
+ *  view without the pairs of its line judges @p d as a whole and names no
+ *  pair. HealthOk without the key or without atoms. */
 HealthVerdict cutoff_reach_check(const tadah::core::stats::DataStats &d,
                                  const SeedView &s, const std::string &key);
 
@@ -109,24 +124,30 @@ double blip_reach_width(double dist);
 
 /** \brief The reach check of the radial channels of a many-body density:
  *  each centre CGRIDMB(i) with its width SGRIDMB(i) and the cutoff RCUTMB
- *  of @p s, against the neighbour distances of @p d (neighbour_range), the
- *  statistics of the element pairs of the line of @p s, which its messages
- *  name ("every (W, W) neighbour distance within RCUTMB = 3.5").
+ *  of @p s, against the neighbour distances (neighbour_range) of each
+ *  element pair of the line of @p s on its own, the statistics of @p d of
+ *  the element pairs of the data it names (a pair with "*" one pair), which
+ *  its messages name ("every (W, W) neighbour distance within RCUTMB =
+ *  3.5").
  *
  *  A Gaussian channel (@p kind Gaussian, exp(-SGRIDMB (r - CGRIDMB)^2))
- *  fails when it is below kDensityReachFloor at every distance of the
- *  range; a blip channel (Blip, b(SGRIDMB (r - CGRIDMB)), support |r -
- *  CGRIDMB| < 2/SGRIDMB) when its support holds none. A width of 0 or
- *  less is no reach failure (other rules refuse it). HealthFail names the
- *  first channel that fails by its entry of the configuration
- *  (SeedView::entry_number(): CGRIDMB(3) for the second channel of a
- *  joined line's descriptor after one of another), its centre and width,
- *  the form and the range; also a centre without a width, and data of one
- *  atom or more without a pair when @p s has no RCUTMB. HealthOk for an
- *  RCUTMB below every neighbour distance (or data without a pair within
- *  it): the check of the cutoff (cutoff_reach_check) gives that finding.
- *  HealthOk without CGRIDMB, or for data without atoms. @throws
- *  std::logic_error for a @p kind other than Gaussian and Blip. */
+ *  misses a pair when it is below kDensityReachFloor at every distance of
+ *  the pair's range; a blip channel (Blip, b(SGRIDMB (r - CGRIDMB)),
+ *  support |r - CGRIDMB| < 2/SGRIDMB) when its support holds none. A
+ *  channel that misses a pair fails. A width of 0 or less is no reach
+ *  failure (other rules refuse it). HealthFail names the first channel that
+ *  fails by its entry of the configuration (SeedView::entry_number():
+ *  CGRIDMB(3) for the second channel of a joined line's descriptor after
+ *  one of another), its centre and width, the form, and each pair it misses
+ *  with its range; "so ρ is ~0 for every atom" (0 for a blip) when it
+ *  reaches no pair of the line within RCUTMB, "so ρ gets nothing from the
+ *  (W, W) pairs of atoms" when it reaches some. Also a centre without a
+ *  width, and, when @p s has no RCUTMB, data of one atom or more without a
+ *  pair of the line ("the dataset has no (W, W) pair of atoms"). A pair
+ *  without a neighbour distance within RCUTMB is left to the check of the
+ *  cutoff (cutoff_reach_check), which gives that finding: HealthOk when no
+ *  pair has one. HealthOk without CGRIDMB, or for data without atoms.
+ *  @throws std::logic_error for a @p kind other than Gaussian and Blip. */
 HealthVerdict radial_reach_check(const tadah::core::stats::DataStats &d,
                                  const SeedView &s, BasisKind kind);
 

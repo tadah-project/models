@@ -266,7 +266,9 @@ using BoundSuggester = std::function<BoundSuggestion(
 /** \brief Validate (or warn about) a parameter or parameter combination
  *  given the seed and the data: the pre-flight audit gives it the
  *  statistics of the element pairs of the descriptor's line
- *  (LinePairs::stats(), SeedView::line_pairs()).
+ *  (LinePairs::stats(), SeedView::line_pairs()), and a check of the reach
+ *  of a cutoff or a channel judges each pair of the line on its own
+ *  (cutoff_reach_check(), radial_reach_check()).
  */
 using HealthCheck = std::function<HealthVerdict(
     const tadah::core::stats::DataStats&,

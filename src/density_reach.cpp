@@ -48,6 +48,62 @@ std::string of_pairs(const SeedView &s) {
   return t.empty() ? t : " " + t;
 }
 
+/* An element pair of the line of the descriptor of a view as a check judges
+ * it, on its own: its name as a message gives it before "pair of atoms" or
+ * "neighbour distance" (" (Ta, Ta)"; empty for "* *", or for a view without
+ * the pairs of its line) and the statistics of the element pairs of the
+ * data it names. */
+struct JudgedPair {
+  std::string name;
+  DataStats stats;
+};
+
+/* The element pairs a check of the view @p s judges one at a time: each
+ * pair of the line of @p s (SeedView::line_pairs()) as the line writes it,
+ * with the statistics of @p d of the element pairs of the data it names
+ * (LinePairs::stats()); a pair with "*" is one pair ("Ta *": the (Ta, Ta)
+ * and (Ta, W) distances together), and a pair the line names twice is
+ * judged once. A descriptor sums over the neighbours of each pair of its
+ * line, so a pair that a cutoff or a channel does not reach adds nothing to
+ * it whatever the other pairs give. A view without the pairs of its line
+ * gives @p d as a whole, named by no pair. */
+std::vector<JudgedPair> judged_pairs(const DataStats &d, const SeedView &s) {
+  const LinePairs *p = s.line_pairs();
+  if (p == nullptr || p->pairs().empty()) return {JudgedPair{{}, d}};
+  std::vector<JudgedPair> out;
+  for (const auto &pair : p->pairs()) {
+    const LinePairs one({pair.first, pair.second});
+    const std::string t = one.text();
+    const std::string name = t.empty() ? t : " " + t;
+    const bool seen =
+        std::any_of(out.begin(), out.end(),
+                    [&](const JudgedPair &j) { return j.name == name; });
+    if (!seen) out.push_back(JudgedPair{name, one.stats(d)});
+  }
+  return out;
+}
+
+/* @p items joined as a sentence lists them: "a", "a and b", "a, b and c"
+ * (@p last " or ": "a or b"). */
+std::string listed(const std::vector<std::string> &items,
+                   const std::string &last = " and ") {
+  std::string out;
+  for (std::size_t i = 0; i < items.size(); ++i)
+    out += (i == 0 ? "" : i + 1 == items.size() ? last : ", ") + items[i];
+  return out;
+}
+
+/* The pairs @p names (each " (Ta, Ta)", JudgedPair::name) as a message
+ * names some of the pairs of a line: " (Ta, Ta)", " (Ta, Ta) or (Mo, Mo)"
+ * (@p last " and ": " (Ta, Ta) and (Mo, Mo)"). */
+std::string some_pairs(const std::vector<std::string> &names,
+                       const std::string &last = " or ") {
+  std::vector<std::string> bare;
+  for (const auto &n : names)
+    if (!n.empty()) bare.push_back(n.substr(1));
+  return bare.empty() ? std::string() : " " + listed(bare, last);
+}
+
 /* "KEY(n)" for value @p i of @p key of @p s, n its 1-based number in the
  * configuration, as an OPTIM line names an entry (SeedView::entry_number:
  * the entries of a joined line's descriptor follow those of the
@@ -318,16 +374,40 @@ HealthVerdict cutoff_reach_check(const DataStats &d, const SeedView &s,
                                  const std::string &key) {
   if (!s.contains(key) || d.n_atoms == 0) return HealthOk{};
   const double rc = s.get<double>(key);
-  const std::string pairs = of_pairs(s);
-  if (d.per_pair.empty())
-    return HealthFail{key + " = " + seed_num(rc) + ": no" + pairs +
+  // Each element pair of the line on its own: the pairs of which the cutoff
+  // holds no neighbour distance.
+  const std::vector<JudgedPair> pairs = judged_pairs(d, s);
+  std::vector<std::string> misses, missed;
+  for (const auto &p : pairs) {
+    if (p.stats.per_pair.empty()) {
+      misses.push_back("holds no" + p.name + " pair of atoms of the dataset");
+    } else {
+      const NeighbourRange range = neighbour_range(p.stats, rc);
+      if (!range.empty) continue;
+      misses.push_back("is below the smallest" + p.name +
+                       " neighbour distance of the dataset (" +
+                       num(range.lo) + " Å)");
+    }
+    missed.push_back(p.name);
+  }
+  if (missed.empty()) return HealthOk{};
+  if (missed.size() < pairs.size())
+    return HealthFail{key + " = " + seed_num(rc) + " " + listed(misses) +
+                      ": the" + some_pairs(missed, " and ") +
+                      (missed.size() == 1 ? " pair adds" : " pairs add") +
+                      " nothing to the descriptor, which sums over its other "
+                      "element pairs alone."};
+  // No pair of the line within the cutoff: the line as a whole.
+  const DataStats line = s.line_pairs() ? s.line_pairs()->stats(d) : d;
+  const std::string all = of_pairs(s);
+  if (line.per_pair.empty())
+    return HealthFail{key + " = " + seed_num(rc) + ": no" + all +
                       " pair of atoms of the dataset lies within it, so the "
                       "descriptor sums over no neighbour and is 0 for every "
                       "atom."};
-  const NeighbourRange range = neighbour_range(d, rc);
-  if (!range.empty) return HealthOk{};
+  const NeighbourRange range = neighbour_range(line, rc);
   return HealthFail{key + " = " + seed_num(rc) + " is below the smallest" +
-                    pairs + " neighbour distance of the dataset (" +
+                    all + " neighbour distance of the dataset (" +
                     num(range.lo) + " Å): the descriptor sums over no "
                     "neighbour and is 0 for every atom."};
 }
@@ -365,21 +445,34 @@ HealthVerdict radial_reach_check(const DataStats &d, const SeedView &s,
   if (!s.contains("CGRIDMB") || d.n_atoms == 0) return HealthOk{};
   const bool has_cut = s.contains("RCUTMB");
   const double rcut = has_cut ? s.get<double>("RCUTMB") : 0.0;
-  const NeighbourRange range = neighbour_range(d, rcut);
   const std::string within =
       has_cut ? "within RCUTMB = " + seed_num(rcut) : "of the dataset";
-  const std::string pairs = of_pairs(s);
-  if (range.empty) {
-    // An RCUTMB below every neighbour distance, or data without a pair
-    // within it: the check of the cutoff (cutoff_reach_check) gives the
-    // finding, once.
-    if (has_cut) return HealthOk{};
-    return HealthFail{"the dataset has no" + pairs +
-                      " pair of atoms: ρ is 0 for every atom."};
+  // Each element pair of the line on its own: the neighbour distances of
+  // each that the density sums over. A pair without one within RCUTMB is
+  // the check of the cutoff's (cutoff_reach_check), which gives the finding
+  // once; without RCUTMB, a pair the data do not have adds nothing to ρ.
+  struct Reach {
+    std::string name;
+    NeighbourRange range;
+  };
+  std::vector<Reach> reach;
+  std::vector<std::string> absent;
+  const std::vector<JudgedPair> pairs = judged_pairs(d, s);
+  for (const auto &p : pairs) {
+    const NeighbourRange range = neighbour_range(p.stats, rcut);
+    if (!range.empty)
+      reach.push_back(Reach{p.name, range});
+    else if (!has_cut)
+      absent.push_back(p.name);
   }
-  const std::string distances = "every" + pairs + " neighbour distance " +
-                                within + " (" + num(range.lo) + " to " +
-                                num(range.hi) + " Å)";
+  if (absent.size() == pairs.size())
+    return HealthFail{"the dataset has no" + of_pairs(s) +
+                      " pair of atoms: ρ is 0 for every atom."};
+  if (!absent.empty())
+    return HealthFail{"the dataset has no" + some_pairs(absent) +
+                      " pair of atoms: ρ gets nothing from " +
+                      (absent.size() == 1 ? "that pair." : "these pairs.")};
+  if (reach.empty()) return HealthOk{};
   const std::size_t n = s.size("CGRIDMB");
   const std::size_t widths = s.contains("SGRIDMB") ? s.size("SGRIDMB") : 0;
   for (std::size_t i = 0; i < n; ++i) {
@@ -390,27 +483,57 @@ HealthVerdict radial_reach_check(const DataStats &d, const SeedView &s,
                         ": the reach of its channel of ρ cannot be judged."};
     const double eta = s.get<double>("SGRIDMB", i);
     if (!(eta > 0.0)) continue;  // no decay: refused by other rules
-    // The distance from the centre to the nearest neighbour distance.
-    const double dist =
-        c < range.lo ? range.lo - c : (c > range.hi ? c - range.hi : 0.0);
+    const double half = 2.0 / eta;  // b(eta (r - c)) is 0 for |r - c| >= 2/eta
+    // The pairs whose neighbour distances the channel does not reach, each
+    // by the distance from the centre to the nearest of them.
+    std::vector<const Reach *> missed;
+    for (const auto &r : reach) {
+      const double dist = c < r.range.lo   ? r.range.lo - c
+                          : c > r.range.hi ? c - r.range.hi
+                                           : 0.0;
+      const bool misses = kind == BasisKind::Gaussian
+                              ? eta > gaussian_reach_width(dist)
+                              : !(dist < half);
+      if (misses) missed.push_back(&r);
+    }
+    if (missed.empty()) continue;
+    // "every (W, W) neighbour distance within RCUTMB = 3.5 (2.5 to 2.7 Å)",
+    // a further pair "every (Ta, Ta) one (2.86 to 3.5 Å)".
+    std::vector<std::string> where, names;
+    for (const Reach *r : missed) {
+      const std::string span =
+          " (" + num(r->range.lo) + " to " + num(r->range.hi) + " Å)";
+      where.push_back(where.empty()
+                          ? r->name + " neighbour distance " + within + span
+                          : r->name + " one" + span);
+      names.push_back(r->name);
+    }
+    // Every pair of the line missed, or beyond the cutoff: ρ is 0 for every
+    // atom; some: the pairs missed add nothing to it.
+    const bool every = missed.size() == reach.size();
     const std::string channel = entry(s, "CGRIDMB", i) + " = " +
                                 seed_num(c) + " with " +
                                 entry(s, "SGRIDMB", i) + " = " + seed_num(eta);
+    const std::string some =
+        ", so ρ gets nothing from the" + some_pairs(names) + " pairs of atoms";
     if (kind == BasisKind::Gaussian) {
-      if (!(eta > gaussian_reach_width(dist))) continue;
+      std::vector<std::string> at;
+      for (const auto &w : where)
+        at.push_back((at.empty() ? "" : "at ") + std::string("every") + w);
       return HealthFail{channel +
                         ": the Gaussian exp(-SGRIDMB (r - CGRIDMB)^2) is "
-                        "below 1e-6 at " + distances +
-                        ", so ρ is ~0 for every atom (a smaller SGRIDMB, "
-                        "or a centre nearer the neighbours, reaches them)."};
+                        "below 1e-6 at " + listed(at) +
+                        (every ? ", so ρ is ~0 for every atom" : some) +
+                        " (a smaller SGRIDMB, or a centre nearer the "
+                        "neighbours, reaches them)."};
     }
-    const double half = 2.0 / eta;  // b(eta (r - c)) is 0 for |r - c| >= 2/eta
-    if (dist < half) continue;
+    std::vector<std::string> none;
+    for (const auto &w : where) none.push_back("no" + w);
     return HealthFail{channel + ": the support of the blip, |r - CGRIDMB| < "
-                      "2/SGRIDMB = " + num(half) + " Å, holds no" + pairs +
-                      " neighbour distance " + within + " (" + num(range.lo) +
-                      " to " + num(range.hi) + " Å), so ρ is 0 for every "
-                      "atom (a smaller SGRIDMB widens the support)."};
+                      "2/SGRIDMB = " + num(half) + " Å, holds " +
+                      listed(none) +
+                      (every ? ", so ρ is 0 for every atom" : some) +
+                      " (a smaller SGRIDMB widens the support)."};
   }
   return HealthOk{};
 }
