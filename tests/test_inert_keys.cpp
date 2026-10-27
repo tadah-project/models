@@ -14,6 +14,7 @@
 
 #include "catch2/catch.hpp"
 
+#include <tadah/core/blueprint_parser.h>
 #include <tadah/core/context.h>
 #include <tadah/core/core_user_config_parser.h>
 #include <tadah/core/logger.h>
@@ -285,4 +286,59 @@ TEST_CASE("inert keys: a fit that writes its own WATOM refuses another",
   const std::string one =
       dir.write_file("refit1.train", std::string(kLj) + "WATOM 1\n");
   CHECK(refusal(CoreUserConfigParser().parse(one), refit).empty());
+}
+
+/* Pins: a refusal of several lines separates them with "; ", and the
+ * reason of a deprecated key's line (its blueprint text) has no ";", so
+ * that each "; " of the refusal begins the next line: a configuration with
+ * MBLOCK 64, NBLOCK 8, MPIWPCKG 50, SIGMA 1 0.5 and RHOFORM SIGNED (no
+ * DM_REAM block) is refused with a text that "; " splits into five parts,
+ * the first naming MBLOCK 64 and each other beginning with the key of its
+ * line. The text of every deprecated key of the blueprint has no ";" and
+ * says "A fit refuses it.", so that the notice of a potential's line,
+ * which quotes the same text, says what a fit does with it.
+ * Before the fix: the texts of MPIWPCKG, MBLOCK, NBLOCK and SIGMA said "A
+ * potential that has it still loads, its value ignored; a fit refuses it",
+ * so the refusal split into nine parts and a line's reason ran into the
+ * next line ("... its value ignored; a fit refuses it; NBLOCK 8 ..."). */
+TEST_CASE("inert keys: each '; ' of a refusal of several lines begins the "
+          "next line",
+          "[inert_keys]") {
+  tadah::core::PeriodicTable::initialize();
+  const ScratchDir dir;
+  Quiet quiet;
+  const std::string path = dir.write_file(
+      "several.train", std::string(kLj) +
+                           "MBLOCK 64\nNBLOCK 8\nMPIWPCKG 50\nSIGMA 1 0.5\n"
+                           "RHOFORM SIGNED\n");
+  const std::string what = refusal(CoreUserConfigParser().parse(path));
+  INFO("refusal: " << what);
+  std::vector<std::string> parts;
+  for (std::size_t from = 0;;) {
+    const std::size_t at = what.find("; ", from);
+    parts.push_back(what.substr(from, at == std::string::npos
+                                          ? std::string::npos
+                                          : at - from));
+    if (at == std::string::npos) break;
+    from = at + 2;
+  }
+  REQUIRE(parts.size() == 5u);
+  CHECK_THAT(parts[0], Catch::Contains("MBLOCK 64 (line 8 of " + path + ")"));
+  CHECK_THAT(parts[1], Catch::StartsWith("NBLOCK 8 (line 9 of " + path + ")"));
+  CHECK_THAT(parts[2],
+             Catch::StartsWith("MPIWPCKG 50 (line 10 of " + path + ")"));
+  CHECK_THAT(parts[3],
+             Catch::StartsWith("SIGMA 1 0.5 (line 11 of " + path + ")"));
+  CHECK_THAT(parts[4],
+             Catch::StartsWith("RHOFORM SIGNED (line 12 of " + path + ")"));
+
+  std::size_t deprecated = 0;
+  for (const auto &entry : tadah::core::BlueprintParser::getKeysMapRef()) {
+    if (!entry.second.isDeprecated()) continue;
+    ++deprecated;
+    INFO(entry.first << ": " << entry.second.deprecated);
+    CHECK(entry.second.deprecated.find(';') == std::string::npos);
+    CHECK_THAT(entry.second.deprecated, Catch::Contains("A fit refuses it."));
+  }
+  CHECK(deprecated >= 4u);
 }

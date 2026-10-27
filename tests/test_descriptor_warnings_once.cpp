@@ -209,13 +209,17 @@ TEST_CASE("DM_REAM warns once per process of a density knot past RCUTMB",
 
 /* Pins: three DC_Selectors built from a DM_mBlipEnv configuration with
  * Lmax 1 (a DM_mEAD descriptor whose channel function is not F_SQ) log the
- * warning "channel function is not F_SQ — descriptor is NOT rotationally
- * invariant for L>0" exactly once between them (check_logged_once), and
- * the warning says what that does to the stress: "The stress is then not
- * the strain derivative of the energy (the virial is not symmetric)."
+ * warning "DM_mEAD: the channel function is not F_SQ, so the descriptor
+ * is not rotationally invariant for L>0 and its stress is not the strain
+ * derivative of the energy (the virial is not symmetric). The DM_PS_*
+ * descriptors are invariant." exactly once between them
+ * (check_logged_once).
  * Before the fix: three times, once per descriptor object (a tadah hpo
- * run printed it once per evaluation). Before the stress sentence was
- * added: the warning did not mention the stress. */
+ * run printed it once per evaluation). Before the stress clause was added:
+ * the warning did not mention the stress. Before the warning was
+ * reordered: "... NOT rotationally invariant for L>0. Use DM_PS_*
+ * descriptors instead. The stress is then not the strain derivative ...",
+ * whose "then" read as if it followed from the remedy. */
 TEST_CASE("DM_mEAD warns once per process of a channel that is not "
           "rotationally invariant",
           "[descriptor][warn_once]") {
@@ -230,21 +234,26 @@ TEST_CASE("DM_mEAD warns once per process of a channel that is not "
   const bool before = tadah::models::warning_logged_once(key);
   CoutCapture out;
   for (int k = 0; k < 3; ++k) tadah::models::DC_Selector s(c);
-  check_logged_once(out.str(), "rotationally invariant for L>0", key, before);
   check_logged_once(out.str(),
-                    "The stress is then not the strain derivative of the "
-                    "energy (the virial is not symmetric).",
+                    "DM_mEAD: the channel function is not F_SQ, so the "
+                    "descriptor is not rotationally invariant for L>0 and "
+                    "its stress is not the strain derivative of the energy "
+                    "(the virial is not symmetric). The DM_PS_* descriptors "
+                    "are invariant.",
                     key, before);
 }
 
 /* Pins: three DC_Selectors built from a DM_OW_SQRT configuration with
  * Lmax 1 (a DM_Poly descriptor, OrbitalWise, whose channel function is not
- * F_SQ) log the warning "DM_Poly (OrbitalWise): channel function is not
- * F_SQ ..." exactly once between them (check_logged_once), and the warning
- * says what that does to the stress: "The stress is then not the strain
- * derivative of the energy (the virial is not symmetric)."
+ * F_SQ) log the warning "DM_Poly (OrbitalWise): the channel function is not
+ * F_SQ, so the descriptor is not rotationally invariant for L>0 and its
+ * stress is not the strain derivative of the energy (the virial is not
+ * symmetric). PowerSpectrum mode is invariant." exactly once between them
+ * (check_logged_once).
  * Before the fix: three times, once per descriptor object. Before the
- * stress sentence was added: the warning did not mention the stress. */
+ * stress clause was added: the warning did not mention the stress. Before
+ * the warning was reordered: "... Use PowerSpectrum mode. The stress is
+ * then not the strain derivative ...". */
 TEST_CASE("DM_Poly OrbitalWise warns once per process of a channel that is "
           "not rotationally invariant",
           "[descriptor][warn_once]") {
@@ -258,11 +267,12 @@ TEST_CASE("DM_Poly OrbitalWise warns once per process of a channel that is "
   const bool before = tadah::models::warning_logged_once(key);
   CoutCapture out;
   for (int k = 0; k < 3; ++k) tadah::models::DC_Selector s(c);
-  check_logged_once(out.str(), "DM_Poly (OrbitalWise): channel function is "
-                    "not F_SQ", key, before);
   check_logged_once(out.str(),
-                    "The stress is then not the strain derivative of the "
-                    "energy (the virial is not symmetric).",
+                    "DM_Poly (OrbitalWise): the channel function is not "
+                    "F_SQ, so the descriptor is not rotationally invariant "
+                    "for L>0 and its stress is not the strain derivative of "
+                    "the energy (the virial is not symmetric). PowerSpectrum "
+                    "mode is invariant.",
                     key, before);
 }
 
