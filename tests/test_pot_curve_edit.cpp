@@ -575,6 +575,67 @@ TEST_CASE_METHOD(EditFixture, "potedit: derived/normalized knot RCUT",
   }
 }
 
+/* Pins: normalize_knot_rcut with a list of notes rewrites the stated
+ * cutoff as the logging form does and hands the caller the message instead
+ * of logging it (tadah hpo journals it as a WARNING of the run): a stale
+ * RCUT2B 5.3 gives one note of level WARNING, "test: RCUT2B 5.3 is above
+ * the largest knot (5): the knot basis vanishes at its largest knot, so the
+ * cutoff of a D2_Knot5 line is 5, which the CGRID2B knot positions set."
+ * (the text the logging form prints), and nothing on standard output; a gap of
+ * 3e-13 one note of level INFO; a consistent cutoff none.
+ * Before the fix: there was no such form (the case does not compile
+ * against the header without it). */
+TEST_CASE_METHOD(EditFixture,
+                 "potedit: normalize_knot_rcut hands its notes to a caller "
+                 "that journals them",
+                 "[potedit][notes]") {
+  auto &log = tadah::core::Logger::instance();
+  const auto old_level = log.getLogLevel();
+  log.setLogLevel(tadah::core::LogLevel::INFO);
+  const auto normalize = [](Context &k, std::vector<KnotRcutNote> &notes,
+                            std::string &printed) {
+    std::ostringstream captured;
+    std::streambuf *old_buf = std::cout.rdbuf(captured.rdbuf());
+    const bool changed = normalize_knot_rcut(k, "test", notes);
+    std::cout.rdbuf(old_buf);
+    printed = captured.str();
+    return changed;
+  };
+  std::string printed;
+  {
+    Context k = make_knot_pot();
+    k.remove("RCUT2B");
+    k.add("RCUT2B", 5.3);
+    std::vector<KnotRcutNote> notes;
+    REQUIRE(normalize(k, notes, printed));
+    CHECK(k.get<double>("RCUT2B") == 5.0);
+    REQUIRE(notes.size() == 1u);
+    CHECK(notes[0].level == tadah::core::LogLevel::WARNING);
+    CHECK(notes[0].text ==
+          "test: RCUT2B 5.3 is above the largest knot (5): the knot basis "
+          "vanishes at its largest knot, so the cutoff of a D2_Knot5 line is "
+          "5, which the CGRID2B knot positions set.");
+    CHECK(printed.empty());
+  }
+  {
+    Context k = make_knot_pot();
+    k.remove("RCUT2B");
+    k.add("RCUT2B", 5.0 + 3e-13);
+    std::vector<KnotRcutNote> notes;
+    REQUIRE(normalize(k, notes, printed));
+    REQUIRE(notes.size() == 1u);
+    CHECK(notes[0].level == tadah::core::LogLevel::INFO);
+    CHECK(printed.empty());
+  }
+  {
+    Context k = make_knot_pot();
+    std::vector<KnotRcutNote> notes;
+    REQUIRE_FALSE(normalize(k, notes, printed));
+    CHECK(notes.empty());
+  }
+  log.setLogLevel(old_level);
+}
+
 TEST_CASE_METHOD(EditFixture,
                  "potedit: normalize_knot_rcut rewrites ANY difference "
                  "exactly, WARNING only above 1e-9 relative",
@@ -1614,4 +1675,187 @@ TEST_CASE_METHOD(EditFixture,
     REQUIRE(rep.resid_comp == Approx(own).epsilon(1e-9));
     REQUIRE(own < (1.0 - 1e-6) * other);
   }
+}
+
+/* Pins: normalize_knot_rcut derives the cutoff of each knot descriptor of
+ * a joined line from its own knots, as that of a line of one knot
+ * descriptor, so that the fits (tadah train, analysis check_bounds and hpo)
+ * agree on it (a potential keeps its stated cutoffs:
+ * normalize_potential_knot_rcut): TYPE2B D2_mJoin of D2_Knot5 (knots 2.5
+ * 3.5 4.5) and D2_Blip with RCUT2B 5.3 5 becomes RCUT2B 4.5 5 (the
+ * D2_Blip's 5 kept, RCUT2BMAX 5), with one WARNING naming the descriptor
+ * and the entry of the key, as an OPTIM line numbers the whole key, "test:
+ * TYPE2B descriptor 1 (D2_Knot5): RCUT2B (1) 5.3 is above the largest knot
+ * (4.5): the knot basis vanishes at its largest knot, so the cutoff of a
+ * D2_Knot5 descriptor is 4.5, which the CGRID2B knot positions set."; a
+ * second call, and a joined line whose knot cutoff is its largest knot,
+ * change nothing. TYPEMB DM_mJoin of DM_Blip and a knot DM_REAM density
+ * (knots 4.6 3.0) with RCUTMB 5 5.2 becomes RCUTMB 5 4.6, its WARNING
+ * "test: TYPEMB descriptor 2 (DM_REAM): RCUTMB (2) 5.2 is above the largest
+ * knot (4.6): ... the cutoff of a knot DM_REAM density is 4.6, ...".
+ * Before the fix: a joined line was left as stated (derived_knot_rcut
+ * reads the line's first value, D2_mJoin): no change, no note; then the
+ * note said "RCUT2B 5.3" and "the cutoff of a D2_Knot5 line", a line the
+ * descriptor is not, without the entry. */
+TEST_CASE("potedit: normalize_knot_rcut derives the cutoff of each knot "
+          "descriptor of a joined line",
+          "[potedit][notes][join]") {
+  auto joined = [](const char *rcut) {
+    Context c;
+    c.add("ATOM", "Ta");
+    c.add("INIT2B", "true");
+    c.add("INITMB", "false");
+    c.add("TYPE2B", "D2_mJoin D2_Knot5 3 3 Ta Ta D2_Blip 3 3 Ta Ta");
+    c.add("RCTYPE2B", "Cut_Dummy Cut_Dummy");
+    c.add("RCUT2B", rcut);
+    c.add("CGRID2B", "2.5 3.5 4.5 2.5 3.0 3.5");
+    c.add("KDEG2B", "5 5 5");
+    c.add("SGRID2B", "2 2 2");
+    return c;
+  };
+  Context k = joined("5.3 5.0");
+  std::vector<KnotRcutNote> notes;
+  REQUIRE(normalize_knot_rcut(k, "test", notes));
+  REQUIRE(k.size("RCUT2B") == 2u);
+  CHECK(k.get<double>("RCUT2B", 0) == 4.5);
+  CHECK(k.get<double>("RCUT2B", 1) == 5.0);
+  CHECK(k.get<double>("RCUT2BMAX") == 5.0);
+  REQUIRE(notes.size() == 1u);
+  CHECK(notes[0].level == tadah::core::LogLevel::WARNING);
+  CHECK(notes[0].text ==
+        "test: TYPE2B descriptor 1 (D2_Knot5): RCUT2B (1) 5.3 is above the "
+        "largest knot (4.5): the knot basis vanishes at its largest knot, so "
+        "the cutoff of a D2_Knot5 descriptor is 4.5, which the CGRID2B knot "
+        "positions set.");
+  notes.clear();
+  CHECK_FALSE(normalize_knot_rcut(k, "test", notes));
+  CHECK(notes.empty());
+  Context same = joined("4.5 5.0");
+  CHECK_FALSE(normalize_knot_rcut(same, "test", notes));
+  CHECK(notes.empty());
+
+  Context mb;
+  mb.add("ATOM", "Ta");
+  mb.add("INIT2B", "false");
+  mb.add("INITMB", "true");
+  mb.add("TYPEMB", "DM_mJoin DM_Blip 0 2 2 Ta Ta DM_REAM 2 2 0 2 3 0 0 0 "
+                   "Ta Ta");
+  mb.add("RCTYPEMB", "Cut_Dummy Cut_Dummy");
+  mb.add("RCUTMB", "5.0 5.2");
+  mb.add("CGRIDMB", "2.5 3.5 4.6 3.0");
+  mb.add("SGRIDMB", "1.0 1.0");
+  mb.add("AMPGRIDMB", "0.4 0.2");
+  mb.add("CEMBFUNC", "0.0 0.5 1.0");
+  REQUIRE(normalize_knot_rcut(mb, "test", notes));
+  REQUIRE(mb.size("RCUTMB") == 2u);
+  CHECK(mb.get<double>("RCUTMB", 0) == 5.0);
+  CHECK(mb.get<double>("RCUTMB", 1) == 4.6);
+  REQUIRE(notes.size() == 1u);
+  CHECK(notes[0].text ==
+        "test: TYPEMB descriptor 2 (DM_REAM): RCUTMB (2) 5.2 is above the "
+        "largest knot (4.6): the knot basis vanishes at its largest knot, so "
+        "the cutoff of a knot DM_REAM density is 4.6, which the CGRIDMB knot "
+        "positions set.");
+}
+
+/* Pins: normalize_potential_knot_rcut, the form for a potential that tadah
+ * predict and tadah refit --edit evaluate with its coefficients, keeps the
+ * stated cutoffs of a joined line, with which those coefficients were
+ * fitted (Tadah! 1.5.0 fitted a joined line at its stated cutoffs and
+ * wrote them), and derives that of a line of one knot descriptor as
+ * normalize_knot_rcut does (every fit of such a line derives it): TYPE2B
+ * D2_mJoin of D2_Knot5 (knots 2.5 3.5 4.5) and D2_Blip with RCUT2B 5.3 5
+ * under Cut_Cos stays RCUT2B 5.3 5 (RCUT2BMAX 5.3), nothing logged and
+ * false returned; a D2_Knot5 line alone with RCUT2B 5.3 and knots up to 5
+ * becomes RCUT2B 5 with its WARNING ("test: RCUT2B 5.3 is above the
+ * largest knot (5): ..."), true returned.
+ * Before the fix: there was no such form (the case does not compile
+ * against the header without it); predict and refit --edit called
+ * normalize_knot_rcut, which made the joined line RCUT2B 4.5 5. */
+TEST_CASE("potedit: normalize_potential_knot_rcut keeps the stated cutoffs "
+          "of a joined line of a potential",
+          "[potedit][notes][join]") {
+  auto &log = tadah::core::Logger::instance();
+  const auto old_level = log.getLogLevel();
+  log.setLogLevel(tadah::core::LogLevel::INFO);
+  const auto normalize = [](Context &k, std::string &printed) {
+    std::ostringstream captured;
+    std::streambuf *old_buf = std::cout.rdbuf(captured.rdbuf());
+    const bool changed = normalize_potential_knot_rcut(k, "test");
+    std::cout.rdbuf(old_buf);
+    printed = captured.str();
+    return changed;
+  };
+  std::string printed;
+  {
+    Context c;
+    c.add("ATOM", "Ta");
+    c.add("INIT2B", "true");
+    c.add("INITMB", "false");
+    c.add("TYPE2B", "D2_mJoin D2_Knot5 3 3 Ta Ta D2_Blip 3 3 Ta Ta");
+    c.add("RCTYPE2B", "Cut_Cos Cut_Cos");
+    c.add("RCUT2B", "5.3 5.0");
+    c.add("CGRID2B", "2.5 3.5 4.5 2.5 3.0 3.5");
+    c.add("KDEG2B", "5 5 5");
+    c.add("SGRID2B", "2 2 2");
+    CHECK_FALSE(normalize(c, printed));
+    REQUIRE(c.size("RCUT2B") == 2u);
+    CHECK(c.get<double>("RCUT2B", 0) == 5.3);
+    CHECK(c.get<double>("RCUT2B", 1) == 5.0);
+    CHECK(c.get<double>("RCUT2BMAX") == 5.3);
+    CHECK(printed.empty());
+  }
+  {
+    Context k = make_knot_pot();
+    k.remove("RCUT2B");
+    k.add("RCUT2B", 5.3);
+    CHECK(normalize(k, printed));
+    CHECK(k.get<double>("RCUT2B") == 5.0);
+    CHECK_THAT(printed,
+               Catch::Matchers::Contains(
+                   "WARNING: test: RCUT2B 5.3 is above the largest knot (5): "
+                   "the knot basis vanishes at its largest knot"));
+  }
+  log.setLogLevel(old_level);
+}
+
+/* Pins: under a smooth cutoff the note of a knot descriptor of a joined
+ * line says only what the fit does: normalize_knot_rcut on TYPE2B D2_mJoin
+ * of D2_Knot5 (knots 2.5 3.5 4.5) and D2_Blip with RCUT2B 5.3 5 under
+ * Cut_Cos gives one WARNING, "test: TYPE2B descriptor 1 (D2_Knot5): RCUT2B
+ * (1) 5.3 is above the largest knot (4.5): the knot basis vanishes at its
+ * largest knot, so the cutoff of a D2_Knot5 descriptor is 4.5, which the
+ * CGRID2B knot positions set.", without the note of a line of one knot
+ * descriptor that pair_style tadah reads the stated cutoff and differs from
+ * tadah predict on a potential file stating it: tadah predict and tadah
+ * refit --edit take the stated cutoffs of a joined line too
+ * (normalize_potential_knot_rcut).
+ * Before the fix: the WARNING went on with "Under the smooth RCTYPE2B the
+ * cutoff value enters every pair term, and pair_style tadah (LAMMPS) reads
+ * the stated RCUT2B without re-deriving it: on a potential file stating
+ * 5.3, LAMMPS differs from tadah train/predict/hpo ..."; then it said
+ * "RCUT2B 5.3" and "the cutoff of a D2_Knot5 line", without the entry. */
+TEST_CASE("potedit: the note of a knot descriptor of a joined line under a "
+          "smooth cutoff says what the fit does",
+          "[potedit][notes][join]") {
+  Context c;
+  c.add("ATOM", "Ta");
+  c.add("INIT2B", "true");
+  c.add("INITMB", "false");
+  c.add("TYPE2B", "D2_mJoin D2_Knot5 3 3 Ta Ta D2_Blip 3 3 Ta Ta");
+  c.add("RCTYPE2B", "Cut_Cos Cut_Cos");
+  c.add("RCUT2B", "5.3 5.0");
+  c.add("CGRID2B", "2.5 3.5 4.5 2.5 3.0 3.5");
+  c.add("KDEG2B", "5 5 5");
+  c.add("SGRID2B", "2 2 2");
+  std::vector<KnotRcutNote> notes;
+  REQUIRE(normalize_knot_rcut(c, "test", notes));
+  CHECK(c.get<double>("RCUT2B", 0) == 4.5);
+  REQUIRE(notes.size() == 1u);
+  CHECK(notes[0].level == tadah::core::LogLevel::WARNING);
+  CHECK(notes[0].text ==
+        "test: TYPE2B descriptor 1 (D2_Knot5): RCUT2B (1) 5.3 is above the "
+        "largest knot (4.5): the knot basis vanishes at its largest knot, so "
+        "the cutoff of a D2_Knot5 descriptor is 4.5, which the CGRID2B knot "
+        "positions set.");
 }
