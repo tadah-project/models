@@ -86,14 +86,6 @@ std::string D2_MIE::label() const {
 void D2_MIE::init() {
   nparams=2;
 }
-bool D2_MIE::reinit(const tadah::core::Context& ctx) {
-  double temp;
-  temp = ctx.get<double>("TYPE2B", 1); if (temp != -1) n = temp;
-  temp = ctx.get<double>("TYPE2B", 2); if (temp != -1) m = temp;
-  if (fcut) fcut->set_rcut(ctx.get<double>("RCUT2BMAX"));
-  return false;  // s = 2 always
-}
-
 bool D2_MIE::calc_dDdtheta(
   const std::string& theta_name,
   int                arg_pos,

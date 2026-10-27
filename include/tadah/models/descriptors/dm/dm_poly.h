@@ -145,7 +145,6 @@ public:
     tadah::core::rho_type& rho,
     const double scale = 1) const override;
   void init() override;
-  bool reinit(const tadah::core::Context& ctx) override;
   std::optional<DescriptorMeta> meta() const override;
   // Radial family comes from the compile-time policy (BlipRadial/GaussianRadial);
   // the ChannelFn/AggMode axes are orthogonal to the radial basis.

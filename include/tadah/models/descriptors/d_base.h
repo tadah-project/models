@@ -116,10 +116,8 @@ public:
    *      populates watom_Z_by_arg_pos.
    *    - Pair triples (sym sym value)+ : symmetric direct writes. Sets
    *      watom_mode = PairTriple and populates watom_pair_by_arg_pos.
-   *  Always resets `weights` to 1.0 first when called via the
-   *  constructor; subsequent calls (HPO reinit) write only the listed
-   *  pairs so callers can rely on prior state being preserved on
-   *  unlisted slots. */
+   *  The constructor resets `weights` to 1.0 first; a later call writes
+   *  only the listed pairs, so the unlisted slots keep their values. */
   void update_weights(const tadah::core::Context &c);
 
   /** One `weights[Zi][Zj] = weights[Zj][Zi] = w` write of update_weights. */
@@ -177,8 +175,8 @@ public:
    *  throws DensityFormError (rhoform.h), prefixed by @p who, when a WATOM
    *  value in @p c is not finite and > 0 (per-species values give
    *  W = sqrt(w_i w_j) > 0 exactly when every w_i > 0). Reads the context,
-   *  not `weights`: DC_Selector::reinit calls the descriptor's reinit()
-   *  before update_weights(). No WATOM (all weights 1.0) passes. */
+   *  not `weights`: a constructor checks the form before update_weights().
+   *  No WATOM (all weights 1.0) passes. */
   static void require_positive_density_weights(const tadah::core::Context &c,
                                                const std::string &who);
 
@@ -248,20 +246,6 @@ public:
   /** \brief Return dimension of the descriptor.
   */
   virtual size_t size() const;
-
-  /** \brief Update descriptor parameters in-place from context.
-   *
-   * Re-reads all parameters that were baked in at construction time.
-   * Returns true if the descriptor's output size changed, requiring a
-   * full Trainer rebuild.  Default: no-op (for file-based or fixed descriptors).
-   *
-   * Through DC_Selector::reinit(), an in-place update for library users;
-   * tadah hpo does not call it (it builds a Trainer, and so the
-   * descriptors, for every evaluation). It updates the descriptor only:
-   * a model, basis function or kernel built from the old context keeps
-   * what it read then.
-   */
-  virtual bool reinit(const tadah::core::Context& /*ctx*/) { return false; }
 
   /** \brief What fixes value @p i (0-based) of this descriptor's cutoff key
    *  (RCUT2B for a two-body, RCUTMB for a many-body descriptor), as a
@@ -388,7 +372,7 @@ protected:
    *  pots with spill exist and their truncation is part of the fitted model
    *  (authoring surfaces — hpo preflight, refit, --edit — hard-error
    *  instead). Smooth cutoffs damp the overhang to zero -> no-op. Call from
-   *  the ctor and reinit() of bump descriptors. */
+   *  the ctor of bump descriptors. */
   void warn_if_bump_support_beyond_rcut(const std::string &who,
                                         const std::string &ckey,
                                         const std::string &rkey,

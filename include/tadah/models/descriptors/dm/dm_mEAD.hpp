@@ -484,27 +484,6 @@ template <typename F>
     keys.push_back("SEMBFUNC");
     nparams=5;
   }
-template <typename F>
-  bool DM_mEAD<F>::reinit(const tadah::core::Context& ctx) {
-    const size_t old_s = s;
-    get_grid(ctx, "CGRIDMB", cgrid);
-    get_grid(ctx, "SGRIDMB", sgrid);
-    Lmax = ctx.get<int>("TYPEMB", 1);
-    // rc must be updated before gen_atomic_orbitals: fac[][] depends on rc
-    rc = ctx.get<double>("RCUTMBMAX");
-    if (fcut) fcut->set_rcut(rc);
-    // Re-construct embedding function (re-reads CEMBFUNC/SEMBFUNC from ctx)
-    emb = F(ctx, cgrid.size(), sgrid.size());
-    odim     = emb.output_dim();
-    const std::size_t ng = cgrid.size();
-    const std::size_t norbs = gen_atomic_orbitals(Lmax);
-    s         = odim * static_cast<size_t>(Lmax + 1);
-    rhoisize  = norbs * ng;
-    rhoipsize = norbs * odim;
-    set_drfidx(rhoisize);
-    return s != old_s;
-  }
-
 /* ================================================================== *
  *  calc_drhoi_dtheta — closed-form drho_i/dtheta for the radial side
  *  (CGRIDMB[k], SGRIDMB[k], RCUTMB). Mirrors DM_EAD::calc_drhoi_dtheta

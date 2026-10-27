@@ -543,10 +543,6 @@ TEST_CASE_METHOD(ReamEmbf0Fixture, "DM_REAM EMBF0: key handling",
     using Catch::Matchers::Contains;
     REQUIRE_THROWS_WITH(DM_REAM(c),
                         Contains("ZERO") && Contains("FREE") && Contains("ON"));
-    // reinit reads the key too
-    Context ok = make_draw_ctx(d, nullptr);
-    DM_REAM dm(ok);
-    REQUIRE_THROWS_WITH(dm.reinit(c), Contains("ZERO") && Contains("FREE"));
   }
   SECTION("INITMB false: nothing is read, no key materialised") {
     Context c = make_draw_ctx(d, nullptr);
@@ -838,70 +834,6 @@ TEST_CASE_METHOD(ReamEmbf0Fixture,
     });
     INFO(kFamilies[fi].name << ": " << v.n << " violations; first: " << v.first);
     CHECK(v.n == 0);
-  }
-}
-
-// ------------------------------------------------------------------------
-//  6. reinit
-// ------------------------------------------------------------------------
-
-TEST_CASE_METHOD(ReamEmbf0Fixture,
-                 "DM_REAM EMBF0: reinit recomputes the reference and honours "
-                 "a key change",
-                 "[ream][embf0][reinit]") {
-  for (std::size_t fi = 0; fi < kNumFamilies; ++fi) {
-    INFO(kFamilies[fi].name);
-    std::mt19937 rng(777u + static_cast<unsigned>(fi));
-    for (int it = 0; it < 20; ++it) {
-      INFO("draw " << it);
-      const EmbDraw a = draw_emb(kFamilies[fi], rng, false);
-      // same size, new CEMBFUNC/SEMBFUNC; atom 0 active at rho = 0
-      EmbDraw b = a;
-      for (std::size_t m = 0; m < b.M(); ++m) {
-        double s;
-        draw_atom(b.fam, rng, m == 0 ? 1 : 0, b.c[m], s);
-        if (!b.s.empty()) b.s[m] = s;
-      }
-      const t_type wb = weights(b);
-
-      Context ca = make_draw_ctx(a, nullptr);
-      DM_REAM dm(ca);
-      Context cb = make_draw_ctx(b, nullptr);
-      REQUIRE_FALSE(dm.reinit(cb));  // same size
-      REQUIRE(dm.embf0_mode() == EmbF0Mode::Zero);
-      REQUIRE(cb.stored_value("EMBF0").value_or("") == "ZERO");
-      double F0, Fp0;
-      dm.eam_embed(wb, 0.0, F0, Fp0);
-      REQUIRE(F0 == 0.0);
-      {
-        DM_REAM fresh(cb);
-        REQUIRE(same_bits(all_outputs(dm, b), all_outputs(fresh, b)));
-      }
-      // ZERO -> FREE
-      Context cbf = make_draw_ctx(b, "FREE");
-      dm.reinit(cbf);
-      REQUIRE(dm.embf0_mode() == EmbF0Mode::Free);
-      {
-        DM_REAM fresh(cbf);
-        REQUIRE(same_bits(all_outputs(dm, b), all_outputs(fresh, b)));
-      }
-      // FREE -> ZERO (explicit) and back to the absent key
-      Context cbz = make_draw_ctx(b, "ZERO");
-      dm.reinit(cbz);
-      REQUIRE(dm.embf0_mode() == EmbF0Mode::Zero);
-      {
-        DM_REAM fresh(cbz);
-        REQUIRE(same_bits(all_outputs(dm, b), all_outputs(fresh, b)));
-      }
-      dm.reinit(cbf);
-      Context cb2 = make_draw_ctx(b, nullptr);
-      dm.reinit(cb2);
-      REQUIRE(dm.embf0_mode() == EmbF0Mode::Zero);
-      {
-        DM_REAM fresh(cb2);
-        REQUIRE(same_bits(all_outputs(dm, b), all_outputs(fresh, b)));
-      }
-    }
   }
 }
 

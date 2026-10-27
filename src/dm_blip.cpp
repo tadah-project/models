@@ -515,22 +515,6 @@ void DM_Blip::init()
   nparams = 2+1;
 }
 
-bool DM_Blip::reinit(const tadah::core::Context& ctx) {
-  const size_t old_s = s;
-  get_grid(ctx, "CGRIDMB", cgrid);
-  get_grid(ctx, "SGRIDMB", sgrid);
-
-  Lmax = ctx.get<int>("TYPEMB", 1);
-  // rc must be updated before gen_atomic_orbitals: fac[][] depends on rc
-  rc = ctx.get<double>("RCUTMBMAX");
-  if (fcut) fcut->set_rcut(rc);
-  s        = cgrid.size() * static_cast<size_t>(Lmax + 1);
-  rhoisize = gen_atomic_orbitals(Lmax) * cgrid.size();
-  // F'(rho) right after the density, as the constructor places it.
-  set_drfidx(rhoisize);
-  return s != old_s;
-}
-
 std::optional<DescriptorMeta> DM_Blip::meta() const {
   using DataStats = tadah::core::stats::DataStats;
   static constexpr std::size_t I_P99 = tadah::core::stats::IDX_P99;

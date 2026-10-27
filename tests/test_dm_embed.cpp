@@ -79,7 +79,7 @@ TEST_CASE("DM_Embed independently selects density embedding cutoff and envelope"
       }
 }
 
-TEST_CASE("DM_Embed force buffers are additive and invalid reinit preserves state",
+TEST_CASE("DM_Embed force buffers are additive and an invalid component is refused",
           "[unified-dm]") {
   auto c=embed_config(); DC_Selector s(c);
   const double before=energy(*s.dmb,1.3);
@@ -88,10 +88,9 @@ TEST_CASE("DM_Embed force buffers are additive and invalid reinit preserves stat
   for(auto &line:blocks[0].lines) if(line.find("AMPLITUDES")!=std::string::npos)
     line="AMPLITUDES -1 1";
   bad.replace_blocks(blocks);
-  REQUIRE_THROWS(s.dmb->reinit(bad));
-  REQUIRE(energy(*s.dmb,1.3) == before);
-  // The constructor refuses the invalid component too.
+  // The constructor refuses the invalid component.
   REQUIRE_THROWS(DC_Selector(bad));
+  REQUIRE(energy(*s.dmb,1.3) == before);
   rho_type rho; s.dmb->init_rhoi(rho);
   s.dmb->calc_rho(73,73,1.3,1.69,Vec3d(1.3,0,0),rho);
   aed_type a(3); a.set_zero(); s.dmb->calc_aed(rho,a);
@@ -239,7 +238,7 @@ TEST_CASE("Compact basis metadata uses inverse distance units", "[unified-dm][me
   }
 }
 
-TEST_CASE("DM_Embed composes with legacy terms in explicit order and preserves failed reinit", "[unified-dm][composition]") {
+TEST_CASE("DM_Embed composes with legacy terms in explicit order and an invalid component is refused", "[unified-dm][composition]") {
   auto fresh=embed_config("Gaussian","Blip5");auto spec=embed_specs(fresh).at(0);
   auto legacy=fresh;legacy.replace_blocks({});legacy.set_component_cutoffs({});legacy.remove("TYPEMB");
   legacy.add("TYPEMB","DM_REAM 0 1 1 1 2 2 0 0 Ta Ta");legacy.add("RHOFORM","SIGNED");legacy.add("EMBF0","FREE");
@@ -256,9 +255,7 @@ TEST_CASE("DM_Embed composes with legacy terms in explicit order and preserves f
     for(std::size_t i=0;i<b.size();++i)REQUIRE(all(i+(reverse?0:3))==b(i));
     REQUIRE_FALSE(combined.dmb->embf0_mode().has_value());
     auto bad=joined;auto broken=spec;broken.density.amplitudes[0]=-1;bad.replace_blocks({embed_block(broken)});
-    const double before=energy(*combined.dmb,1.37);REQUIRE_THROWS(combined.dmb->reinit(bad));
-    REQUIRE(energy(*combined.dmb,1.37)==before);
-    REQUIRE_THROWS(DC_Selector(bad));  // the constructor refuses it too
+    REQUIRE_THROWS(DC_Selector(bad));  // the constructor refuses it
   }
 }
 

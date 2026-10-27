@@ -110,48 +110,6 @@ namespace tadah {
         size_t descriptor_size() const { return dsize; }
         size_t density_size() const { return rsize; }
 
-        /** Update descriptor parameters in-place from context.
-         *  Returns true if the descriptor or the density array changed size
-         *  or a descriptor reports a change (a Trainer must be rebuilt).
-         *  The descriptors only (D_Base::reinit()): tadah hpo does not call
-         *  it, it builds a Trainer for every evaluation. Afterwards the
-         *  selector is laid out as init() lays out one built from @p ctx:
-         *  the intercept columns of its BIAS and ATOM, the two-body block
-         *  from the last of them, the many-body block after it, the density
-         *  array with rho_i from 0 and F'(rho_i) right after it, and dsize
-         *  and rsize of those sizes.
-         *
-         *  The objects stay the same (a DescriptorsCalc, such as a
-         *  Trainer's, holds references to them), so the update is in
-         *  place and its exception guarantee is the basic one: nothing
-         *  leaks, but a reinit that throws (a key it cannot read, a
-         *  refused grid or WATOM) may leave d2b, its cutoff or a part of a
-         *  descriptor holding the new values and the rest the old ones.
-         *  Build a new selector (a new Trainer) from a context that reads
-         *  instead of using one whose reinit threw. */
-        bool reinit(const tadah::core::Context& ctx) {
-          bool changed = false;
-          if (d2b) {
-            changed |= d2b->reinit(ctx);
-            d2b->update_weights(ctx);
-            if (c2b && ctx.get<bool>("INIT2B"))
-              c2b->set_rcut(ctx.get<double>("RCUT2BMAX"));
-          }
-          if (dmb) {
-            changed |= dmb->reinit(ctx);
-            dmb->update_weights(ctx);
-            if (cmb && ctx.get<bool>("INITMB"))
-              cmb->set_rcut(ctx.get<double>("RCUTMBMAX"));
-          }
-          if (d2b && dmb) {
-            const size_t old_dsize = dsize, old_rsize = rsize;
-            bias = static_cast<int>(tadah::core::n_intercept_columns(ctx));
-            place();
-            changed |= dsize != old_dsize || rsize != old_rsize;
-          }
-          return changed;
-        }
-
         ~DC_Selector()
         {
           release();
@@ -171,7 +129,7 @@ namespace tadah {
         }
 
       private:
-        /* The layout of init() and reinit(), for `bias` intercept
+        /* The layout of init(), for `bias` intercept
          * columns: the two-body block from column bias, the many-body
          * block after it, the density array with rho_i from 0 and
          * F'(rho_i) right after it (where each descriptor's constructor

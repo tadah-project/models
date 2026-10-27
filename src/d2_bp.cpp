@@ -255,15 +255,6 @@ void D2_BP::init() {
   keys.push_back("SGRID2B");
   nparams=2;
 }
-bool D2_BP::reinit(const tadah::core::Context& ctx) {
-  const size_t old_s = s;
-  get_grid(ctx, "CGRID2B", cgrid);
-  get_grid(ctx, "SGRID2B", sgrid);
-  s = cgrid.size();
-  if (fcut) fcut->set_rcut(ctx.get<double>("RCUT2BMAX"));
-  return s != old_s;
-}
-
 // ----------------------------------------------------------------
 // meta() — see param_meta.h. D2_BP shares its parameter shape with
 // D2_Blip (RCUT2B + paired CGRID2B/SGRID2B vectors) so the

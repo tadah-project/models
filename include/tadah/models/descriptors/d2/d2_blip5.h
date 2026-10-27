@@ -114,7 +114,6 @@ public:
 
   std::string label() const override;
   void init() override;
-  bool reinit(const tadah::core::Context& ctx) override;
   std::optional<DescriptorMeta> meta() const override;
   std::optional<BasisKind> basis_kind() const override { return BasisKind::Blip5; }
 };
