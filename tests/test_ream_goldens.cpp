@@ -15,13 +15,15 @@
  * The density calls the C library's cos (Cut_Cos), sin (its derivative)
  * and exp (Gaussian), whose results the C standard does not fix to the
  * bit. C libraries, and the code paths one C library takes on different
- * CPUs, round some arguments one ulp apart: calc_rho of the Blip Cut_Cos
- * signed case at r = 0x1.e60aa64c2f838p-1 is 0x1.4f8f2a2a6d567p-2 with
- * musl (Alpine 3.19) against the stored 0x1.4f8f2a2a6d566p-2, and that of
- * the Gaussian Cut_Cos signed case at r = 0x1.064f765fd8adap+1 is
- * -0x1.8a1e1fc8fd51p-14 with the cos, sin and exp that glibc 2.43 takes on
- * an x86-64 CPU without AVX2 and FMA against the stored
- * -0x1.8a1e1fc8fd5ep-14, for the code before RHOFORM and for SIGNED alike.
+ * CPUs, round some arguments one ulp apart, which moves a density value by
+ * one ulp, or by more where the terms of the sum cancel: calc_rho of the
+ * Blip Cut_Cos signed case at r = 0x1.e60aa64c2f838p-1 is
+ * 0x1.4f8f2a2a6d567p-2 with musl (Alpine 3.19) against the stored
+ * 0x1.4f8f2a2a6d566p-2 (1 ulp), and that of the Gaussian Cut_Cos signed
+ * case at r = 0x1.064f765fd8adap+1 is -0x1.8a1e1fc8fd51p-14 with the cos,
+ * sin and exp that glibc 2.43 takes on an x86-64 CPU without AVX2 and FMA
+ * against the stored -0x1.8a1e1fc8fd5ep-14 (208 ulp, from one exp result
+ * one ulp apart), for the code before RHOFORM and for SIGNED alike.
  * Hence the density before RHOFORM is computed here, on the platform, with
  * the C library's functions, for the cases that compare RHOFORM with it.
  * The stored goldens anchor the frozen copy with the results of cos, sin
