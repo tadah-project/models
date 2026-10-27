@@ -1168,10 +1168,12 @@ TEST_CASE_METHOD(DensityFixture,
   }
   /* Pins: a D2_mJoin with a D2_Blip or D2_Blip5 descriptor holds its
    * SGRID2B widths > 0, as a line of one D2_Blip does, by the rule of the
-   * bump descriptor ("the D2_Blip pair basis of the D2_mJoin line"); every
-   * SGRID2B entry of the line, as a DM_mJoin with a bump DM_REAM density
-   * holds every SGRIDMB entry. A D2_mJoin without a bump descriptor has no
-   * width rule.
+   * bump descriptor ("the D2_Blip pair basis of the D2_mJoin line requires
+   * each of its SGRID2B widths > 0"): the rule of the key is the rule of
+   * the bump descriptor's entries, the entry form below says whose entry
+   * an entry is. It held every SGRID2B entry of the line ("every SGRID2B
+   * width > 0"), the D2_BP's included, until the entry form. A D2_mJoin
+   * without a bump descriptor has no width rule.
    * Before the fix: no rule for a D2_mJoin (bump_channel_halfwidth reads
    * the line's first value), so a seed width of -1 and a width box from 0
    * were accepted. */
@@ -1193,7 +1195,7 @@ TEST_CASE_METHOD(DensityFixture,
       CHECK(r->strict);
       CHECK_FALSE(r->admits(0.0));
       CHECK(r->admits(0.25));
-      CHECK_THAT(r->requirement, Contains("every SGRID2B width > 0"));
+      CHECK_THAT(r->requirement, Contains("each of its SGRID2B widths > 0"));
       CHECK(r->by ==
             std::string("the ") + label + " pair basis of the D2_mJoin line");
       CHECK_FALSE(optim_low_bound_rule("CGRID2B", c));
@@ -1208,6 +1210,68 @@ TEST_CASE_METHOD(DensityFixture,
     c.add("RCTYPE2B", "Cut_Cos Cut_Cos");
     c.add("RCUT2B", "5.0 5.0");
     CHECK_FALSE(optim_low_bound_rule("SGRID2B", c));
+  }
+  /* Pins: the rule of an entry of SGRID2B on a D2_mJoin line
+   * (optim_low_bound_rule(key, ctx, entry), 0-based) is that of the
+   * descriptor whose entry it is: on D2_mJoin of D2_BP 2 2 (SGRID2B
+   * entries 0 and 1) and D2_Blip 3 3 (entries 2 to 4), entries 0 and 1 have
+   * no rule, as SGRID2B of a line of one D2_BP has none, and entries 2 to 4
+   * have the bump rule, "the D2_Blip pair basis of the D2_mJoin line
+   * requires each of its SGRID2B widths > 0 (...)"; an entry past the
+   * line's values has none. A line of one D2_Blip gives every entry its
+   * rule, and an entry of SGRIDMB the rule of the key.
+   * Before the fix: there was no entry form (the case does not compile
+   * against the header without it); the rule of the key held every
+   * SGRID2B entry of the line, the D2_BP's included. */
+  SECTION("SGRID2B entries of a D2_mJoin: the rule of their descriptor") {
+    Context c;
+    c.add("ATOM", "Ta");
+    c.add("INIT2B", "true");
+    c.add("INITMB", "false");
+    c.add("TYPE2B", "D2_mJoin D2_BP 2 2 Ta Ta D2_Blip 3 3 Ta Ta");
+    c.add("CGRID2B", "0 0 2.2 3.2 4.2");
+    c.add("SGRID2B", "0.5 1.0 1.0 1.0 1.0");
+    c.add("RCTYPE2B", "Cut_Cos Cut_Cos");
+    c.add("RCUT2B", "5.0 5.0");
+    for (std::size_t i : {0u, 1u, 5u}) {
+      INFO(i);
+      CHECK_FALSE(optim_low_bound_rule("SGRID2B", c, i));
+    }
+    for (std::size_t i : {2u, 3u, 4u}) {
+      INFO(i);
+      const auto r = optim_low_bound_rule("SGRID2B", c, i);
+      REQUIRE(r);
+      CHECK(r->strict);
+      CHECK_FALSE(r->admits(0.0));
+      CHECK(r->by == "the D2_Blip pair basis of the D2_mJoin line");
+      CHECK(std::string(r->requirement) ==
+            "each of its SGRID2B widths > 0 (a radial bump spans [c - w/s, "
+            "c + w/s]; a width <= 0 has no support edge)");
+    }
+    CHECK_FALSE(optim_low_bound_rule("CGRID2B", c, 2));
+    Context lone;
+    lone.add("ATOM", "Ta");
+    lone.add("INIT2B", "true");
+    lone.add("INITMB", "false");
+    lone.add("TYPE2B", "D2_Blip 3 3 Ta Ta");
+    lone.add("CGRID2B", "2.2 3.2 4.2");
+    lone.add("SGRID2B", "1.0 1.0 1.0");
+    lone.add("RCTYPE2B", "Cut_Cos");
+    lone.add("RCUT2B", "5.0");
+    for (std::size_t i : {0u, 2u}) {
+      const auto r = optim_low_bound_rule("SGRID2B", lone, i);
+      REQUIRE(r);
+      CHECK(r->by == "the D2_Blip pair basis");
+      CHECK_THAT(r->requirement, Contains("every SGRID2B width > 0"));
+    }
+    const Context ream = ream_ctx(layout(BasisKind::Blip, true), "SIGNED",
+                                  "Cut_Cos");
+    const auto whole = optim_low_bound_rule("SGRIDMB", ream);
+    const auto entry = optim_low_bound_rule("SGRIDMB", ream, 1);
+    REQUIRE(whole);
+    REQUIRE(entry);
+    CHECK(entry->by == whole->by);
+    CHECK(std::string(entry->requirement) == whole->requirement);
   }
   SECTION("a DM_REAM configuration without RHOFORM: the migration text") {
     CHECK_THROWS_WITH(
