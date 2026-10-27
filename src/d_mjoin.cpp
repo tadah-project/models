@@ -305,6 +305,35 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
   // pair_style tadah) and the potential loads. A configuration with them is
   // refused: the values would be dropped from the model without a word.
   const bool potential = c.has_stored("WEIGHTS");
+  // The values of a key are the potential's own when no line outside a
+  // potential's own lines gave one of them, nor a descriptor of the line
+  // that reads them (core::Context::key_lines(): the lines of a file that
+  // includes the potential with CONFIG, above or below the CONFIG line;
+  // values the program set have no lines). A key with such a line is read
+  // as in a configuration: its values are counted with the potential's, and
+  // those the descriptors do not take are refused.
+  auto own_lines = [&](const std::string &key) {
+    for (const auto &line : c.key_lines(key))
+      if (!line.potential) return false;
+    return true;
+  };
+  const bool own_descriptors = potential && own_lines(type_str);
+  auto potentials = [&](const std::string &key) {
+    return own_descriptors && own_lines(key);
+  };
+  // ", set on line 1 of run.train and on line 20 of pot.tadah (CONFIG on
+  // line 2 of run.train)": the lines that gave the values of @p key, for a
+  // refusal of their count; empty for values the program set.
+  auto set_on = [&](const std::string &key) {
+    const std::vector<tadah::core::KeyLine> at = c.key_lines(key);
+    std::string out;
+    for (std::size_t i = 0; i < at.size(); ++i) {
+      const char *sep =
+          i == 0 ? ", set on " : i + 1 == at.size() ? " and on " : ", on ";
+      out += sep + at[i].where;
+    }
+    return out;
+  };
   const bool joined =
       c.get<std::string>(type_str, 0).find("mJoin") != std::string::npos;
   const std::string label0 = lines.empty() ? "" : lines[0][0];
@@ -338,7 +367,7 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
     const std::vector<std::string> &v = *data_map[key].first;
     const std::size_t have = v.size();
     if (have == lines.size()) continue;
-    if (potential && have > lines.size() && !lines.empty()) {
+    if (potentials(key) && have > lines.size() && !lines.empty()) {
       if (joined || key == rctypekey) {
         report_unread(key, v, lines.size());
         continue;
@@ -361,7 +390,7 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
     }
     throw std::runtime_error(
         type_str + " names " + named + " but " + key + " has " +
-        values(have) + ": each descriptor takes one " + key +
+        values(have) + set_on(key) + ": each descriptor takes one " + key +
         " value, in the order of the " + type_str + " lines");
   }
 
@@ -475,7 +504,8 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
                              std::to_string(taken) + ")";
         throw std::runtime_error(where + " takes " + std::to_string(n) + " " +
                                  key + (n == 1 ? " value" : " values") +
-                                 ", but " + key + " has " + has + ": " + text);
+                                 ", but " + key + " has " + has +
+                                 set_on(key) + ": " + text);
       }
       c1.add(type_str, n);
       for (size_t j = 0; j < n; ++j) {
@@ -521,7 +551,7 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
     const auto it = data_map.find(key);
     const size_t given = it == data_map.end() ? 0 : it->second.first->size();
     if (given <= taken) continue;
-    if (potential && (joined || !declared.count(key))) {
+    if (potentials(key) && (joined || !declared.count(key))) {
       report_unread(key, *it->second.first, taken);
       continue;
     }
@@ -530,11 +560,13 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
     if (lines.size() == 1)
       throw std::runtime_error(type_str + " " + lines[0][0] + " takes " +
                                takes + ", but " + key + " has " +
-                               values(given) + ": " + last_text);
+                               values(given) + set_on(key) + ": " +
+                               last_text);
     throw std::runtime_error(
         type_str + " names " + named + ", which take " + takes + ", but " +
-        key + " has " + values(given) + ": each descriptor takes its " + key +
-        " values, in the order of the " + type_str + " lines");
+        key + " has " + values(given) + set_on(key) +
+        ": each descriptor takes its " + key + " values, in the order of the " +
+        type_str + " lines");
   }
   return contexts;
 }
