@@ -45,10 +45,11 @@ inline void require_crystal(const std::string &lattice, double a0) {
   throw std::runtime_error(
       "tadah refit: the EAM header does not specify a crystal usable for the "
       "faithfulness self-test (lattice='" + (lattice.empty() ? "<missing>" : lattice) +
-      "', a0=" + std::to_string(a0) + "). The self-test needs one of fcc/bcc/hcp "
-      "and a positive lattice constant. Edit the element line of the setfl file "
-      "(`<Z> <mass> <a0> <lattice>`): set the ground-state lattice (e.g. change "
-      "'NONE' to 'fcc', 'bcc' or 'hcp') and the equilibrium lattice constant.");
+      "', a0=" + tadah::core::format_roundtrip(a0) + "). The self-test needs "
+      "one of fcc, bcc and hcp and a positive lattice constant, which the "
+      "element line of the setfl file (`<Z> <mass> <a0> <lattice>`) gives: "
+      "the ground-state lattice, fcc, bcc or hcp in place of a placeholder "
+      "such as NONE, and the equilibrium lattice constant.");
 }
 
 /// nearest-neighbour distance for lattice constant \p a
