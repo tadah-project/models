@@ -796,3 +796,184 @@ TEST_CASE("Every cutoff is compared with the smallest neighbour distance of "
   }
   CHECK(cutoffs > 10u);
 }
+
+/* Pins: a suggestion taken from the shells, peaks or percentiles of the
+ * neighbour distances names the element pair whose distances they are, the
+ * first element pair of the statistics (DataStats sorts per_pair by element
+ * pair): on Ta-W data (ta_w_stats(), the (Ta, Ta) pairs first)
+ *  - the cutoff suggestion of every descriptor that has one names "the
+ *    99th percentile of the Ta-Ta neighbour distances";
+ *  - for DM_EAD and DM_Blip, a centre at 2.9 A gets a CGRIDMB and an
+ *    SGRIDMB suggestion naming "the Ta-Ta neighbour shell nearest to it",
+ *    and a seed without CGRIDMB a CGRIDMB suggestion naming "the first
+ *    Ta-Ta neighbour shell" and an SGRIDMB suggestion naming "Ta-Ta";
+ *  - DM_EAD's Gaussian at the origin gets an SGRIDMB suggestion naming the
+ *    Ta-Ta neighbour distances its width is taken from.
+ * Before the fix: each of these rationales named "the neighbour distances"
+ * or "the neighbour shell" alone, while the check of a cutoff reads every
+ * element pair. */
+TEST_CASE("A suggestion names the element pair whose distances it comes "
+          "from",
+          "[metadata][density_reach][suggest]") {
+  const DataStats data = ta_w_stats();
+  std::size_t cutoffs = 0;
+  for (const auto &label : tadah::core::Registry<D_Base>::names()) {
+    std::unique_ptr<D_Base> d(tadah::core::factory<D_Base>(label));
+    const auto meta = d->meta();
+    if (!meta.has_value()) continue;
+    for (const auto &pm : meta->params) {
+      if (pm.key != "RCUT2B" && pm.key != "RCUTMB") continue;
+      if (!pm.suggest) continue;
+      ++cutoffs;
+      CAPTURE(label, pm.key);
+      Context seed;
+      seed.add<double>(pm.key, 5.6);
+      const BoundSuggestion s = pm.suggest(data, SeedView(seed), -1);
+      INFO(s.rationale);
+      CHECK(s.rationale.find(
+                "the 99th percentile of the Ta-Ta neighbour distances") !=
+            std::string::npos);
+    }
+  }
+  CHECK(cutoffs > 10u);
+
+  for (const char *label : {"DM_EAD", "DM_Blip"}) {
+    CAPTURE(label);
+    std::unique_ptr<D_Base> d(tadah::core::factory<D_Base>(label));
+    const auto meta = d->meta();
+    REQUIRE(meta.has_value());
+    const ParamMeta *centre = param_of(*meta, "CGRIDMB");
+    const ParamMeta *width = param_of(*meta, "SGRIDMB");
+    REQUIRE(centre != nullptr);
+    REQUIRE(width != nullptr);
+    Context seeded;
+    seeded.add("CGRIDMB", "0 2.9");
+    seeded.add("SGRIDMB", "1 1");
+    seeded.add<double>("RCUTMB", 5.6);
+    const SeedView sv(seeded);
+    const BoundSuggestion c1 = centre->suggest(data, sv, 1);
+    INFO("CGRIDMB(2): " << c1.rationale);
+    CHECK(c1.rationale.find("the Ta-Ta neighbour shell nearest to it") !=
+          std::string::npos);
+    const BoundSuggestion w1 = width->suggest(data, sv, 1);
+    INFO("SGRIDMB(2): " << w1.rationale);
+    CHECK(w1.rationale.find("the Ta-Ta neighbour shell nearest to it") !=
+          std::string::npos);
+    Context bare;
+    bare.add<double>("RCUTMB", 5.6);
+    const BoundSuggestion c0 = centre->suggest(data, SeedView(bare), 0);
+    INFO("CGRIDMB without a seed: " << c0.rationale);
+    CHECK(c0.rationale.find("the first Ta-Ta neighbour shell") !=
+          std::string::npos);
+    const BoundSuggestion w0 = width->suggest(data, SeedView(bare), 0);
+    INFO("SGRIDMB without a seed: " << w0.rationale);
+    CHECK(w0.rationale.find("Ta-Ta") != std::string::npos);
+  }
+
+  std::unique_ptr<D_Base> ead(tadah::core::factory<D_Base>("DM_EAD"));
+  const auto meta = ead->meta();
+  REQUIRE(meta.has_value());
+  const ParamMeta *width = param_of(*meta, "SGRIDMB");
+  REQUIRE(width != nullptr);
+  Context origin;
+  origin.add<double>("CGRIDMB", 0.0);
+  origin.add<double>("SGRIDMB", 0.2);
+  origin.add<double>("RCUTMB", 5.6);
+  const BoundSuggestion w = width->suggest(data, SeedView(origin), 0);
+  INFO("SGRIDMB at the origin: " << w.rationale);
+  CHECK_FALSE(w.none);
+  CHECK(w.rationale.find("Ta-Ta neighbour distances") != std::string::npos);
+}
+
+/* Pins: every Critical parameter of every registered descriptor has a
+ * suggester, so that tadah analysis suggest_bounds, which the
+ * critical-parameter warning of tadah hpo names (Tadah.MLIP), gives it a
+ * row: the cutoff of D2_Knot5 (RCUT2B) included, which has the suggestion
+ * of every cutoff (cutoff_suggestion) and is a fixed value of a search on a
+ * D2_mJoin line, where tadah hpo takes the stated cutoff.
+ * Before the fix: D2_Knot5's RCUT2B, Critical, had no suggester, and tadah
+ * analysis suggest_bounds gave it no row, on a D2_mJoin line too, where
+ * tadah hpo warns that it is fixed. */
+TEST_CASE("Every critical parameter has a suggestion",
+          "[metadata][suggest][cutoff]") {
+  std::size_t critical = 0;
+  for (const auto &label : tadah::core::Registry<D_Base>::names()) {
+    std::unique_ptr<D_Base> d(tadah::core::factory<D_Base>(label));
+    const auto meta = d->meta();
+    if (!meta.has_value()) continue;
+    for (const auto &pm : meta->params) {
+      if (pm.crit != Criticality::Critical) continue;
+      ++critical;
+      CAPTURE(label, pm.key);
+      CHECK(static_cast<bool>(pm.suggest));
+    }
+  }
+  CHECK(critical > 20u);
+}
+
+/* Pins: the grids of DM_REAM (CGRIDMB, SGRIDMB, AMPGRIDMB, CEMBFUNC,
+ * SEMBFUNC) get a row without an OPTIM line on data with distances, its
+ * rationale saying that the neighbour distances give no range for a value
+ * of a DM_REAM grid, and naming no other command.
+ * Before the fix: the rationale said that "tadah refit writes an OPTIM line
+ * of +-OPTIM_PCT percent about each value of a DM_REAM potential", which
+ * tadah refit of an EAM file does not do (it writes a DM_Embed component);
+ * only tadah refit --edit of a DM_REAM potential writes such lines, and it
+ * writes them commented out. */
+TEST_CASE("The grids of DM_REAM get no range, the neighbour distances "
+          "giving none",
+          "[metadata][suggest][dm_ream]") {
+  std::unique_ptr<D_Base> d(tadah::core::factory<D_Base>("DM_REAM"));
+  const auto meta = d->meta();
+  REQUIRE(meta.has_value());
+  const DataStats data = make_ta_like_stats();
+  for (const char *key :
+       {"CGRIDMB", "SGRIDMB", "AMPGRIDMB", "CEMBFUNC", "SEMBFUNC"}) {
+    CAPTURE(key);
+    const ParamMeta *p = param_of(*meta, key);
+    REQUIRE(p != nullptr);
+    REQUIRE(static_cast<bool>(p->suggest));
+    const BoundSuggestion s = p->suggest(data, SeedView(Context{}), 0);
+    INFO(s.rationale);
+    CHECK(s.none);
+    CHECK(s.rationale.find("the neighbour distances give no range for a "
+                           "value of a DM_REAM grid") != std::string::npos);
+    CHECK(s.rationale.find("refit") == std::string::npos);
+  }
+}
+
+#include <regex>
+
+/* Pins: the role text of every parameter of every registered descriptor,
+ * which tadah analysis suggest_bounds prints as the rationale of a range
+ * that has none, numbers an entry as an OPTIM line does ("CGRID2B (i)"),
+ * never with a bracket index ("CGRID2B[i]").
+ * Before the fix: the centres of D2_Blip, D2_Blip5 and D2_BP read "Centre
+ * of the i-th radial blip (CGRID2B[i])." above an OPTIM CGRID2B (1-7)
+ * line. */
+TEST_CASE("A role text numbers an entry as an OPTIM line does",
+          "[metadata][suggest]") {
+  const std::regex bracket(R"([A-Z][A-Z0-9_]*\[[^\]]*\])");
+  std::size_t roles = 0;
+  for (const auto &label : tadah::core::Registry<D_Base>::names()) {
+    std::unique_ptr<D_Base> d(tadah::core::factory<D_Base>(label));
+    const auto meta = d->meta();
+    if (!meta.has_value()) continue;
+    for (const auto &pm : meta->params) {
+      ++roles;
+      CAPTURE(label, pm.key, pm.role);
+      CHECK_FALSE(std::regex_search(pm.role, bracket));
+    }
+  }
+  CHECK(roles > 50u);
+  for (const char *label : {"D2_Blip", "D2_Blip5", "D2_BP"}) {
+    CAPTURE(label);
+    std::unique_ptr<D_Base> d(tadah::core::factory<D_Base>(label));
+    const auto meta = d->meta();
+    REQUIRE(meta.has_value());
+    const ParamMeta *centre = param_of(*meta, "CGRID2B");
+    REQUIRE(centre != nullptr);
+    CAPTURE(centre->role);
+    CHECK(centre->role.find("CGRID2B (i)") != std::string::npos);
+  }
+}
