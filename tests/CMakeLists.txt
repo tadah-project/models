@@ -4,11 +4,22 @@ tadah_setup_tests()
 file(GLOB tests_src CONFIGURE_DEPENDS "*.cpp")
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/tests_data DESTINATION .)
 
+# The DM_REAM density before RHOFORM that test_ream_goldens.cpp compares
+# with: a frozen copy of the code the goldens were captured from, compiled
+# once with MODELS' flags, never with -march=native (an FMA would change its
+# bits), for test_models and test_models_ream_native_link alike.
+list(REMOVE_ITEM tests_src
+     ${CMAKE_CURRENT_SOURCE_DIR}/ream_density_before_rhoform.cpp)
+add_library(test_models_ream_before_rhoform OBJECT
+            ream_density_before_rhoform.cpp)
+target_link_libraries(test_models_ream_before_rhoform PRIVATE tadah.models)
+
 add_executable(test_models ${tests_src})
 # Threads: test_kernel_settings_once.cpp builds kernels in std::threads.
 find_package(Threads REQUIRED)
 target_link_libraries(test_models PRIVATE Catch2 tadah.models tadah.core
-                                          Threads::Threads)
+                                          Threads::Threads
+                                          test_models_ream_before_rhoform)
 target_include_directories(test_models PRIVATE ../include)
 # test_api_examples.cpp reads the configuration examples of the class
 # documentation (the API reference) from the headers.
@@ -33,12 +44,14 @@ catch_discover_tests(test_models
 # with TADAH_MARCH_NATIVE: MODELS' objects, compiled with MODELS' flags,
 # keep their code at such a link, and give the program the density before
 # RHOFORM bit for bit when those flags have no FMA contraction (the
-# presets'). Two of the cases reach the density through DM_REAM's
-# out-of-line methods; one calls ReamDensity from this program's own
-# -march=native unit, and fails when a ReamDensity method is compiled here,
-# as an inline function moved into ream_density.h would be (its multiply-
-# adds fused into FMAs on an FMA machine). Not built when the compiler has
-# no -march=native (TADAH_MARCH_NATIVE is ignored then too).
+# presets'), as the frozen copy of that density, compiled with the same
+# flags (test_models_ream_before_rhoform), computes it. Two of the cases
+# reach the density through DM_REAM's out-of-line methods; one calls
+# ReamDensity from this program's own -march=native unit, and fails when a
+# ReamDensity method is compiled here, as an inline function moved into
+# ream_density.h would be (its multiply-adds fused into FMAs on an FMA
+# machine). Not built when the compiler has no -march=native
+# (TADAH_MARCH_NATIVE is ignored then too).
 # Before the fix: passes as well (a pin of the build layout; with value,
 # deriv and value_deriv moved into ream_density.h it fails, GCC 15.2).
 include(CheckCXXCompilerFlag)
@@ -47,7 +60,7 @@ if(TADAH_MODELS_TESTS_HAVE_MARCH_NATIVE)
   add_executable(test_models_ream_native_link
       test_ream_goldens.cpp test_main.cpp)
   target_link_libraries(test_models_ream_native_link
-      PRIVATE Catch2 tadah.models tadah.core)
+      PRIVATE Catch2 tadah.models tadah.core test_models_ream_before_rhoform)
   target_compile_options(test_models_ream_native_link PRIVATE -march=native)
   target_link_options(test_models_ream_native_link PRIVATE -march=native)
   add_test(NAME tadah.models_ream_goldens_native_link
