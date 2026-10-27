@@ -185,9 +185,9 @@ PotEAMView parse_pot_view(const core::Context &ctx) {
         "layout consistent.");
   if (ctx.contains("NORM") && ctx.size("NORM") > 0 && ctx.get<bool>("NORM"))
     throw std::runtime_error(
-        "pot edit: NORM true is not supported — the stored normalization "
+        "pot edit: NORM true is not supported — the stored normalisation "
         "vectors are column-aligned with WEIGHTS and cannot survive a basis "
-        "edit. Set NORM false.");
+        "edit; a basis edit takes a potential fitted with NORM false.");
 
   // ---- two-body family ----
   const std::string t2 = ctx.get<std::string>("TYPE2B", 0);

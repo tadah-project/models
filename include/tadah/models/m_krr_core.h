@@ -39,9 +39,8 @@ public:
         kernel(c)
     {
         static_assert(std::is_base_of<Kern_Base, K>::value,
-                      "\nThe provided Kernel K is not of a Kernel type.\n"
-                      "For KRR use kernels defined in kernel.h.\n"
-                      "e.g. Use Kern_Linear instead of BF_Linear.\n");
+                      "\nM_KRR takes a kernel, such as Kern_Linear; a basis "
+                      "function, such as BF_Linear, is taken by M_BLR.\n");
         init();
     }
 

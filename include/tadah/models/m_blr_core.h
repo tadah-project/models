@@ -34,10 +34,8 @@ public:
      */
     M_BLR_Core(tadah::core::Context &c) : context(c), bf(c) {
         static_assert(std::is_base_of<BF_Base, BF>::value,
-                      "\nThe provided Basis function is not of a BasisFunction type.\n"
-                      "For BLR use basis functions defined in basis_functions.h.\n"
-                      "If you want to use this kernel functions use M_KRR class instead.\n"
-                      "e.g. Use BF_Linear instead of Kern_Linear.\n");
+                      "\nM_BLR takes a basis function, such as BF_Linear; "
+                      "a kernel, such as Kern_Linear, is taken by M_KRR.\n");
         init();
     }
 

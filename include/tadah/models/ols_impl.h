@@ -76,8 +76,8 @@ void OLS::solveImpl(M& A, V& B, V& weights, double rcond, Algorithm algorithm) {
         // Underdetermined system
         if (!(algorithm == Algorithm::GELSD || algorithm == Algorithm::Pseudoinverse)) {
             throw std::invalid_argument("The chosen algorithm (" + to_string_algorithm(algorithm) +
-                                        ") is not suitable for underdetermined systems (m < n). "
-                                        "Please use GELSD or Pseudoinverse.");
+                                        ") does not solve an underdetermined system (m < n); "
+                                        "GELSD and Pseudoinverse do.");
         }
     } else {
         // Overdetermined or square system
@@ -154,7 +154,7 @@ for (int i = m; i < maxmn; ++i) {
     } else if (algorithm == Algorithm::GELS) {
         // Use DGELS for overdetermined systems
         if (isUnderdetermined) {
-            throw std::invalid_argument("GELS algorithm cannot handle underdetermined systems (m < n). Please use GELSD or Pseudoinverse.");
+            throw std::invalid_argument("GELS does not solve an underdetermined system (m < n); GELSD and Pseudoinverse do.");
         }
         int nrhs = 1;
         double* a = A.ptr();
