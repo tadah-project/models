@@ -1777,3 +1777,43 @@ TEST_CASE("potedit: normalize_potential_knot_rcut keeps the stated cutoffs "
   }
   log.setLogLevel(old_level);
 }
+
+/* Pins: under a smooth cutoff the note of a knot descriptor of a joined
+ * line says only what the fit does: normalize_knot_rcut on TYPE2B D2_mJoin
+ * of D2_Knot5 (knots 2.5 3.5 4.5) and D2_Blip with RCUT2B 5.3 5 under
+ * Cut_Cos gives one WARNING, "test: TYPE2B descriptor 1 (D2_Knot5): RCUT2B
+ * 5.3 is above the largest knot (4.5): the knot basis vanishes at its
+ * largest knot, so the cutoff of a D2_Knot5 line is 4.5, which the CGRID2B
+ * knot positions set.", without the note of a line of one knot descriptor
+ * that pair_style tadah reads the stated cutoff and differs from tadah
+ * predict on a potential file stating it: tadah predict and tadah refit
+ * --edit take the stated cutoffs of a joined line too
+ * (normalize_potential_knot_rcut).
+ * Before the fix: the WARNING went on with "Under the smooth RCTYPE2B the
+ * cutoff value enters every pair term, and pair_style tadah (LAMMPS) reads
+ * the stated RCUT2B without re-deriving it: on a potential file stating
+ * 5.3, LAMMPS differs from tadah train/predict/hpo ...". */
+TEST_CASE("potedit: the note of a knot descriptor of a joined line under a "
+          "smooth cutoff says what the fit does",
+          "[potedit][notes][join]") {
+  Context c;
+  c.add("ATOM", "Ta");
+  c.add("INIT2B", "true");
+  c.add("INITMB", "false");
+  c.add("TYPE2B", "D2_mJoin D2_Knot5 3 3 Ta Ta D2_Blip 3 3 Ta Ta");
+  c.add("RCTYPE2B", "Cut_Cos Cut_Cos");
+  c.add("RCUT2B", "5.3 5.0");
+  c.add("CGRID2B", "2.5 3.5 4.5 2.5 3.0 3.5");
+  c.add("KDEG2B", "5 5 5");
+  c.add("SGRID2B", "2 2 2");
+  std::vector<KnotRcutNote> notes;
+  REQUIRE(normalize_knot_rcut(c, "test", notes));
+  CHECK(c.get<double>("RCUT2B", 0) == 4.5);
+  REQUIRE(notes.size() == 1u);
+  CHECK(notes[0].level == tadah::core::LogLevel::WARNING);
+  CHECK(notes[0].text ==
+        "test: TYPE2B descriptor 1 (D2_Knot5): RCUT2B 5.3 is above the "
+        "largest knot (4.5): the knot basis vanishes at its largest knot, so "
+        "the cutoff of a D2_Knot5 line is 4.5, which the CGRID2B knot "
+        "positions set.");
+}
