@@ -66,7 +66,7 @@ BoundSuggestion no_pair_suggestion(const SeedView &s);
  *  their 99th percentile) to their 99th percentile, the distances taken up
  *  to the reach of the statistics (kCutoffSearchReach times the largest
  *  cutoff of the seed); no_pair_suggestion() without a pair. The rationale
- *  names the form, the element pair ("Ta-Ta") and the statistics. tadah
+ *  names the form, the element pair ("(Ta, Ta)") and the statistics. tadah
  *  analysis suggest_bounds gives it the statistics of one element pair of
  *  the descriptor's line at a time. */
 BoundSuggestion cutoff_suggestion(const tadah::core::stats::DataStats &d,

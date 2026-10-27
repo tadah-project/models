@@ -26,13 +26,14 @@ std::string num(double v) {
 /* A value of the seed as its shortest round-trip text ("5.61234567"). */
 std::string seed_num(double v) { return tadah::core::format_roundtrip(v); }
 
-/* The element pair of @p pp as a rationale names it ("Ta-Ta"): a range
- * taken from the shells, peaks or percentiles of the distances is taken
- * from those of the first element pair of the statistics (DataStats sorts
- * per_pair by element pair), which tadah analysis suggest_bounds gives one
- * element pair of the descriptor's line at a time. */
+/* The element pair of @p pp as a rationale names it ("(Ta, Ta)", as the
+ * checks name a pair: LinePairs::text()): a range taken from the shells,
+ * peaks or percentiles of the distances is taken from those of the first
+ * element pair of the statistics (DataStats sorts per_pair by element
+ * pair), which tadah analysis suggest_bounds gives one element pair of the
+ * descriptor's line at a time. */
 std::string pair_name(const tadah::core::stats::PerPairStats &pp) {
-  return pp.elements.first + "-" + pp.elements.second;
+  return "(" + pp.elements.first + ", " + pp.elements.second + ")";
 }
 
 /* " (Ta, Ta)", " (Ta, Ta) or (W, W)": the element pairs of the line of the
