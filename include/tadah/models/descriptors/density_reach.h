@@ -29,11 +29,11 @@
 // TYPEMB line names (LinePairs): its checks are given the statistics of
 // those pairs (the pre-flight audit, tadah analysis check_bounds) and judge
 // each element pair the line stands for on its own, a pair with "*" each
-// element pair of the data it matches, since a pair that the cutoff, or
-// every channel of a density, does not reach adds nothing to the descriptor
-// whatever the other pairs give (the line Ta Ta W W with a cutoff below
-// every (Ta, Ta) distance is 0 for every Ta atom); its suggestions are
-// given those of one of them at a time (tadah analysis suggest_bounds).
+// element pair it matches, since a pair that the cutoff, or every channel
+// of a density, does not reach adds nothing to the descriptor whatever the
+// other pairs give (the line Ta Ta W W with a cutoff below every (Ta, Ta)
+// distance is 0 for every Ta atom); its suggestions are given those of one
+// of them at a time (tadah analysis suggest_bounds).
 // Their messages name the pairs of the line when the view of the seed has
 // them (SeedView::line_pairs()): "the smallest (Ta, Ta) neighbour distance
 // of the dataset".
@@ -80,11 +80,12 @@ BoundSuggestion cutoff_suggestion(const tadah::core::stats::DataStats &d,
 /** \brief The check of the cutoff @p key (RCUT2B, RCUTMB) of @p s, each
  *  element pair the line of @p s (SeedView::line_pairs()) stands for judged
  *  on its own by the statistics of @p d of that pair: a pair of two
- *  elements as the line writes it, a pair with "*" each element pair of the
- *  data it matches (the elements @p d lists and those of its pairs: "Ta *"
- *  on Ta-W data stands for (Ta, Ta) and (Ta, W), "* *" for (Ta, Ta), (Ta,
- *  W) and (W, W)), so that two lines that give the descriptor the same
- *  pairs get the same verdict. It fails when the data have atoms and a
+ *  elements as the line writes it, a pair with "*" each element pair it
+ *  matches, of the elements of the data (those @p d lists and those of its
+ *  pairs) and those the line names: "Ta *" on Ta-W data stands for (Ta,
+ *  Ta) and (Ta, W), "* *" for (Ta, Ta), (Ta, W) and (W, W), "Mo *" for
+ *  (Mo, Mo), (Mo, Ta) and (Mo, W); so that two lines that give the
+ *  descriptor the same pairs get the same verdict. It fails when the data have atoms and a
  *  pair has no neighbour distance within the cutoff (the cutoff is below
  *  its smallest one, or @p d has none of it). When no pair of the line has
  *  one, the descriptor sums over no neighbour, and the message names the
@@ -134,8 +135,8 @@ double blip_reach_width(double dist);
  *  each centre CGRIDMB(i) with its width SGRIDMB(i) and the cutoff RCUTMB
  *  of @p s, against the neighbour distances (neighbour_range) of each
  *  element pair the line of @p s stands for, judged on its own as by
- *  cutoff_reach_check() (a pair with "*" each element pair of the data it
- *  matches), which its messages name ("every (W, W) neighbour distance
+ *  cutoff_reach_check() (a pair with "*" each element pair it matches),
+ *  which its messages name ("every (W, W) neighbour distance
  *  within RCUTMB = 3.5").
  *
  *  A Gaussian channel (@p kind Gaussian, exp(-SGRIDMB (r - CGRIDMB)^2))

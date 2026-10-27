@@ -63,11 +63,12 @@ struct JudgedPair {
  * element pair the line of @p s (SeedView::line_pairs()) names, with the
  * statistics of @p d of that pair (LinePairs::stats()). A pair of two
  * elements is judged as the line writes it ("W Ta": (W, Ta)); a pair with
- * "*" stands for each element pair of the data it matches, the elements of
- * the data being those @p d lists and those of its pairs, whether the
- * statistics hold distances of a pair or not ("Ta *" on Ta-W data: (Ta,
- * Ta) and (Ta, W); "* *": (Ta, Ta), (Ta, W) and (W, W)); a pair is judged
- * once, in the order the line first names it. A descriptor sums over the
+ * "*" stands for each element pair it matches, of the elements of the data
+ * (those @p d lists and those of its pairs, whether the statistics hold
+ * distances of a pair or not) and those the line names ("Ta *" on Ta-W
+ * data: (Ta, Ta) and (Ta, W); "* *": (Ta, Ta), (Ta, W) and (W, W); "Mo *"
+ * there: (Mo, Mo), (Mo, Ta) and (Mo, W), as "Mo Mo Mo Ta Mo W"); a pair is
+ * judged once, in the order the line first names it. A descriptor sums over the
  * neighbours of each of these pairs, so a pair that a cutoff, or every
  * channel of a density, does not reach adds nothing to it whatever the
  * other pairs give; the verdict is the same for each way of writing the
@@ -81,6 +82,9 @@ std::vector<JudgedPair> judged_pairs(const DataStats &d, const SeedView &s) {
     elements.push_back(pp.elements.first);
     elements.push_back(pp.elements.second);
   }
+  for (const auto &pair : p->pairs())
+    for (const std::string *e : {&pair.first, &pair.second})
+      if (*e != "*") elements.push_back(*e);
   std::sort(elements.begin(), elements.end());
   elements.erase(std::unique(elements.begin(), elements.end()),
                  elements.end());
