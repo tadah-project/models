@@ -51,11 +51,17 @@ std::vector<std::string> stored_tokens(const core::Context &c,
   return out;
 }
 
-/* "KEY v1 v2 ...", the values as stored. */
+/* "KEY v1 v2 ...", the values as stored; a line of more than six values
+ * by its first three and the number of the others ("SIGMA 3 5.48e-09
+ * 3.2e-09 and 7 more values"), as a refusal of a retired key names one. */
 std::string key_text(const std::string &key,
                      const std::vector<std::string> &values) {
+  constexpr std::size_t kWhole = 6, kShown = 3;
+  const std::size_t n = values.size();
   std::string t = key;
-  for (const std::string &v : values) t += " " + v;
+  for (std::size_t i = 0; i < n && (n <= kWhole || i < kShown); ++i)
+    t += " " + values[i];
+  if (n > kWhole) t += " and " + std::to_string(n - kShown) + " more values";
   return t;
 }
 
@@ -175,14 +181,15 @@ std::vector<InertKeyLine> inert_key_lines(const core::Context &c,
   return out;
 }
 
-std::string inert_keys_refusal(const std::vector<InertKeyLine> &lines,
-                               const std::string &who) {
+std::string inert_keys_text(const std::vector<InertKeyLine> &lines,
+                            bool also) {
   const bool one = lines.size() == 1;
+  const std::string has = also ? "also has " : "has ";
   std::string out =
-      who + (one ? ": the configuration has a line that changes nothing a "
-                   "fit gives, and a fit refuses it: "
-                 : ": the configuration has lines that change nothing a fit "
-                   "gives, and a fit refuses them: ");
+      "the configuration " + has +
+      (one ? "a line that changes nothing a fit gives, and a fit refuses it: "
+           : "lines that change nothing a fit gives, and a fit refuses "
+             "them: ");
   for (std::size_t i = 0; i < lines.size(); ++i) {
     const InertKeyLine &l = lines[i];
     out += (i == 0 ? "" : "; ") + l.text +
@@ -192,6 +199,11 @@ std::string inert_keys_refusal(const std::vector<InertKeyLine> &lines,
   out += one ? ". With this line deleted, the fit is the same."
              : ". With these lines deleted, the fit is the same.";
   return out;
+}
+
+std::string inert_keys_refusal(const std::vector<InertKeyLine> &lines,
+                               const std::string &who) {
+  return who + ": " + inert_keys_text(lines, false);
 }
 
 void require_no_inert_keys(const core::Context &c, const std::string &who,

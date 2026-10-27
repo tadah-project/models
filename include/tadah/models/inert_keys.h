@@ -45,7 +45,7 @@ bool watom_sets_a_weight(const core::Context &c);
 /** A line of a key that changes nothing a fit gives. */
 struct InertKeyLine {
   std::string key;     ///< The key, upper case.
-  std::string text;    ///< The key and its values: "MBLOCK 64".
+  std::string text;    ///< The key and its values: "MBLOCK 64" (see inert_keys_text()).
   std::string where;   ///< "line 3 of run.train"; "" for values no line gave.
   std::string reason;  ///< Why it changes nothing.
 };
@@ -65,11 +65,21 @@ struct InertKeyRules {
 std::vector<InertKeyLine> inert_key_lines(const core::Context &c,
                                           const InertKeyRules &rules = {});
 
+/** What a fit says of the lines @p lines (at least one): "the
+ *  configuration has lines that change nothing a fit gives, and a fit
+ *  refuses them: MBLOCK 64 (line 3 of run.train): <reason>; EMBF0 FREE
+ *  (line 4 of run.train): <reason>. With these lines deleted, the fit is
+ *  the same." (one line: "has a line that changes ..., and a fit refuses
+ *  it: ... With this line deleted, ..."). With @p also, "the configuration
+ *  also has": the sentence a fit adds to its refusal of retired keys
+ *  (MLIP require_no_unused_keys). A line of more than six values is named
+ *  by its key, its first three values and the number of the others
+ *  ("SIGMA 3 5.48e-09 3.2e-09 and 7 more values"). */
+std::string inert_keys_text(const std::vector<InertKeyLine> &lines,
+                            bool also);
+
 /** The refusal of a fit of a configuration with the lines @p lines (at
- *  least one): "<who>: the configuration has lines that change nothing a
- *  fit gives, and a fit refuses them: MBLOCK 64 (line 3 of run.train):
- *  <reason>; EMBF0 FREE (line 4 of run.train): <reason>. With these lines
- *  deleted, the fit is the same." */
+ *  least one): "<who>: " and inert_keys_text(@p lines, false). */
 std::string inert_keys_refusal(const std::vector<InertKeyLine> &lines,
                                const std::string &who);
 
