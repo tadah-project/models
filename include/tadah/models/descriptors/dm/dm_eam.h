@@ -34,6 +34,12 @@ namespace models {
  * cutoff. Another value is refused, naming both (require_setfl_cutoff();
  * see \ref D2_EAM).
  *
+ * \ref WATOM does not weight this descriptor: the functions of the file
+ * are used as they are. A fit refuses a WATOM with a value other than 1
+ * when no descriptor of its configuration reads it (D2_EAM and DM_EAM read
+ * none), naming the line; a potential with one loads with a notice
+ * (inert_keys.h).
+ *
  * The setfl parsing, cubic splines and extrapolation are provided by the shared
  * \ref EAMSetflIO class (also used by \ref D2_EAM and the `tadah refit` machinery).
  *
