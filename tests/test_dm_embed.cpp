@@ -90,6 +90,8 @@ TEST_CASE("DM_Embed force buffers are additive and invalid reinit preserves stat
   bad.replace_blocks(blocks);
   REQUIRE_THROWS(s.dmb->reinit(bad));
   REQUIRE(energy(*s.dmb,1.3) == before);
+  // The constructor refuses the invalid component too.
+  REQUIRE_THROWS(DC_Selector(bad));
   rho_type rho; s.dmb->init_rhoi(rho);
   s.dmb->calc_rho(73,73,1.3,1.69,Vec3d(1.3,0,0),rho);
   aed_type a(3); a.set_zero(); s.dmb->calc_aed(rho,a);
@@ -256,6 +258,7 @@ TEST_CASE("DM_Embed composes with legacy terms in explicit order and preserves f
     auto bad=joined;auto broken=spec;broken.density.amplitudes[0]=-1;bad.replace_blocks({embed_block(broken)});
     const double before=energy(*combined.dmb,1.37);REQUIRE_THROWS(combined.dmb->reinit(bad));
     REQUIRE(energy(*combined.dmb,1.37)==before);
+    REQUIRE_THROWS(DC_Selector(bad));  // the constructor refuses it too
   }
 }
 

@@ -674,6 +674,33 @@ TEST_CASE_METHOD(DensityFixture,
   CHECK(snapshot() != before);
 }
 
+/* Pins: the DM_REAM constructor refuses the contexts the reinit case above
+ * gives a built descriptor: RHOFORM NONNEG with negative amplitudes and a
+ * context without RHOFORM (DensityFormError), a zero entry in SEMBFUNC
+ * ("zero entry in SEMBFUNC"); RHOFORM NONNEG with non-negative amplitudes
+ * builds a NONNEG density. A caller with a new context builds a new
+ * descriptor, and these checks apply.
+ * Before the fix: passes as well (a pin of the constructor's checks). */
+TEST_CASE_METHOD(DensityFixture,
+                 "DM_REAM: the constructor refuses a context whose density "
+                 "form or embedding it cannot evaluate",
+                 "[ream][rhoform][validation]") {
+  Context neg = ream_ctx(layout(BasisKind::Blip5, false), "NONNEG", "Cut_Cos");
+  CHECK_THROWS_AS(DM_REAM(neg), DensityFormError);
+
+  Context keyless = ream_ctx(layout(BasisKind::Blip5, true), "", "Cut_Cos");
+  CHECK_THROWS_AS(DM_REAM(keyless), DensityFormError);
+
+  Context bad_emb = ream_ctx(layout(BasisKind::Blip5, true), "SIGNED", "Cut_Cos");
+  bad_emb.remove("SEMBFUNC");
+  bad_emb.add("SEMBFUNC", "1.0 0.0 1.0");
+  CHECK_THROWS_WITH(DM_REAM(bad_emb), Contains("zero entry in SEMBFUNC"));
+
+  Context pos = ream_ctx(layout(BasisKind::Blip5, true), "NONNEG", "Cut_Cos");
+  DM_REAM dm(pos);
+  CHECK(dm.density().form == RhoForm::NonNeg);
+}
+
 // ---------------------------------------------------------------------------
 //  5. rhoform.h helpers
 // ---------------------------------------------------------------------------

@@ -180,6 +180,18 @@ TEST_CASE_METHOD(MjoinEmbf0Fixture,
     dm.set_fidx(0);
     check_ream_blocks_at_zero(dm, EmbF0Mode::Free);
   }
+  SECTION("ctor, no EMBF0 (ZERO)") {
+    Context c = cz;
+    DM_mJoin dm(c);
+    dm.set_fidx(0);
+    check_ream_blocks_at_zero(dm, EmbF0Mode::Zero);
+  }
+  SECTION("ctor, explicit ZERO") {
+    Context c = make_mjoin_ctx("ZERO");
+    DM_mJoin dm(c);
+    dm.set_fidx(0);
+    check_ream_blocks_at_zero(dm, EmbF0Mode::Zero);
+  }
   SECTION("reinit ZERO -> FREE -> ZERO") {
     Context c = cz;
     DM_mJoin dm(c);
