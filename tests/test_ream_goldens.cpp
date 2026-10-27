@@ -6,21 +6,27 @@
  * (signed, all non-negative), calc_rho's increment, the calc_dXijdri force
  * prefactor and eam_density's rho and rho' at 56-64 distances in (0, rcut],
  * captured as hex floats from the tree before the density forms (MODELS
- * 4c4144b) with glibc on x86-64. ream_density_before_rhoform.cpp is a
+ * 4c4144b) on x86-64. ream_density_before_rhoform.cpp is a
  * frozen copy of that tree's code: it gives the density before RHOFORM on
  * the platform the test runs on. RHOFORM SIGNED must reproduce it bit for
  * bit on both amplitude sets, and RHOFORM NONNEG on the non-negative set
  * (every cutoff here is >= 0, so the max(f_c, 0) clamp is inert).
  *
  * The density calls the C library's cos (Cut_Cos), sin (its derivative)
- * and exp (Gaussian), whose results the C standard does not fix to the bit:
- * musl's round some arguments one ulp away from glibc's, so that calc_rho
- * of the Blip Cut_Cos signed case at r = 0x1.e60aa64c2f838p-1 is
- * 0x1.4f8f2a2a6d567p-2 with musl against the stored 0x1.4f8f2a2a6d566p-2,
- * for the code before RHOFORM and for SIGNED alike. Hence the density
- * before RHOFORM is computed here, on the platform, and the stored goldens
- * anchor the frozen copy: bit for bit with glibc, with which they were
- * captured, and with any C library within the bound kLibmBound states.
+ * and exp (Gaussian), whose results the C standard does not fix to the
+ * bit. C libraries, and the code paths one C library takes on different
+ * CPUs, round some arguments one ulp apart: calc_rho of the Blip Cut_Cos
+ * signed case at r = 0x1.e60aa64c2f838p-1 is 0x1.4f8f2a2a6d567p-2 with
+ * musl (Alpine 3.19) against the stored 0x1.4f8f2a2a6d566p-2, and that of
+ * the Gaussian Cut_Cos signed case at r = 0x1.064f765fd8adap+1 is
+ * -0x1.8a1e1fc8fd51p-14 with the cos, sin and exp that glibc 2.43 takes on
+ * an x86-64 CPU without AVX2 and FMA against the stored
+ * -0x1.8a1e1fc8fd5ep-14, for the code before RHOFORM and for SIGNED alike.
+ * Hence the density before RHOFORM is computed here, on the platform, with
+ * the C library's functions, for the cases that compare RHOFORM with it.
+ * The stored goldens anchor the frozen copy with the results of cos, sin
+ * and exp recorded in ream_goldens_libm.h, which the copy is given in
+ * place of the C library's: bit for bit whatever the C library.
  */
 #include "tadah_test_skip.hpp"  // includes catch2/catch.hpp
 #include "ream_density_before_rhoform.h"
@@ -35,7 +41,7 @@
 #include <tadah/models/cutoffs.h>
 #include <tadah/models/descriptors/dm/dm_ream.h>
 
-#include <cfloat>
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -43,6 +49,7 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 using namespace tadah::core;
@@ -186,78 +193,62 @@ std::size_t mismatches(const ream_goldens::Case &gc, const char *form,
   return bad;
 }
 
-/* The anchor's bound where the C library is not the capture's: every value
- * of the frozen copy is within kLibmBound * DBL_EPSILON * scale of its
- * golden, scale from before::libm_scale() (the sum over the value's terms
- * of the magnitudes of the C library's factors times the rest of the
- * term). Two C libraries whose cos, sin and exp are within one ulp of the
- * exact result differ by at most one ulp, eps relative, per call.
- * A value adds 6 terms (each case has 6 grid entries), each a product of
- * the bare basis value or derivative with f_c or f_c', and for the
- * Gaussian with exp: at most two such factors per term, which move it by 2
- * eps of its scale each (f_c of Cut_Cos, 0.5 (cos + 1), by 2 eps of
- * (|cos| + 1)/2), and at most 4 roundings after them, 1 eps each; then 5
- * additions and the weight (and 1/r for the prefactor), 1 eps each: at
- * most 4 + 4 + 5 + 2 = 15 eps of the scale. The bound is about twice that.
- * A change of a formula, not only of its rounding, moves values far
- * further. */
-constexpr double kLibmBound = 32.0;
+/* A C library that gives the results recorded in ream_goldens_libm.h: each
+ * function looks its argument up by its bits and returns the recorded
+ * result. It counts the calls at an argument that has no recorded result
+ * (and returns a NaN for them) and marks the results it gave, so that the
+ * anchor sees a copy that calls a function at another argument, or that
+ * does not reach it through before::Libm. */
+struct Replay {
+  const char *name;
+  const ream_goldens_libm::Result *tab;
+  std::size_t n;
+  std::unordered_map<std::uint64_t, std::size_t> at;  // bits of x -> entry
+  std::vector<bool> used;
+  std::size_t missing = 0;
+  std::string first_missing;
 
-struct AnchorCount {
-  std::size_t values = 0;
-  std::size_t outside_bound = 0;
-  std::size_t not_bitwise = 0;
-  std::string first_outside;
-  std::string first_not_bitwise;
+  Replay(const char *nm, const ream_goldens_libm::Result *t, std::size_t k)
+      : name(nm), tab(t), n(k) {
+    for (std::size_t i = 0; i < k; ++i) at.emplace(bits(t[i].x), i);
+    reset();
+  }
+  void reset() {
+    used.assign(n, false);
+    missing = 0;
+    first_missing.clear();
+  }
+  double operator()(double x) {
+    const auto it = at.find(bits(x));
+    if (it == at.end()) {
+      if (missing++ == 0) first_missing = std::string(name) + "(" + hex(x) + ")";
+      return std::numeric_limits<double>::quiet_NaN();
+    }
+    used[it->second] = true;
+    return tab[it->second].y;
+  }
+  std::size_t unused() const {
+    return static_cast<std::size_t>(std::count(used.begin(), used.end(), false));
+  }
 };
 
-// The frozen copy through @p lm against every stored golden of a case.
-void anchor(const ream_goldens::Case &gc, const before::Libm &lm,
-            AnchorCount &n) {
-  const before::Density d = golden_density(gc);
-  for (std::size_t k = 0; k < gc.npts; ++k) {
-    const ream_goldens::Point &p = gc.pts[k];
-    const before::Values v = before::evaluate(d, p.r, lm);
-    const before::Values sc = before::libm_scale(d, p.r);
-    const double got[4] = {v.rho, v.pref, v.eam_rho, v.eam_rhop};
-    const double want[4] = {p.rho, p.pref, p.eam_rho, p.eam_rhop};
-    const double scale[4] = {sc.rho, sc.pref, sc.eam_rho, sc.eam_rhop};
-    const char *what[4] = {"calc_rho", "calc_dXijdri pref", "eam_density rho",
-                           "eam_density rho'"};
-    for (int q = 0; q < 4; ++q) {
-      ++n.values;
-      const std::string at = std::string(gc.family) + " " + gc.cutoff +
-                             (gc.nonneg_amps ? " non-negative" : " signed") +
-                             ", " + what[q] + " at r = " + hex(p.r) +
-                             ": computed " + hex(got[q]) + ", stored " +
-                             hex(want[q]);
-      if (bits(got[q]) != bits(want[q]) && n.not_bitwise++ == 0)
-        n.first_not_bitwise = at;
-      const double bound = kLibmBound * DBL_EPSILON * scale[q];
-      if (!(std::fabs(got[q] - want[q]) <= bound) && n.outside_bound++ == 0)
-        n.first_outside = at + ", bound " + hex(bound);
-    }
-  }
+#define TADAH_REAM_TABLE(t) (t), sizeof(t) / sizeof((t)[0])
+Replay &replay_cos() {
+  static Replay r("cos", TADAH_REAM_TABLE(ream_goldens_libm::kCos));
+  return r;
 }
-
-// A C library whose cos, sin and exp round results one ulp away from this
-// platform's: every result up (M = 1), every result down (M = 2), or by
-// the argument's two lowest bits (M = 0: 01 up, 10 down, else unmoved).
-template <int M>
-double one_ulp_away(double x, double y) {
-  std::uint64_t u = bits(x) & 3u;
-  if (M == 1) u = 1;
-  if (M == 2) u = 2;
-  if (u == 1) return std::nextafter(y, std::numeric_limits<double>::infinity());
-  if (u == 2) return std::nextafter(y, -std::numeric_limits<double>::infinity());
-  return y;
+Replay &replay_sin() {
+  static Replay r("sin", TADAH_REAM_TABLE(ream_goldens_libm::kSin));
+  return r;
 }
-template <int M> double moved_cos(double x) { return one_ulp_away<M>(x, std::cos(x)); }
-template <int M> double moved_sin(double x) { return one_ulp_away<M>(x, std::sin(x)); }
-template <int M> double moved_exp(double x) { return one_ulp_away<M>(x, std::exp(x)); }
-template <int M> before::Libm moved_libm() {
-  return before::Libm{&moved_cos<M>, &moved_sin<M>, &moved_exp<M>};
+Replay &replay_exp() {
+  static Replay r("exp", TADAH_REAM_TABLE(ream_goldens_libm::kExp));
+  return r;
 }
+#undef TADAH_REAM_TABLE
+double recorded_cos(double x) { return replay_cos()(x); }
+double recorded_sin(double x) { return replay_sin()(x); }
+double recorded_exp(double x) { return replay_exp()(x); }
 
 // The results of one function of ream_goldens_libm.h against @p f, the C
 // library's: the number of arguments at which they differ, and the first.
@@ -313,70 +304,86 @@ TEST_CASE("DM_REAM goldens: this C library's cos, sin and exp differ from "
             << " recorded results differ; the first: " << first);
 }
 
-/* Pins: the frozen copy of the code before RHOFORM, run on this platform,
- * gives every stored golden value (1770 points, 4 values each) within
- * kLibmBound * DBL_EPSILON of the value's libm scale, and with glibc, the C
- * library of the capture, bit for bit. A copy whose formulas drift from
- * that code fails here on every platform, and with glibc any changed bit
- * fails; the cases below compare RHOFORM with the copy.
- * Before the fix: new; passes (a pin of the copy: the cases below compared
- * RHOFORM with the stored goldens and failed with musl, Alpine 3.19). */
+/* Pins: the frozen copy of the code before RHOFORM, given the results of
+ * cos, sin and exp recorded in ream_goldens_libm.h in place of the C
+ * library's, gives every stored golden value (1770 points, 4 values each)
+ * bit for bit, and calls cos, sin and exp at the recorded arguments only,
+ * each of them. The C library's own cos, sin and exp enter none of these
+ * values, so the case holds with any C library: a copy whose arithmetic or
+ * arguments drift from the code it copies fails here on every platform.
+ * The goldens are the bits of that arithmetic without fused multiply-adds,
+ * as MODELS' flags compile the copy on x86-64 (never -march=native,
+ * tests/CMakeLists.txt). The cases below compare RHOFORM with the copy run
+ * with the C library's own cos, sin and exp.
+ * Before the fix: the copy ran with the C library's cos, sin and exp, and
+ * had to give the stored goldens bit for bit wherever __GLIBC__ is defined
+ * (within 32 eps of a scale of each value elsewhere); it failed with glibc
+ * 2.43 on x86-64 under GLIBC_TUNABLES=glibc.cpu.hwcaps=-AVX2,-FMA, the
+ * cos, sin and exp of a CPU without AVX2 and FMA, which give one exp
+ * result differently: '8 == 0', 8 values differ, the first 'Gaussian
+ * Cut_Cos signed, calc_rho at r = 0x1.064f765fd8adap+1: computed
+ * -0x1.8a1e1fc8fd51p-14, stored -0x1.8a1e1fc8fd5ep-14'. */
 TEST_CASE_METHOD(GoldenFixture,
                  "DM_REAM goldens: the density before RHOFORM computed here "
-                 "is the stored goldens (bit for bit with glibc, within the "
-                 "C library's rounding elsewhere)",
+                 "from the recorded C library results is the stored goldens "
+                 "bit for bit",
                  "[ream][rhoform][goldens]") {
-  AnchorCount n;
-  for (const auto &gc : ream_goldens::kCases)
-    anchor(gc, before::platform_libm(), n);
-  REQUIRE(n.values > 4 * 1500);  // the table is present and complete
-  INFO((n.outside_bound ? "first value outside the bound: " + n.first_outside
-                        : std::string("every value is within the bound")));
-  CHECK(n.outside_bound == 0);
-#if defined(__GLIBC__)
-  INFO("glibc, the C library the goldens were captured with; first value "
-       "that differs: " << n.first_not_bitwise);
-  CHECK(n.not_bitwise == 0);
-#endif
-}
-
-/* Pins: the anchor's bound holds for a C library whose cos, sin and exp
- * round one ulp away from this platform's (every result up, every result
- * down, or by the argument): the frozen copy through each such library
- * changes golden values (at least one value's bits) and keeps every value
- * within kLibmBound * DBL_EPSILON of its scale. The bound is what the
- * anchor asserts with a C library other than glibc (musl on the GitLab
- * runner); this case checks it against C libraries that round differently
- * on any platform.
- * Before the fix: new; passes (a pin of the bound). */
-TEST_CASE_METHOD(GoldenFixture,
-                 "DM_REAM goldens: the anchor's bound holds for a C library "
-                 "whose cos, sin and exp round one ulp away",
-                 "[ream][rhoform][goldens]") {
-  const before::Libm libms[3] = {moved_libm<0>(), moved_libm<1>(),
-                                 moved_libm<2>()};
-  const char *names[3] = {"by the argument's lowest bits", "every result up",
-                          "every result down"};
-  for (int i = 0; i < 3; ++i) {
-    INFO("cos, sin and exp one ulp away: " << names[i]);
-    AnchorCount n;
-    for (const auto &gc : ream_goldens::kCases) anchor(gc, libms[i], n);
-    INFO((n.outside_bound ? "first value outside the bound: " + n.first_outside
-                          : std::string("every value is within the bound")));
-    CHECK(n.outside_bound == 0);
-    CHECK(n.not_bitwise > 0);  // the library changes the density
+  Replay *const libm[3] = {&replay_cos(), &replay_sin(), &replay_exp()};
+  for (Replay *f : libm) {
+    INFO(f->name << ": one recorded result per argument");
+    REQUIRE(f->at.size() == f->n);
+    f->reset();
   }
+  const before::Libm recorded{&recorded_cos, &recorded_sin, &recorded_exp};
+  std::size_t values = 0, differ = 0;
+  std::string first;
+  for (const auto &gc : ream_goldens::kCases) {
+    const before::Density d = golden_density(gc);
+    for (std::size_t k = 0; k < gc.npts; ++k) {
+      const ream_goldens::Point &p = gc.pts[k];
+      const before::Values v = before::evaluate(d, p.r, recorded);
+      const double got[4] = {v.rho, v.pref, v.eam_rho, v.eam_rhop};
+      const double want[4] = {p.rho, p.pref, p.eam_rho, p.eam_rhop};
+      const char *what[4] = {"calc_rho", "calc_dXijdri pref",
+                             "eam_density rho", "eam_density rho'"};
+      for (int q = 0; q < 4; ++q) {
+        ++values;
+        if (bits(got[q]) == bits(want[q])) continue;
+        if (differ++ == 0)
+          first = std::string(gc.family) + " " + gc.cutoff +
+                  (gc.nonneg_amps ? " non-negative" : " signed") + ", " +
+                  what[q] + " at r = " + hex(p.r) + ": computed " +
+                  hex(got[q]) + ", stored " + hex(want[q]);
+      }
+    }
+  }
+  REQUIRE(values > 4 * 1500);  // the table is present and complete
+  for (Replay *f : libm) {
+    INFO(f->name << ": " << f->missing
+                 << " calls at an argument with no recorded result; the "
+                    "first: "
+                 << f->first_missing);
+    CHECK(f->missing == 0);
+    INFO(f->name << ": " << f->unused() << " of " << f->n
+                 << " recorded results not used");
+    CHECK(f->unused() == 0);
+  }
+  INFO("first value that differs: " << first);
+  CHECK(differ == 0);
 }
 
 /* Pins: RHOFORM SIGNED gives the density before RHOFORM, computed here on
  * this platform by the frozen copy, bit for bit at every golden point, on
  * both amplitude sets.
  * Before the fix: passes as well (a pin of DM_REAM; the defect was this
- * test's reference, the stored goldens, which differ from the density of
- * any C library other than glibc: with musl, Alpine 3.19, it failed for
- * every Cut_Cos case and the Gaussian Cut_Poly cases, 'calc_rho at r =
- * 0x1.e60aa64c2f838p-1: got 0x1.4f8f2a2a6d567p-2, before RHOFORM
- * 0x1.4f8f2a2a6d566p-2'). */
+ * test's reference, the stored goldens, the density with the cos, sin and
+ * exp results of ream_goldens_libm.h, which differs from the density with
+ * a C library that rounds one of those arguments differently: with musl,
+ * Alpine 3.19, it failed for every Cut_Cos case and the Gaussian Cut_Poly
+ * cases, 'calc_rho at r = 0x1.e60aa64c2f838p-1: got 0x1.4f8f2a2a6d567p-2,
+ * before RHOFORM 0x1.4f8f2a2a6d566p-2', and with glibc 2.43 on x86-64
+ * under GLIBC_TUNABLES=glibc.cpu.hwcaps=-AVX2,-FMA for Gaussian Cut_Cos
+ * signed and both Gaussian Cut_Poly cases, at r = 0x1.064f765fd8adap+1). */
 TEST_CASE_METHOD(GoldenFixture,
                  "DM_REAM goldens: RHOFORM SIGNED is bitwise the density before RHOFORM "
                  "(signed and non-negative amplitudes)",
@@ -398,8 +405,10 @@ TEST_CASE_METHOD(GoldenFixture,
 /* Pins: RHOFORM NONNEG gives the density before RHOFORM, computed here on
  * this platform by the frozen copy, bit for bit at every golden point of
  * the 15 non-negative amplitude sets.
- * Before the fix: passes as well (a pin; with musl it failed against the
- * stored goldens for every Cut_Cos case and Gaussian Cut_Poly). */
+ * Before the fix: passes as well (a pin; against the stored goldens it
+ * failed with musl, Alpine 3.19, for every Cut_Cos case and Gaussian
+ * Cut_Poly, and with glibc 2.43 under
+ * GLIBC_TUNABLES=glibc.cpu.hwcaps=-AVX2,-FMA for Gaussian Cut_Poly). */
 TEST_CASE_METHOD(GoldenFixture,
                  "DM_REAM goldens: RHOFORM NONNEG is bitwise the density before RHOFORM "
                  "on non-negative amplitudes",
@@ -448,7 +457,9 @@ TEST_CASE_METHOD(GoldenFixture,
  * function, this unit's -march=native one, and DM_REAM's methods call it.
  * Without this case, whose unit calls the density itself, that move
  * passed. Its reference was the stored goldens, with which it failed with
- * musl (Alpine 3.19) for every Cut_Cos case and Gaussian Cut_Poly. */
+ * musl (Alpine 3.19) for every Cut_Cos case and Gaussian Cut_Poly, and
+ * with glibc 2.43 under GLIBC_TUNABLES=glibc.cpu.hwcaps=-AVX2,-FMA for
+ * Gaussian Cut_Cos signed and both Gaussian Cut_Poly cases. */
 TEST_CASE_METHOD(GoldenFixture,
                  "DM_REAM goldens: ReamDensity called by the program gives the "
                  "density before RHOFORM",

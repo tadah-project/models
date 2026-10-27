@@ -10,7 +10,9 @@
  * Cut_Poly (src/cutoffs.cpp), every expression as it was, so that it gives
  * the bits that tadah gave on the platform it runs on. Only the C library's
  * cos, sin and exp are reached through Libm, so that a test can give the
- * copy a C library that rounds differently. The file is compiled with
+ * copy other results of them: test_ream_goldens.cpp gives it those recorded
+ * in ream_goldens_libm.h, with which it gives the stored goldens bit for
+ * bit whatever the C library. The file is compiled with
  * MODELS' flags and never with -march=native (tests/CMakeLists.txt): a
  * compiler that fuses its multiply-adds into FMAs would change its bits. Do
  * not edit the copy; the goldens anchor it.
@@ -57,14 +59,6 @@ struct Values {
 
 /// The density before RHOFORM at distance @p r, through @p lm.
 Values evaluate(const Density &d, double r, const Libm &lm);
-
-/// For each value, the sum over its terms of the magnitudes of the
-/// factors a C library gives (f_c, f_c' and the Gaussian's exp) times the
-/// rest of the term: what a result of cos, sin or exp one ulp away can
-/// move by a few eps. Cut_Cos counts (|cos| + 1)/2 for f_c, so that a
-/// change of cos near the cutoff, where f_c is a difference of nearly
-/// equal numbers, stays within the bound.
-Values libm_scale(const Density &d, double r);
 
 }  // namespace ream_before_rhoform
 

@@ -13,41 +13,13 @@ namespace {
 
 // ---- descriptors/d_basis_functions.h ----------------------------------
 
-double G(const Libm &lm, double r, double eta, double miu) {
-  return lm.exp(-eta*(r-miu)*(r-miu));
-}
-
 double G(const Libm &lm, double r, double eta, double miu, double f) {
   return lm.exp(-eta*(r-miu)*(r-miu))*f;
-}
-
-double dG(const Libm &lm, double r, double eta, double miu) {
-  return -2.0*eta*(r-miu)*lm.exp(-eta*(r-miu)*(r-miu));
 }
 
 double dG(const Libm &lm, double r, double eta, double miu, double f,
           double fp) {
   return lm.exp(-eta*(r-miu)*(r-miu) )*(-2.0*f*eta*(r-miu)+fp);
-}
-
-double B(double x_c)
-{
-  if (-2.0 < x_c && x_c <= -1.0) {
-    double b = 2.0 + x_c;
-    return 0.25 * b*b*b;
-  }
-  else if (-1.0 < x_c && x_c <= 1.0) {
-    double x2 = x_c*x_c;
-    double x3 = x2*x_c;
-    return 1.0 - 1.5*x2 + 0.75*std::fabs(x3);
-  }
-  else if (1.0 < x_c && x_c < 2.0) {
-    double b = 2.0 - x_c;
-    return 0.25 * b*b*b;
-  }
-  else {
-    return 0.0;
-  }
 }
 
 double B(double x_c, double f)
@@ -64,24 +36,6 @@ double B(double x_c, double f)
   else if (1.0 < x_c && x_c < 2.0) {
     double b = 2.0 - x_c;
     return f*(0.25 * b*b*b);
-  }
-  else {
-    return 0.0;
-  }
-}
-
-double dB(double x_c, double eta)
-{
-  if (-2.0 < x_c && x_c <= -1.0) {
-    double d = 2.0+x_c;
-    return 0.75*eta*d*d;
-  }
-  else if (-1.0 < x_c && x_c <= 1.0) {
-    return -3.0*eta*x_c + 2.25*eta*x_c*std::fabs(x_c);
-  }
-  else if (1.0 < x_c && x_c < 2.0) {
-    double d = 2.0-x_c;
-    return -0.75*eta*d*d;
   }
   else {
     return 0.0;
@@ -262,30 +216,6 @@ void radial_value_deriv(const Libm &lm, Basis k, double r, double fc,
   deriv = radial_deriv(lm, k, r, fc, fcp, s, c, deg);
 }
 
-// The bare basis (no cutoff weight) and its derivative in r, for
-// libm_scale (radial_value_bare and radial_deriv_bare).
-double radial_value_bare(const Libm &lm, Basis k, double r, double s,
-                         double c, int deg) {
-  switch (k) {
-    case Blip:     return B (s * (r - c));
-    case Blip5:    return B5(s * (r - c));
-    case Knot5:    return deg == 3 ? K3L(r - c) : K5L(r - c);
-    case Gaussian: return G (lm, r, s, c);
-  }
-  throw std::invalid_argument("ream_before_rhoform: unknown basis");
-}
-
-double radial_deriv_bare(const Libm &lm, Basis k, double r, double s,
-                         double c, int deg) {
-  switch (k) {
-    case Blip:     return dB (s * (r - c), s);
-    case Blip5:    return dB5(s * (r - c), s);
-    case Knot5:    return deg == 3 ? dK3L(r - c, 1.0) : dK5L(r - c, 1.0);
-    case Gaussian: return dG (lm, r, s, c);
-  }
-  throw std::invalid_argument("ream_before_rhoform: unknown basis");
-}
-
 // ---- src/cutoffs.cpp ----------------------------------------------------
 
 enum CutKind { Dummy, Cos, Poly };
@@ -348,13 +278,6 @@ struct Cutoff {
     }
     throw std::invalid_argument("ream_before_rhoform: unknown cutoff");
   }
-
-  // The magnitude of f_c that a C library's cos can move (libm_scale).
-  double calc_scale(const Libm &lm, double r) const {
-    if (kind == Cos && r < rcut)
-      return 0.5 * (std::fabs(lm.cos(M_PI*r*rcut_inv)) + 1.0);
-    return std::fabs(calc(lm, r));
-  }
 };
 
 // ---- src/dm_ream.cpp (DM_REAM before RHOFORM) --------------------------
@@ -364,9 +287,6 @@ struct Ream {
   Basis basis;
   const Density &d;
 
-  double width(std::size_t n) const {
-    return (n < d.s.size()) ? d.s[n] : 1.0;
-  }
   int rho_deg(std::size_t n) const {
     return n < d.kdeg.size() ? static_cast<int>(d.kdeg[n]) : 5;
   }
@@ -443,32 +363,6 @@ Values evaluate(const Density &d, double rij, const Libm &lm) {
     out.eam_rho  = w * rho_raw_both;
     out.eam_rhop = w * rhop_raw;
   }
-  return out;
-}
-
-Values libm_scale(const Density &d, double r) {
-  const Libm lm = platform_libm();
-  const Ream ream{lm, basis_of(d.bcode), d};
-  const Cutoff fcut(d.cutoff, d.rcut);
-  Values out{0.0, 0.0, 0.0, 0.0};
-  if (r > d.rcut) return out;
-  const double mfc = fcut.calc_scale(lm, r);
-  const double mfcp = std::fabs(fcut.calc_prime(lm, r));
-  double value = 0.0, deriv = 0.0;
-  for (std::size_t n = 0; n < d.c.size(); ++n) {
-    const double s = ream.width(n);
-    const double p = std::fabs(radial_value_bare(lm, ream.basis, r, s, d.c[n],
-                                                 ream.rho_deg(n)));
-    const double q = std::fabs(radial_deriv_bare(lm, ream.basis, r, s, d.c[n],
-                                                 ream.rho_deg(n)));
-    value += std::fabs(d.a[n]) * p * mfc;
-    deriv += std::fabs(d.a[n]) * (q * mfc + p * mfcp);
-  }
-  const double w = std::fabs(d.w);
-  out.rho = w * value;
-  out.eam_rho = w * value;
-  out.eam_rhop = w * deriv;
-  out.pref = w * deriv / r;
   return out;
 }
 
