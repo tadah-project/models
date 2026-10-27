@@ -1672,14 +1672,20 @@ TEST_CASE_METHOD(EditFixture,
  * agree on it (a potential keeps its stated cutoffs:
  * normalize_potential_knot_rcut): TYPE2B D2_mJoin of D2_Knot5 (knots 2.5
  * 3.5 4.5) and D2_Blip with RCUT2B 5.3 5 becomes RCUT2B 4.5 5 (the
- * D2_Blip's 5 kept, RCUT2BMAX 5), with one WARNING naming the descriptor,
- * "test: TYPE2B descriptor 1 (D2_Knot5): RCUT2B 5.3 is above the largest
- * knot (4.5): the knot basis vanishes at its largest knot, so the cutoff of
- * a D2_Knot5 line is 4.5, which the CGRID2B knot positions set."; a second
- * call, and a joined line whose knot cutoff is its largest knot, change
- * nothing.
+ * D2_Blip's 5 kept, RCUT2BMAX 5), with one WARNING naming the descriptor
+ * and the entry of the key, as an OPTIM line numbers the whole key, "test:
+ * TYPE2B descriptor 1 (D2_Knot5): RCUT2B (1) 5.3 is above the largest knot
+ * (4.5): the knot basis vanishes at its largest knot, so the cutoff of a
+ * D2_Knot5 descriptor is 4.5, which the CGRID2B knot positions set."; a
+ * second call, and a joined line whose knot cutoff is its largest knot,
+ * change nothing. TYPEMB DM_mJoin of DM_Blip and a knot DM_REAM density
+ * (knots 4.6 3.0) with RCUTMB 5 5.2 becomes RCUTMB 5 4.6, its WARNING
+ * "test: TYPEMB descriptor 2 (DM_REAM): RCUTMB (2) 5.2 is above the largest
+ * knot (4.6): ... the cutoff of a knot DM_REAM density is 4.6, ...".
  * Before the fix: a joined line was left as stated (derived_knot_rcut
- * reads the line's first value, D2_mJoin): no change, no note. */
+ * reads the line's first value, D2_mJoin): no change, no note; then the
+ * note said "RCUT2B 5.3" and "the cutoff of a D2_Knot5 line", a line the
+ * descriptor is not, without the entry. */
 TEST_CASE("potedit: normalize_knot_rcut derives the cutoff of each knot "
           "descriptor of a joined line",
           "[potedit][notes][join]") {
@@ -1706,9 +1712,9 @@ TEST_CASE("potedit: normalize_knot_rcut derives the cutoff of each knot "
   REQUIRE(notes.size() == 1u);
   CHECK(notes[0].level == tadah::core::LogLevel::WARNING);
   CHECK(notes[0].text ==
-        "test: TYPE2B descriptor 1 (D2_Knot5): RCUT2B 5.3 is above the "
+        "test: TYPE2B descriptor 1 (D2_Knot5): RCUT2B (1) 5.3 is above the "
         "largest knot (4.5): the knot basis vanishes at its largest knot, so "
-        "the cutoff of a D2_Knot5 line is 4.5, which the CGRID2B knot "
+        "the cutoff of a D2_Knot5 descriptor is 4.5, which the CGRID2B knot "
         "positions set.");
   notes.clear();
   CHECK_FALSE(normalize_knot_rcut(k, "test", notes));
@@ -1716,6 +1722,29 @@ TEST_CASE("potedit: normalize_knot_rcut derives the cutoff of each knot "
   Context same = joined("4.5 5.0");
   CHECK_FALSE(normalize_knot_rcut(same, "test", notes));
   CHECK(notes.empty());
+
+  Context mb;
+  mb.add("ATOM", "Ta");
+  mb.add("INIT2B", "false");
+  mb.add("INITMB", "true");
+  mb.add("TYPEMB", "DM_mJoin DM_Blip 0 2 2 Ta Ta DM_REAM 2 2 0 2 3 0 0 0 "
+                   "Ta Ta");
+  mb.add("RCTYPEMB", "Cut_Dummy Cut_Dummy");
+  mb.add("RCUTMB", "5.0 5.2");
+  mb.add("CGRIDMB", "2.5 3.5 4.6 3.0");
+  mb.add("SGRIDMB", "1.0 1.0");
+  mb.add("AMPGRIDMB", "0.4 0.2");
+  mb.add("CEMBFUNC", "0.0 0.5 1.0");
+  REQUIRE(normalize_knot_rcut(mb, "test", notes));
+  REQUIRE(mb.size("RCUTMB") == 2u);
+  CHECK(mb.get<double>("RCUTMB", 0) == 5.0);
+  CHECK(mb.get<double>("RCUTMB", 1) == 4.6);
+  REQUIRE(notes.size() == 1u);
+  CHECK(notes[0].text ==
+        "test: TYPEMB descriptor 2 (DM_REAM): RCUTMB (2) 5.2 is above the "
+        "largest knot (4.6): the knot basis vanishes at its largest knot, so "
+        "the cutoff of a knot DM_REAM density is 4.6, which the CGRIDMB knot "
+        "positions set.");
 }
 
 /* Pins: normalize_potential_knot_rcut, the form for a potential that tadah
@@ -1783,17 +1812,18 @@ TEST_CASE("potedit: normalize_potential_knot_rcut keeps the stated cutoffs "
  * line says only what the fit does: normalize_knot_rcut on TYPE2B D2_mJoin
  * of D2_Knot5 (knots 2.5 3.5 4.5) and D2_Blip with RCUT2B 5.3 5 under
  * Cut_Cos gives one WARNING, "test: TYPE2B descriptor 1 (D2_Knot5): RCUT2B
- * 5.3 is above the largest knot (4.5): the knot basis vanishes at its
- * largest knot, so the cutoff of a D2_Knot5 line is 4.5, which the CGRID2B
- * knot positions set.", without the note of a line of one knot descriptor
- * that pair_style tadah reads the stated cutoff and differs from tadah
- * predict on a potential file stating it: tadah predict and tadah refit
- * --edit take the stated cutoffs of a joined line too
+ * (1) 5.3 is above the largest knot (4.5): the knot basis vanishes at its
+ * largest knot, so the cutoff of a D2_Knot5 descriptor is 4.5, which the
+ * CGRID2B knot positions set.", without the note of a line of one knot
+ * descriptor that pair_style tadah reads the stated cutoff and differs from
+ * tadah predict on a potential file stating it: tadah predict and tadah
+ * refit --edit take the stated cutoffs of a joined line too
  * (normalize_potential_knot_rcut).
  * Before the fix: the WARNING went on with "Under the smooth RCTYPE2B the
  * cutoff value enters every pair term, and pair_style tadah (LAMMPS) reads
  * the stated RCUT2B without re-deriving it: on a potential file stating
- * 5.3, LAMMPS differs from tadah train/predict/hpo ...". */
+ * 5.3, LAMMPS differs from tadah train/predict/hpo ..."; then it said
+ * "RCUT2B 5.3" and "the cutoff of a D2_Knot5 line", without the entry. */
 TEST_CASE("potedit: the note of a knot descriptor of a joined line under a "
           "smooth cutoff says what the fit does",
           "[potedit][notes][join]") {
@@ -1813,8 +1843,8 @@ TEST_CASE("potedit: the note of a knot descriptor of a joined line under a "
   REQUIRE(notes.size() == 1u);
   CHECK(notes[0].level == tadah::core::LogLevel::WARNING);
   CHECK(notes[0].text ==
-        "test: TYPE2B descriptor 1 (D2_Knot5): RCUT2B 5.3 is above the "
+        "test: TYPE2B descriptor 1 (D2_Knot5): RCUT2B (1) 5.3 is above the "
         "largest knot (4.5): the knot basis vanishes at its largest knot, so "
-        "the cutoff of a D2_Knot5 line is 4.5, which the CGRID2B knot "
+        "the cutoff of a D2_Knot5 descriptor is 4.5, which the CGRID2B knot "
         "positions set.");
 }
