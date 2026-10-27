@@ -336,8 +336,8 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
   };
   // " (TYPE2B on line 4 of run.train)", every line of the TYPE key: where a
   // refusal of a descriptor of the key's lines is (they cannot be told
-  // apart: a line may hold several descriptors); empty for values the
-  // program set.
+  // apart: a line may hold several descriptors), the end of every refusal
+  // below, a count too; empty for values the program set.
   const std::string type_on = [&] {
     const std::vector<tadah::core::KeyLine> at = c.key_lines(type_str);
     if (at.empty()) return std::string();
@@ -404,7 +404,7 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
     throw std::runtime_error(
         type_str + " names " + named + " but " + key + " has " +
         values(have) + set_on(key) + ": each descriptor takes one " + key +
-        " value, in the order of the " + type_str + " lines");
+        " value, in the order of the " + type_str + " lines" + type_on);
   }
 
   std::vector<tadah::core::Context> contexts;
@@ -523,7 +523,7 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
         throw std::runtime_error(where + " takes " + std::to_string(n) + " " +
                                  key + (n == 1 ? " value" : " values") +
                                  ", but " + key + " has " + has +
-                                 set_on(key) + ": " + text);
+                                 set_on(key) + ": " + text + type_on);
       }
       c1.add(type_str, n);
       for (size_t j = 0; j < n; ++j) {
@@ -582,12 +582,12 @@ std::vector<tadah::core::Context> D_mJoin::parse_context(const tadah::core::Cont
       throw std::runtime_error(type_str + " " + lines[0][0] + " takes " +
                                takes + ", but " + key + " has " +
                                values(given) + set_on(key) + ": " +
-                               last_text);
+                               last_text + type_on);
     throw std::runtime_error(
         type_str + " names " + named + ", which take " + takes + ", but " +
         key + " has " + values(given) + set_on(key) +
         ": each descriptor takes its " + key + " values, in the order of the " +
-        type_str + " lines");
+        type_str + " lines" + type_on);
   }
   return contexts;
 }

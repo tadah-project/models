@@ -775,9 +775,10 @@ public:
    *         requests nothing (require_lambda_request()), a value of Phi or
    *         T that is not finite, and fewer non-zero data rows than weights
    *         (LAMBDA 0) or than intercept columns (LAMBDA > 0).
-   * @throws std::logic_error (an internal error: the gate of tadah hpo's
-   *         analytical gradient refuses both when a run starts) for an
-   *         OALGO other than 4 and for LAMBDA -1.
+   * @throws std::logic_error (an internal error of the caller: the fit
+   *         serves an analytical gradient that reuses its factor, which a
+   *         caller asks for with OALGO 4 and a fixed LAMBDA) for an OALGO
+   *         other than 4 and for LAMBDA -1.
    */
   static void train_with_factor(
       tadah::core::Context &context,
@@ -795,8 +796,9 @@ public:
         context.size("OALGO") == 2 ? context.get<double>("OALGO", 1) : 1e-8;
     (void)rcond;  // NormalEquations does not consume rcond.
 
-    // The fit of the analytical gradient of tadah hpo, whose gate refuses
-    // both cases when the run starts: internal errors.
+    // A fit for an analytical gradient that reuses its factor, which a
+    // caller asks for with OALGO 4 and a fixed LAMBDA (tadah hpo builds its
+    // own factor and does not call it): internal errors of the caller.
     if (oalgo != 4) {
       throw std::logic_error(
           "internal error: the analytical gradient fits with OALGO 4 (the "

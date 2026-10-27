@@ -45,7 +45,9 @@ public:
    *  count names the lines that gave the key its values when @p c records
    *  them (core::Context::key_lines(), a parse of a file: 'TYPE2B names 1
    *  descriptor (D2_Blip) but RCUT2B has 2 values, set on line 6 of
-   *  config.train: ...').
+   *  config.train: ...'), and every refusal ends with the lines of the TYPE
+   *  key (' (TYPE2B on line 4 of config.train)'), which locate a TYPE line
+   *  of an included file.
    *
    *  A potential (@p c with WEIGHTS) is read as it was written: values its
    *  model does not read are reported once per key and process
