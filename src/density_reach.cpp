@@ -532,7 +532,7 @@ HealthVerdict radial_reach_check(const DataStats &d, const SeedView &s,
     return listed(where);
   };
   // The channels are judged together: a channel that reaches no pair of the
-  // line fails (its part of ρ is 0 for every atom); a pair that no channel
+  // line fails (its channel of ρ is 0 for every atom); a pair that no channel
   // reaches fails below (ρ gets nothing from it); a channel that misses a
   // pair another channel reaches is no finding.
   const std::size_t n = s.size("CGRIDMB");
@@ -573,13 +573,14 @@ HealthVerdict radial_reach_check(const DataStats &d, const SeedView &s,
       return HealthFail{channel +
                         ": the Gaussian exp(-SGRIDMB (r - CGRIDMB)^2) is "
                         "below 1e-6 at " + distances(missed, "every") +
-                        ", so ρ is ~0 for every atom (a smaller SGRIDMB, or "
-                        "a centre nearer the neighbours, reaches them)."};
+                        ", so its channel of ρ is ~0 for every atom (a "
+                        "smaller SGRIDMB, or a centre nearer the neighbours, "
+                        "reaches them)."};
     return HealthFail{channel + ": the support of the blip, |r - CGRIDMB| < "
                       "2/SGRIDMB = " + num(half) + " Å, holds " +
                       distances(missed, "no") +
-                      ", so ρ is 0 for every atom (a smaller SGRIDMB widens "
-                      "the support)."};
+                      ", so its channel of ρ is 0 for every atom (a smaller "
+                      "SGRIDMB widens the support)."};
   }
   // The pairs that no channel reaches.
   std::vector<const Reach *> unreached;

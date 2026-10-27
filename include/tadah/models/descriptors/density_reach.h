@@ -145,17 +145,17 @@ double blip_reach_width(double dist);
  *  support |r - CGRIDMB| < 2/SGRIDMB) when its support holds one of them. A
  *  width of 0 or less is no reach failure (other rules refuse it). The
  *  channels are judged together: a channel that reaches no pair of the
- *  line fails (its part of ρ is 0 for every atom), and so does a pair that
- *  no channel reaches (ρ gets nothing from it); a channel that misses a
- *  pair that another channel reaches is no finding. HealthFail names the
+ *  line fails (its channel of ρ is 0 for every atom), and so does a pair
+ *  that no channel reaches (ρ gets nothing from it); a channel that misses
+ *  a pair that another channel reaches is no finding. HealthFail names the
  *  first channel that reaches no pair by its entry of the configuration
  *  (SeedView::entry_number(): CGRIDMB(3) for the second channel of a
  *  joined line's descriptor after one of another), its centre and width,
- *  the form, and each pair with its range ("so ρ is ~0 for every atom", 0
- *  for a blip); else the pairs that no channel reaches, with the channel
- *  and its width for a density of one channel ("CGRIDMB(1) = 3.1 with
- *  SGRIDMB(1) = 100: the Gaussian ... is below 1e-6 at every (W, W)
- *  neighbour distance within RCUTMB = 3.5 (2.5 to 2.7 Å), so ρ gets
+ *  the form, and each pair with its range ("so its channel of ρ is ~0 for
+ *  every atom", 0 for a blip); else the pairs that no channel reaches, with
+ *  the channel and its width for a density of one channel ("CGRIDMB(1) =
+ *  3.1 with SGRIDMB(1) = 100: the Gaussian ... is below 1e-6 at every
+ *  (W, W) neighbour distance within RCUTMB = 3.5 (2.5 to 2.7 Å), so ρ gets
  *  nothing from the (W, W) pairs of atoms ..."), with the entries of the
  *  channels for several ("the channels CGRIDMB(1) to CGRIDMB(4) with their
  *  widths SGRIDMB(1) to SGRIDMB(4): each Gaussian ..."). Also a centre
