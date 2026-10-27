@@ -211,3 +211,39 @@ TEST_CASE("require_no_inert_keys: a fit refuses a line that changes nothing "
     CHECK_FALSE(refusal(c).empty());
   }
 }
+
+/* Pins: a line of more than six values is named by its key and first three
+ * values and the number of the others, as a refusal of a retired key names
+ * one: the SIGMA line of a potential of Tadah! 1.5.0 (SIGMA 3 and nine
+ * values) is "SIGMA 3 5.4833944e-09 3.2e-09 and 7 more values (line 2 of
+ * <file>)". inert_keys_text(lines, true), the sentence a fit adds to its
+ * refusal of retired keys, says "the configuration also has a line that
+ * changes nothing a fit gives, and a fit refuses it: SIGMA 3 ...";
+ * inert_keys_refusal is "<who>: " and inert_keys_text(lines, false).
+ * Before the fix: does not compile (no inert_keys_text); the SIGMA line was
+ * named with all its values. */
+TEST_CASE("inert keys: a long line is named by its first values, and the "
+          "sentence after a refusal of retired keys says 'also'",
+          "[inert_keys]") {
+  tadah::core::PeriodicTable::initialize();
+  const ScratchDir dir;
+  Quiet quiet;
+  const std::string path = dir.write_file(
+      "sigma.tadah",
+      std::string("ATOM Ta\nSIGMA 3 5.4833944e-09 3.2e-09 1 2 3 4 5 6 7\n") +
+          kLj);
+  const Context c = CoreUserConfigParser().parse(path);
+  const std::vector<InertKeyLine> lines = inert_key_lines(c);
+  REQUIRE(lines.size() == 1u);
+  CHECK(lines[0].key == "SIGMA");
+  CHECK(lines[0].text == "SIGMA 3 5.4833944e-09 3.2e-09 and 7 more values");
+  CHECK(lines[0].where == "line 2 of " + path);
+  CHECK_THAT(inert_keys_text(lines, true),
+             Catch::StartsWith("the configuration also has a line that "
+                               "changes nothing a fit gives, and a fit "
+                               "refuses it: SIGMA 3 5.4833944e-09 3.2e-09 "
+                               "and 7 more values (line 2 of " +
+                               path + "): "));
+  CHECK(inert_keys_refusal(lines, "tadah train") ==
+        "tadah train: " + inert_keys_text(lines, false));
+}
