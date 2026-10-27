@@ -95,8 +95,10 @@ public:
    *  (core::Context::key_lines()).
    *
    *  A potential has one line for each key of its descriptors, and its
-   *  D2_mJoin or DM_mJoin line as one line per descriptor, each starting
-   *  with the descriptor's name. The keys of the TYPE2B and TYPEMB lines
+   *  TYPE2B and TYPEMB keys as tadah writes them: lines one after another,
+   *  a new line at each descriptor's name (a D2_mJoin or DM_mJoin line as
+   *  one line per descriptor; core::Context::written_line_sizes()). The
+   *  keys of the TYPE2B and TYPEMB lines
    *  are judged, those parse_context() reads: the TYPE key, its RCTYPE and
    *  RCUT keys and the list keys of the line's type (CGRID, SGRID and KDEG;
    *  AMPGRIDMB, CEMBFUNC and SEMBFUNC). Such a key set on two lines or more
@@ -107,8 +109,11 @@ public:
    *  potential's descriptors from the line the potential has for it, and a
    *  potential's value is changed by editing its line in a copy of the
    *  potential (...)"), unless the key is the TYPE key and its lines there
-   *  are the lines of a joined line (its first value names D2_mJoin or
-   *  DM_mJoin, and each later line starts with a descriptor's name). The
+   *  are the lines tadah writes for their values: consecutive lines of the
+   *  file (core::KeyLine::line), each with the number of values
+   *  core::Context::written_line_sizes() gives it; any other line of the
+   *  TYPE key is refused naming every line, and saying how a potential has
+   *  them. The
    *  values of one line that the descriptors do not take (a potential of
    *  tadah 1.5.0) are not refused: parse_context() reports them, and a
    *  potential read for prediction is read so too. Keys without lines

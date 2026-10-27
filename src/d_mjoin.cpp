@@ -180,7 +180,6 @@ void D_mJoin::check_potential_lines(const tadah::core::Context &c,
   for (const std::string type_str : {"TYPE2B", "TYPEMB"}) {
     if (!c.has_stored(type_str)) continue;
     const std::string sfx = type_str.substr(type_str.size() - 2);
-    const std::string prefix = type_str == "TYPE2B" ? "D2_" : "DM_";
     std::vector<std::string> keys = {type_str, "RC" + type_str, "RCUT" + sfx};
     for (const auto &k : list_keys_of(type_str)) keys.push_back(k);
     for (const auto &key : keys) {
@@ -191,9 +190,12 @@ void D_mJoin::check_potential_lines(const tadah::core::Context &c,
         if (lines[i].potential) of_file[lines[i].source].push_back(i);
       for (const auto &[source, at] : of_file) {
         if (at.size() < 2) continue;
-        // A joined TYPE line: written with one line per descriptor, each
-        // starting with the descriptor's name, after the line that names
-        // the join. The lines give the key its values in line order.
+        // The TYPE key of a potential as tadah writes it: lines one after
+        // another, a new line at each descriptor's name (D2_mJoin, then a
+        // line per descriptor; a block reference @id before a descriptor on
+        // a line of its own), the lines Context::written_line_sizes() gives
+        // for their values. The lines give the key its values in line
+        // order.
         if (key == type_str) {
           std::vector<std::string> values(c.size(key));
           c.get(key, values);
@@ -208,13 +210,21 @@ void D_mJoin::check_potential_lines(const tadah::core::Context &c,
                 "D_mJoin::check_potential_lines: the lines of " + key +
                 " give " + std::to_string(n) + " values, and it has " +
                 std::to_string(values.size()));
-          bool joined_layout =
-              lines[at[0]].values > 0 &&
-              values[first[at[0]]].find("mJoin") != std::string::npos;
-          for (std::size_t k = 1; k < at.size() && joined_layout; ++k)
-            joined_layout = lines[at[k]].values > 0 &&
-                            values[first[at[k]]].rfind(prefix, 0) == 0;
-          if (joined_layout) continue;
+          // The values of the file's lines, and the lines tadah writes
+          // them on.
+          std::vector<std::string> own;
+          for (const std::size_t i : at)
+            own.insert(own.end(),
+                       values.begin() + static_cast<std::ptrdiff_t>(first[i]),
+                       values.begin() + static_cast<std::ptrdiff_t>(
+                                            first[i] + lines[i].values));
+          const std::vector<std::size_t> written =
+              c.written_line_sizes(key, own);
+          bool as_written = written.size() == at.size();
+          for (std::size_t k = 0; k < at.size() && as_written; ++k)
+            as_written = lines[at[k]].values == written[k] &&
+                         lines[at[k]].line == lines[at[0]].line + k;
+          if (as_written) continue;
         }
         std::string on;
         for (std::size_t k = 0; k < at.size(); ++k)
@@ -226,9 +236,9 @@ void D_mJoin::check_potential_lines(const tadah::core::Context &c,
             tadah::core::task_command_words(command) +
             " reads a key of a potential's descriptors from the line the "
             "potential has for it" +
-            (key == type_str ? " (a " + prefix + "mJoin line has one line "
-                               "per descriptor, each starting with the "
-                               "descriptor's name)"
+            (key == type_str ? " (the " + key + " lines of a potential "
+                               "follow one another, a new line at each "
+                               "descriptor's name, as tadah writes them)"
                              : std::string()) +
             ", and a potential's value is changed by editing its line in a "
             "copy of the potential (the Training page of the documentation, "
