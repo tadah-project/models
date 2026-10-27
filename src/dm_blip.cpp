@@ -533,9 +533,6 @@ bool DM_Blip::reinit(const tadah::core::Context& ctx) {
 
 std::optional<DescriptorMeta> DM_Blip::meta() const {
   using DataStats = tadah::core::stats::DataStats;
-  static constexpr std::size_t I_P10 = tadah::core::stats::IDX_P10;
-  static constexpr std::size_t I_P50 = tadah::core::stats::IDX_P50;
-  static constexpr std::size_t I_P90 = tadah::core::stats::IDX_P90;
   static constexpr std::size_t I_P99 = tadah::core::stats::IDX_P99;
 
   DescriptorMeta dm;
@@ -554,12 +551,9 @@ std::optional<DescriptorMeta> DM_Blip::meta() const {
   p_rcut.hard.lo  = 0.0;
   p_rcut.crit     = Criticality::Critical;
   p_rcut.scope    = PairScope::Global;
-  p_rcut.suggest  = [](const DataStats& d, const SeedView&, int) {
-    if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
-    const auto& pp = d.per_pair[0];
-    double low = pp.r_percentiles[I_P50];
-    if (pp.r_peaks.size() >= 2) low = pp.r_peaks[1].position * 1.05;
-    return std::make_pair(low, pp.r_percentiles[I_P99]);
+  p_rcut.suggest = cutoff_suggestion;
+  p_rcut.check    = [](const DataStats& d, const SeedView& s) {
+    return cutoff_reach_check(d, s, "RCUTMB");
   };
   dm.params.push_back(std::move(p_rcut));
 
@@ -575,22 +569,7 @@ std::optional<DescriptorMeta> DM_Blip::meta() const {
   p_cgrid.hard.lo  = 0.0;
   p_cgrid.crit     = Criticality::Critical;
   p_cgrid.scope    = PairScope::PerElementPair;
-  p_cgrid.suggest  = [](const DataStats& d, const SeedView&,
-                         int) -> BoundSuggestion {
-    if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
-    const auto& pp = d.per_pair[0];
-    if (!pp.r_peaks.empty()) {
-      const auto& pk = pp.r_peaks.front();
-      return BoundSuggestion(std::max(0.0, pk.position - pk.fwhm),
-                             pk.position + pk.fwhm,
-                             "blip b(SGRIDMB (r - CGRIDMB)) centred on the "
-                             "first neighbour shell: its peak +- its FWHM");
-    }
-    return BoundSuggestion(pp.r_percentiles[I_P10], pp.r_percentiles[I_P50],
-                           "blip b(SGRIDMB (r - CGRIDMB)): the 10th "
-                           "percentile to the median of the neighbour "
-                           "distances (no peak found)");
-  };
+  p_cgrid.suggest = blip_centre_suggestion;
   p_cgrid.check    = [](const DataStats& d, const SeedView& s) {
     return radial_reach_check(d, s, BasisKind::Blip);
   };
@@ -607,23 +586,7 @@ std::optional<DescriptorMeta> DM_Blip::meta() const {
   p_sgrid.hard.lo  = 1.0e-6;
   p_sgrid.crit     = Criticality::Critical;
   p_sgrid.scope    = PairScope::Global;
-  p_sgrid.suggest  = [](const DataStats& d, const SeedView&,
-                         int) -> BoundSuggestion {
-    if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
-    const auto& pp = d.per_pair[0];
-    double w = pp.r_percentiles[I_P90] - pp.r_percentiles[I_P10];
-    if (!pp.r_peaks.empty()) w = pp.r_peaks[0].fwhm;
-    if (!(w > 0.0))
-      return BoundSuggestion::fixed_range(
-          0.1, 1.0, "fixed range: the neighbour distances have no spread "
-                    "to take a width of the blip from");
-    // eta in [1 / w, 6 / w] (inverse distance): the blip's support
-    // half-width 2/eta runs from 2 w down to w/3 of the first peak's width.
-    return BoundSuggestion(1.0 / w, 6.0 / w,
-                           "blip b(SGRIDMB (r - CGRIDMB)): its support "
-                           "half-width 2/SGRIDMB from 2 w down to w/3, with "
-                           "w the FWHM of the first neighbour shell");
-  };
+  p_sgrid.suggest = blip_width_suggestion;
   dm.params.push_back(std::move(p_sgrid));
 
   // Cross-param: CGRIDMB.size() == SGRIDMB.size()

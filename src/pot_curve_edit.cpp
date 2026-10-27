@@ -499,23 +499,26 @@ bool normalize_knot_rcut(core::Context &ctx, const std::string &who) {
                      1e-9 * std::max(1.0, std::fabs(*derived));
     // Shortest exact text: the values may differ in the 13th digit.
     const std::string d_txt = core::format_roundtrip(*derived);
+    // The channel whose cutoff this is, as the configuration names it.
+    const std::string channel = std::string(sfx) == "2B"
+                                    ? "a D2_Knot5 line"
+                                    : "a knot DM_REAM density";
+    const std::string set_by = ", which the CGRID" + std::string(sfx) +
+                               " knot positions set.";
     std::ostringstream msg;
     msg << who << ": " << key << " ";
     if (!have) {
-      msg << "is missing";
+      msg << "is missing: the cutoff of " << channel
+          << " is its largest knot, " << d_txt << set_by;
     } else if (stated < *derived) {
-      msg << core::format_roundtrip(stated)
-          << " is SMALLER than the largest knot (" << d_txt
-          << ") — knots beyond " << key << " were silently truncated";
+      msg << core::format_roundtrip(stated) << " is below the largest knot ("
+          << d_txt << "): the cutoff of " << channel
+          << " is its largest knot, " << d_txt << set_by;
     } else {
-      msg << core::format_roundtrip(stated)
-          << " differs from the largest knot (" << d_txt
-          << ") — the knot basis vanishes at its largest knot, so the "
-          << "effective cutoff is the knot position";
+      msg << core::format_roundtrip(stated) << " is above the largest knot ("
+          << d_txt << "): the knot basis vanishes at its largest knot, so "
+          << "the cutoff of " << channel << " is " << d_txt << set_by;
     }
-    msg << "; using the derived value " << d_txt
-        << ". To change the effective cutoff, move the CGRID" << sfx
-        << " knot positions.";
     // pair_style tadah (Tadah.LAMMPS, never modified here) reads the stated
     // RCUT from a potential file and does not re-derive it. Under a smooth
     // cutoff the RCUT value enters f_c(r) of every pair, so LAMMPS then

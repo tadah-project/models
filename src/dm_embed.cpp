@@ -1,4 +1,5 @@
 #include <tadah/models/descriptors/dm/dm_embed.h>
+#include <tadah/models/descriptors/density_reach.h>
 
 namespace tadah {
 namespace models {
@@ -195,6 +196,19 @@ std::optional<DescriptorMeta> DM_Embed::meta() const {
     };
     if (b.positive)
       p.hard.lo = 0;
+    // The density cutoff (DENSITY CUTOFF RADIUS) has the check of every
+    // cutoff: the density sums over the neighbours within it, and is 0 for
+    // every atom when it holds none.
+    const std::string radius = ".DENSITY.CUTOFF.RADIUS";
+    if (b.path.size() > radius.size() &&
+        b.path.compare(b.path.size() - radius.size(), radius.size(),
+                       radius) == 0) {
+      p.role = "Cutoff radius of the density (DENSITY CUTOFF RADIUS)";
+      p.check = [key = b.path](const core::stats::DataStats &d,
+                               const SeedView &seed) {
+        return cutoff_reach_check(d, seed, key);
+      };
+    }
     m.params.push_back(std::move(p));
   }
   return m;

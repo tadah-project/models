@@ -192,8 +192,9 @@ class SeedView {
  *  - `fixed`: the range is a fixed one, not derived from the data (the
  *    statistic it needs is absent), and `rationale` says why;
  *  - `none`: no OPTIM line is suggested for the entry (a radial centre at
- *    the origin, whose width alone sets its reach), and `rationale` says
- *    why; the range is then empty.
+ *    the origin, whose width alone sets its reach; data without a pair of
+ *    atoms to take a range from; a value the data give no range for), and
+ *    `rationale` says why; the range is then empty.
  */
 struct BoundSuggestion : std::pair<double, double> {
   std::string rationale{};
@@ -226,7 +227,9 @@ struct BoundSuggestion : std::pair<double, double> {
 /** \brief Suggest a `(lo, hi)` bound from data + seed.
  *
  *  arg_pos: -1 for scalar params; 0..n-1 for vector entries
- *  (the framework calls the suggester per vector entry).
+ *  (the framework calls the suggester per vector entry). A suggester never
+ *  returns a range of zero width: without a range from the data it returns
+ *  BoundSuggestion::no_row with the reason.
  *
  *  Closures are written to read DataStats — never to embed magic
  *  numbers. The only constants permitted in a suggester body are
@@ -258,10 +261,17 @@ using ColumnCounter = std::function<std::size_t(const SeedView&)>;
 
 struct ParamMeta {
   std::string  key{};
-  /** Position within the key's value list (1-based, matching OPTIM (n)
-   *  syntax used in HPO target files). Use -1 for scalar parameters
-   *  and 0 for "vector entry whose index is filled by the framework
-   *  when iterating". */
+  /** Which values of the key the parameter is, in one convention:
+   *  - -1: the key's one value (a scalar key: RCUT2B);
+   *  - 0: each value of a list key (CGRID2B), the framework iterating over
+   *    the seed's values;
+   *  - n >= 1: the value at 1-based position n among the key's values in
+   *    the descriptor's own context, its own line for a value of its
+   *    TYPE2B or TYPEMB line, where position 1 is the descriptor's name
+   *    (the screening length a0 of "D2_ZBL a0 s0 p0 p1 Ta Ta" is 2): the
+   *    arg_pos the descriptor's calc_dDdtheta takes for that value.
+   *  tadah analysis suggest_bounds names a value as an OPTIM line of the
+   *  configuration numbers it, among the numbers of the whole key. */
   int          arg_pos{-1};
 
   Scale        scale{Scale::Dimensionless};

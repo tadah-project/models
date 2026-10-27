@@ -73,10 +73,11 @@ public:
    *    dD_n/d rcut  = -w(Zj) r^{-n} dfc/d rcut
    *    dD_m/d rcut  = +w(Zj) r^{-m} dfc/d rcut
    *
-   *  arg_pos convention (HPOTargets::ui_offset + i+1, +1 shift versus
-   *  user-facing OPTIM (n) for the leading "D2_MIE" string token):
-   *    arg_pos == 2 -> n  (TYPE2B numerical token #1; config index 1)
-   *    arg_pos == 3 -> m  (TYPE2B numerical token #2; config index 2)
+   *  arg_pos convention (ParamMeta::arg_pos): the 1-based position of the
+   *  value on the descriptor's TYPE2B line, whose first value is the name
+   *  D2_MIE:
+   *    arg_pos == 2 -> n  (config index 1)
+   *    arg_pos == 3 -> m  (config index 2)
    */
   bool calc_dDdtheta(
       const std::string& theta_name,

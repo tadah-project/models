@@ -275,3 +275,70 @@ TEST_CASE("DM_Embed analytical routing refuses unknown components and zero vecto
     REQUIRE_FALSE(selector.dmb->calc_drhoi_dtheta(path,1,73,73,1.3,1.69,Vec3d(1.3,0,0),derivative));
   REQUIRE_FALSE(selector.dmb->calc_drhoi_dtheta("ta.density.centres",0,73,73,1.3,1.69,Vec3d(1.3,0,0),derivative));
 }
+
+#include <tadah/core/stats/data_stats.h>
+#include <optional>
+
+/* Pins: the density cutoff of a DM_Embed component (DENSITY CUTOFF RADIUS,
+ * the metadata key TA.DENSITY.CUTOFF.RADIUS) has the check of every cutoff
+ * (cutoff_reach_check): for the component of embed_config() (RADIUS 6), on
+ * Ta distances from 2.25 A it passes, on Ta distances from 6.5 A it fails,
+ * the message naming TA.DENSITY.CUTOFF.RADIUS, 6 and 6.5 A, and on data
+ * with atoms but no pair it fails, naming the key; a component without a
+ * cutoff (TYPE NONE) has no such key.
+ * Before the fix: the metadata of DM_Embed had no check, and tadah train
+ * under AUDIT error trained a component whose RADIUS holds no neighbour
+ * distance, its density 0 for every atom. */
+TEST_CASE("DM_Embed's density cutoff fails when it holds no neighbour "
+          "distance",
+          "[unified-dm][metadata][cutoff]") {
+  auto ta_stats = [](double r_min) {
+    tadah::core::stats::DataStats d;
+    d.n_atoms = 100;
+    d.n_structures = 10;
+    d.elements = {"Ta"};
+    tadah::core::stats::PerPairStats pp;
+    pp.elements = {"Ta", "Ta"};
+    pp.n_pairs = 1000;
+    pp.r_min = r_min;
+    pp.r_max = 7.5;
+    for (std::size_t i = 0; i < pp.r_percentiles.size(); ++i)
+      pp.r_percentiles[i] = r_min + 0.1 * static_cast<double>(i);
+    d.per_pair.push_back(pp);
+    return d;
+  };
+  auto radius_check = [](const Context &parent) -> const ParamMeta * {
+    static std::optional<DescriptorMeta> meta;
+    meta.reset();
+    for (const auto &child : embed_contexts(parent)) {
+      std::unique_ptr<DM_Base> descriptor(factory<DM_Base, const Context &>(
+          child.get<std::string>("TYPEMB"), child));
+      meta = descriptor->meta();
+    }
+    REQUIRE(meta.has_value());
+    for (const auto &p : meta->params)
+      if (p.key == "TA.DENSITY.CUTOFF.RADIUS") return &p;
+    return nullptr;
+  };
+  const Context parent = embed_config();
+  const ParamMeta *radius = radius_check(parent);
+  REQUIRE(radius != nullptr);
+  REQUIRE(static_cast<bool>(radius->check));
+  const SeedView seed(parent);
+  CHECK(is_ok(radius->check(ta_stats(2.25), seed)));
+  const HealthVerdict below = radius->check(ta_stats(6.5), seed);
+  const std::string message = verdict_message(below);
+  INFO(message);
+  CHECK(is_fail(below));
+  CHECK(message.find("TA.DENSITY.CUTOFF.RADIUS = 6 ") != std::string::npos);
+  CHECK(message.find("(6.5 Å)") != std::string::npos);
+  tadah::core::stats::DataStats none = ta_stats(2.25);
+  none.per_pair.clear();
+  const HealthVerdict no_pair = radius->check(none, seed);
+  INFO(verdict_message(no_pair));
+  CHECK(is_fail(no_pair));
+  CHECK(verdict_message(no_pair).find("TA.DENSITY.CUTOFF.RADIUS") !=
+        std::string::npos);
+  CHECK(radius_check(embed_config("Blip5", "Gaussian", "NONNEG", "NONE")) ==
+        nullptr);
+}
