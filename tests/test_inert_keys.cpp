@@ -219,9 +219,14 @@ TEST_CASE("require_no_inert_keys: a fit refuses a line that changes nothing "
  * <file>)". inert_keys_text(lines, true), the sentence a fit adds to its
  * refusal of retired keys, says "the configuration also has a line that
  * changes nothing a fit gives, and a fit refuses it: SIGMA 3 ...";
- * inert_keys_refusal is "<who>: " and inert_keys_text(lines, false).
+ * inert_keys_refusal is "<who>: " and inert_keys_text(lines, false). The
+ * sentence after a refusal of retired keys ends "With this line deleted as
+ * well, the configuration trains." (that refusal says the configuration
+ * trains with its lines converted); the refusal of these lines alone ends
+ * "With this line deleted, the fit is the same."
  * Before the fix: does not compile (no inert_keys_text); the SIGMA line was
- * named with all its values. */
+ * named with all its values. Before the ending was added: both sentences
+ * ended "the fit is the same". */
 TEST_CASE("inert keys: a long line is named by its first values, and the "
           "sentence after a refusal of retired keys says 'also'",
           "[inert_keys]") {
@@ -246,6 +251,14 @@ TEST_CASE("inert keys: a long line is named by its first values, and the "
                                path + "): "));
   CHECK(inert_keys_refusal(lines, "tadah train") ==
         "tadah train: " + inert_keys_text(lines, false));
+  // After a refusal of retired keys, which ends "the configuration trains",
+  // the sentence says so of these lines too.
+  CHECK_THAT(inert_keys_text(lines, true),
+             Catch::EndsWith(". With this line deleted as well, the "
+                             "configuration trains."));
+  CHECK_THAT(inert_keys_text(lines, false),
+             Catch::EndsWith(". With this line deleted, the fit is the "
+                             "same."));
 }
 
 /* Pins: with InertKeyRules::watom_never_read set (a fit that writes its own
