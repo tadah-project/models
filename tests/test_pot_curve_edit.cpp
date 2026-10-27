@@ -1716,3 +1716,64 @@ TEST_CASE("potedit: normalize_knot_rcut derives the cutoff of each knot "
   CHECK_FALSE(normalize_knot_rcut(same, "test", notes));
   CHECK(notes.empty());
 }
+
+/* Pins: normalize_potential_knot_rcut, the form for a potential that tadah
+ * predict and tadah refit --edit evaluate with its coefficients, keeps the
+ * stated cutoffs of a joined line, with which those coefficients were
+ * fitted (Tadah! 1.5.0 fitted a joined line at its stated cutoffs and
+ * wrote them), and derives that of a line of one knot descriptor as
+ * normalize_knot_rcut does (every fit of such a line derives it): TYPE2B
+ * D2_mJoin of D2_Knot5 (knots 2.5 3.5 4.5) and D2_Blip with RCUT2B 5.3 5
+ * under Cut_Cos stays RCUT2B 5.3 5 (RCUT2BMAX 5.3), nothing logged and
+ * false returned; a D2_Knot5 line alone with RCUT2B 5.3 and knots up to 5
+ * becomes RCUT2B 5 with its WARNING ("test: RCUT2B 5.3 is above the
+ * largest knot (5): ..."), true returned.
+ * Before the fix: there was no such form (the case does not compile
+ * against the header without it); predict and refit --edit called
+ * normalize_knot_rcut, which made the joined line RCUT2B 4.5 5. */
+TEST_CASE("potedit: normalize_potential_knot_rcut keeps the stated cutoffs "
+          "of a joined line of a potential",
+          "[potedit][notes][join]") {
+  auto &log = tadah::core::Logger::instance();
+  const auto old_level = log.getLogLevel();
+  log.setLogLevel(tadah::core::LogLevel::INFO);
+  const auto normalize = [](Context &k, std::string &printed) {
+    std::ostringstream captured;
+    std::streambuf *old_buf = std::cout.rdbuf(captured.rdbuf());
+    const bool changed = normalize_potential_knot_rcut(k, "test");
+    std::cout.rdbuf(old_buf);
+    printed = captured.str();
+    return changed;
+  };
+  std::string printed;
+  {
+    Context c;
+    c.add("ATOM", "Ta");
+    c.add("INIT2B", "true");
+    c.add("INITMB", "false");
+    c.add("TYPE2B", "D2_mJoin D2_Knot5 3 3 Ta Ta D2_Blip 3 3 Ta Ta");
+    c.add("RCTYPE2B", "Cut_Cos Cut_Cos");
+    c.add("RCUT2B", "5.3 5.0");
+    c.add("CGRID2B", "2.5 3.5 4.5 2.5 3.0 3.5");
+    c.add("KDEG2B", "5 5 5");
+    c.add("SGRID2B", "2 2 2");
+    CHECK_FALSE(normalize(c, printed));
+    REQUIRE(c.size("RCUT2B") == 2u);
+    CHECK(c.get<double>("RCUT2B", 0) == 5.3);
+    CHECK(c.get<double>("RCUT2B", 1) == 5.0);
+    CHECK(c.get<double>("RCUT2BMAX") == 5.3);
+    CHECK(printed.empty());
+  }
+  {
+    Context k = make_knot_pot();
+    k.remove("RCUT2B");
+    k.add("RCUT2B", 5.3);
+    CHECK(normalize(k, printed));
+    CHECK(k.get<double>("RCUT2B") == 5.0);
+    CHECK_THAT(printed,
+               Catch::Matchers::Contains(
+                   "WARNING: test: RCUT2B 5.3 is above the largest knot (5): "
+                   "the knot basis vanishes at its largest knot"));
+  }
+  log.setLogLevel(old_level);
+}
