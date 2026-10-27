@@ -177,8 +177,12 @@ std::optional<OptimLowBoundRule> optim_low_bound_rule(
   return std::nullopt;
 }
 
-std::optional<OptimLowBoundRule> optim_low_bound_rule(
-    const std::string &key, const tadah::core::Context &ctx) {
+namespace {
+/* optim_low_bound_rule(key, ctx) and, with @p entry, of that entry
+ * (0-based) of the key. */
+std::optional<OptimLowBoundRule> low_bound_rule_of(
+    const std::string &key, const tadah::core::Context &ctx,
+    std::optional<std::size_t> entry) {
   std::optional<RhoForm> form;
   std::optional<BasisKind> basis;
   if (context_has_ream(ctx)) {
@@ -195,27 +199,56 @@ std::optional<OptimLowBoundRule> optim_low_bound_rule(
         "width <= 0 has no support edge)",
         std::string("the DM_REAM ") + basis_name(*basis) + " density basis"};
   if (k == "SGRID2B") {
-    const char *requirement =
-        "every SGRID2B width > 0 (a radial bump spans [c - w/s, c + w/s]; a "
-        "width <= 0 has no support edge)";
     if (potedit::bump_channel_halfwidth(ctx, "2B")) {
       const auto label = ctx.stored_value("TYPE2B", 0);
       return OptimLowBoundRule{
-          true, requirement, "the " + label.value_or("TYPE2B") + " pair basis"};
+          true,
+          "every SGRID2B width > 0 (a radial bump spans [c - w/s, c + w/s]; "
+          "a width <= 0 has no support edge)",
+          "the " + label.value_or("TYPE2B") + " pair basis"};
     }
-    // a D2_mJoin: its first D2_Blip or D2_Blip5 descriptor holds every
-    // SGRID2B entry, as a bump DM_REAM child of a DM_mJoin holds every
-    // SGRIDMB entry (optim_rule_basis)
+    // A D2_mJoin: a D2_Blip or D2_Blip5 descriptor holds its own SGRID2B
+    // entries (D_mJoin::parse_context gives each descriptor its share, in
+    // the order of the line), the entries of another descriptor keep that
+    // descriptor's rule (a D2_BP's, none). Without an entry, the rule of
+    // the first bump descriptor's entries.
     const auto line = ctx.stored_value("TYPE2B", 0);
-    if (line && *line == "D2_mJoin")
-      for (const auto &child : D_mJoin::parse_context(ctx, "TYPE2B"))
-        if (potedit::bump_channel_halfwidth(child, "2B"))
-          return OptimLowBoundRule{
-              true, requirement,
-              "the " + child.stored_value("TYPE2B", 0).value_or("TYPE2B") +
-                  " pair basis of the D2_mJoin line"};
+    if (line && *line == "D2_mJoin") {
+      std::size_t at = 0;  // the first entry of the descriptor
+      for (const auto &child : D_mJoin::parse_context(ctx, "TYPE2B")) {
+        const std::size_t n =
+            child.contains("SGRID2B") ? child.size("SGRID2B") : 0;
+        const bool bump =
+            potedit::bump_channel_halfwidth(child, "2B").has_value();
+        const bool owns = entry && *entry >= at && *entry < at + n;
+        at += n;
+        if (entry && !owns) continue;
+        if (!bump) {
+          if (entry) return std::nullopt;
+          continue;
+        }
+        return OptimLowBoundRule{
+            true,
+            "each of its SGRID2B widths > 0 (a radial bump spans [c - w/s, "
+            "c + w/s]; a width <= 0 has no support edge)",
+            "the " + child.stored_value("TYPE2B", 0).value_or("TYPE2B") +
+                " pair basis of the D2_mJoin line"};
+      }
+    }
   }
   return std::nullopt;
+}
+}  // namespace
+
+std::optional<OptimLowBoundRule> optim_low_bound_rule(
+    const std::string &key, const tadah::core::Context &ctx) {
+  return low_bound_rule_of(key, ctx, std::nullopt);
+}
+
+std::optional<OptimLowBoundRule> optim_low_bound_rule(
+    const std::string &key, const tadah::core::Context &ctx,
+    std::size_t entry) {
+  return low_bound_rule_of(key, ctx, entry);
 }
 
 std::optional<BasisKind> optim_rule_basis(const tadah::core::Context &ctx) {
