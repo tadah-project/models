@@ -370,10 +370,10 @@ TEST_CASE("IFT chain-rule under ridge regression (lambda > 0)",
     }
 }
 
-/* Pins: train_with_factor, the fit of the analytical gradient of tadah hpo
- * (whose gate refuses OALGO other than 4 and LAMBDA -1 when the run starts),
- * refuses OALGO 1 with an internal error (std::logic_error) that says what
- * the fit needs: "internal error: the analytical gradient fits with OALGO 4
+/* Pins: train_with_factor, a fit of the C++ API that hands its caller the
+ * Cholesky factor for an analytical gradient (tadah hpo builds its own
+ * factor and does not call it), refuses OALGO 1 with an internal error
+ * (std::logic_error, a caller's error) that says what the fit needs: "internal error: the analytical gradient fits with OALGO 4
  * (the Cholesky normal equations), whose factor it reuses, and was given
  * OALGO 1".
  * Before the fix: std::runtime_error "LinearRegressor::train_with_factor

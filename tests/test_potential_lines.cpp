@@ -8,8 +8,9 @@
 // line of the including file, above or below the CONFIG line) adds its
 // values to the key, and the key is read as in a training configuration:
 // values past those the descriptors take are refused, naming the lines that
-// set the key and their files. The refusal of a count names those lines for
-// a training configuration read from a file as well.
+// set the key and their files, and the lines of the TYPE key. The refusal of
+// a count names those lines for a training configuration read from a file as
+// well.
 
 #include "catch2/catch.hpp"
 
@@ -165,11 +166,17 @@ const char *kOneRcut2B =
  * the descriptor takes one: refused as in a training configuration, naming
  * both lines and their files, for training (expand_grids) and for a model
  * built from the configuration (DC_Selector). A smaller cutoff than the
- * potential's alike.
+ * potential's alike. A KDEG2B line, which the descriptor does not read, is
+ * refused naming its line. Each refusal ends with the TYPE2B line of the
+ * potential, " (TYPE2B on line 4 of single.tadah (CONFIG on line 2 of
+ * above.train))".
  * Before the fix: accepted with 'Part of RCUT2B (5) is ignored: TYPE2B
  * D2_Blip takes one RCUT2B value, and its cutoff is the largest, 6; the
  * potential works unchanged with RCUT2B 6 alone': the largest cutoff was
- * the model's (4 below the CONFIG line was ignored). */
+ * the model's (4 below the CONFIG line was ignored).
+ * Before the fix that names the TYPE line in a refusal of a count: each
+ * refusal ended at "... in the order of the TYPE2B lines" or at the quoted
+ * TYPE2B line. */
 TEST_CASE("A line of RCUT2B in a file that includes a single-descriptor "
           "potential is refused naming both lines",
           "[D_mJoin][potential][config_include][potential_lines]") {
@@ -181,7 +188,9 @@ TEST_CASE("A line of RCUT2B in a file that includes a single-descriptor "
     const std::string expected =
         "TYPE2B names 1 descriptor (D2_Blip) but RCUT2B has 2 values, set "
         "on line 1 of " + above + " and on line 6 of " + pot +
-        " (CONFIG on line 2 of " + above + ")" + kOneRcut2B;
+        " (CONFIG on line 2 of " + above + ")" + kOneRcut2B +
+        " (TYPE2B on line 4 of " + pot + " (CONFIG on line 2 of " + above +
+        "))";
     IgnoredKeyNoticeCapture cap;
     CHECK(refusal(parsed(above)) == expected);
     CHECK(load_refusal(parsed(above)) == expected);
@@ -195,7 +204,9 @@ TEST_CASE("A line of RCUT2B in a file that includes a single-descriptor "
     CHECK(refusal(parsed(below)) ==
           "TYPE2B names 1 descriptor (D2_Blip) but RCUT2B has 2 values, set "
           "on line 6 of " + pot + " (CONFIG on line 1 of " + below +
-              ") and on line 2 of " + below + kOneRcut2B);
+              ") and on line 2 of " + below + kOneRcut2B +
+              " (TYPE2B on line 4 of " + pot + " (CONFIG on line 1 of " +
+              below + "))");
     INFO(joined(cap.notices()));
     CHECK(cap.notices().empty());
   }
@@ -205,15 +216,19 @@ TEST_CASE("A line of RCUT2B in a file that includes a single-descriptor "
     IgnoredKeyNoticeCapture cap;
     CHECK(refusal(parsed(kdeg)) ==
           "TYPE2B D2_Blip takes 0 KDEG2B values, but KDEG2B has 2 values, set "
-          "on line 1 of " + kdeg + ": TYPE2B D2_Blip 2 2 Ta Ta");
+          "on line 1 of " + kdeg + ": TYPE2B D2_Blip 2 2 Ta Ta (TYPE2B on "
+          "line 4 of " + pot + " (CONFIG on line 2 of " + kdeg + "))");
     INFO(joined(cap.notices()));
     CHECK(cap.notices().empty());
   }
 }
 
-/* The same for a single many-body descriptor: RCUTMB below the CONFIG line.
+/* The same for a single many-body descriptor: RCUTMB below the CONFIG line,
+ * the refusal ending with the TYPEMB line of the potential.
  * Before the fix: 'Part of RCUTMB (4.5) is ignored: TYPEMB DM_EAD takes one
- * RCUTMB value, and its cutoff is the largest, 5; ...', accepted. */
+ * RCUTMB value, and its cutoff is the largest, 5; ...', accepted.
+ * Before the fix that names the TYPE line in a refusal of a count: the
+ * refusal ended at "... in the order of the TYPEMB lines". */
 TEST_CASE("A line of RCUTMB in a file that includes a single many-body "
           "potential is refused naming both lines",
           "[D_mJoin][potential][config_include][potential_lines]") {
@@ -227,7 +242,8 @@ TEST_CASE("A line of RCUTMB in a file that includes a single many-body "
         "line 6 of " + pot + " (CONFIG on line 1 of " + below +
             ") and on line 2 of " + below +
             ": each descriptor takes one RCUTMB value, in the order of the "
-            "TYPEMB lines");
+            "TYPEMB lines (TYPEMB on line 4 of " + pot +
+            " (CONFIG on line 1 of " + below + "))");
   INFO(joined(cap.notices()));
   CHECK(cap.notices().empty());
 }
@@ -236,11 +252,13 @@ TEST_CASE("A line of RCUTMB in a file that includes a single many-body "
  * 'RCUT2B 6' above the CONFIG line would give the descriptors 6 and 5.3,
  * below it 6 would be read by none; a CGRID2B line below it gives the line
  * two values past those its descriptors take. Each is refused, naming the
- * lines that set the key.
+ * lines that set the key and the three TYPE2B lines of the potential.
  * Before the fix: accepted, 'Part of RCUT2B (4.5) is ignored: TYPE2B names
  * 2 descriptors (D2_Blip, D2_BP), which take its first 2 values; the
  * potential works unchanged without it' (D2_BP's cutoff 5.3), 'Part of
- * RCUT2B (6) ...' and 'Part of CGRID2B (4 5) ...'. */
+ * RCUT2B (6) ...' and 'Part of CGRID2B (4 5) ...'.
+ * Before the fix that names the TYPE line in a refusal of a count: each
+ * refusal ended at "... in the order of the TYPE2B lines". */
 TEST_CASE("A line of a descriptor key in a file that includes a D2_mJoin "
           "potential is refused naming the lines",
           "[D_mJoin][potential][config_include][potential_lines]") {
@@ -251,10 +269,12 @@ TEST_CASE("A line of a descriptor key in a file that includes a D2_mJoin "
   SECTION("RCUT2B above the CONFIG line") {
     const std::string above =
         dir.write("above.train", "RCUT2B 6.0\nCONFIG " + pot + "\n");
+    const std::string by = " (CONFIG on line 2 of " + above + ")";
     const std::string expected =
         named + " but RCUT2B has 3 values, set on line 1 of " + above +
-        " and on line 8 of " + pot + " (CONFIG on line 2 of " + above + ")" +
-        kOneRcut2B;
+        " and on line 8 of " + pot + by + kOneRcut2B + " (TYPE2B on line 4 of " +
+        pot + by + ", on line 5 of " + pot + by + " and on line 6 of " + pot +
+        by + ")";
     IgnoredKeyNoticeCapture cap;
     CHECK(refusal(parsed(above)) == expected);
     CHECK(load_refusal(parsed(above)) == expected);
@@ -264,24 +284,29 @@ TEST_CASE("A line of a descriptor key in a file that includes a D2_mJoin "
   SECTION("RCUT2B below the CONFIG line") {
     const std::string below =
         dir.write("below.train", "CONFIG " + pot + "\nRCUT2B 6.0\n");
+    const std::string by = " (CONFIG on line 1 of " + below + ")";
     IgnoredKeyNoticeCapture cap;
     CHECK(refusal(parsed(below)) ==
-          named + " but RCUT2B has 3 values, set on line 8 of " + pot +
-              " (CONFIG on line 1 of " + below + ") and on line 2 of " +
-              below + kOneRcut2B);
+          named + " but RCUT2B has 3 values, set on line 8 of " + pot + by +
+              " and on line 2 of " + below + kOneRcut2B +
+              " (TYPE2B on line 4 of " + pot + by + ", on line 5 of " + pot +
+              by + " and on line 6 of " + pot + by + ")");
     INFO(joined(cap.notices()));
     CHECK(cap.notices().empty());
   }
   SECTION("CGRID2B below the CONFIG line") {
     const std::string grid =
         dir.write("grid.train", "CONFIG " + pot + "\nCGRID2B 4 5\n");
+    const std::string by = " (CONFIG on line 1 of " + grid + ")";
     IgnoredKeyNoticeCapture cap;
     CHECK(refusal(parsed(grid)) ==
           named + ", which take 4 CGRID2B values, but CGRID2B has 6 values, "
-                  "set on line 9 of " + pot + " (CONFIG on line 1 of " +
-              grid + ") and on line 2 of " + grid +
+                  "set on line 9 of " + pot + by + " and on line 2 of " +
+              grid +
               ": each descriptor takes its CGRID2B values, in the order of "
-              "the TYPE2B lines");
+              "the TYPE2B lines (TYPE2B on line 4 of " + pot + by +
+              ", on line 5 of " + pot + by + " and on line 6 of " + pot + by +
+              ")");
     INFO(joined(cap.notices()));
     CHECK(cap.notices().empty());
   }
@@ -289,10 +314,12 @@ TEST_CASE("A line of a descriptor key in a file that includes a D2_mJoin "
 
 /* A DM_mJoin potential (two DM_EAD) included with CONFIG: an RCUTMB line
  * below the CONFIG line and an RCTYPEMB line above it are refused naming
- * the lines.
+ * the lines and the three TYPEMB lines of the potential.
  * Before the fix: accepted, 'Part of RCUTMB (6) is ignored: ...' and 'Part
  * of RCTYPEMB (Cut_Cos) is ignored: ...' (the descriptors took Cut_Tanh and
- * the potential's first Cut_Cos). */
+ * the potential's first Cut_Cos).
+ * Before the fix that names the TYPE line in a refusal of a count: each
+ * refusal ended at "... in the order of the TYPEMB lines". */
 TEST_CASE("A line of a descriptor key in a file that includes a DM_mJoin "
           "potential is refused naming the lines",
           "[D_mJoin][potential][config_include][potential_lines]") {
@@ -302,25 +329,30 @@ TEST_CASE("A line of a descriptor key in a file that includes a DM_mJoin "
   SECTION("RCUTMB below the CONFIG line") {
     const std::string below =
         dir.write("below_mb.train", "CONFIG " + pot + "\nRCUTMB 6\n");
+    const std::string by = " (CONFIG on line 1 of " + below + ")";
     IgnoredKeyNoticeCapture cap;
     CHECK(refusal(parsed(below)) ==
-          named + " but RCUTMB has 3 values, set on line 8 of " + pot +
-              " (CONFIG on line 1 of " + below + ") and on line 2 of " +
-              below +
+          named + " but RCUTMB has 3 values, set on line 8 of " + pot + by +
+              " and on line 2 of " + below +
               ": each descriptor takes one RCUTMB value, in the order of the "
-              "TYPEMB lines");
+              "TYPEMB lines (TYPEMB on line 4 of " + pot + by +
+              ", on line 5 of " + pot + by + " and on line 6 of " + pot + by +
+              ")");
     INFO(joined(cap.notices()));
     CHECK(cap.notices().empty());
   }
   SECTION("RCTYPEMB above the CONFIG line") {
     const std::string above =
         dir.write("above_mb.train", "RCTYPEMB Cut_Tanh\nCONFIG " + pot + "\n");
+    const std::string by = " (CONFIG on line 2 of " + above + ")";
     IgnoredKeyNoticeCapture cap;
     CHECK(refusal(parsed(above)) ==
           named + " but RCTYPEMB has 3 values, set on line 1 of " + above +
-              " and on line 7 of " + pot + " (CONFIG on line 2 of " + above +
-              "): each descriptor takes one RCTYPEMB value, in the order of "
-              "the TYPEMB lines");
+              " and on line 7 of " + pot + by +
+              ": each descriptor takes one RCTYPEMB value, in the order of "
+              "the TYPEMB lines (TYPEMB on line 4 of " + pot + by +
+              ", on line 5 of " + pot + by + " and on line 6 of " + pot + by +
+              ")");
     INFO(joined(cap.notices()));
     CHECK(cap.notices().empty());
   }
@@ -331,11 +363,14 @@ TEST_CASE("A line of a descriptor key in a file that includes a DM_mJoin "
  * take) adds a third descriptor, with its RCTYPE2B, CGRID2B and SGRID2B
  * lines: the potential's RCUT2B values are then read by descriptors that
  * are not the potential's own, as in a configuration, and four values for
- * three descriptors are refused naming the potential's line.
+ * three descriptors are refused naming the potential's line and the
+ * TYPE2B lines, the potential's three and the line of ext.train.
  * Before the fix: accepted with 'Part of RCUT2B (7) is ignored: TYPE2B
  * names 3 descriptors (D2_Blip, D2_BP, D2_BP), which take its first 3
  * values; the potential works unchanged without it', the third descriptor
- * taking the potential's unread 6 as its cutoff. */
+ * taking the potential's unread 6 as its cutoff.
+ * Before the fix that names the TYPE line in a refusal of a count: the
+ * refusal ended at "... in the order of the TYPE2B lines". */
 TEST_CASE("A descriptor that a file including a potential adds to its line "
           "reads the potential's values as a configuration does",
           "[D_mJoin][potential][config_include][potential_lines]") {
@@ -348,10 +383,13 @@ TEST_CASE("A descriptor that a file including a potential adds to its line "
                        "\nTYPE2B D2_BP 2 2 Ta Ta\nRCTYPE2B Cut_Cos\n"
                        "CGRID2B 2 3\nSGRID2B 1 1\n");
   IgnoredKeyNoticeCapture cap;
+  const std::string by = " (CONFIG on line 1 of " + ext + ")";
   CHECK(refusal(parsed(ext)) ==
         "TYPE2B names 3 descriptors (D2_Blip, D2_BP, D2_BP) but RCUT2B has 4 "
-        "values, set on line 8 of " + pot + " (CONFIG on line 1 of " + ext +
-            ")" + kOneRcut2B);
+        "values, set on line 8 of " + pot + by + kOneRcut2B +
+            " (TYPE2B on line 4 of " + pot + by + ", on line 5 of " + pot +
+            by + ", on line 6 of " + pot + by + " and on line 2 of " + ext +
+            ")");
   INFO(joined(cap.notices()));
   CHECK(cap.notices().empty());
 }
@@ -408,10 +446,14 @@ TEST_CASE("A potential's own values that its descriptors do not take are "
 
 /* A training configuration read from a file, without a potential: the
  * refusal of a count names the line that sets the key and its file (a line
- * of no file, its number).
+ * of no file, its number), and ends with the TYPE2B line, " (TYPE2B on line
+ * 4 of two.train)" (" (TYPE2B on line 4)").
  * Before the fix: 'TYPE2B names 1 descriptor (D2_Blip) but RCUT2B has 2
  * values: each descriptor ...' and 'TYPE2B D2_Blip takes 2 CGRID2B values,
- * but CGRID2B has 3 values: TYPE2B D2_Blip 2 2 Ta Ta', without the line. */
+ * but CGRID2B has 3 values: TYPE2B D2_Blip 2 2 Ta Ta', without the line.
+ * Before the fix that names the TYPE line in a refusal of a count: the
+ * refusals ended at "... in the order of the TYPE2B lines" and at the
+ * quoted TYPE2B line. */
 TEST_CASE("The refusal of a count of a training configuration names the "
           "lines of the key",
           "[D_mJoin][list_keys][potential_lines]") {
@@ -424,7 +466,8 @@ TEST_CASE("The refusal of a count of a training configuration names the "
     const std::string cfg = dir.write("two.train", two);
     CHECK(refusal(parsed(cfg)) ==
           "TYPE2B names 1 descriptor (D2_Blip) but RCUT2B has 2 values, set "
-          "on line 6 of " + cfg + kOneRcut2B);
+          "on line 6 of " + cfg + kOneRcut2B + " (TYPE2B on line 4 of " +
+              cfg + ")");
   }
   SECTION("CGRID2B, by lines of no file") {
     std::vector<std::string> lines;
@@ -436,7 +479,8 @@ TEST_CASE("The refusal of a count of a training configuration names the "
     tadah::core::PeriodicTable::initialize();
     CHECK(refusal(CoreUserConfigParser().parse(lines)) ==
           "TYPE2B D2_Blip takes 2 CGRID2B values, but CGRID2B has 3 values, "
-          "set on line 7 and on line 9: TYPE2B D2_Blip 2 2 Ta Ta");
+          "set on line 7 and on line 9: TYPE2B D2_Blip 2 2 Ta Ta (TYPE2B "
+          "on line 4)");
   }
 }
 
@@ -502,6 +546,93 @@ TEST_CASE("A refusal of a descriptor of a TYPE line names the lines of the "
           "parameter 2, the number of SGRID2B values, must be a non-negative "
           "integer, not \"Ta\": TYPE2B D2_Blip 2 Ta Ta (TYPE2B on line 4 of " +
               word + ")");
+  }
+}
+
+/* Pins: a refusal of a count of a list key, RCTYPE or RCUT ends with the
+ * lines of the TYPE key, as the other refusals of a descriptor do, so that
+ * a TYPE line of an included file is located: with "TYPE2B D2_Blip 2 2 Ta
+ * Ta" on line 1 of inc.train, which line 4 of run.train includes with
+ * CONFIG,
+ *  - "RCUT2B 5 6": "TYPE2B names 1 descriptor (D2_Blip) but RCUT2B has 2
+ *    values, set on line 5 of run.train: each descriptor takes one RCUT2B
+ *    value, in the order of the TYPE2B lines (TYPE2B on line 1 of inc.train
+ *    (CONFIG on line 4 of run.train))";
+ *  - "CGRID2B 2", fewer values than the line takes: "TYPE2B D2_Blip takes 2
+ *    CGRID2B values, but CGRID2B has 1 value, set on line 6 of run.train:
+ *    TYPE2B D2_Blip 2 2 Ta Ta (TYPE2B on line 1 of inc.train (CONFIG on line
+ *    4 of run.train))";
+ *  - "CGRID2B 2 3 4", more: "... but CGRID2B has 3 values, set on line 6 of
+ *    run.train: TYPE2B D2_Blip 2 2 Ta Ta (TYPE2B on line 1 of ...)";
+ * and with a D2_mJoin of D2_Blip 2 2 and D2_BP 1 1 on lines 1 to 3 of
+ * incj.train, "CGRID2B 2 3 4 5": "TYPE2B names 2 descriptors (D2_Blip,
+ * D2_BP), which take 3 CGRID2B values, but CGRID2B has 4 values, set on
+ * line 6 of runj.train: each descriptor takes its CGRID2B values, in the
+ * order of the TYPE2B lines (TYPE2B on line 1 of incj.train (CONFIG on line
+ * 4 of runj.train), on line 2 ... and on line 3 ...)", and "CGRID2B 2 3":
+ * "TYPE2B D2_BP (descriptor 2 of 2) takes 1 CGRID2B value, but CGRID2B has
+ * 0 values left of 2 (the descriptors before it take 2), set on line 6 of
+ * runj.train: TYPE2B D2_BP 1 1 Ta Ta (TYPE2B on line 1 of ...)".
+ * Before the fix: each refusal ended at the quoted TYPE2B line or at "...
+ * in the order of the TYPE2B lines", naming neither the line nor the file
+ * of the TYPE2B line. */
+TEST_CASE("A refusal of a count of a descriptor key names the TYPE line of "
+          "an included file",
+          "[D_mJoin][config_include][type_lines][potential_lines]") {
+  Scratch dir;
+  const std::string head = "ATOM Ta\nINIT2B true\nINITMB false\n";
+  const std::string inc =
+      dir.write("inc.train", "TYPE2B D2_Blip 2 2 Ta Ta\nRCTYPE2B Cut_Cos\n");
+  auto run = [&](const std::string &lines) {
+    return dir.write("run.train", head + "CONFIG " + inc + "\n" + lines);
+  };
+  const std::string single =
+      " (TYPE2B on line 1 of " + inc + " (CONFIG on line 4 of " + run("") +
+      "))";
+  SECTION("RCUT2B") {
+    const std::string r = run("RCUT2B 5 6\nCGRID2B 2 3\nSGRID2B 1 1\n");
+    CHECK(refusal(parsed(r)) ==
+          "TYPE2B names 1 descriptor (D2_Blip) but RCUT2B has 2 values, set "
+          "on line 5 of " + r + kOneRcut2B + single);
+  }
+  SECTION("fewer CGRID2B values than the line takes") {
+    const std::string r = run("RCUT2B 5\nCGRID2B 2\nSGRID2B 1 1\n");
+    CHECK(refusal(parsed(r)) ==
+          "TYPE2B D2_Blip takes 2 CGRID2B values, but CGRID2B has 1 value, "
+          "set on line 6 of " + r + ": TYPE2B D2_Blip 2 2 Ta Ta" + single);
+  }
+  SECTION("more CGRID2B values than the line takes") {
+    const std::string r = run("RCUT2B 5\nCGRID2B 2 3 4\nSGRID2B 1 1\n");
+    CHECK(refusal(parsed(r)) ==
+          "TYPE2B D2_Blip takes 2 CGRID2B values, but CGRID2B has 3 values, "
+          "set on line 6 of " + r + ": TYPE2B D2_Blip 2 2 Ta Ta" + single);
+  }
+  const std::string incj = dir.write(
+      "incj.train", "TYPE2B D2_mJoin\nTYPE2B D2_Blip 2 2 Ta Ta\n"
+                    "TYPE2B D2_BP 1 1 Ta Ta\nRCTYPE2B Cut_Cos Cut_Cos\n");
+  auto runj = [&](const std::string &lines) {
+    return dir.write("runj.train", head + "CONFIG " + incj + "\n" + lines);
+  };
+  const std::string runj_path = runj("");
+  const std::string by = " (CONFIG on line 4 of " + runj_path + ")";
+  const std::string joined_on = " (TYPE2B on line 1 of " + incj + by +
+                                ", on line 2 of " + incj + by +
+                                " and on line 3 of " + incj + by + ")";
+  SECTION("more CGRID2B values than a D2_mJoin line takes") {
+    const std::string r =
+        runj("RCUT2B 5 5\nCGRID2B 2 3 4 5\nSGRID2B 1 1 1\n");
+    CHECK(refusal(parsed(r)) ==
+          "TYPE2B names 2 descriptors (D2_Blip, D2_BP), which take 3 CGRID2B "
+          "values, but CGRID2B has 4 values, set on line 6 of " + r +
+              ": each descriptor takes its CGRID2B values, in the order of "
+              "the TYPE2B lines" + joined_on);
+  }
+  SECTION("fewer CGRID2B values than a D2_mJoin line takes") {
+    const std::string r = runj("RCUT2B 5 5\nCGRID2B 2 3\nSGRID2B 1 1 1\n");
+    CHECK(refusal(parsed(r)) ==
+          "TYPE2B D2_BP (descriptor 2 of 2) takes 1 CGRID2B value, but "
+          "CGRID2B has 0 values left of 2 (the descriptors before it take 2), "
+          "set on line 6 of " + r + ": TYPE2B D2_BP 1 1 Ta Ta" + joined_on);
   }
 }
 

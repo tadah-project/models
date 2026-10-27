@@ -1104,8 +1104,8 @@ TEST_CASE("LinearRegressor: a design matrix or target that is not finite is "
   }
 }
 
-/* Pins: train_with_factor (OALGO 4 with the Cholesky factor cached for
- * tadah hpo's analytical gradients) refuses a non-finite design matrix as
+/* Pins: train_with_factor (OALGO 4 with the Cholesky factor cached for a
+ * caller's analytical gradient) refuses a non-finite design matrix as
  * train() does: "LinearRegressor::train: the design matrix holds a value
  * that is not finite (nan or inf) at row 2, column 3 (...)".
  * Before the fix: "OLS::solveAndCacheFactor: DPOTRF failed (matrix is not
