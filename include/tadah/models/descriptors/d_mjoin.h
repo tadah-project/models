@@ -41,7 +41,11 @@ public:
    *  more values than the line has descriptors, and when a list key of the
    *  line's type has more values than the descriptors take (a key that no
    *  descriptor of the line reads included: 'TYPE2B D2_LJ takes 0 CGRID2B
-   *  values, but CGRID2B has 3 values: TYPE2B D2_LJ Ta Ta').
+   *  values, but CGRID2B has 3 values: TYPE2B D2_LJ Ta Ta'). A refusal of a
+   *  count names the lines that gave the key its values when @p c records
+   *  them (core::Context::key_lines(), a parse of a file: 'TYPE2B names 1
+   *  descriptor (D2_Blip) but RCUT2B has 2 values, set on line 6 of
+   *  config.train: ...').
    *
    *  A potential (@p c with WEIGHTS) is read as it was written: values its
    *  model does not read are reported once per key and process
@@ -53,7 +57,16 @@ public:
    *  the RCUT values but the largest (its cutoff) of a single descriptor,
    *  and the values of a key no descriptor of the line reads. A single
    *  descriptor reads every value of the list keys it declares: their
-   *  count is checked as in a configuration.
+   *  count is checked as in a configuration. That holds for the values of
+   *  the potential's own lines read by its own descriptors: a key that a
+   *  line outside them gave a value, and every key of a TYPE line that a
+   *  line outside them gave a descriptor (core::KeyLine::potential false: a
+   *  line of a file that includes the potential with CONFIG, above or below
+   *  the CONFIG line), is read as in a configuration, its values counted
+   *  with the potential's ('TYPE2B names 2 descriptors (D2_Blip, D2_BP) but
+   *  RCUT2B has 3 values, set on line 1 of run.train and on line 20 of
+   *  pot.tadah (CONFIG on line 2 of run.train): ...'). Values that no line
+   *  gave (the program set them) are the potential's.
    *
    *  The list keys a descriptor reads whole (D_Base::context_keys, the
    *  CEMBFUNC/SEMBFUNC of a DM_Poly channel function) go whole, expanded,
@@ -87,9 +100,10 @@ public:
   /** \brief The TYPE2B and TYPEMB lines of @p c split and checked
    *  (parse_context()), and their grids expanded in @p c, for tadah train
    *  and tadah hpo. For a potential (@p c with WEIGHTS: training from a
-   *  potential) the values its descriptors do not read are reported and
-   *  left out of @p c, so the training context builds the potential's
-   *  model: a single descriptor keeps its largest RCUT value, its cutoff.
+   *  potential) the values of its own lines that its descriptors do not
+   *  read are reported and left out of @p c, so the training context
+   *  builds the potential's model: a single descriptor keeps its largest
+   *  RCUT value, its cutoff.
    *  Returns the keys whose values were left out (tadah hpo names them
    *  when an OPTIM index is past the values kept).
    */
