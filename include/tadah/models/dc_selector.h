@@ -6,6 +6,7 @@
 #include <tadah/models/descriptors/d_all.h>
 #include <tadah/models/cut_all.h>
 #include <tadah/models/descriptors/dm/embf0.h>
+#include <tadah/models/inert_keys.h>
 #include <tadah/core/registry.h>
 
 namespace tadah {
@@ -57,9 +58,11 @@ namespace tadah {
           const auto &context=component_blocks?resolved:input;
           double rcutzero = 0.0; // for dummies
 
-          // EMBF0 / RHOFORM without a DM_REAM block have no effect: one
-          // stderr notice per key and process, wherever a model is built.
+          // EMBF0 / RHOFORM without a DM_REAM block, and a WATOM weight
+          // that no descriptor reads, have no effect: one stderr notice per
+          // key and process, wherever a model is built.
           report_ream_only_keys(context);
+          report_unread_watom(context);
 
           // The RCTYPE, RCUT and list values of a single descriptor's line,
           // as D2_mJoin and DM_mJoin check theirs: refused in a
