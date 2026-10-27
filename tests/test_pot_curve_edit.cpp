@@ -1665,3 +1665,54 @@ TEST_CASE_METHOD(EditFixture,
     REQUIRE(own < (1.0 - 1e-6) * other);
   }
 }
+
+/* Pins: normalize_knot_rcut derives the cutoff of each knot descriptor of
+ * a joined line from its own knots, as that of a line of one knot
+ * descriptor, so that tadah train, predict, refit --edit, analysis
+ * check_bounds and hpo agree on it: TYPE2B D2_mJoin of D2_Knot5 (knots 2.5
+ * 3.5 4.5) and D2_Blip with RCUT2B 5.3 5 becomes RCUT2B 4.5 5 (the
+ * D2_Blip's 5 kept, RCUT2BMAX 5), with one WARNING naming the descriptor,
+ * "test: TYPE2B descriptor 1 (D2_Knot5): RCUT2B 5.3 is above the largest
+ * knot (4.5): the knot basis vanishes at its largest knot, so the cutoff of
+ * a D2_Knot5 line is 4.5, which the CGRID2B knot positions set."; a second
+ * call, and a joined line whose knot cutoff is its largest knot, change
+ * nothing.
+ * Before the fix: a joined line was left as stated (derived_knot_rcut
+ * reads the line's first value, D2_mJoin): no change, no note. */
+TEST_CASE("potedit: normalize_knot_rcut derives the cutoff of each knot "
+          "descriptor of a joined line",
+          "[potedit][notes][join]") {
+  auto joined = [](const char *rcut) {
+    Context c;
+    c.add("ATOM", "Ta");
+    c.add("INIT2B", "true");
+    c.add("INITMB", "false");
+    c.add("TYPE2B", "D2_mJoin D2_Knot5 3 3 Ta Ta D2_Blip 3 3 Ta Ta");
+    c.add("RCTYPE2B", "Cut_Dummy Cut_Dummy");
+    c.add("RCUT2B", rcut);
+    c.add("CGRID2B", "2.5 3.5 4.5 2.5 3.0 3.5");
+    c.add("KDEG2B", "5 5 5");
+    c.add("SGRID2B", "2 2 2");
+    return c;
+  };
+  Context k = joined("5.3 5.0");
+  std::vector<KnotRcutNote> notes;
+  REQUIRE(normalize_knot_rcut(k, "test", notes));
+  REQUIRE(k.size("RCUT2B") == 2u);
+  CHECK(k.get<double>("RCUT2B", 0) == 4.5);
+  CHECK(k.get<double>("RCUT2B", 1) == 5.0);
+  CHECK(k.get<double>("RCUT2BMAX") == 5.0);
+  REQUIRE(notes.size() == 1u);
+  CHECK(notes[0].level == tadah::core::LogLevel::WARNING);
+  CHECK(notes[0].text ==
+        "test: TYPE2B descriptor 1 (D2_Knot5): RCUT2B 5.3 is above the "
+        "largest knot (4.5): the knot basis vanishes at its largest knot, so "
+        "the cutoff of a D2_Knot5 line is 4.5, which the CGRID2B knot "
+        "positions set.");
+  notes.clear();
+  CHECK_FALSE(normalize_knot_rcut(k, "test", notes));
+  CHECK(notes.empty());
+  Context same = joined("4.5 5.0");
+  CHECK_FALSE(normalize_knot_rcut(same, "test", notes));
+  CHECK(notes.empty());
+}
