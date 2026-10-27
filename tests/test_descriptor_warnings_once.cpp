@@ -210,9 +210,12 @@ TEST_CASE("DM_REAM warns once per process of a density knot past RCUTMB",
 /* Pins: three DC_Selectors built from a DM_mBlipEnv configuration with
  * Lmax 1 (a DM_mEAD descriptor whose channel function is not F_SQ) log the
  * warning "channel function is not F_SQ — descriptor is NOT rotationally
- * invariant for L>0" exactly once between them (check_logged_once).
+ * invariant for L>0" exactly once between them (check_logged_once), and
+ * the warning says what that does to the stress: "The stress is then not
+ * the strain derivative of the energy (the virial is not symmetric)."
  * Before the fix: three times, once per descriptor object (a tadah hpo
- * run printed it once per evaluation). */
+ * run printed it once per evaluation). Before the stress sentence was
+ * added: the warning did not mention the stress. */
 TEST_CASE("DM_mEAD warns once per process of a channel that is not "
           "rotationally invariant",
           "[descriptor][warn_once]") {
@@ -228,13 +231,20 @@ TEST_CASE("DM_mEAD warns once per process of a channel that is not "
   CoutCapture out;
   for (int k = 0; k < 3; ++k) tadah::models::DC_Selector s(c);
   check_logged_once(out.str(), "rotationally invariant for L>0", key, before);
+  check_logged_once(out.str(),
+                    "The stress is then not the strain derivative of the "
+                    "energy (the virial is not symmetric).",
+                    key, before);
 }
 
 /* Pins: three DC_Selectors built from a DM_OW_SQRT configuration with
  * Lmax 1 (a DM_Poly descriptor, OrbitalWise, whose channel function is not
  * F_SQ) log the warning "DM_Poly (OrbitalWise): channel function is not
- * F_SQ ..." exactly once between them (check_logged_once).
- * Before the fix: three times, once per descriptor object. */
+ * F_SQ ..." exactly once between them (check_logged_once), and the warning
+ * says what that does to the stress: "The stress is then not the strain
+ * derivative of the energy (the virial is not symmetric)."
+ * Before the fix: three times, once per descriptor object. Before the
+ * stress sentence was added: the warning did not mention the stress. */
 TEST_CASE("DM_Poly OrbitalWise warns once per process of a channel that is "
           "not rotationally invariant",
           "[descriptor][warn_once]") {
@@ -250,6 +260,10 @@ TEST_CASE("DM_Poly OrbitalWise warns once per process of a channel that is "
   for (int k = 0; k < 3; ++k) tadah::models::DC_Selector s(c);
   check_logged_once(out.str(), "DM_Poly (OrbitalWise): channel function is "
                     "not F_SQ", key, before);
+  check_logged_once(out.str(),
+                    "The stress is then not the strain derivative of the "
+                    "energy (the virial is not symmetric).",
+                    key, before);
 }
 
 /* Pins: log_warning_once called while the Logger hides WARNINGs (level
