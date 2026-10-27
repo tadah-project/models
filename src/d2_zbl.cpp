@@ -1,6 +1,7 @@
 #include <tadah/models/descriptors/d2/d2_zbl.h>
 #include <tadah/models/descriptors/param_meta.h>
 #include <tadah/core/stats/data_stats.h>
+#include <tadah/models/descriptors/density_reach.h>
 namespace tadah {
 namespace models {
 
@@ -311,17 +312,15 @@ double D2_ZBL::screening_length(int Zi, int Zj) const {
 // (a0, s0, p0, p1) sitting at config indices 1..4 of the TYPE2B value
 // list "D2_ZBL a0 s0 p0 p1 ELEM_i ELEM_j".
 //
-// arg_pos in ParamMeta matches the runtime arg_pos seen by
-// calc_dDdtheta: the value at index arg_pos - 1 of the descriptor's
-// TYPE2B line, so arg_pos = 2..5 here (the leading "D2_ZBL" token is
-// index 0). They have no bound suggester: tadah hpo searches no value of
-// a TYPE2B line (it refuses OPTIM TYPE2B), and tadah analysis
-// suggest_bounds gives each a row without an OPTIM line.
+// Their ParamMeta::arg_pos is the position of the value on the
+// descriptor's TYPE2B line, from 1, the name D2_ZBL being 1: a0 to p1 are
+// 2 to 5, the arg_pos calc_dDdtheta takes for them. They have no bound
+// suggester: tadah hpo searches no value of a TYPE2B line (it refuses
+// OPTIM TYPE2B), and tadah analysis suggest_bounds gives each a row
+// without an OPTIM line.
 // ----------------------------------------------------------------
 std::optional<DescriptorMeta> D2_ZBL::meta() const {
   using DataStats = tadah::core::stats::DataStats;
-  static constexpr std::size_t I_P50 = tadah::core::stats::IDX_P50;
-  static constexpr std::size_t I_P99 = tadah::core::stats::IDX_P99;
 
   DescriptorMeta dm;
   dm.label = "D2_ZBL";
@@ -335,26 +334,9 @@ std::optional<DescriptorMeta> D2_ZBL::meta() const {
   p_rcut.hard.lo  = 0.0;
   p_rcut.crit     = Criticality::Critical;
   p_rcut.scope    = PairScope::Global;
-  p_rcut.suggest  = [](const DataStats& d, const SeedView&, int)
-      -> std::pair<double, double> {
-    if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
-    const auto& pp = d.per_pair[0];
-    double low = pp.r_percentiles[I_P50];
-    if (pp.r_peaks.size() >= 2) low = pp.r_peaks[1].position * 1.05;
-    return std::make_pair(low, pp.r_percentiles[I_P99]);
-  };
-  p_rcut.check = [](const DataStats& d, const SeedView& s) -> HealthVerdict {
-    if (!s.contains("RCUT2B")) return HealthOk{};
-    const double rc = s.get<double>("RCUT2B");
-    if (d.per_pair.empty() && d.n_atoms > 0)
-      return HealthFail{"RCUT2B=" + std::to_string(rc) +
-                        " is too small — no neighbours found."};
-    if (d.per_pair.empty()) return HealthOk{};
-    if (rc < d.per_pair[0].r_min)
-      return HealthFail{"RCUT2B=" + std::to_string(rc) +
-                        " is below dataset r_min=" +
-                        std::to_string(d.per_pair[0].r_min) + "."};
-    return HealthOk{};
+  p_rcut.suggest = cutoff_suggestion;
+  p_rcut.check = [](const DataStats& d, const SeedView& s) {
+    return cutoff_reach_check(d, s, "RCUT2B");
   };
   dm.params.push_back(std::move(p_rcut));
 

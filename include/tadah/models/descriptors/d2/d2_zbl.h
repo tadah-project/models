@@ -108,13 +108,13 @@ public:
    *        da/dp0 = -a Zi^p0 ln(Zi) / (Zi^p0 + Zj^p1)
    *        da/dp1 = -a Zj^p1 ln(Zj) / (Zi^p0 + Zj^p1)
    *
-   *  arg_pos convention (matches HPOTargets::ui_offset + i+1):
-   *    arg_pos == 2 -> a0  (TYPE2B numerical token #1; config index 1)
+   *  arg_pos convention (ParamMeta::arg_pos): the 1-based position of the
+   *  value on the descriptor's TYPE2B line, whose first value is the name
+   *  D2_ZBL:
+   *    arg_pos == 2 -> a0  (config index 1)
    *    arg_pos == 3 -> s0  (config index 2)
    *    arg_pos == 4 -> p0  (config index 3)
    *    arg_pos == 5 -> p1  (config index 4)
-   *  Note the +1 shift versus user-facing OPTIM (n) syntax — the leading
-   *  "D2_ZBL" string token sits at config index 0.
    */
   bool calc_dDdtheta(
       const std::string& theta_name,

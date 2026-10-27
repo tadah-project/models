@@ -14,6 +14,7 @@
 
 #include <tadah/models/descriptors/param_meta.h>
 #include <tadah/core/stats/data_stats.h>
+#include <tadah/models/descriptors/density_reach.h>
 
 namespace tadah {
 namespace models {
@@ -34,8 +35,6 @@ inline DescriptorMeta make_closed_form_meta(
     const std::string& cutoff_key,
     bool cutoff_from_setfl = false) {
   using DataStats = tadah::core::stats::DataStats;
-  static constexpr std::size_t I_P50 = tadah::core::stats::IDX_P50;
-  static constexpr std::size_t I_P99 = tadah::core::stats::IDX_P99;
 
   DescriptorMeta dm;
   dm.label = descriptor_label;
@@ -58,26 +57,9 @@ inline DescriptorMeta make_closed_form_meta(
   const std::string ck = cutoff_key;
 
   if (!cutoff_from_setfl)
-    p_rcut.suggest = [](const DataStats& d, const SeedView&, int)
-        -> std::pair<double, double> {
-      if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
-      const auto& pp = d.per_pair[0];
-      double low = pp.r_percentiles[I_P50];
-      if (pp.r_peaks.size() >= 2) low = pp.r_peaks[1].position * 1.05;
-      return std::make_pair(low, pp.r_percentiles[I_P99]);
-    };
-  p_rcut.check = [ck](const DataStats& d, const SeedView& s) -> HealthVerdict {
-    if (!s.contains(ck)) return HealthOk{};
-    const double rc = s.get<double>(ck);
-    if (d.per_pair.empty() && d.n_atoms > 0)
-      return HealthFail{ck + "=" + std::to_string(rc) +
-                        " is too small — no neighbours found."};
-    if (d.per_pair.empty()) return HealthOk{};
-    if (rc < d.per_pair[0].r_min)
-      return HealthFail{ck + "=" + std::to_string(rc) +
-                        " is below dataset r_min=" +
-                        std::to_string(d.per_pair[0].r_min) + "."};
-    return HealthOk{};
+    p_rcut.suggest = cutoff_suggestion;
+  p_rcut.check = [ck](const DataStats& d, const SeedView& s) {
+    return cutoff_reach_check(d, s, ck);
   };
   dm.params.push_back(std::move(p_rcut));
 

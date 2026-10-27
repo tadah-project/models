@@ -3,6 +3,7 @@
 #include <tadah/models/descriptors/d_basis_functions.h>
 #include <cstdlib>
 #include <stdexcept>
+#include <tadah/models/descriptors/density_reach.h>
 namespace tadah {
 namespace models {
 
@@ -294,7 +295,6 @@ bool D2_Blip::reinit(const tadah::core::Context& ctx) {
 std::optional<DescriptorMeta> D2_Blip::meta() const {
   using DataStats = tadah::core::stats::DataStats;
   static constexpr std::size_t I_P10 = tadah::core::stats::IDX_P10;
-  static constexpr std::size_t I_P50 = tadah::core::stats::IDX_P50;
   static constexpr std::size_t I_P90 = tadah::core::stats::IDX_P90;
   static constexpr std::size_t I_P99 = tadah::core::stats::IDX_P99;
 
@@ -311,31 +311,9 @@ std::optional<DescriptorMeta> D2_Blip::meta() const {
   p_rcut.hard.lo  = 0.0;            // r >= 0
   p_rcut.crit     = Criticality::Critical;
   p_rcut.scope    = PairScope::Global;
-  p_rcut.suggest  = [](const DataStats& d, const SeedView&, int) {
-    // Lower: include the second peak of the per-pair r_ij KDE if
-    // present, else fall back to the median of r_ij. Upper: just past
-    // p99 to preserve the long tail.
-    if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
-    const auto& pp = d.per_pair[0];
-    double low = pp.r_percentiles[I_P50];
-    if (pp.r_peaks.size() >= 2) low = pp.r_peaks[1].position * 1.05;
-    return std::make_pair(low, pp.r_percentiles[I_P99]);
-  };
-  p_rcut.check    = [](const DataStats& d, const SeedView& s) -> HealthVerdict {
-    if (!s.contains("RCUT2B")) return HealthOk{};
-    const double rc = s.get<double>("RCUT2B");
-    if (d.per_pair.empty() && d.n_atoms > 0) {
-      return HealthFail{"RCUT2B=" + std::to_string(rc) +
-                        " is too small — no neighbours were found in any "
-                        "structure (per_pair stats empty)."};
-    }
-    if (d.per_pair.empty()) return HealthOk{};
-    if (rc < d.per_pair[0].r_min)
-      return HealthFail{"RCUT2B=" + std::to_string(rc) +
-                        " is below the dataset r_min=" +
-                        std::to_string(d.per_pair[0].r_min) +
-                        " — no 2-body neighbours."};
-    return HealthOk{};
+  p_rcut.suggest = cutoff_suggestion;
+  p_rcut.check = [](const DataStats& d, const SeedView& s) {
+    return cutoff_reach_check(d, s, "RCUT2B");
   };
   dm.params.push_back(std::move(p_rcut));
 
@@ -345,12 +323,12 @@ std::optional<DescriptorMeta> D2_Blip::meta() const {
   p_cgrid.arg_pos  = 0;
   p_cgrid.scale    = Scale::Distance;
   p_cgrid.units    = "Å";
-  p_cgrid.role     = "Centre of the i-th radial blip (CGRID2B[i]).";
+  p_cgrid.role     = "Centre of the i-th radial blip, CGRID2B (i).";
   p_cgrid.hard.lo  = 0.0;
   p_cgrid.crit     = Criticality::Recommended;
   p_cgrid.scope    = PairScope::PerElementPair;
-  p_cgrid.suggest  = [](const DataStats& d, const SeedView&, int) {
-    if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
+  p_cgrid.suggest  = [](const DataStats& d, const SeedView&, int) -> BoundSuggestion {
+    if (d.per_pair.empty()) return no_pair_suggestion();
     const auto& pp = d.per_pair[0];
     // Spread CGRID2B[i] uniformly between 0 and the data's r_ij p99.
     return std::make_pair(0.0, pp.r_percentiles[I_P99]);
@@ -371,7 +349,7 @@ std::optional<DescriptorMeta> D2_Blip::meta() const {
   p_sgrid.scope    = PairScope::Global;
   p_sgrid.suggest  = [](const DataStats& d, const SeedView&,
                          int) -> BoundSuggestion {
-    if (d.per_pair.empty()) return std::make_pair(0.0, 0.0);
+    if (d.per_pair.empty()) return no_pair_suggestion();
     const auto& pp = d.per_pair[0];
     const double spread = pp.r_percentiles[I_P90] - pp.r_percentiles[I_P10];
     if (spread <= 0.0)

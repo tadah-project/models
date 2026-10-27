@@ -686,6 +686,80 @@ TEST_CASE_METHOD(EditFixture,
   log.setLogLevel(old_level);
 }
 
+/* Pins: the message of normalize_knot_rcut says that the cutoff of a knot
+ * channel is its largest knot, which the knot positions set, in impersonal
+ * words: on the knot potential (D2_Knot5 knots up to 5, a knot DM_REAM
+ * density up to 4.8, Cut_Dummy), "test: RCUT2B 2 is below the largest knot
+ * (5): the cutoff of a D2_Knot5 line is its largest knot, 5, which the
+ * CGRID2B knot positions set.", "test: RCUT2B 5.3 is above the largest knot
+ * (5): the knot basis vanishes at its largest knot, so the cutoff of a
+ * D2_Knot5 line is 5, which the CGRID2B knot positions set." and, without
+ * RCUTMB, "test: RCUTMB is missing: the cutoff of a knot DM_REAM density is
+ * its largest knot, 4.8, which the CGRIDMB knot positions set."; no message
+ * says "truncated", "SMALLER" or "To change".
+ * Before the fix: "RCUT2B 2 is SMALLER than the largest knot (5) -- knots
+ * beyond RCUT2B were silently truncated; using the derived value 5. To
+ * change the effective cutoff, move the CGRID2B knot positions.", while no
+ * knot is truncated (the cutoff is replaced before any use) and the last
+ * sentence addresses the reader. */
+TEST_CASE_METHOD(EditFixture,
+                 "potedit: normalize_knot_rcut says that the cutoff of a "
+                 "knot channel is its largest knot",
+                 "[potedit]") {
+  auto &log = tadah::core::Logger::instance();
+  const auto old_level = log.getLogLevel();
+  log.setLogLevel(tadah::core::LogLevel::WARNING);
+  auto normalize_capturing = [](Context &k) {
+    std::ostringstream captured;
+    std::streambuf *old_buf = std::cout.rdbuf(captured.rdbuf());
+    const bool changed = normalize_knot_rcut(k, "test");
+    std::cout.rdbuf(old_buf);
+    REQUIRE(changed);
+    return captured.str();
+  };
+  std::vector<std::string> texts;
+  {
+    Context k = make_knot_pot();
+    k.remove("RCUT2B");
+    k.add("RCUT2B", 2.0);
+    texts.push_back(normalize_capturing(k));
+    CHECK(k.get<double>("RCUT2B") == 5.0);
+    CHECK(texts.back().find(
+              "test: RCUT2B 2 is below the largest knot (5): the cutoff of a "
+              "D2_Knot5 line is its largest knot, 5, which the CGRID2B knot "
+              "positions set.") != std::string::npos);
+  }
+  {
+    Context k = make_knot_pot();
+    k.remove("RCUT2B");
+    k.add("RCUT2B", 5.3);
+    texts.push_back(normalize_capturing(k));
+    CHECK(texts.back().find(
+              "test: RCUT2B 5.3 is above the largest knot (5): the knot "
+              "basis vanishes at its largest knot, so the cutoff of a "
+              "D2_Knot5 line is 5, which the CGRID2B knot positions set.") !=
+          std::string::npos);
+  }
+  {
+    Context k = make_knot_pot();
+    k.remove("RCUTMB");
+    texts.push_back(normalize_capturing(k));
+    CHECK(k.get<double>("RCUTMB") == 4.8);
+    CHECK(texts.back().find(
+              "test: RCUTMB is missing: the cutoff of a knot DM_REAM density "
+              "is its largest knot, 4.8, which the CGRIDMB knot positions "
+              "set.") != std::string::npos);
+  }
+  for (const auto &text : texts) {
+    INFO(text);
+    CHECK(text.find("WARNING") != std::string::npos);
+    CHECK(text.find("truncated") == std::string::npos);
+    CHECK(text.find("SMALLER") == std::string::npos);
+    CHECK(text.find("To change") == std::string::npos);
+  }
+  log.setLogLevel(old_level);
+}
+
 TEST_CASE_METHOD(EditFixture, "potedit: pure two-body potentials",
                  "[potedit]") {
   SECTION("parse classifies and splits the weights") {
