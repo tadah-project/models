@@ -15,6 +15,7 @@
 #include <tadah/models/cut_all.h>
 #include <tadah/models/descriptors/basis_dispatch.h>
 #include <tadah/models/descriptors/d_base.h>
+#include <tadah/models/descriptors/d_mjoin.h>
 #include <tadah/models/descriptors/d2/d2_blip.h>
 #include <tadah/models/descriptors/d2/d2_blip5.h>
 #include <tadah/models/descriptors/d2/d2_knot5.h>
@@ -486,70 +487,136 @@ bool normalize_knot_rcut(core::Context &ctx, const std::string &who) {
   return changed;
 }
 
+namespace {
+/* The note of normalize_knot_rcut for a knot channel whose cutoff is
+ * @p derived and whose stated cutoff is @p stated (@p have: one is stated)
+ * under the cutoff @p rctype (its context and suffix @p c, @p sfx), the
+ * channel named by @p where ("" for a line of one descriptor, else "TYPE2B
+ * descriptor 1 (D2_Knot5): "). */
+KnotRcutNote knot_rcut_note(const core::Context &c, const char *sfx,
+                            const std::string &who, const std::string &where,
+                            bool have, double stated, double derived) {
+  const std::string key = std::string("RCUT") + sfx;
+  // Only a real mismatch is worth a WARNING; a gap within 1e-9 relative
+  // (e.g. the ~3e-13 left by the <= 1.5.0 writers, which rounded CGRID to
+  // 12 decimals but not RCUT) is fixed at INFO.
+  const bool mismatch =
+      !have || std::fabs(stated - derived) >
+                   1e-9 * std::max(1.0, std::fabs(derived));
+  // Shortest exact text: the values may differ in the 13th digit.
+  const std::string d_txt = core::format_roundtrip(derived);
+  // The channel whose cutoff this is, as the configuration names it.
+  const std::string channel = std::string(sfx) == "2B"
+                                  ? "a D2_Knot5 line"
+                                  : "a knot DM_REAM density";
+  const std::string set_by = ", which the CGRID" + std::string(sfx) +
+                             " knot positions set.";
+  std::ostringstream msg;
+  msg << who << ": " << where << key << " ";
+  if (!have) {
+    msg << "is missing: the cutoff of " << channel
+        << " is its largest knot, " << d_txt << set_by;
+  } else if (stated < derived) {
+    msg << core::format_roundtrip(stated) << " is below the largest knot ("
+        << d_txt << "): the cutoff of " << channel
+        << " is its largest knot, " << d_txt << set_by;
+  } else {
+    msg << core::format_roundtrip(stated) << " is above the largest knot ("
+        << d_txt << "): the knot basis vanishes at its largest knot, so "
+        << "the cutoff of " << channel << " is " << d_txt << set_by;
+  }
+  // pair_style tadah (Tadah.LAMMPS, never modified here) reads the stated
+  // RCUT from a potential file and does not re-derive it. Under a smooth
+  // cutoff the RCUT value enters f_c(r) of every pair, so LAMMPS then
+  // differs from train/predict/hpo on that file, even for a sub-1e-9 gap:
+  // say so at default visibility. A hard cutoff (Cut_Dummy) past the
+  // largest knot is prediction-exact: no note, INFO stays INFO.
+  const bool smooth_note = have && !channel_cutoff_is_discontinuous(c, sfx);
+  if (smooth_note) {
+    std::ostringstream gap;
+    gap << std::setprecision(2)
+        << std::fabs(stated - derived) / std::max(1.0, std::fabs(derived));
+    msg << " Under the smooth RCTYPE" << sfx << " the cutoff value enters "
+        << "every pair term, and pair_style tadah (LAMMPS) reads the stated "
+        << key << " without re-deriving it: on a potential file stating "
+        << core::format_roundtrip(stated) << ", LAMMPS differs from tadah "
+        << "train/predict/hpo (relative " << key << " gap " << gap.str()
+        << ") until the potential is re-written — a potential written by "
+        << "tadah train, tadah refit --edit or tadah hpo (best_pot.tadah) "
+        << "carries the derived value.";
+  }
+  return {(mismatch || smooth_note) ? core::LogLevel::WARNING
+                                    : core::LogLevel::INFO,
+          msg.str()};
+}
+
+/* Whether the TYPE`sfx` line of @p ctx joins descriptors (D2_mJoin,
+ * DM_mJoin; a TYPEMB line configured by DESCRIPTOR blocks does not). */
+bool joins_descriptors(const core::Context &ctx, const char *sfx) {
+  const std::string type_key = std::string("TYPE") + sfx;
+  if (!ctx.contains(type_key) || ctx.size(type_key) == 0) return false;
+  if (std::string(sfx) == "MB" && !ctx.blocks("DESCRIPTOR").empty())
+    return false;
+  return ctx.get<std::string>(type_key, 0).find("mJoin") != std::string::npos;
+}
+}  // namespace
+
 bool normalize_knot_rcut(core::Context &ctx, const std::string &who,
                          std::vector<KnotRcutNote> &notes) {
   bool changed = false;
   for (const char *sfx : {"2B", "MB"}) {
+    const std::string key = std::string("RCUT") + sfx;
+    // Exact: every consumer (train, predict, refit --edit, analysis
+    // check_bounds, hpo startup and hpo's per-evaluation derivation) must
+    // use the same cutoff, so ANY difference is rewritten.
+    if (joins_descriptors(ctx, sfx)) {
+      // A joined line: each knot descriptor's own RCUT value, derived from
+      // its own knots (D_mJoin::parse_context gives each descriptor its
+      // RCUT value and its share of CGRID, in the order of the line).
+      std::vector<core::Context> parts;
+      try {
+        parts = D_mJoin::parse_context(ctx, std::string("TYPE") + sfx);
+      } catch (const std::exception &) {
+        continue;  // a line D_mJoin refuses: its own error, when it is built
+      }
+      std::vector<double> values;
+      std::size_t at = 0;  // the entry of the part's RCUT value
+      for (std::size_t k = 0; k < parts.size(); ++k) {
+        const core::Context &part = parts[k];
+        const std::size_t n = part.contains(key) ? part.size(key) : 0;
+        const auto derived = derived_knot_rcut(part, sfx);
+        if (derived && n == 1 && part.get<double>(key) != *derived) {
+          if (values.empty()) {
+            values.resize(ctx.size(key));
+            for (std::size_t i = 0; i < values.size(); ++i)
+              values[i] = ctx.get<double>(key, i);
+          }
+          if (at < values.size()) {
+            const std::string where =
+                std::string("TYPE") + sfx + " descriptor " +
+                std::to_string(k + 1) + " (" +
+                part.get<std::string>(std::string("TYPE") + sfx, 0) + "): ";
+            notes.push_back(knot_rcut_note(part, sfx, who, where, true,
+                                           part.get<double>(key), *derived));
+            values[at] = *derived;
+          }
+        }
+        at += n;
+      }
+      if (!values.empty()) {
+        ctx.remove(key);
+        ctx.add(key, values);
+        changed = true;
+      }
+      continue;
+    }
     const auto derived = derived_knot_rcut(ctx, sfx);
     if (!derived) continue;
-    const std::string key = std::string("RCUT") + sfx;
     const bool have = ctx.contains(key) && ctx.size(key) > 0;
     const double stated = have ? ctx.get<double>(key) : -1.0;
-    // Exact: every consumer (train, predict, refit --edit, hpo startup and
-    // hpo's per-evaluation derivation) must use the same cutoff, so ANY
-    // difference is rewritten. Only a real mismatch is worth a WARNING; a
-    // gap within 1e-9 relative (e.g. the ~3e-13 left by the <= 1.5.0
-    // writers, which rounded CGRID to 12 decimals but not RCUT) is fixed
-    // at INFO.
     if (have && stated == *derived) continue;
-    const bool mismatch =
-        !have || std::fabs(stated - *derived) >
-                     1e-9 * std::max(1.0, std::fabs(*derived));
-    // Shortest exact text: the values may differ in the 13th digit.
-    const std::string d_txt = core::format_roundtrip(*derived);
-    // The channel whose cutoff this is, as the configuration names it.
-    const std::string channel = std::string(sfx) == "2B"
-                                    ? "a D2_Knot5 line"
-                                    : "a knot DM_REAM density";
-    const std::string set_by = ", which the CGRID" + std::string(sfx) +
-                               " knot positions set.";
-    std::ostringstream msg;
-    msg << who << ": " << key << " ";
-    if (!have) {
-      msg << "is missing: the cutoff of " << channel
-          << " is its largest knot, " << d_txt << set_by;
-    } else if (stated < *derived) {
-      msg << core::format_roundtrip(stated) << " is below the largest knot ("
-          << d_txt << "): the cutoff of " << channel
-          << " is its largest knot, " << d_txt << set_by;
-    } else {
-      msg << core::format_roundtrip(stated) << " is above the largest knot ("
-          << d_txt << "): the knot basis vanishes at its largest knot, so "
-          << "the cutoff of " << channel << " is " << d_txt << set_by;
-    }
-    // pair_style tadah (Tadah.LAMMPS, never modified here) reads the stated
-    // RCUT from a potential file and does not re-derive it. Under a smooth
-    // cutoff the RCUT value enters f_c(r) of every pair, so LAMMPS then
-    // differs from train/predict/hpo on that file, even for a sub-1e-9 gap:
-    // say so at default visibility. A hard cutoff (Cut_Dummy) past the
-    // largest knot is prediction-exact: no note, INFO stays INFO.
-    const bool smooth_note = have && !channel_cutoff_is_discontinuous(ctx, sfx);
-    if (smooth_note) {
-      std::ostringstream gap;
-      gap << std::setprecision(2)
-          << std::fabs(stated - *derived) / std::max(1.0, std::fabs(*derived));
-      msg << " Under the smooth RCTYPE" << sfx << " the cutoff value enters "
-          << "every pair term, and pair_style tadah (LAMMPS) reads the stated "
-          << key << " without re-deriving it: on a potential file stating "
-          << core::format_roundtrip(stated) << ", LAMMPS differs from tadah "
-          << "train/predict/hpo (relative " << key << " gap " << gap.str()
-          << ") until the potential is re-written — a potential written by "
-          << "tadah train, tadah refit --edit or tadah hpo (best_pot.tadah) "
-          << "carries the derived value.";
-    }
-    notes.push_back({(mismatch || smooth_note) ? core::LogLevel::WARNING
-                                               : core::LogLevel::INFO,
-                     msg.str()});
+    notes.push_back(
+        knot_rcut_note(ctx, sfx, who, "", have, stated, *derived));
     ctx.remove(key);
     ctx.add(key, *derived);
     changed = true;

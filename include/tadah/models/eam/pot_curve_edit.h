@@ -177,8 +177,11 @@ std::optional<double> derived_knot_rcut(const core::Context &ctx,
  *  prefixed with `who`. Under a smooth cutoff (not
  *  `channel_cutoff_is_discontinuous`) any difference is a WARNING that
  *  also says pair_style tadah reads the stated value (LAMMPS then differs
- *  from train/predict/hpo on that file until it is re-written). Bump
- *  channels are never modified. Returns true if anything changed. */
+ *  from train/predict/hpo on that file until it is re-written). On a
+ *  D2_mJoin or DM_mJoin line each knot descriptor's own RCUT value is
+ *  derived from its own knots (D_mJoin::parse_context) and the message
+ *  names it ("TYPE2B descriptor 1 (D2_Knot5): "). Bump channels are never
+ *  modified. Returns true if anything changed. */
 bool normalize_knot_rcut(core::Context &ctx, const std::string &who);
 
 /** \brief One message of normalize_knot_rcut: its level (WARNING or INFO)
