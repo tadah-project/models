@@ -250,7 +250,9 @@ struct BoundSuggestion : std::pair<double, double> {
  *  BoundSuggestion::no_row with the reason. tadah analysis suggest_bounds
  *  calls it with the statistics of one element pair of the descriptor's
  *  line at a time (LinePairs::stats(), SeedView::line_pairs()) and takes
- *  the range that holds the range of each.
+ *  the range that holds the range of each, or, for a parameter marked
+ *  ParamMeta::reach_each_pair (a cutoff), the range from the largest low
+ *  end of their ranges to the largest high end.
  *
  *  Closures are written to read DataStats — never to embed magic
  *  numbers. The only constants permitted in a suggester body are
@@ -267,8 +269,9 @@ using BoundSuggester = std::function<BoundSuggestion(
  *  given the seed and the data: the pre-flight audit gives it the
  *  statistics of the element pairs of the descriptor's line
  *  (LinePairs::stats(), SeedView::line_pairs()), and a check of the reach
- *  of a cutoff or a channel judges each pair of the line on its own
- *  (cutoff_reach_check(), radial_reach_check()).
+ *  of a cutoff or of the channels of a density judges each element pair
+ *  the line stands for on its own (cutoff_reach_check(),
+ *  radial_reach_check()).
  */
 using HealthCheck = std::function<HealthVerdict(
     const tadah::core::stats::DataStats&,
@@ -309,6 +312,14 @@ struct ParamMeta {
 
   BoundSuggester suggest{};
   HealthCheck    check{};
+  /** Whether each value of the parameter must reach each element pair of
+   *  the descriptor's line, as the check of a cutoff judges it
+   *  (cutoff_reach_check()): every RCUT2B and RCUTMB. For a line of
+   *  several pairs, tadah analysis suggest_bounds then suggests the range
+   *  from the largest low end of the ranges of its pairs to the largest
+   *  high end, so that each value in it reaches each pair; for any other
+   *  parameter, the range that holds the range of each pair. */
+  bool           reach_each_pair{false};
 
   /** Per-parameter aggregate thresholds used by the per-iter health
    *  monitor. All have rationale-bearing defaults; descriptors
