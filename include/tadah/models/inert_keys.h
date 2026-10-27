@@ -75,8 +75,9 @@ std::vector<InertKeyLine> inert_key_lines(const core::Context &c,
  *  (line 4 of run.train): <reason>. With these lines deleted, the fit is
  *  the same." (one line: "has a line that changes ..., and a fit refuses
  *  it: ... With this line deleted, ..."). With @p also, "the configuration
- *  also has": the sentence a fit adds to its refusal of retired keys
- *  (MLIP require_no_unused_keys). A line of more than six values is named
+ *  also has", ending "With these lines deleted as well, the configuration
+ *  trains.": the sentence a fit adds to its refusal of retired keys (MLIP
+ *  require_no_unused_keys). A line of more than six values is named
  *  by its key, its first three values and the number of the others
  *  ("SIGMA 3 5.48e-09 3.2e-09 and 7 more values"). */
 std::string inert_keys_text(const std::vector<InertKeyLine> &lines,

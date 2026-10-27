@@ -198,8 +198,13 @@ std::string inert_keys_text(const std::vector<InertKeyLine> &lines,
            (l.where.empty() ? std::string() : " (" + l.where + ")") + ": " +
            l.reason;
   }
-  out += one ? ". With this line deleted, the fit is the same."
-             : ". With these lines deleted, the fit is the same.";
+  if (also)
+    out += one ? ". With this line deleted as well, the configuration trains."
+               : ". With these lines deleted as well, the configuration "
+                 "trains.";
+  else
+    out += one ? ". With this line deleted, the fit is the same."
+               : ". With these lines deleted, the fit is the same.";
   return out;
 }
 
