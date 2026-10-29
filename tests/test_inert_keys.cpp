@@ -141,6 +141,39 @@ TEST_CASE("context_reads_watom: whether a descriptor of a configuration "
       ctx_of({{"INIT2B", "false"}, {"INITMB", "true"}, {"TYPEMB", "@ta"}})));
 }
 
+/* Pins: a configuration whose many-body term is DESCRIPTOR blocks without a
+ * TYPEMB line (the blocks are its descriptors, DM_Embed components, whose
+ * density WATOM weighs) reads WATOM, with INITMB true and without an
+ * INITMB line (the blocks switch the term on): context_reads_watom true,
+ * and require_no_inert_keys takes a WATOM of 2.0 (no refusal); with INITMB
+ * false (which the blocks refuse) and INIT2B false it reads none.
+ * Before the fix: context_reads_watom was false for both, and a fit
+ * refused WATOM 2.0, "WATOM 2.0 ...: no descriptor of the configuration
+ * reads it", although the weight changes the fit. */
+TEST_CASE("context_reads_watom: DESCRIPTOR blocks without a TYPEMB line "
+          "read WATOM",
+          "[inert_keys][watom][embed]") {
+  tadah::core::PeriodicTable::initialize();
+  const std::string block =
+      "DESCRIPTOR ta DM_Embed\nPAIRS Ta Ta\nDENSITY\nBASIS Blip5\n"
+      "FORM SIGNED\nCENTRES 2.8 3.6 4.4\nETA 3 3 3\n"
+      "AMPLITUDES 0.5 0.3 0.1\nCUTOFF\nTYPE Cut_Cos\nRADIUS 4.5\n"
+      "ENDCUTOFF\nENDDENSITY\nEMBEDDING\nBASIS Gaussian\n"
+      "CENTRES 0 0.5 1\nETA 2 2 2\nREFERENCE ZERO\nENDEMBEDDING\n"
+      "ENDDESCRIPTOR\n";
+  for (const std::string initmb : {"INITMB true\n", ""}) {
+    INFO("INITMB line: '" << initmb << "'");
+    std::istringstream in("ATOM Ta\nWATOM 2.0\nINIT2B false\n" + initmb +
+                          "MODEL M_BLR BF_Linear\n" + block);
+    const Context c = CoreUserConfigParser().parse(in);
+    CHECK(context_reads_watom(c));
+    CHECK(refusal(c).empty());
+  }
+  std::istringstream off("ATOM Ta\nWATOM 2.0\nINIT2B false\nINITMB false\n"
+                         "MODEL M_BLR BF_Linear\n" + block);
+  CHECK_FALSE(context_reads_watom(CoreUserConfigParser().parse(off)));
+}
+
 /* Pins: require_no_inert_keys refuses a configuration with a line that
  * changes nothing a fit gives, naming who refuses, the key with its values
  * and the line and file of the line: MBLOCK 64, NBLOCK 8 and MPIWPCKG 50
