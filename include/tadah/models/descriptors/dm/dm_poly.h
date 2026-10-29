@@ -135,6 +135,13 @@ public:
     tadah::core::fd_type& fd_ij,
     const double scale = 1) const override;
   std::string label() const override;
+  /** DM_Base::depends_on(), and the scalar keys of the embedding function
+   *  (ChannelFn::scalar_keys()). */
+  bool depends_on(const std::string &theta_name, int arg_pos) const override {
+    for (const std::string &k : ChannelFn::scalar_keys())
+      if (theta_name == k) return true;
+    return DM_Base::depends_on(theta_name, arg_pos);
+  }
   void init_rhoi(tadah::core::rho_type& rhoi) override;
   void calc_rho(
     const int Zi,

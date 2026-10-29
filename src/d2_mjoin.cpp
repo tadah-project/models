@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstddef>
 #include <tadah/models/descriptors/d2/d2_mjoin.h>
 namespace tadah {
@@ -72,6 +73,18 @@ void D2_mJoin::init() {
   keys.push_back("RCTYPE2B");
   keys.push_back("RCUT2B");
   nparams=std::numeric_limits<size_t>::max();
+}
+bool D2_mJoin::reads_watom() const {
+  for (auto d : ds)
+    if (d->reads_watom()) return true;
+  return false;
+}
+bool D2_mJoin::depends_on(const std::string &theta_name, int arg_pos) const {
+  if (std::find(keys.begin(), keys.end(), theta_name) != keys.end())
+    return true;
+  for (auto d : ds)
+    if (d->depends_on(theta_name, arg_pos)) return true;
+  return false;
 }
 std::string D2_mJoin::cutoff_fixed_by(std::size_t i) const {
   return i < ds.size() ? ds[i]->cutoff_fixed_by(0) : std::string();

@@ -43,6 +43,9 @@ public:
 
   std::string label() const override;
   void init() override;
+  /** No values: WATOM weighs none, and nothing changes them. */
+  bool reads_watom() const override { return false; }
+  bool depends_on(const std::string &, int) const override { return false; }
 };
 } // namespace models
 } // namespace tadah

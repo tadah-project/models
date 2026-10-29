@@ -98,6 +98,8 @@ public:
   /** The cutoff of the setfl file, for every value of the cutoff key ("" when
    *  the descriptor read no file: built with INIT2B/INITMB false). */
   std::string cutoff_fixed_by(std::size_t i) const override;
+  /** The tables of the setfl file are evaluated unweighted. */
+  bool reads_watom() const override { return false; }
 };
 } // namespace models
 } // namespace tadah

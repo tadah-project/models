@@ -29,10 +29,13 @@ namespace models {
 /** Whether a descriptor of @p c weights its pairs by WATOM: an initialised
  *  (INIT2B, INITMB true) TYPE2B or TYPEMB line names a descriptor other than
  *  D2_EAM, DM_EAM, D2_Dummy and DM_Dummy (the descriptors of a D2_mJoin or
- *  DM_mJoin line each), or a component (an @id of a DESCRIPTOR block).
- *  D2_EAM and DM_EAM take their pair and density functions from the SETFL
- *  file, unweighted. Reads stored values only (an INIT key that is not
- *  stored is its blueprint default). */
+ *  DM_mJoin line each), or a component (an @id of a DESCRIPTOR block), or
+ *  the configuration has DESCRIPTOR blocks without a TYPEMB line and not
+ *  INITMB false (the blocks are then the many-body term). D2_EAM and DM_EAM
+ *  take their pair and density functions from the SETFL file, unweighted;
+ *  the answer is that of D_Base::reads_watom() of the descriptors a model
+ *  of @p c builds. Reads stored values only (an INIT key that is not stored
+ *  is its blueprint default). */
 bool context_reads_watom(const core::Context &c);
 
 /** Whether @p c has a WATOM with a value other than 1: a per-species value

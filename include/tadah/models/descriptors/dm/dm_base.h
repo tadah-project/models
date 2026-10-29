@@ -82,6 +82,13 @@ public:
   virtual ~DM_Base() {};
   virtual std::vector<std::string> get_init_atoms(const tadah::core::Context &c) override;
 
+  /** \brief D_Base::depends_on(), and RCUTMB: the density passes through
+   *  the cutoff function, whose radius it is (Cut_Dummy truncates it there).
+   */
+  bool depends_on(const std::string &theta_name, int arg_pos) const override {
+    return theta_name == "RCUTMB" || D_Base::depends_on(theta_name, arg_pos);
+  }
+
   /** \brief Calculate \ref AED
    *
    * Calculate Atomic Energy Descriptor for the atom local environment.

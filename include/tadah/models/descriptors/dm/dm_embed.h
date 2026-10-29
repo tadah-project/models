@@ -41,6 +41,11 @@ public:
   std::optional<EmbF0Mode> embf0_mode() const override;
   std::optional<double> raw_embedding_f0(const core::t_type &) const override;
   std::optional<DescriptorMeta> meta() const override;
+  /** WATOM (D_Base::depends_on: its density is weighted by it), and a
+   *  component path of its ID that names a parameter of its block
+   *  (<ID>.DENSITY.CENTRES, ...), whether it differentiates it or not.
+   *  Not RCUTMB: its cutoff is the block's (<ID>.DENSITY.CUTOFF.RADIUS). */
+  bool depends_on(const std::string &, int) const override;
   bool calc_drhoi_dtheta(const std::string &, int, int, int, double, double,
                          const core::Vec3d &, core::rho_type &,
                          double = 1) const override;

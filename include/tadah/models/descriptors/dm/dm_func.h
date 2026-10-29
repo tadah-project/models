@@ -44,6 +44,12 @@ public:
   /** @brief Whether the function runs without its context_keys (F_SQRT:
    *  every SEMBFUNC value 1 when SEMBFUNC is not set). */
   static constexpr bool context_keys_optional = false;
+  /**
+   * @brief The scalar keys the function reads from the context (RCUTENV of
+   *        F_mEnv); none for the others. A descriptor of the function
+   *        depends on them (D_Base::depends_on).
+   */
+  static std::vector<std::string> scalar_keys() { return {}; }
 
   /**
    * @brief Returns the number of output channels per orbital per L.
@@ -321,6 +327,7 @@ private:
   F fcut;
 public:
   static std::vector<std::string> context_keys() { return {"CEMBFUNC", "SEMBFUNC"}; }
+  static std::vector<std::string> scalar_keys() { return {"RCUTENV"}; }
   static constexpr bool expands_dimensions = true;
 
   F_mEnv(const tadah::core::Context &c, size_t cSize, size_t sSize):

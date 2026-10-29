@@ -106,6 +106,12 @@ public:
   /** Value @p i of the cutoff key is the i-th joined descriptor's: its
    *  answer for its value 0, "" past the last descriptor. */
   std::string cutoff_fixed_by(std::size_t i) const override;
+  /** WATOM weighs its values when it weighs those of a descriptor it
+   *  joins. */
+  bool reads_watom() const override;
+  /** Its own keys, and what a descriptor it joins depends on (each joined
+   *  descriptor is asked with the same index). */
+  bool depends_on(const std::string &theta_name, int arg_pos) const override;
 
   /** EMBF0 of the joined DM_REAM children (one global key: the children read
    *  copies of the same context); nullopt when no child has an embedding
