@@ -499,11 +499,11 @@ public:
 
   /** The intercept rule of OALGO 3, checked on the configuration and the
    *  number of intercept columns the fit has, with train()'s messages:
-   *  OALGO 3 penalises every weight alike, while a ridge penalty leaves the
+   *  OALGO 3 penalises every coefficient alike, while a ridge penalty leaves the
    *  intercept columns out, so with @p n_intercepts > 0 it refuses a LAMBDA
    *  other than 0. LAMBDA -1 requests the evidence approximation, which
    *  only OALGO 3 runs: its message says what it needs (BIAS false, or
-   *  every intercept weight pinned with FIXINDEX and FIXWEIGHT) and what
+   *  every intercept coefficient fixed with FIXINDEX and FIXWEIGHT) and what
    *  fits with BIAS true. @p n_intercepts counts the intercept columns the
    *  fit fits (those FIXINDEX pins leave the design matrix). train() calls
    *  it; tadah hpo applies it when a run starts (MLIP
@@ -518,17 +518,19 @@ public:
     if (std::abs(lambda + 1) < std::numeric_limits<double>::min())
       throw std::runtime_error(
           "LAMBDA -1 requests the evidence approximation, which only OALGO 3 "
-          "runs; OALGO 3 penalises every weight alike, and the model has " +
-          n + " intercept column(s) (BIAS true with ATOM), which a ridge "
-          "penalty leaves out. The evidence approximation needs BIAS false, "
-          "or every intercept weight pinned with FIXINDEX and FIXWEIGHT. "
+          "runs; OALGO 3 penalises every coefficient alike, and the model "
+          "has " + n + " intercept column(s) (BIAS true with ATOM), which a "
+          "ridge penalty leaves out. The evidence approximation needs BIAS "
+          "false, or every intercept coefficient fixed with FIXINDEX and "
+          "FIXWEIGHT. "
           "With BIAS true, LAMBDA 0 fits with any OALGO, and LAMBDA > 0 with "
           "OALGO 1, 2 or 4.");
     throw std::runtime_error(
-        "OALGO=3 (SVD with uniform ridge) does not support intercept "
-        "exclusion from regularisation. The model has " + n +
-        " intercept column(s) (BIAS=true with ATOM) and LAMBDA != 0; OALGO "
-        "1, 2 or 4 fits such a model with LAMBDA != 0.");
+        "OALGO 3 (SVD with a uniform ridge) penalises every coefficient "
+        "alike, and the model has " + n + " intercept column(s) (BIAS true "
+        "with ATOM), which a ridge penalty leaves out, so OALGO 3 takes "
+        "LAMBDA 0 only; OALGO 1, 2 or 4 fits such a model with a LAMBDA "
+        "other than 0.");
   }
 
 private:

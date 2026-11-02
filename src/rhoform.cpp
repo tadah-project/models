@@ -47,9 +47,9 @@ RhoForm parse_rhoform(const std::string &value) {
 namespace {
 // The three forms, shared by the absent-key and the invalid-value messages.
 const char *const kFormList =
-    "SIGNED (rho = W f_c sum a_n psi_n with signed a_n, the density before "
-    "tadah 1.6.0; add 'RHOFORM SIGNED' to use an existing potential "
-    "unchanged), "
+    "SIGNED (rho = W f_c sum a_n psi_n with signed a_n: the density before "
+    "tadah 1.6.0, which a RHOFORM SIGNED line declares for an existing "
+    "potential, with an EMBF0 FREE line for its embedding reference), "
     "NONNEG (the same with every a_n >= 0: rho >= 0 by construction) or "
     "MONOTONE (rho = W f_c sum a_n S_n(r), S_n the integrated bump, "
     "a_n >= 0: rho >= 0 and non-increasing by construction).";

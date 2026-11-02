@@ -61,12 +61,13 @@ std::string embf0_absent_consequence(bool linear) {
     return "this potential is evaluated with the default EMBF0 ZERO (F(0) = 0 "
            "by construction). A potential written by tadah 1.5.0 or earlier "
            "now gives every atomic energy shifted by -F(0) (forces and "
-           "stresses are unchanged for this linear model); add 'EMBF0 FREE' "
-           "to the potential to reproduce its energies.";
+           "stresses are unchanged for this linear model); an EMBF0 FREE line "
+           "in the potential reproduces its energies.";
   return "this potential is evaluated with the default EMBF0 ZERO (F(0) = 0 "
          "by construction). The model is non-linear in the descriptor, so for "
          "a potential written by tadah 1.5.0 or earlier its energies AND "
-         "forces change; add 'EMBF0 FREE' to the potential to reproduce them.";
+         "forces change; an EMBF0 FREE line in the potential reproduces "
+         "them.";
 }
 
 void report_ream_only_key(const std::string &key) {
