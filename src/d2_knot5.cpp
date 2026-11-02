@@ -284,8 +284,9 @@ std::optional<DescriptorMeta> D2_Knot5::meta() const {
   p_cgrid.scale    = Scale::Distance;
   p_cgrid.units    = "Å";
   p_cgrid.role     = "Knot position r_s of the i-th truncated power "
-                     "(r_s - r)_+^5, CGRID2B (i); on a TYPE2B line of "
-                     "D2_Knot5 alone the cutoff RCUT2B is the largest knot.";
+                     "(r_s - r)_+^p, CGRID2B (i), with p = 5 unless KDEG2B (i) "
+                     "gives 3; on a TYPE2B line of D2_Knot5 alone the "
+                     "cutoff RCUT2B is the largest knot.";
   p_cgrid.hard.lo  = 0.0;
   p_cgrid.crit     = Criticality::Recommended;
   p_cgrid.scope    = PairScope::PerElementPair;
@@ -304,8 +305,9 @@ std::optional<DescriptorMeta> D2_Knot5::meta() const {
   p_kdeg.arg_pos  = 0;
   p_kdeg.scale    = Scale::Dimensionless;
   p_kdeg.units    = "";
-  p_kdeg.role     = "Knot-degree DATA (3 = cubic atom, an exact f''' "
-                    "corner; 5 = quintic). NOT optimizable.";
+  p_kdeg.role     = "Degree of each knot function, one entry per CGRID2B "
+                    "knot: 3 (cubic, an exact f''' corner) or 5 (quintic, "
+                    "the degree when KDEG2B is absent); not optimisable.";
   p_kdeg.hard.lo  = 3.0;
   p_kdeg.crit     = Criticality::Optional;
   p_kdeg.scope    = PairScope::Global;

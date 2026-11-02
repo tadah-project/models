@@ -455,35 +455,35 @@ std::optional<DescriptorMeta> DM_REAM::meta() const {
   };
   add_vec("CGRIDMB", Scale::Distance, "Å",
           "Centre (knot families: knot position) of the i-th density radial "
-          "basis function. Optimizable (OPTIM CGRIDMB).", 0.0,
+          "basis function. Optimisable (OPTIM CGRIDMB).", 0.0,
           Criticality::Recommended);
   add_vec("SGRIDMB", basis==BasisKind::Gaussian?Scale::InverseDistanceSq:Scale::InverseDistance, basis==BasisKind::Gaussian?"Å^-2":"Å^-1",
           "Inverse width of the i-th density radial basis function — bump "
           "families only; ABSENT for knot families (eta is a pure gauge). "
-          "Optimizable where present.", 1.0e-6, Criticality::Recommended);
+          "Optimisable where present.", 1.0e-6, Criticality::Recommended);
   add_vec("AMPGRIDMB", Scale::Dimensionless, "",
           "Density-expansion amplitude a_n: rho(r) = W sum_n a_n T_n(r) "
           "f_c(r), T_n = psi_n (RHOFORM SIGNED/NONNEG) or the integrated "
           "bump S_n (MONOTONE); >= 0 under NONNEG and MONOTONE. Excluded "
-          "from the LINEAR solve by bilinearity, but a first-class "
-          "NONLINEAR HPO parameter (OPTIM AMPGRIDMB).", -1.0e30,
+          "from the LINEAR solve by bilinearity, but a NONLINEAR "
+          "search parameter of tadah hpo (OPTIM AMPGRIDMB).", -1.0e30,
           Criticality::Recommended);
   add_vec("CEMBFUNC", Scale::Density, "rho",
           "Centre (in rho-space) of the i-th embedding basis function. "
-          "Optimizable (OPTIM CEMBFUNC).", -1.0e30,
+          "Optimisable (OPTIM CEMBFUNC).", -1.0e30,
           Criticality::Recommended);
   add_vec("SEMBFUNC", basis==BasisKind::Gaussian?Scale::InverseDensitySq:Scale::InverseDensity, basis==BasisKind::Gaussian?"rho^-2":"rho^-1",
           "Inverse width (in rho-space) of the i-th embedding basis "
           "function — bump families only; ABSENT for knot families. "
-          "Optimizable where present.", 1.0e-6, Criticality::Recommended);
+          "Optimisable where present.", 1.0e-6, Criticality::Recommended);
   add_vec("KDEGMB", Scale::Dimensionless, "",
-          "Knot-degree DATA (3|5) per density atom: a discrete structure "
-          "choice, NOT optimizable (data_keys; values outside {3,5} are "
-          "rejected at construction — the de-facto OPTIM guard).", 3.0,
+          "Knot-degree data (3 or 5) per density atom: a discrete structure "
+          "choice that tadah hpo does not search; values other than 3 and "
+          "5 are refused.", 3.0,
           Criticality::Optional);
   add_vec("KDEGEMB", Scale::Dimensionless, "",
-          "Knot-degree DATA (3|5) per embedding atom: NOT optimizable "
-          "(data_keys).", 3.0, Criticality::Optional);
+          "Knot-degree data (3 or 5) per embedding atom: a discrete structure "
+          "choice that tadah hpo does not search.", 3.0, Criticality::Optional);
 
   dm.expected_columns = [](const SeedView& s) -> std::size_t {
     if (!s.contains("CEMBFUNC")) return 0;
