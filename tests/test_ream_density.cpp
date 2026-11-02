@@ -468,11 +468,12 @@ TEST_CASE_METHOD(DensityFixture, "DM_REAM: RHOFORM is mandatory",
   CHECK_FALSE(c.has_stored("RHOFORM"));  // nothing was materialised
   REQUIRE_THROWS_AS(ReamDensity::from_context(c), DensityFormError);
   // an invalid value names itself and lists the forms (the key is present,
-  // so it does not claim the key is missing)
+  // so it does not claim the key is missing), without an instruction (it
+  // said "is not a density form: use SIGNED ...")
   c.add("RHOFORM", "SQUARE");
   REQUIRE_THROWS_WITH(DM_REAM(c),
-                      Contains("RHOFORM 'SQUARE' is not a density form: use "
-                               "SIGNED") &&
+                      Contains("RHOFORM 'SQUARE' is not a density form; the "
+                               "density forms are SIGNED") &&
                           !Contains("RHOFORM is required"));
   // INITMB false reads nothing
   Context off = ream_ctx(layout(BasisKind::Blip5, true), "", "Cut_Dummy");
