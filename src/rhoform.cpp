@@ -74,7 +74,8 @@ RhoForm require_rhoform(const tadah::core::Context &ctx,
     return parse_rhoform(*v);
   } catch (const DensityFormError &) {
     throw DensityFormError(prefix + "DM_REAM: RHOFORM '" + *v +
-                           "' is not a density form: use " + kFormList);
+                           "' is not a density form; the density forms are " +
+                           kFormList);
   }
 }
 
