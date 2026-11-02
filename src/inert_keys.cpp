@@ -91,14 +91,24 @@ bool init_flag(const core::Context &c, const std::string &key) {
 
 /* The descriptor labels the initialised TYPE2B and TYPEMB lines of @p c
  * name (the descriptors of an mJoin line each, without the mJoin label),
- * and "@" for a component. */
+ * and "@" for a component. DESCRIPTOR blocks without a TYPEMB line are the
+ * many-body term's components, one "@" each, and switch the term on
+ * without an INITMB line (resolve_embed_blocks, which refuses them under
+ * INITMB false). */
 std::vector<std::string> descriptor_labels(const core::Context &c) {
   std::vector<std::string> out;
+  const std::size_t blocks = c.blocks("DESCRIPTOR").size();
   for (const auto &pair : {std::make_pair(std::string("INIT2B"),
                                           std::string("TYPE2B")),
                            std::make_pair(std::string("INITMB"),
                                           std::string("TYPEMB"))}) {
-    if (!init_flag(c, pair.first)) continue;
+    const bool by_blocks = pair.first == "INITMB" && blocks > 0;
+    if (!init_flag(c, pair.first) && !(by_blocks && !c.has_stored("INITMB")))
+      continue;
+    if (by_blocks && !c.has_stored("TYPEMB")) {
+      out.insert(out.end(), blocks, "@");
+      continue;
+    }
     for (const std::string &t : stored_tokens(c, pair.second)) {
       if (!t.empty() && t[0] == '@') {
         out.push_back("@");
@@ -110,6 +120,9 @@ std::vector<std::string> descriptor_labels(const core::Context &c) {
   return out;
 }
 
+/* The descriptors whose D_Base::reads_watom() is false, by label, for a
+ * configuration whose descriptors are not built (a test pins the two
+ * against each other for every registered descriptor). */
 bool reads_no_watom(const std::string &label) {
   return label == "D2_EAM" || label == "DM_EAM" || label == "D2_Dummy" ||
          label == "DM_Dummy";

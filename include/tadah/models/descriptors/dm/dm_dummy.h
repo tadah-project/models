@@ -41,6 +41,9 @@ public:
     tadah::core::fd_type &fd_ij, 
     const double scale=1) const override;
   std::string label() const override;
+  /** No values: WATOM weighs none, and nothing changes them. */
+  bool reads_watom() const override { return false; }
+  bool depends_on(const std::string &, int) const override { return false; }
   void init_rhoi(tadah::core::rho_type& rhoi) override;
   void calc_rho(
     const int Zi,

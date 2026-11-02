@@ -118,6 +118,13 @@ public:
   std::string label() const override;
   void init() override;
   std::optional<DescriptorMeta> meta() const override;
+  /** D2_Base::depends_on(), and the exponents n and m of the TYPE2B line:
+   *  TYPE2B positions 2 and 3 (the label is 1), as calc_dDdtheta takes
+   *  them. */
+  bool depends_on(const std::string &theta_name, int arg_pos) const override {
+    return (theta_name == "TYPE2B" && (arg_pos == 2 || arg_pos == 3)) ||
+           D2_Base::depends_on(theta_name, arg_pos);
+  }
 };
 } // namespace models
 } // namespace tadah

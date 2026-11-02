@@ -237,6 +237,11 @@ DM_Embed::Parameter DM_Embed::parameter(const std::string &name,
                                                : p.index < c.centres.size();
   return p;
 }
+bool DM_Embed::depends_on(const std::string &name, int pos) const {
+  if (name == "WATOM")
+    return D_Base::depends_on(name, pos);
+  return parameter(name, pos).field != ' ';
+}
 bool DM_Embed::calc_drhoi_dtheta(const std::string &name, int pos, int zi,
                                  int zj, double r, double, const core::Vec3d &,
                                  core::rho_type &out, double scale) const {

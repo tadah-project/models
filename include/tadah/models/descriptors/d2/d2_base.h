@@ -27,6 +27,13 @@ public:
   virtual ~D2_Base() {};
   virtual std::vector<std::string> get_init_atoms(const tadah::core::Context &c) override;
 
+  /** \brief D_Base::depends_on(), and RCUT2B: the values pass through the
+   *  cutoff function, whose radius it is (Cut_Dummy truncates them there).
+   */
+  bool depends_on(const std::string &theta_name, int arg_pos) const override {
+    return theta_name == "RCUT2B" || D_Base::depends_on(theta_name, arg_pos);
+  }
+
   /** \brief Calculate \ref AED
    *
    * Calculate Atomic Energy Descriptor for the atom local environment.

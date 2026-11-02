@@ -215,6 +215,57 @@ public:
    *  is unconfigured, fall back to FD" (return false). */
   bool has_watom_arg_pos(int arg_pos) const;
 
+  /** True when value @p arg_pos (1-based, `OPTIM WATOM (n)`) of the WATOM
+   *  read by the last update_weights call sets the weight of a pair of
+   *  elements this descriptor is initialised for (is_init_for_atoms):
+   *  per species, a pair of the arg_pos-th element of ATOM with an element
+   *  of ATOM (itself included); in the pair form, the arg_pos-th pair.
+   *  False for a value past the list or without WATOM. Reads the elements
+   *  and the pairs, not the values: a weight that a value sets depends on
+   *  it whatever the values are. */
+  bool watom_value_weighs_a_pair(int arg_pos) const;
+
+  /** \brief Whether the values of this descriptor (its descriptor entries
+   *  and their position derivatives) are weighted by the WATOM pair
+   *  weights `weights[Zi][Zj]`.
+   *
+   *  True by default, so that a descriptor added later reads WATOM until
+   *  it says otherwise (depends_on() then takes WATOM by finite
+   *  differences instead of leaving out its part). False for D2_EAM and
+   *  DM_EAM, which evaluate the tables of their setfl file unweighted, and
+   *  for D2_Dummy and DM_Dummy, which have no values. D2_mJoin and DM_mJoin
+   *  read it when a descriptor they join does. context_reads_watom()
+   *  (inert_keys.h) tells the same from the stored values of a
+   *  configuration, without building a descriptor. */
+  virtual bool reads_watom() const { return true; }
+
+  /** \brief Whether the values of this descriptor (its descriptor entries
+   *  and their position derivatives) depend on value @p arg_pos (1-based,
+   *  the OPTIM index) of the search parameter @p theta_name (an upper-case
+   *  key, or a component path), whatever the atoms of a structure.
+   *
+   *  The analytical gradient of tadah hpo takes the rows of a search
+   *  parameter from the closed forms of the two-body and the many-body
+   *  descriptor (calc_dDdtheta, calc_drhoi_dtheta, ...), and claims the
+   *  rows only when every descriptor that depends on the parameter
+   *  differentiates it in them (mlip::assemble_dphi_train_both_rows). A
+   *  descriptor that depends on a parameter and has no closed form for it
+   *  so hands the parameter to finite differences (GRAD_STRATEGY HYBRID)
+   *  or to the startup refusal of GRAD_STRATEGY ANALYTICAL, instead of
+   *  leaving its part out of the gradient: an answer of true for a value
+   *  the values do not depend on costs finite differences, one of false
+   *  for a value they depend on is a wrong gradient.
+   *
+   *  Default: WATOM when reads_watom() and watom_value_weighs_a_pair(); a
+   *  key of `keys` or `context_keys`, at every index; nothing else.
+   *  D2_Base adds RCUT2B and DM_Base RCUTMB (the cutoff function, the
+   *  truncation of Cut_Dummy included); D2_ZBL and D2_MIE add their TYPE2B
+   *  family parameters; DM_mBlipEnv adds RCUTENV; DM_Embed depends on the
+   *  component paths of its ID and on WATOM (its cutoff is its block's,
+   *  not RCUTMB); D2_mJoin and DM_mJoin on their own keys and on what a
+   *  descriptor they join depends on; D2_Dummy and DM_Dummy on nothing. */
+  virtual bool depends_on(const std::string &theta_name, int arg_pos) const;
+
   /** \brief Print grid to the log.
    *
    * @param v Vector to print.

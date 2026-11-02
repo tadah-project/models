@@ -268,6 +268,27 @@ bool D_Base::has_watom_arg_pos(int arg_pos) const {
   }
   return false;
 }
+bool D_Base::watom_value_weighs_a_pair(int arg_pos) const {
+  if (!has_watom_arg_pos(arg_pos)) return false;
+  const size_t idx = static_cast<size_t>(arg_pos - 1);
+  if (watom_mode == WatomMode::PerSpecies) {
+    // update_weights writes the pairs of ATOM elements: (Z, Zj) for every
+    // Zj of ATOM, Z itself included.
+    const int Z = watom_Z_by_arg_pos[idx];
+    for (const int Zj : watom_Z_by_arg_pos)
+      if (is_init_for_atoms(Z, Zj)) return true;
+    return false;
+  }
+  const auto &pair = watom_pair_by_arg_pos[idx];
+  return is_init_for_atoms(pair.first, pair.second);
+}
+bool D_Base::depends_on(const std::string &theta_name, int arg_pos) const {
+  if (theta_name == "WATOM")
+    return reads_watom() && watom_value_weighs_a_pair(arg_pos);
+  return std::find(keys.begin(), keys.end(), theta_name) != keys.end() ||
+         std::find(context_keys.begin(), context_keys.end(), theta_name) !=
+             context_keys.end();
+}
 double D_Base::dweight_dw_n(int Zi, int Zj, int arg_pos) const {
   if (arg_pos < 1) return 0.0;
   const size_t idx = static_cast<size_t>(arg_pos - 1);
