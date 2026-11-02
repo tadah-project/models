@@ -562,7 +562,9 @@ TEST_CASE("EMBF0: absent-key consequence text (DM_REAM notice, LAMMPS "
   for (const std::string *t : {&lin, &nl}) {
     REQUIRE_THAT(*t, Contains("default EMBF0 ZERO"));
     REQUIRE_THAT(*t, Contains("tadah 1.5.0 or earlier"));
-    REQUIRE_THAT(*t, Contains("'EMBF0 FREE'"));
+    /* It said "add 'EMBF0 FREE' to the potential ...". */
+    REQUIRE_THAT(*t, Contains("an EMBF0 FREE line in the potential "
+                              "reproduces"));
   }
   REQUIRE_THAT(lin, Contains("forces and stresses are unchanged"));
   REQUIRE_THAT(nl, Contains("energies AND forces change"));

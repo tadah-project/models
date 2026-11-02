@@ -462,17 +462,18 @@ TEST_CASE_METHOD(DensityFixture, "DM_REAM: RHOFORM is mandatory",
   REQUIRE_THROWS_AS(DM_REAM(c), DensityFormError);
   REQUIRE_THROWS_WITH(DM_REAM(c),
                       Contains("DM_REAM: RHOFORM is required: SIGNED") &&
-                          Contains("add 'RHOFORM SIGNED' to use an existing "
-                                   "potential unchanged") &&
+                          Contains("which a RHOFORM SIGNED line declares for "
+                                   "an existing potential") &&
                           Contains("NONNEG") && Contains("MONOTONE"));
   CHECK_FALSE(c.has_stored("RHOFORM"));  // nothing was materialised
   REQUIRE_THROWS_AS(ReamDensity::from_context(c), DensityFormError);
   // an invalid value names itself and lists the forms (the key is present,
-  // so it does not claim the key is missing)
+  // so it does not claim the key is missing), without an instruction (it
+  // said "is not a density form: use SIGNED ...")
   c.add("RHOFORM", "SQUARE");
   REQUIRE_THROWS_WITH(DM_REAM(c),
-                      Contains("RHOFORM 'SQUARE' is not a density form: use "
-                               "SIGNED") &&
+                      Contains("RHOFORM 'SQUARE' is not a density form; the "
+                               "density forms are SIGNED") &&
                           !Contains("RHOFORM is required"));
   // INITMB false reads nothing
   Context off = ream_ctx(layout(BasisKind::Blip5, true), "", "Cut_Dummy");
@@ -676,11 +677,12 @@ TEST_CASE_METHOD(DensityFixture, "rhoform: names, parse and the key contract",
 
   CHECK(rhoform_absent_message() ==
         "DM_REAM: RHOFORM is required: SIGNED (rho = W f_c sum a_n psi_n with "
-        "signed a_n, the density before tadah 1.6.0; add 'RHOFORM SIGNED' to use "
-        "an existing potential unchanged), NONNEG (the same with every a_n >= "
-        "0: rho >= 0 by construction) or MONOTONE (rho = W f_c sum a_n "
-        "S_n(r), S_n the integrated bump, a_n >= 0: rho >= 0 and "
-        "non-increasing by construction).");
+        "signed a_n: the density before tadah 1.6.0, which a RHOFORM SIGNED "
+        "line declares for an existing potential, with an EMBF0 FREE line for "
+        "its embedding reference), NONNEG (the same with every a_n >= 0: rho "
+        ">= 0 by construction) or MONOTONE (rho = W f_c sum a_n S_n(r), S_n "
+        "the integrated bump, a_n >= 0: rho >= 0 and non-increasing by "
+        "construction).");
 
   // the blueprint gives RHOFORM no default: nothing ever materialises it
   Context c;
