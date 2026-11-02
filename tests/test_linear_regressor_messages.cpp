@@ -929,11 +929,14 @@ TEST_CASE("LinearRegressor: with LAMBDA > 0 the OALGO 4 message names the "
   CHECK(fit_refusal(ctx("3", true), ones_design(4, 3), target(4, 3)) ==
         "OALGO 3 (SVD with a uniform ridge) penalises every coefficient "
         "alike, and the model has 1 intercept column(s) (BIAS true with "
-        "ATOM), which a ridge penalty leaves out, so OALGO 3 takes LAMBDA 0 "
-        "only; OALGO 1, 2 or 4 fits such a model with a LAMBDA other than "
-        "0.");
-  /* It said "OALGO=3 (SVD with uniform ridge) does not support intercept
-   * exclusion from regularisation. The model has 1 intercept column(s)
+        "ATOM), which the ridge of OALGO 1, 2 and 4 leaves unpenalised and "
+        "OALGO 3 cannot, so OALGO 3 takes LAMBDA 0 only; OALGO 1, 2 or 4 "
+        "fits such a model with a LAMBDA other than 0.");
+  /* It said "..., which a ridge penalty leaves out, so OALGO 3 takes
+   * LAMBDA 0 only", which read as if every ridge left the intercepts out,
+   * OALGO 3's too. Before that it said "OALGO=3 (SVD with uniform ridge)
+   * does not support intercept exclusion from regularisation. The model
+   * has 1 intercept column(s)
    * (BIAS=true with ATOM) and LAMBDA != 0; OALGO 1, 2 or 4 fits such a
    * model with LAMBDA != 0." */
 }
@@ -973,8 +976,9 @@ TEST_CASE("LinearRegressor: OALGO 3 with LAMBDA -1 and an intercept column "
   CHECK(ea ==
         "LAMBDA -1 requests the evidence approximation, which only OALGO 3 "
         "runs; OALGO 3 penalises every coefficient alike, and the model has 1 "
-        "intercept column(s) (BIAS true with ATOM), which a ridge penalty "
-        "leaves out. The evidence approximation needs BIAS false, or every "
+        "intercept column(s) (BIAS true with ATOM), which the ridge of "
+        "OALGO 1, 2 and 4 leaves unpenalised and OALGO 3 cannot. The "
+        "evidence approximation needs BIAS false, or every "
         "intercept coefficient fixed with FIXINDEX and FIXWEIGHT. With BIAS "
         "true, LAMBDA 0 fits with any OALGO, and LAMBDA > 0 with OALGO 1, 2 "
         "or 4.");
