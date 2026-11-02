@@ -5,7 +5,7 @@ project(Tadah.MODELS LANGUAGES CXX)
 if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
   message(FATAL_ERROR
     "In-source builds are not allowed.\n"
-    "Create a separate build directory and run CMake from there.")
+    "CMake must run in a separate build directory, outside the source directory.")
 endif()
 
 # 1. Global settings
