@@ -1026,9 +1026,9 @@ TEST_CASE("The role texts of the radial grids state their basis and "
   CHECK(blip5.find("2/eta") == std::string::npos);
   CHECK(bp.find("exp(-eta (r - c)^2)") != std::string::npos);
   CHECK(knot ==
-        "Knot position r_s of the i-th truncated power (r_s - r)_+^5, "
-        "CGRID2B (i); on a TYPE2B line of D2_Knot5 alone the cutoff RCUT2B "
-        "is the largest knot.");
+        "Knot position r_s of the i-th truncated power (r_s - r)_+^p, "
+        "CGRID2B (i), with p = 5 unless KDEG2B (i) gives 3; on a TYPE2B "
+        "line of D2_Knot5 alone the cutoff RCUT2B is the largest knot.");
   const std::vector<std::pair<const char *, const char *>> grids = {
       {"D2_Blip", "CGRID2B"},  {"D2_Blip", "SGRID2B"},
       {"D2_Blip5", "CGRID2B"}, {"D2_Blip5", "SGRID2B"},
