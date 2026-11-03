@@ -26,6 +26,7 @@
 #include <tadah/core/core_types.h>
 #include <tadah/core/logger.h>
 #include <tadah/models/ea.h>
+#include <tadah/models/fit_warnings.h>
 #include <tadah/models/functions/basis_functions/bf_linear.h>
 #include <tadah/models/functions/kernels/kern_linear.h>
 #include <tadah/models/m_blr_train.h>
@@ -287,12 +288,14 @@ TEST_CASE("OALGO 3 with FIXINDEX: the free weights are those of the solve "
 
 /* Pins: an OALGO 3 fit (M_BLR_Train<BF_Linear>, LAMBDA 0, OALGO 3 1e-6) of
  * a 9 x 4 design matrix whose last two columns are equal logs one WARNING
- * for the direction the solve drops, about the weights alone:
- * "LinearRegressor (OALGO 3): 1 of 4 singular directions of the design
- * matrix are at or below the rank threshold (OALGO's rcond 1e-06 times the
+ * for the direction the solve drops, about the weights alone and without a
+ * class name: "OALGO 3: 1 of 4 singular directions of the design matrix
+ * are at or below the rank threshold (OALGO's rcond 1e-06 times the
  * largest singular value): the solve leaves them out of the coefficients."
  * Before the fix: the WARNING went on "and the weight covariance WCOV
- * leaves them out too (no uncertainty along them)". */
+ * leaves them out too (no uncertainty along them)"; then it began
+ * "LinearRegressor (OALGO 3): ", a class name, where it begins "OALGO 3:
+ * ": the text check fails on that. */
 TEST_CASE("OALGO 3: a direction the solve drops is a WARNING about the "
           "weights",
           "[oalgo3][uncertainty]") {
@@ -311,15 +314,62 @@ TEST_CASE("OALGO 3: a direction the solve drops is a WARNING about the "
   }
   INFO(log);
   const std::string warning =
-      "WARNING: LinearRegressor (OALGO 3): 1 of 4 singular directions of "
-      "the design matrix are at or below the rank threshold (OALGO's rcond "
-      "1e-06 times the largest singular value): the solve leaves them out "
-      "of the coefficients.\n";
+      "WARNING: OALGO 3: 1 of 4 singular directions of the design matrix "
+      "are at or below the rank threshold (OALGO's rcond 1e-06 times the "
+      "largest singular value): the solve leaves them out of the "
+      "coefficients.\n";
   CHECK(log.size() >= warning.size());
   CHECK(log.compare(log.size() - warning.size(), warning.size(), warning) ==
         0);
   CHECK(log.find("WARNING") == log.rfind("WARNING"));
   CHECK(log.find("WCOV") == std::string::npos);
+}
+
+/* Pins: under a FitWarningCollector (tadah hpo makes one around the fits of
+ * its evaluations and journals each kind of WARNING once per run), the
+ * WARNING of the singular directions an OALGO 3 fit drops goes to the
+ * collector, not the Logger: two such fits of the 9 x 4 design matrix
+ * above collect two WARNINGs, each of a kind other than that of the
+ * evidence approximation and with the text "OALGO 3: 1 of 4 singular
+ * directions of the design matrix are at or below the rank threshold
+ * (...)", and the Logger prints nothing. Without a collector each fit
+ * prints it once (the case above), as tadah train needs.
+ * Before the fix: the fit logged it to the Logger whatever the collector,
+ * so a search printed it once per evaluation (75 lines in a run of 75
+ * evaluations): the collector held nothing and the Logger printed two
+ * WARNINGs. */
+TEST_CASE("OALGO 3: a direction the solve drops is a fit WARNING that a "
+          "collector takes",
+          "[oalgo3][fit_warnings]") {
+  const phi_type Phi = design(9, 4, 0.37, true);
+  const t_type T = targets(Phi, 9);
+  Context c = oalgo3("0", "1e-6");
+  BF_Linear bf;
+  std::string log;
+  std::vector<FitWarning> collected;
+  {
+    LogCapture cap;
+    FitWarningCollector collector;
+    for (int fit = 0; fit < 2; ++fit) {
+      M_BLR_Train<BF_Linear> m(bf, c);
+      phi_type P = Phi;
+      t_type t = T;
+      m.train(P, t, 9);
+    }
+    collected = collector.warnings();
+    log = cap.text();
+  }
+  INFO(log);
+  CHECK(log.find("WARNING") == std::string::npos);
+  REQUIRE(collected.size() == 2u);
+  for (const FitWarning &w : collected) {
+    CHECK(w.kind != FitWarningKind::EvidenceApproximationLimit);
+    CHECK(w.text ==
+          "OALGO 3: 1 of 4 singular directions of the design matrix are at "
+          "or below the rank threshold (OALGO's rcond 1e-06 times the "
+          "largest singular value): the solve leaves them out of the "
+          "coefficients.");
+  }
 }
 
 /* Pins: an OALGO 3 fit with no more observations than effective weights

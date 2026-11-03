@@ -4,6 +4,7 @@
 #include <tadah/core/maths.h>
 #include <tadah/models/cutoffs.h>
 #include <cmath>
+#include <memory>
 #include <vector>
 
 using namespace tadah::core;
@@ -372,6 +373,12 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_Blip 2", "[DM]") {
     test_case<DM_Blip, Cut_Tanh>(context, "DM_Blip", 4 * 3);
     test_case<DM_Blip, Cut_PolyS>(context, "DM_Blip", 4 * 3);
 }
+/* The label of DM_mEAD<F_RLR> and DM_mEAD<F_SQRT> is the name the
+ * descriptor registry gives them, DM_mRLR and DM_mSQRT, which a TYPEMB line
+ * writes; DM_mEAD<F_SQ>, registered under no name, keeps the family name
+ * DM_mEAD. (Before the fix every DM_mEAD<F> was labelled DM_mEAD, and these
+ * cases expected it: a correction, so the DM_mRLR and DM_mSQRT cases fail
+ * on it.) */
 TEST_CASE_METHOD(TestFixture, "Testing DM_mEAD<F_RLR> 1", "[DM]") {
     Context context;
     context.add("RCUTMB", 10);
@@ -387,10 +394,10 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_mEAD<F_RLR> 1", "[DM]") {
     context.add("SGRIDMB", "0.1 0.2");
     context.add("CEMBFUNC", "1 2");
     context.add("SEMBFUNC", "0.1 0.2");
-    test_case<DM_mEAD<F_RLR>, Cut_Dummy>(context, "DM_mEAD", 3 * 2);
-    test_case<DM_mEAD<F_RLR>, Cut_Cos>(context, "DM_mEAD", 3 * 2);
-    test_case<DM_mEAD<F_RLR>, Cut_Tanh>(context, "DM_mEAD", 3 * 2);
-    test_case<DM_mEAD<F_RLR>, Cut_PolyS>(context, "DM_mEAD", 3 * 2);
+    test_case<DM_mEAD<F_RLR>, Cut_Dummy>(context, "DM_mRLR", 3 * 2);
+    test_case<DM_mEAD<F_RLR>, Cut_Cos>(context, "DM_mRLR", 3 * 2);
+    test_case<DM_mEAD<F_RLR>, Cut_Tanh>(context, "DM_mRLR", 3 * 2);
+    test_case<DM_mEAD<F_RLR>, Cut_PolyS>(context, "DM_mRLR", 3 * 2);
 }
 TEST_CASE_METHOD(TestFixture, "Testing DM_mEAD<F_RLR> 2", "[DM]") {
     Context context;
@@ -407,10 +414,10 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_mEAD<F_RLR> 2", "[DM]") {
     context.add("SGRIDMB", "0.1 0.2 0.3");
     context.add("CEMBFUNC", "1 2 3");
     context.add("SEMBFUNC", "0.1 0.2 0.3");
-    test_case<DM_mEAD<F_RLR>, Cut_Dummy>(context, "DM_mEAD", 4 * 3);
-    test_case<DM_mEAD<F_RLR>, Cut_Cos>(context, "DM_mEAD", 4 * 3);
-    test_case<DM_mEAD<F_RLR>, Cut_Tanh>(context, "DM_mEAD", 4 * 3);
-    test_case<DM_mEAD<F_RLR>, Cut_PolyS>(context, "DM_mEAD", 4 * 3);
+    test_case<DM_mEAD<F_RLR>, Cut_Dummy>(context, "DM_mRLR", 4 * 3);
+    test_case<DM_mEAD<F_RLR>, Cut_Cos>(context, "DM_mRLR", 4 * 3);
+    test_case<DM_mEAD<F_RLR>, Cut_Tanh>(context, "DM_mRLR", 4 * 3);
+    test_case<DM_mEAD<F_RLR>, Cut_PolyS>(context, "DM_mRLR", 4 * 3);
 }
 TEST_CASE_METHOD(TestFixture, "Testing DM_mEAD<F_SQRT> 1", "[DM]") {
     Context context;
@@ -426,10 +433,10 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_mEAD<F_SQRT> 1", "[DM]") {
     context.add("CGRIDMB", "1 2");
     context.add("SGRIDMB", "0.1 0.2");
     context.add("SEMBFUNC", "1 1");
-    test_case<DM_mEAD<F_SQRT>, Cut_Dummy>(context, "DM_mEAD", 3 * 2);
-    test_case<DM_mEAD<F_SQRT>, Cut_Cos>(context, "DM_mEAD", 3 * 2);
-    test_case<DM_mEAD<F_SQRT>, Cut_Tanh>(context, "DM_mEAD", 3 * 2);
-    test_case<DM_mEAD<F_SQRT>, Cut_PolyS>(context, "DM_mEAD", 3 * 2);
+    test_case<DM_mEAD<F_SQRT>, Cut_Dummy>(context, "DM_mSQRT", 3 * 2);
+    test_case<DM_mEAD<F_SQRT>, Cut_Cos>(context, "DM_mSQRT", 3 * 2);
+    test_case<DM_mEAD<F_SQRT>, Cut_Tanh>(context, "DM_mSQRT", 3 * 2);
+    test_case<DM_mEAD<F_SQRT>, Cut_PolyS>(context, "DM_mSQRT", 3 * 2);
 }
 TEST_CASE_METHOD(TestFixture, "Testing DM_mEAD<F_SQRT> 2", "[DM]") {
     Context context;
@@ -445,10 +452,10 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_mEAD<F_SQRT> 2", "[DM]") {
     context.add("CGRIDMB", "1 2 3");
     context.add("SGRIDMB", "0.1 0.2 0.3");
     context.add("SEMBFUNC", "1 1 1");
-    test_case<DM_mEAD<F_SQRT>, Cut_Dummy>(context, "DM_mEAD", 4 * 3);
-    test_case<DM_mEAD<F_SQRT>, Cut_Cos>(context, "DM_mEAD", 4 * 3);
-    test_case<DM_mEAD<F_SQRT>, Cut_Tanh>(context, "DM_mEAD", 4 * 3);
-    test_case<DM_mEAD<F_SQRT>, Cut_PolyS>(context, "DM_mEAD", 4 * 3);
+    test_case<DM_mEAD<F_SQRT>, Cut_Dummy>(context, "DM_mSQRT", 4 * 3);
+    test_case<DM_mEAD<F_SQRT>, Cut_Cos>(context, "DM_mSQRT", 4 * 3);
+    test_case<DM_mEAD<F_SQRT>, Cut_Tanh>(context, "DM_mSQRT", 4 * 3);
+    test_case<DM_mEAD<F_SQRT>, Cut_PolyS>(context, "DM_mSQRT", 4 * 3);
 }
 // SUPERSEDED: DM_mEAD<F_SQ> is equivalent to DM_GOW_SQ (= DM_Poly<F_SQ,GaussianRadial,OrbitalWise>).
 // Kept for regression; see test_dm_poly.cpp for the equivalence cross-validation.
@@ -594,4 +601,26 @@ TEST_CASE_METHOD(TestFixture, "Testing DM_Dummy", "[DM]") {
     REQUIRE_NOTHROW(d.calc_dXijdri_dXjidri(1, 1, 0, 0, del, rho1, rho1, fd, 1));
     REQUIRE(d.rhoi_size() == 0);
     REQUIRE(d.rhoip_size() == 0);
+}
+
+/* Pins: every descriptor of the registry (Registry<D_Base>, default
+ * constructed through factory<D_Base>) has the label of its registered
+ * name, the TYPE2B, TYPEMB or TYPE3B value that names it, which messages
+ * and the HEALTH_LOG columns of tadah hpo print: DM_mBlipEnv is labelled
+ * DM_mBlipEnv and DM_GPS_SQ is labelled DM_GPS_SQ.
+ * Before the fix: the four DM_mEAD<F> descriptors (DM_mRLR, DM_mSQRT,
+ * DM_mBlip, DM_mBlipEnv) were labelled DM_mEAD and the sixteen DM_Poly
+ * descriptors (DM_PS_*, DM_GPS_*, DM_OW_*, DM_GOW_*) DM_Poly: twenty
+ * failures. */
+TEST_CASE("Every registered descriptor is labelled with its registered name",
+          "[DM][label]") {
+  std::size_t checked = 0;
+  for (const std::string &name : Registry<D_Base>::names()) {
+    INFO("registered as " << name);
+    std::unique_ptr<D_Base> d(factory<D_Base>(name));
+    REQUIRE(d);
+    CHECK(d->label() == name);
+    ++checked;
+  }
+  CHECK(checked > 30);
 }

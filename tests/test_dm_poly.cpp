@@ -239,40 +239,44 @@ struct TestFixturePoly {
 //  Tested: Lmax=0 and Lmax=1, Cut_Dummy and Cut_Cos.
 // -----------------------------------------------------------------------
 
+/* Each case expects the label of its descriptor to be its registered name
+ * (DM_PS_SQ, ..., DM_GOW_Blip), the TYPEMB value that names it. (Before
+ * the fix every DM_Poly instance was labelled DM_Poly, and these cases
+ * expected it: a correction, so each FD case fails on its label.) */
 TEST_CASE_METHOD(TestFixturePoly, "DM_PS_SQ: FD gradient test", "[dm_poly]")
 {
     { auto ctx = make_ctx_sq(10.0, 0, "DM_PS_SQ");
-      test_dm_poly_fd<DM_Poly<F_SQ>, Cut_Dummy>(ctx, "DM_Poly", 1*2);
-      test_dm_poly_fd<DM_Poly<F_SQ>, Cut_Cos>  (ctx, "DM_Poly", 1*2); }
+      test_dm_poly_fd<DM_Poly<F_SQ>, Cut_Dummy>(ctx, "DM_PS_SQ", 1*2);
+      test_dm_poly_fd<DM_Poly<F_SQ>, Cut_Cos>  (ctx, "DM_PS_SQ", 1*2); }
     { auto ctx = make_ctx_sq(10.0, 1, "DM_PS_SQ");
-      test_dm_poly_fd<DM_Poly<F_SQ>, Cut_Dummy>(ctx, "DM_Poly", 2*2); }
+      test_dm_poly_fd<DM_Poly<F_SQ>, Cut_Dummy>(ctx, "DM_PS_SQ", 2*2); }
 }
 
 TEST_CASE_METHOD(TestFixturePoly, "DM_PS_SQRT: FD gradient test", "[dm_poly]")
 {
     { auto ctx = make_ctx_sqrt(10.0, 0, "DM_PS_SQRT");
-      test_dm_poly_fd<DM_Poly<F_SQRT>, Cut_Dummy>(ctx, "DM_Poly", 1*2);
-      test_dm_poly_fd<DM_Poly<F_SQRT>, Cut_Cos>  (ctx, "DM_Poly", 1*2); }
+      test_dm_poly_fd<DM_Poly<F_SQRT>, Cut_Dummy>(ctx, "DM_PS_SQRT", 1*2);
+      test_dm_poly_fd<DM_Poly<F_SQRT>, Cut_Cos>  (ctx, "DM_PS_SQRT", 1*2); }
     { auto ctx = make_ctx_sqrt(10.0, 1, "DM_PS_SQRT");
-      test_dm_poly_fd<DM_Poly<F_SQRT>, Cut_Dummy>(ctx, "DM_Poly", 2*2); }
+      test_dm_poly_fd<DM_Poly<F_SQRT>, Cut_Dummy>(ctx, "DM_PS_SQRT", 2*2); }
 }
 
 TEST_CASE_METHOD(TestFixturePoly, "DM_PS_RLR: FD gradient test", "[dm_poly]")
 {
     { auto ctx = make_ctx_rlr(10.0, 0, "DM_PS_RLR");
-      test_dm_poly_fd<DM_Poly<F_RLR>, Cut_Dummy>(ctx, "DM_Poly", 1*2);
-      test_dm_poly_fd<DM_Poly<F_RLR>, Cut_Cos>  (ctx, "DM_Poly", 1*2); }
+      test_dm_poly_fd<DM_Poly<F_RLR>, Cut_Dummy>(ctx, "DM_PS_RLR", 1*2);
+      test_dm_poly_fd<DM_Poly<F_RLR>, Cut_Cos>  (ctx, "DM_PS_RLR", 1*2); }
     { auto ctx = make_ctx_rlr(10.0, 1, "DM_PS_RLR");
-      test_dm_poly_fd<DM_Poly<F_RLR>, Cut_Dummy>(ctx, "DM_Poly", 2*2); }
+      test_dm_poly_fd<DM_Poly<F_RLR>, Cut_Dummy>(ctx, "DM_PS_RLR", 2*2); }
 }
 
 TEST_CASE_METHOD(TestFixturePoly, "DM_PS_Blip: FD gradient test", "[dm_poly]")
 {
     { auto ctx = make_ctx_blipf(10.0, 0, "DM_PS_Blip");
-      test_dm_poly_fd<DM_Poly<F_Blip>, Cut_Dummy>(ctx, "DM_Poly", 1*2);
-      test_dm_poly_fd<DM_Poly<F_Blip>, Cut_Cos>  (ctx, "DM_Poly", 1*2); }
+      test_dm_poly_fd<DM_Poly<F_Blip>, Cut_Dummy>(ctx, "DM_PS_Blip", 1*2);
+      test_dm_poly_fd<DM_Poly<F_Blip>, Cut_Cos>  (ctx, "DM_PS_Blip", 1*2); }
     { auto ctx = make_ctx_blipf(10.0, 1, "DM_PS_Blip");
-      test_dm_poly_fd<DM_Poly<F_Blip>, Cut_Dummy>(ctx, "DM_Poly", 2*2); }
+      test_dm_poly_fd<DM_Poly<F_Blip>, Cut_Dummy>(ctx, "DM_PS_Blip", 2*2); }
 }
 
 // -----------------------------------------------------------------------
@@ -283,26 +287,26 @@ TEST_CASE_METHOD(TestFixturePoly, "DM_PS_Blip: FD gradient test", "[dm_poly]")
 TEST_CASE_METHOD(TestFixturePoly, "DM_GPS_SQ: FD gradient test", "[dm_poly]")
 {
     auto ctx = make_ctx_sq(10.0, 0, "DM_GPS_SQ");
-    test_dm_poly_fd<DM_Poly<F_SQ, GaussianRadial>, Cut_Dummy>(ctx, "DM_Poly", 1*2);
-    test_dm_poly_fd<DM_Poly<F_SQ, GaussianRadial>, Cut_Cos>  (ctx, "DM_Poly", 1*2);
+    test_dm_poly_fd<DM_Poly<F_SQ, GaussianRadial>, Cut_Dummy>(ctx, "DM_GPS_SQ", 1*2);
+    test_dm_poly_fd<DM_Poly<F_SQ, GaussianRadial>, Cut_Cos>  (ctx, "DM_GPS_SQ", 1*2);
 }
 
 TEST_CASE_METHOD(TestFixturePoly, "DM_GPS_SQRT: FD gradient test", "[dm_poly]")
 {
     auto ctx = make_ctx_sqrt(10.0, 0, "DM_GPS_SQRT");
-    test_dm_poly_fd<DM_Poly<F_SQRT, GaussianRadial>, Cut_Dummy>(ctx, "DM_Poly", 1*2);
+    test_dm_poly_fd<DM_Poly<F_SQRT, GaussianRadial>, Cut_Dummy>(ctx, "DM_GPS_SQRT", 1*2);
 }
 
 TEST_CASE_METHOD(TestFixturePoly, "DM_GPS_RLR: FD gradient test", "[dm_poly]")
 {
     auto ctx = make_ctx_rlr(10.0, 0, "DM_GPS_RLR");
-    test_dm_poly_fd<DM_Poly<F_RLR, GaussianRadial>, Cut_Dummy>(ctx, "DM_Poly", 1*2);
+    test_dm_poly_fd<DM_Poly<F_RLR, GaussianRadial>, Cut_Dummy>(ctx, "DM_GPS_RLR", 1*2);
 }
 
 TEST_CASE_METHOD(TestFixturePoly, "DM_GPS_Blip: FD gradient test", "[dm_poly]")
 {
     auto ctx = make_ctx_blipf(10.0, 0, "DM_GPS_Blip");
-    test_dm_poly_fd<DM_Poly<F_Blip, GaussianRadial>, Cut_Dummy>(ctx, "DM_Poly", 1*2);
+    test_dm_poly_fd<DM_Poly<F_Blip, GaussianRadial>, Cut_Dummy>(ctx, "DM_GPS_Blip", 1*2);
 }
 
 // -----------------------------------------------------------------------
@@ -313,37 +317,37 @@ TEST_CASE_METHOD(TestFixturePoly, "DM_GPS_Blip: FD gradient test", "[dm_poly]")
 TEST_CASE_METHOD(TestFixturePoly, "DM_OW_SQ: FD gradient test", "[dm_poly]")
 {
     { auto ctx = make_ctx_sq(10.0, 0, "DM_OW_SQ");
-      test_dm_poly_fd<DM_Poly<F_SQ, BlipRadial, OrbitalWise>, Cut_Dummy>(ctx, "DM_Poly", 1*2);
-      test_dm_poly_fd<DM_Poly<F_SQ, BlipRadial, OrbitalWise>, Cut_Cos>  (ctx, "DM_Poly", 1*2); }
+      test_dm_poly_fd<DM_Poly<F_SQ, BlipRadial, OrbitalWise>, Cut_Dummy>(ctx, "DM_OW_SQ", 1*2);
+      test_dm_poly_fd<DM_Poly<F_SQ, BlipRadial, OrbitalWise>, Cut_Cos>  (ctx, "DM_OW_SQ", 1*2); }
     { auto ctx = make_ctx_sq(10.0, 1, "DM_OW_SQ");
-      test_dm_poly_fd<DM_Poly<F_SQ, BlipRadial, OrbitalWise>, Cut_Dummy>(ctx, "DM_Poly", 2*2); }
+      test_dm_poly_fd<DM_Poly<F_SQ, BlipRadial, OrbitalWise>, Cut_Dummy>(ctx, "DM_OW_SQ", 2*2); }
 }
 
 TEST_CASE_METHOD(TestFixturePoly, "DM_OW_SQRT: FD gradient test", "[dm_poly]")
 {
     { auto ctx = make_ctx_sqrt(10.0, 0, "DM_OW_SQRT");
-      test_dm_poly_fd<DM_Poly<F_SQRT, BlipRadial, OrbitalWise>, Cut_Dummy>(ctx, "DM_Poly", 1*2);
-      test_dm_poly_fd<DM_Poly<F_SQRT, BlipRadial, OrbitalWise>, Cut_Cos>  (ctx, "DM_Poly", 1*2); }
+      test_dm_poly_fd<DM_Poly<F_SQRT, BlipRadial, OrbitalWise>, Cut_Dummy>(ctx, "DM_OW_SQRT", 1*2);
+      test_dm_poly_fd<DM_Poly<F_SQRT, BlipRadial, OrbitalWise>, Cut_Cos>  (ctx, "DM_OW_SQRT", 1*2); }
     { auto ctx = make_ctx_sqrt(10.0, 1, "DM_OW_SQRT");
-      test_dm_poly_fd<DM_Poly<F_SQRT, BlipRadial, OrbitalWise>, Cut_Dummy>(ctx, "DM_Poly", 2*2); }
+      test_dm_poly_fd<DM_Poly<F_SQRT, BlipRadial, OrbitalWise>, Cut_Dummy>(ctx, "DM_OW_SQRT", 2*2); }
 }
 
 TEST_CASE_METHOD(TestFixturePoly, "DM_OW_RLR: FD gradient test", "[dm_poly]")
 {
     { auto ctx = make_ctx_rlr(10.0, 0, "DM_OW_RLR");
-      test_dm_poly_fd<DM_Poly<F_RLR, BlipRadial, OrbitalWise>, Cut_Dummy>(ctx, "DM_Poly", 1*2);
-      test_dm_poly_fd<DM_Poly<F_RLR, BlipRadial, OrbitalWise>, Cut_Cos>  (ctx, "DM_Poly", 1*2); }
+      test_dm_poly_fd<DM_Poly<F_RLR, BlipRadial, OrbitalWise>, Cut_Dummy>(ctx, "DM_OW_RLR", 1*2);
+      test_dm_poly_fd<DM_Poly<F_RLR, BlipRadial, OrbitalWise>, Cut_Cos>  (ctx, "DM_OW_RLR", 1*2); }
     { auto ctx = make_ctx_rlr(10.0, 1, "DM_OW_RLR");
-      test_dm_poly_fd<DM_Poly<F_RLR, BlipRadial, OrbitalWise>, Cut_Dummy>(ctx, "DM_Poly", 2*2); }
+      test_dm_poly_fd<DM_Poly<F_RLR, BlipRadial, OrbitalWise>, Cut_Dummy>(ctx, "DM_OW_RLR", 2*2); }
 }
 
 TEST_CASE_METHOD(TestFixturePoly, "DM_OW_Blip: FD gradient test", "[dm_poly]")
 {
     { auto ctx = make_ctx_blipf(10.0, 0, "DM_OW_Blip");
-      test_dm_poly_fd<DM_Poly<F_Blip, BlipRadial, OrbitalWise>, Cut_Dummy>(ctx, "DM_Poly", 1*2);
-      test_dm_poly_fd<DM_Poly<F_Blip, BlipRadial, OrbitalWise>, Cut_Cos>  (ctx, "DM_Poly", 1*2); }
+      test_dm_poly_fd<DM_Poly<F_Blip, BlipRadial, OrbitalWise>, Cut_Dummy>(ctx, "DM_OW_Blip", 1*2);
+      test_dm_poly_fd<DM_Poly<F_Blip, BlipRadial, OrbitalWise>, Cut_Cos>  (ctx, "DM_OW_Blip", 1*2); }
     { auto ctx = make_ctx_blipf(10.0, 1, "DM_OW_Blip");
-      test_dm_poly_fd<DM_Poly<F_Blip, BlipRadial, OrbitalWise>, Cut_Dummy>(ctx, "DM_Poly", 2*2); }
+      test_dm_poly_fd<DM_Poly<F_Blip, BlipRadial, OrbitalWise>, Cut_Dummy>(ctx, "DM_OW_Blip", 2*2); }
 }
 
 // -----------------------------------------------------------------------
@@ -354,26 +358,26 @@ TEST_CASE_METHOD(TestFixturePoly, "DM_OW_Blip: FD gradient test", "[dm_poly]")
 TEST_CASE_METHOD(TestFixturePoly, "DM_GOW_SQ: FD gradient test", "[dm_poly]")
 {
     auto ctx = make_ctx_sq(10.0, 0, "DM_GOW_SQ");
-    test_dm_poly_fd<DM_Poly<F_SQ, GaussianRadial, OrbitalWise>, Cut_Dummy>(ctx, "DM_Poly", 1*2);
-    test_dm_poly_fd<DM_Poly<F_SQ, GaussianRadial, OrbitalWise>, Cut_Cos>  (ctx, "DM_Poly", 1*2);
+    test_dm_poly_fd<DM_Poly<F_SQ, GaussianRadial, OrbitalWise>, Cut_Dummy>(ctx, "DM_GOW_SQ", 1*2);
+    test_dm_poly_fd<DM_Poly<F_SQ, GaussianRadial, OrbitalWise>, Cut_Cos>  (ctx, "DM_GOW_SQ", 1*2);
 }
 
 TEST_CASE_METHOD(TestFixturePoly, "DM_GOW_SQRT: FD gradient test", "[dm_poly]")
 {
     auto ctx = make_ctx_sqrt(10.0, 0, "DM_GOW_SQRT");
-    test_dm_poly_fd<DM_Poly<F_SQRT, GaussianRadial, OrbitalWise>, Cut_Dummy>(ctx, "DM_Poly", 1*2);
+    test_dm_poly_fd<DM_Poly<F_SQRT, GaussianRadial, OrbitalWise>, Cut_Dummy>(ctx, "DM_GOW_SQRT", 1*2);
 }
 
 TEST_CASE_METHOD(TestFixturePoly, "DM_GOW_RLR: FD gradient test", "[dm_poly]")
 {
     auto ctx = make_ctx_rlr(10.0, 0, "DM_GOW_RLR");
-    test_dm_poly_fd<DM_Poly<F_RLR, GaussianRadial, OrbitalWise>, Cut_Dummy>(ctx, "DM_Poly", 1*2);
+    test_dm_poly_fd<DM_Poly<F_RLR, GaussianRadial, OrbitalWise>, Cut_Dummy>(ctx, "DM_GOW_RLR", 1*2);
 }
 
 TEST_CASE_METHOD(TestFixturePoly, "DM_GOW_Blip: FD gradient test", "[dm_poly]")
 {
     auto ctx = make_ctx_blipf(10.0, 0, "DM_GOW_Blip");
-    test_dm_poly_fd<DM_Poly<F_Blip, GaussianRadial, OrbitalWise>, Cut_Dummy>(ctx, "DM_Poly", 1*2);
+    test_dm_poly_fd<DM_Poly<F_Blip, GaussianRadial, OrbitalWise>, Cut_Dummy>(ctx, "DM_GOW_Blip", 1*2);
 }
 
 // -----------------------------------------------------------------------
