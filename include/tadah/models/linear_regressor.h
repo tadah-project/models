@@ -687,9 +687,11 @@ public:
       const std::size_t n_dropped = dropped_directions(svd, rcond);
       // The threshold as OLS::pseudoinverse_threshold sets it: rcond
       // times the largest singular value, 0 for an rcond of 0 or less.
+      // A fit WARNING: a caller that fits many candidates (tadah hpo)
+      // collects it and says it once, tadah train prints it.
       if (n_dropped > 0)
-        core::Logger::instance().log(tadah::core::LogLevel::WARNING,
-            "LinearRegressor (OALGO 3): " + std::to_string(n_dropped) +
+        fit_warning(FitWarningKind::SingularDirectionsDropped,
+            "OALGO 3: " + std::to_string(n_dropped) +
             " of " + std::to_string(Phi.cols()) + " singular directions of "
             "the design matrix are at or below the rank threshold " +
             (rcond > 0.0

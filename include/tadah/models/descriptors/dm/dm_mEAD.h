@@ -1,6 +1,7 @@
 #ifndef DM_mEAD_H
 #define DM_mEAD_H
 #include <tadah/models/descriptors/dm/dm_base.h>
+#include <tadah/models/descriptors/dm/dm_registered_names.h>
 
 namespace tadah {
 namespace models {
@@ -91,7 +92,7 @@ template <typename F>
 class DM_mEAD: public DM_Base {
 private:
   int Lmax=0;
-  std::string lab="DM_mEAD";
+  std::string lab = DM_mEAD_name<F>::value;  // the registered name
   tadah::core::v_type sgrid;
   tadah::core::v_type cgrid;
   std::vector<std::vector<std::vector<int>>> orbitals;
