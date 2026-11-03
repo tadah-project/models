@@ -14,7 +14,11 @@ namespace models {
 enum class FitWarningKind {
   /** The evidence approximation of LAMBDA -1 stopped at its iteration
    *  limit without converging (EA::stopped_at_limit_text()). */
-  EvidenceApproximationLimit
+  EvidenceApproximationLimit,
+  /** An OALGO 3 solve left singular directions of the design matrix at or
+   *  below its rank threshold out of the coefficients ("OALGO 3: 1 of 4
+   *  singular directions ..."). */
+  SingularDirectionsDropped
 };
 
 /** One WARNING of a fit: its kind and its text. */

@@ -2,6 +2,7 @@
 #define DM_POLY_H
 #include <tadah/models/descriptors/dm/dm_base.h>
 #include <tadah/models/descriptors/dm/radial_policies.h>
+#include <tadah/models/descriptors/dm/dm_registered_names.h>
 
 namespace tadah {
 namespace models {
@@ -96,7 +97,8 @@ template <typename ChannelFn,
 class DM_Poly : public DM_Base {
 private:
   int Lmax = 0;
-  std::string lab = "DM_Poly";
+  // the registered name
+  std::string lab = DM_Poly_name<ChannelFn, RadialBasis, AggMode>::value;
   tadah::core::v_type sgrid;
   tadah::core::v_type cgrid;
   std::vector<std::vector<std::vector<int>>> orbitals;

@@ -329,9 +329,9 @@ TEST_CASE("BLR and KRR FIXINDEX naming a weight twice or a descending range "
   for (int krr = 0; krr < 2; ++krr) DYNAMIC_SECTION(
       (krr ? "M_KRR_Train<Kern_Linear>" : "M_BLR_Train<BF_Linear>")) {
     CHECK_THAT(refusal_with_fixindex(krr, "2,2", {0.7, 0.7}),
-               Catch::Contains("FIXINDEX 2,2 names weight 2 twice"));
+               Catch::Contains("FIXINDEX 2,2 names coefficient 2 twice"));
     CHECK_THAT(refusal_with_fixindex(krr, "2,2", {0.7}),
-               Catch::Contains("FIXINDEX 2,2 names weight 2 twice"));
+               Catch::Contains("FIXINDEX 2,2 names coefficient 2 twice"));
     CHECK_THAT(refusal_with_fixindex(krr, "3-2", {0.1, 0.2}),
                Catch::Contains("FIXINDEX: index '3-2' is a descending range"));
   }

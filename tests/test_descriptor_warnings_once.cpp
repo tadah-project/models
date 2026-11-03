@@ -222,10 +222,11 @@ TEST_CASE("DM_REAM warns once per process of a density knot past RCUTMB",
 
 /* Pins: three DC_Selectors built from a DM_mBlipEnv configuration with
  * Lmax 1 (a DM_mEAD descriptor whose channel function is not F_SQ) log the
- * warning "DM_mEAD: the channel function is not F_SQ, so the descriptor
- * is not rotationally invariant for L>0 (the DM_PS_ descriptors are). Its
- * stress is not the strain derivative of the energy (the virial is not
- * symmetric)." exactly once between them (check_logged_once).
+ * warning "DM_mBlipEnv: the channel function is not F_SQ, so the
+ * descriptor is not rotationally invariant for L>0 (the DM_PS_ descriptors
+ * are). Its stress is not the strain derivative of the energy (the virial
+ * is not symmetric)." exactly once between them (check_logged_once): the
+ * warning names the descriptor by its registered name, the TYPEMB value.
  * Before the fix: "channel function is not F_SQ — descriptor
  * is NOT rotationally invariant for L>0. Use DM_PS_* descriptors instead."
  * (no occurrence of the pinned text).
@@ -234,7 +235,9 @@ TEST_CASE("DM_REAM warns once per process of a density knot past RCUTMB",
  * the warning did not mention the stress. Before the warning was
  * reordered: "... NOT rotationally invariant for L>0. Use DM_PS_*
  * descriptors instead. The stress is then not the strain derivative ...",
- * whose "then" read as if it followed from the remedy. */
+ * whose "then" read as if it followed from the remedy. Before the label
+ * was the registered name: "DM_mEAD: the channel function ...", the
+ * family name, for every DM_mEAD descriptor (key "DM_mEAD: channel ..."). */
 TEST_CASE("DM_mEAD warns once per process of a channel that is not "
           "rotationally invariant",
           "[descriptor][warn_once]") {
@@ -245,12 +248,13 @@ TEST_CASE("DM_mEAD warns once per process of a channel that is not "
   c.add("CEMBFUNC", "0.5 0.75 1.0 1.25 1.5");
   c.add("SEMBFUNC", "2.0 2.0 2.0 2.0 2.0");
   c.add("RCUTENV", 0.6);
-  const std::string key = "DM_mEAD: channel not rotationally invariant for L>0";
+  const std::string key =
+      "DM_mBlipEnv: channel not rotationally invariant for L>0";
   const bool before = tadah::models::warning_logged_once(key);
   CoutCapture out;
   for (int k = 0; k < 3; ++k) tadah::models::DC_Selector s(c);
   check_logged_once(out.str(),
-                    "DM_mEAD: the channel function is not F_SQ, so the "
+                    "DM_mBlipEnv: the channel function is not F_SQ, so the "
                     "descriptor is not rotationally invariant for L>0 (the "
                     "DM_PS_ descriptors are). Its stress is not the strain "
                     "derivative of the energy (the virial is not "
@@ -260,18 +264,22 @@ TEST_CASE("DM_mEAD warns once per process of a channel that is not "
 
 /* Pins: three DC_Selectors built from a DM_OW_SQRT configuration with
  * Lmax 1 (a DM_Poly descriptor, OrbitalWise, whose channel function is not
- * F_SQ) log the warning "DM_Poly (OrbitalWise): the channel function is
+ * F_SQ) log the warning "DM_OW_SQRT (OrbitalWise): the channel function is
  * not F_SQ, so the descriptor is not rotationally invariant for L>0 (the
  * PowerSpectrum mode is). Its stress is not the strain derivative of the
  * energy (the virial is not symmetric)." exactly once between them
- * (check_logged_once).
+ * (check_logged_once): the warning names the descriptor by its registered
+ * name, the TYPEMB value.
  * Before the fix: "DM_Poly (OrbitalWise): channel function is
  * not F_SQ — descriptor is NOT rotationally invariant for L>0. Use
  * PowerSpectrum mode." (no occurrence of the pinned text).
  * Before the fix: three times, once per descriptor object. Before the
  * stress clause was added: the warning did not mention the stress. Before
  * the warning was reordered: "... Use PowerSpectrum mode. The stress is
- * then not the strain derivative ...". */
+ * then not the strain derivative ...". Before the label was the
+ * registered name: "DM_Poly (OrbitalWise): the channel function ...", the
+ * family name, for every DM_Poly descriptor (key "DM_Poly (OrbitalWise):
+ * channel ..."). */
 TEST_CASE("DM_Poly OrbitalWise warns once per process of a channel that is "
           "not rotationally invariant",
           "[descriptor][warn_once]") {
@@ -281,12 +289,13 @@ TEST_CASE("DM_Poly OrbitalWise warns once per process of a channel that is "
   c.add("SGRIDMB", "0.1 0.2");
   c.add("SEMBFUNC", "1 1");
   const std::string key =
-      "DM_Poly (OrbitalWise): channel not rotationally invariant for L>0";
+      "DM_OW_SQRT (OrbitalWise): channel not rotationally invariant for L>0";
   const bool before = tadah::models::warning_logged_once(key);
   CoutCapture out;
   for (int k = 0; k < 3; ++k) tadah::models::DC_Selector s(c);
   check_logged_once(out.str(),
-                    "DM_Poly (OrbitalWise): the channel function is not F_SQ, "
+                    "DM_OW_SQRT (OrbitalWise): the channel function is not "
+                    "F_SQ, "
                     "so the descriptor is not rotationally invariant for L>0 "
                     "(the PowerSpectrum mode is). Its stress is not the "
                     "strain derivative of the energy (the virial is not "
