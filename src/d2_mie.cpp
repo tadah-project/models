@@ -253,7 +253,7 @@ std::optional<DescriptorMeta> D2_MIE::meta() const {
   p_n.scale   = Scale::Dimensionless;
   p_n.units   = "";
   p_n.role    = "Mie repulsive exponent n (LJ-like default 12).";
-  p_n.hard.lo = 1.0e-6;     // strictly positive (constructor throws on <0)
+  p_n.hard.lo = kHardLoPositive;     // strictly positive (constructor throws on <0)
   p_n.crit    = Criticality::Recommended;
   p_n.scope   = PairScope::Global;
   dm.params.push_back(std::move(p_n));
@@ -267,7 +267,7 @@ std::optional<DescriptorMeta> D2_MIE::meta() const {
   p_m.scale   = Scale::Dimensionless;
   p_m.units   = "";
   p_m.role    = "Mie attractive exponent m (LJ-like default 6).";
-  p_m.hard.lo = 1.0e-6;
+  p_m.hard.lo = kHardLoPositive;
   p_m.crit    = Criticality::Recommended;
   p_m.scope   = PairScope::Global;
   dm.params.push_back(std::move(p_m));

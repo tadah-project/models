@@ -324,7 +324,7 @@ std::optional<DescriptorMeta> D2_Blip5::meta() const {
                      "b5(eta (r - c)), SGRID2B (i), whose support is "
                      "|r - c| < 3/eta.";
   // hard: SGRID2B = 0 makes the existing init() throw.
-  p_sgrid.hard.lo  = 1.0e-6;
+  p_sgrid.hard.lo  = kHardLoPositive;
   p_sgrid.crit     = Criticality::Recommended;
   p_sgrid.scope    = PairScope::Global;
   p_sgrid.suggest  = [](const DataStats& d, const SeedView& s,

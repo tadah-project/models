@@ -308,7 +308,7 @@ std::optional<DescriptorMeta> D2_BP::meta() const {
   p_sgrid.units    = "Å^-2";
   p_sgrid.role     = "eta of the i-th radial Gaussian exp(-eta (r - c)^2), "
                      "SGRID2B (i): an inverse squared width.";
-  p_sgrid.hard.lo  = 1.0e-6;
+  p_sgrid.hard.lo  = kHardLoPositive;
   p_sgrid.crit     = Criticality::Recommended;
   p_sgrid.scope    = PairScope::Global;
   p_sgrid.suggest  = [](const DataStats& d, const SeedView& s,

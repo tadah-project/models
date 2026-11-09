@@ -502,7 +502,7 @@ DM_Poly<ChannelFn, RadialBasis, AggMode>::meta() const {
       ? "Inverse Gaussian width η of exp(-η (r - CGRIDMB)^2)."
       : "Inverse width η of the blip b(η (r - CGRIDMB)), whose support is "
         "|r - CGRIDMB| < 2/η.";
-  p_sgrid.hard.lo  = 1.0e-6;
+  p_sgrid.hard.lo  = kHardLoPositive;
   p_sgrid.crit     = Criticality::Critical;
   p_sgrid.scope    = PairScope::Global;
   if constexpr (gaussian)
