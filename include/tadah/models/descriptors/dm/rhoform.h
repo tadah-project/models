@@ -126,18 +126,50 @@ enum class OptimLowerBound {
 OptimLowerBound optim_key_lower_bound(const std::string &key,
                                       std::optional<RhoForm> form);
 
-/** \brief What a density form, or a radial bump channel, requires of the
- *  low bound of an OPTIM box. */
+/** \brief What a density form, a radial bump channel or the limit a
+ *  descriptor declares requires of the low bound of an OPTIM box. */
 struct OptimLowBoundRule {
-  bool strict;              ///< lo > 0 (else lo >= 0)
-  const char *requirement;  ///< "every AMPGRIDMB amplitude >= 0", ...
+  bool strict;              ///< lo > bound (else lo >= bound)
+  std::string requirement;  ///< "every AMPGRIDMB amplitude >= 0", ...
   /** What sets the rule, the subject of "<by> requires <requirement>":
    *  "RHOFORM NONNEG", "the D2_Blip5 pair basis", "the DM_REAM Blip density
-   *  basis". */
+   *  basis", "the DM_mBlipEnv descriptor". */
   std::string by;
+  /** The bound: 0, but the lower limit a descriptor declares for a key
+   *  other than 0 and kHardLoPositive (3 for the knot degrees), whose rule
+   *  is >=; a > rule has the bound 0. */
+  double bound = 0.0;
   /** True when @p lo satisfies the rule (NaN never does). */
   bool admits(double lo) const;
+  /** The low end of an AUTO box around @p seed (a value the rule admits)
+   *  that reaches below the rule: the bound of a >= rule; for a > rule,
+   *  positive_box_low(seed, bound), half-way from the bound to the seed
+   *  (half the seed for the bound 0), as the refit writer clamps the box
+   *  of a width, so the box holds the seed and spans a factor of 2 or more
+   *  below it. */
+  double clamp_low(double seed) const;
 };
+
+/** The low end of a box around @p seed of a value that must be
+ *  > @p bound, for a box whose symmetric low end is at or below the bound:
+ *  half-way from the bound to the seed for a seed above the bound (the box
+ *  holds the seed), else bound + max(kHardLoPositive, half the seed's
+ *  distance from the bound). The AUTO FRAC boxes of tadah hpo
+ *  (OptimLowBoundRule::clamp_low), the target file tadah refit writes and
+ *  tadah refit --retarget clamp the box of such a value at it. */
+double positive_box_low(double seed, double bound = 0.0);
+
+/** The rule the lower limit that the registered descriptors declare for
+ *  the values of @p key (case-insensitive; ParamMeta::hard.lo of a
+ *  parameter with arg_pos <= 0) sets on the low bound of an OPTIM box,
+ *  nullopt when no descriptor declares one: every value > 0 for the limit
+ *  kHardLoPositive (SGRID2B, SGRIDMB, SEMBFUNC, RCUTENV), else every value
+ *  >= the limit (RCUT2B, RCUTMB, CGRID2B, CGRIDMB: >= 0). The descriptors
+ *  that declare a limit for a key declare the same one; the subject names
+ *  the first of them by its registered name ("the DM_mBlipEnv
+ *  descriptor"). */
+std::optional<OptimLowBoundRule> declared_low_bound_rule(
+    const std::string &key);
 
 /** The rule RHOFORM @p form sets on the low bound of an OPTIM box on @p key
  *  (case-insensitive) of a DM_REAM density in the TYPEMB basis @p basis,
@@ -196,6 +228,26 @@ std::optional<OptimLowBoundRule> optim_low_bound_rule(
  *  tadah hpo, at an OPTIM box and at startup, and tadah analysis
  *  check_bounds apply to a value. */
 std::optional<OptimLowBoundRule> optim_low_bound_rule(
+    const std::string &key, const tadah::core::Context &ctx,
+    std::size_t entry);
+
+/** The rule of an OPTIM box on @p key (case-insensitive) of the
+ *  configuration or potential @p ctx, nullopt when there is none: the
+ *  density-form or bump rule optim_low_bound_rule(key, ctx) when there is
+ *  one, else the rule of the lower limit that a descriptor of @p ctx that
+ *  reads the key declares (declared_low_bound_rule, its subject that
+ *  descriptor: "the D2_BP descriptor requires every SGRID2B value > 0"); a
+ *  key that no descriptor of @p ctx reads has none. tadah hpo refuses an
+ *  explicit box whose low bound the rule does not admit, at its OPTIM
+ *  line, and clamps an AUTO box at OptimLowBoundRule::clamp_low; tadah
+ *  analysis check_bounds reports a corner below it. */
+std::optional<OptimLowBoundRule> optim_box_low_bound_rule(
+    const std::string &key, const tadah::core::Context &ctx);
+
+/** The rule of entry @p entry (0-based, numbered as in
+ *  optim_low_bound_rule(key, ctx, entry)) of @p key: on a D2_mJoin or
+ *  DM_mJoin line, that of the descriptor whose entry it is. */
+std::optional<OptimLowBoundRule> optim_box_low_bound_rule(
     const std::string &key, const tadah::core::Context &ctx,
     std::size_t entry);
 

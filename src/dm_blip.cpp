@@ -570,7 +570,7 @@ std::optional<DescriptorMeta> DM_Blip::meta() const {
   p_sgrid.role     = "Inverse width eta of the i-th radial blip "
                      "b(eta (r - c)) of the density, SGRIDMB (i), whose "
                      "support is |r - c| < 2/eta.";
-  p_sgrid.hard.lo  = 1.0e-6;
+  p_sgrid.hard.lo  = kHardLoPositive;
   p_sgrid.crit     = Criticality::Critical;
   p_sgrid.scope    = PairScope::Global;
   p_sgrid.suggest = blip_width_suggestion;

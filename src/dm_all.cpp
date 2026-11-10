@@ -76,7 +76,7 @@ DM_mEAD<F_mEnv<Cut_SinInv>>::meta() const {
   p_sgrid.units    = "Å^-2";
   p_sgrid.role     = "Inverse width of the radial GTO. Narrow GTOs "
                      "combined with off-shell centres collapse ρ to 0.";
-  p_sgrid.hard.lo  = 1.0e-6;
+  p_sgrid.hard.lo  = kHardLoPositive;
   p_sgrid.crit     = Criticality::Critical;
   p_sgrid.scope    = PairScope::Global;
   p_sgrid.suggest  = gaussian_width_suggestion;
@@ -92,7 +92,7 @@ DM_mEAD<F_mEnv<Cut_SinInv>>::meta() const {
                     "(0 at ρ=0, sin(πρ/(2 RCUTENV)) up to ρ=RCUTENV, "
                     "saturated to 1 above) should bracket the data's "
                     "active ρ band; otherwise the envelope is inert.";
-  p_renv.hard.lo  = 1.0e-6;
+  p_renv.hard.lo  = kHardLoPositive;
   p_renv.crit     = Criticality::Recommended;
   p_renv.scope    = PairScope::Global;
   p_renv.suggest  = [self](const DataStats& d, const SeedView&,
@@ -136,7 +136,7 @@ DM_mEAD<F_mEnv<Cut_SinInv>>::meta() const {
   p_semb.units    = "ρ^-1";
   p_semb.role     = "Inverse width η_p of the i-th embedding blip, "
                     "SEMBFUNC (i): its support is 4/η_p wide in ρ.";
-  p_semb.hard.lo  = 1.0e-6;
+  p_semb.hard.lo  = kHardLoPositive;
   p_semb.crit     = Criticality::Recommended;
   p_semb.scope    = PairScope::Global;
   p_semb.suggest  = [self](const DataStats& d, const SeedView& s,

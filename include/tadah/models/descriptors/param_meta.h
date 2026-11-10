@@ -48,9 +48,18 @@ enum class Scale {
   Count               // dimensionless integer count
 };
 
-/** \brief Hard physical limits — used by the audit only to refuse
- *  obviously impossible values (negative widths, etc.). NEVER tuning
- *  thresholds.
+/** \brief The lower limit (HardLimit::lo) a descriptor declares for a
+ *  value that must be > 0 (a width, RCUTENV): the OPTIM box of such a
+ *  value has a low bound > 0, and an AUTO box that reaches below it is
+ *  clamped at this limit (models::optim_box_low_bound_rule). */
+inline constexpr double kHardLoPositive = 1.0e-6;
+
+/** \brief Hard physical limits of a value — NEVER tuning thresholds.
+ *  lo: kHardLoPositive for a value that must be > 0, else the smallest
+ *  value (0 for a cutoff or a centre); unset: no limit. The lower limit
+ *  of the values of a key (arg_pos <= 0) is the OPTIM box rule of the key
+ *  (models::declared_low_bound_rule): tadah hpo refuses an explicit box
+ *  below it and clamps an AUTO box at it.
  */
 struct HardLimit {
   std::optional<double> lo{};

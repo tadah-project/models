@@ -330,7 +330,7 @@ std::optional<DescriptorMeta> D2_ZBL::meta() const {
   p_a0.scale   = Scale::Distance;
   p_a0.units   = "Å";
   p_a0.role    = "ZBL screening length scale (default: Bohr radius 0.5292 Å).";
-  p_a0.hard.lo = 1.0e-6;
+  p_a0.hard.lo = kHardLoPositive;
   p_a0.crit    = Criticality::Optional;
   p_a0.scope   = PairScope::Global;
   dm.params.push_back(std::move(p_a0));
@@ -342,7 +342,7 @@ std::optional<DescriptorMeta> D2_ZBL::meta() const {
   p_s0.scale   = Scale::Dimensionless;
   p_s0.units   = "";
   p_s0.role    = "ZBL screening multiplier s0 (default 0.88534).";
-  p_s0.hard.lo = 1.0e-6;
+  p_s0.hard.lo = kHardLoPositive;
   p_s0.crit    = Criticality::Optional;
   p_s0.scope   = PairScope::Global;
   dm.params.push_back(std::move(p_s0));
@@ -354,7 +354,7 @@ std::optional<DescriptorMeta> D2_ZBL::meta() const {
   p_p0.scale   = Scale::Dimensionless;
   p_p0.units   = "";
   p_p0.role    = "ZBL exponent on Zi in screening-length denominator (default 0.23).";
-  p_p0.hard.lo = 1.0e-6;
+  p_p0.hard.lo = kHardLoPositive;
   p_p0.crit    = Criticality::Optional;
   p_p0.scope   = PairScope::Global;
   dm.params.push_back(std::move(p_p0));
@@ -366,7 +366,7 @@ std::optional<DescriptorMeta> D2_ZBL::meta() const {
   p_p1.scale   = Scale::Dimensionless;
   p_p1.units   = "";
   p_p1.role    = "ZBL exponent on Zj in screening-length denominator (default 0.23).";
-  p_p1.hard.lo = 1.0e-6;
+  p_p1.hard.lo = kHardLoPositive;
   p_p1.crit    = Criticality::Optional;
   p_p1.scope   = PairScope::Global;
   dm.params.push_back(std::move(p_p1));

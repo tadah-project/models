@@ -1172,7 +1172,7 @@ std::optional<DescriptorMeta> DM_mEAD<F>::meta() const {
   p_sgrid.scale    = Scale::InverseDistanceSq;
   p_sgrid.units    = "Å^-2";
   p_sgrid.role     = "Inverse Gaussian width η.";
-  p_sgrid.hard.lo  = 1.0e-6;
+  p_sgrid.hard.lo  = kHardLoPositive;
   p_sgrid.crit     = Criticality::Critical;
   p_sgrid.scope    = PairScope::Global;
   p_sgrid.suggest  = gaussian_width_suggestion;
