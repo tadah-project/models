@@ -11,8 +11,10 @@
 #include <algorithm>
 #include <cctype>
 #include <iterator>
+#include <cmath>
 #include <map>
 #include <memory>
+#include <set>
 
 namespace tadah {
 namespace models {
@@ -285,9 +287,15 @@ bool OptimLowBoundRule::admits(double lo) const {
   return strict ? lo > bound : lo >= bound;
 }
 
+double positive_box_low(double seed, double bound) {
+  const double distance = seed - bound;
+  if (distance > 0.0) return bound + 0.5 * distance;
+  return bound + std::max(kHardLoPositive, 0.5 * std::fabs(distance));
+}
+
 double OptimLowBoundRule::clamp_low(double seed) const {
   if (!strict) return bound;
-  return bound + std::min(kHardLoPositive, 0.5 * (seed - bound));
+  return positive_box_low(seed, bound);
 }
 
 namespace {
@@ -336,8 +344,12 @@ OptimLowBoundRule rule_of_limit(const std::string &key, double lo,
 /* The descriptors of @p ctx that read the values of @p key (upper case),
  * in the order of the TYPE2B and TYPEMB lines, each with the 0-based range
  * [first, first + count) of the key's entries that it reads: a descriptor
- * of a D2_mJoin or DM_mJoin line its share (D_mJoin::parse_context), any
- * other descriptor every entry. */
+ * of a D2_mJoin or DM_mJoin line its share of a key the line splits (its
+ * RCUT and RCTYPE values, one per descriptor, and the list keys of its
+ * descriptors: D_mJoin::parse_context), every entry of any other key (the
+ * line gives each descriptor such a key whole: RCUTENV of a DM_mJoin line,
+ * the keys of the other TYPE line), as any other descriptor reads every
+ * entry. */
 struct KeyReader {
   std::string label;
   std::size_t first = 0;
@@ -354,11 +366,28 @@ std::vector<KeyReader> key_readers(const std::string &key,
       out.push_back(KeyReader{*label, 0, 0, true});
       continue;
     }
-    std::size_t at = 0;
-    for (const auto &child : D_mJoin::parse_context(ctx, type)) {
+    const std::vector<tadah::core::Context> children =
+        D_mJoin::parse_context(ctx, type);
+    const std::string suffix = std::string(type).substr(4);
+    std::set<std::string> split = {"RCUT" + suffix, "RCTYPE" + suffix};
+    for (const auto &child : children) {
       const auto child_label = child.stored_value(type, 0);
+      if (!child_label) continue;
+      std::unique_ptr<D_Base> d(tadah::core::factory<D_Base>(*child_label));
+      for (const auto &k : d->keys) split.insert(upper(k));
+      for (const auto &k : d->data_keys) split.insert(upper(k));
+    }
+    const bool shared = split.count(key) == 0;
+    std::size_t at = 0;
+    for (const auto &child : children) {
+      const auto child_label = child.stored_value(type, 0);
+      if (!child_label) continue;
+      if (shared) {
+        out.push_back(KeyReader{*child_label, 0, 0, true});
+        continue;
+      }
       const std::size_t n = child.has_stored(key) ? child.size(key) : 0;
-      if (child_label) out.push_back(KeyReader{*child_label, at, n, false});
+      out.push_back(KeyReader{*child_label, at, n, false});
       at += n;
     }
   }

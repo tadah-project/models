@@ -136,17 +136,28 @@ struct OptimLowBoundRule {
    *  basis", "the DM_mBlipEnv descriptor". */
   std::string by;
   /** The bound: 0, but the lower limit a descriptor declares for a key
-   *  other than 0 and kHardLoPositive (3 for the knot degrees). */
+   *  other than 0 and kHardLoPositive (3 for the knot degrees), whose rule
+   *  is >=; a > rule has the bound 0. */
   double bound = 0.0;
   /** True when @p lo satisfies the rule (NaN never does). */
   bool admits(double lo) const;
   /** The low end of an AUTO box around @p seed (a value the rule admits)
    *  that reaches below the rule: the bound of a >= rule; for a > rule,
-   *  bound + kHardLoPositive (1e-6, the limit a descriptor declares for a
-   *  value that must be > 0), or bound + half the seed's distance from it
-   *  when that is smaller, so the box holds the seed. */
+   *  positive_box_low(seed, bound), half-way from the bound to the seed
+   *  (half the seed for the bound 0), as the refit writer clamps the box
+   *  of a width, so the box holds the seed and spans a factor of 2 or more
+   *  below it. */
   double clamp_low(double seed) const;
 };
+
+/** The low end of a box around @p seed of a value that must be
+ *  > @p bound, for a box whose symmetric low end is at or below the bound:
+ *  half-way from the bound to the seed for a seed above the bound (the box
+ *  holds the seed), else bound + max(kHardLoPositive, half the seed's
+ *  distance from the bound). The AUTO FRAC boxes of tadah hpo
+ *  (OptimLowBoundRule::clamp_low), the target file tadah refit writes and
+ *  tadah refit --retarget clamp the box of such a value at it. */
+double positive_box_low(double seed, double bound = 0.0);
 
 /** The rule the lower limit that the registered descriptors declare for
  *  the values of @p key (case-insensitive; ParamMeta::hard.lo of a
