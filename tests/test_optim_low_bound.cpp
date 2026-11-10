@@ -21,6 +21,7 @@
 #include <limits>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 
@@ -241,18 +242,24 @@ TEST_CASE("optim_box_low_bound_rule: the form and bump rules first, then "
 
 /* Pins: OptimLowBoundRule::clamp_low(seed), the low end of an AUTO box of
  * the seed that reaches below the rule: the bound of a >= rule (0 for
- * CGRID2B), and for a > 0 rule kHardLoPositive (1e-6), or half the seed
- * for a seed at or below 2e-6, so the clamped box holds the seed; admits
- * takes NaN for no rule.
- * Before the fix: clamp_low and the bound of a rule do not exist (an AUTO
- * box below a rule was refused). */
-TEST_CASE("OptimLowBoundRule::clamp_low: at the bound, at 1e-6 for a value "
-          "that must be > 0",
+ * CGRID2B, 3 for KDEGMB), and for a > 0 rule half-way from the bound to
+ * the seed, half the seed (RCUTENV 5 gives 2.5, 0.2 gives 0.1, 1e-6 gives
+ * 5e-7), as the starter target file of tadah refit clamps the box of a
+ * width, so the clamped box holds the seed and spans a factor of 2 below
+ * it; admits takes NaN for no rule.
+ * Before the fix of the clamp: a > 0 rule clamped at kHardLoPositive
+ * (1e-6) for every seed above 2e-6 (RCUTENV 5 and 0.2 gave 1e-6), so an
+ * AUTO FRAC box of RCUTENV 5 was [1e-6, 12.5], over 7 decades under LOG,
+ * while the refit writer gave a width the box [v/2, ...]. Before the fix
+ * that clamps an AUTO box: clamp_low and the bound of a rule did not
+ * exist (an AUTO box below a rule was refused). */
+TEST_CASE("OptimLowBoundRule::clamp_low: at the bound, half-way to the seed "
+          "for a value that must be > 0",
           "[optim_rule][declared]") {
   const auto pos = declared_low_bound_rule("RCUTENV");
   REQUIRE(pos);
-  CHECK(bits(pos->clamp_low(5.0)) == bits(1e-6));
-  CHECK(bits(pos->clamp_low(0.2)) == bits(1e-6));
+  CHECK(bits(pos->clamp_low(5.0)) == bits(2.5));
+  CHECK(bits(pos->clamp_low(0.2)) == bits(0.1));
   CHECK(bits(pos->clamp_low(1e-6)) == bits(5e-7));
   CHECK(pos->admits(pos->clamp_low(1e-6)));
   const double nan = std::numeric_limits<double>::quiet_NaN();
@@ -265,4 +272,72 @@ TEST_CASE("OptimLowBoundRule::clamp_low: at the bound, at 1e-6 for a value "
   const auto kdeg = declared_low_bound_rule("KDEGMB");
   REQUIRE(kdeg);
   CHECK(bits(kdeg->clamp_low(5.0)) == bits(3.0));
+}
+
+/* Pins: a key that a joined line gives every descriptor whole (RCUTENV
+ * on a DM_mJoin line; CGRIDMB, a key of the many-body line, on a D2_mJoin
+ * line: D_mJoin::parse_context splits only the RCUT and RCTYPE values and
+ * the list keys of the line's descriptors) has, in the entry form and
+ * without an entry, the rule of a descriptor that declares a limit for it,
+ * whatever the order of the descriptors on the line:
+ *   - DM_mJoin of DM_mBlip then DM_mBlipEnv, and of DM_mBlipEnv then
+ *     DM_mBlip: RCUTENV (entry 0) > 0 by the DM_mBlipEnv descriptor;
+ *   - D2_mJoin of two D2_BP, with a DM_mBlip line: CGRIDMB (entry 0) >= 0
+ *     by the DM_mBlip descriptor;
+ * a key the line splits keeps the rule of the descriptor whose entry it
+ * is (SEMBFUNC entry 2, of the DM_mBlipEnv after a DM_mBlip: > 0).
+ * Before the fix: the entry form gave entry 0 of RCUTENV to the first
+ * descriptor of the line, DM_mBlip, which declares no limit for it, and
+ * the CGRIDMB entry to the first D2_BP descriptor, and returned no rule, so
+ * tadah hpo took OPTIM RCUTENV (1) -1 7 and searched the AUTO FRAC 1.5
+ * box [-2.5, 12.5] with DM_mBlip first, and refused and clamped them with
+ * DM_mBlipEnv first. */
+TEST_CASE("optim_box_low_bound_rule: a key a joined line gives every "
+          "descriptor whole has the rule of the descriptor that declares "
+          "one",
+          "[metadata][optim_rule][declared]") {
+  /* "<by> requires >" or ">=", or "none": each check runs on its own. */
+  auto rule = [](const std::optional<OptimLowBoundRule> &r) {
+    return r ? r->by + (r->strict ? " requires >" : " requires >=")
+             : std::string("none");
+  };
+  auto mb_join = [](const std::string &first, const std::string &second) {
+    Context c = lines("D2_BP 2 2 H H", "DM_mJoin " + first + " 0 1 1 2 2 H H " +
+                                           second + " 0 1 1 2 2 H H");
+    for (const char *k : {"CGRIDMB", "SGRIDMB", "CEMBFUNC", "SEMBFUNC",
+                          "RCTYPEMB", "RCUTMB"})
+      c.remove(k);
+    c.add("CGRIDMB", "0.1 0.1");
+    c.add("SGRIDMB", "0.2 0.2");
+    c.add("CEMBFUNC", "1.0 2.0 1.0 2.0");
+    c.add("SEMBFUNC", "1.0 1.0 1.0 1.0");
+    c.add("RCTYPEMB", "Cut_Cos Cut_Cos");
+    c.add("RCUTMB", "5.0 5.0");
+    return c;
+  };
+  for (const auto &[first, second] :
+       {std::pair<std::string, std::string>{"DM_mBlip", "DM_mBlipEnv"},
+        {"DM_mBlipEnv", "DM_mBlip"}}) {
+    INFO(first << " then " << second);
+    const Context c = mb_join(first, second);
+    CHECK(rule(optim_box_low_bound_rule("RCUTENV", c, 0)) ==
+          "the DM_mBlipEnv descriptor requires >");
+    CHECK(rule(optim_box_low_bound_rule("RCUTENV", c)) ==
+          "the DM_mBlipEnv descriptor requires >");
+  }
+  CHECK(rule(optim_box_low_bound_rule(
+            "SEMBFUNC", mb_join("DM_mBlip", "DM_mBlipEnv"), 2)) ==
+        "the DM_mBlipEnv descriptor requires >");
+
+  Context pair_join =
+      lines("D2_mJoin D2_BP 2 2 H H D2_BP 2 2 H H", "DM_mBlip 0 1 1 2 2 H H");
+  for (const char *k : {"CGRID2B", "SGRID2B", "RCTYPE2B", "RCUT2B", "CGRIDMB"})
+    pair_join.remove(k);
+  pair_join.add("CGRID2B", "1.0 2.0 1.0 2.0");
+  pair_join.add("SGRID2B", "0.5 1.0 0.5 1.0");
+  pair_join.add("RCTYPE2B", "Cut_Cos Cut_Cos");
+  pair_join.add("RCUT2B", "5.0 5.0");
+  pair_join.add("CGRIDMB", 0.1);
+  CHECK(rule(optim_box_low_bound_rule("CGRIDMB", pair_join, 0)) ==
+        "the DM_mBlip descriptor requires >=");
 }
