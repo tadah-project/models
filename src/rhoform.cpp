@@ -374,7 +374,8 @@ std::optional<OptimLowBoundRule> declared_rule_of(
       continue;
     const auto lo = declared_limit(r.label, k);
     if (lo) return rule_of_limit(k, *lo, r.label);
-    if (entry) return std::nullopt;  // the entry's descriptor declares none
+    // the descriptor of a joined line whose entry it is declares none
+    if (entry && !r.every) return std::nullopt;
   }
   return std::nullopt;
 }
