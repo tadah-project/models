@@ -157,13 +157,18 @@ TEST_CASE("The descriptors declare one lower limit per key, which gives the "
  *     SGRID2B by the bump rule of its pair basis;
  *   - a key that no descriptor of the configuration reads (SGRIDMB without
  *     a many-body term) has none, whatever other descriptors declare;
+ *   - an entry of a key read by a line after one that does not read it
+ *     (RCUTENV (1) and SEMBFUNC (2) of DM_mBlipEnv after a D2_BP line) has
+ *     the rule of the descriptor that reads it;
  *   - on a D2_mJoin line of a D2_BP and a D2_Blip, the entry form gives
  *     each entry the rule of its descriptor: the D2_BP's SGRID2B entries
  *     the D2_BP limit, the D2_Blip's the bump rule, and the rule of the
  *     key without an entry is the bump rule.
  * Before the fix: optim_box_low_bound_rule does not exist; tadah hpo took
  * the boxes of RCUTENV, SGRIDMB of DM_mBlipEnv, SGRID2B of D2_BP and the
- * centres below 0 without a word. */
+ * centres below 0 without a word. Before the fix of the entry form: the
+ * entry form returned no rule for RCUTENV (1) and SEMBFUNC (2), the D2_BP
+ * line, which declares none for them, ending the search. */
 TEST_CASE("optim_box_low_bound_rule: the form and bump rules first, then "
           "the limit the descriptor of the configuration declares",
           "[metadata][optim_rule][declared]") {
@@ -187,6 +192,13 @@ TEST_CASE("optim_box_low_bound_rule: the form and bump rules first, then "
   }
   CHECK_FALSE(optim_box_low_bound_rule("CEMBFUNC", env));
   CHECK(optim_box_low_bound_rule("rcutenv", env));
+  /* An entry of a key that the line before it does not read: the rule of
+   * the descriptor that reads it (DM_mBlipEnv after D2_BP). */
+  const auto entry = optim_box_low_bound_rule("RCUTENV", env, 0);
+  REQUIRE(entry);
+  CHECK(entry->strict);
+  CHECK(entry->by == "the DM_mBlipEnv descriptor");
+  CHECK(optim_box_low_bound_rule("SEMBFUNC", env, 1));
 
   const Context bp = lines("D2_BP 2 2 H H");
   CHECK_FALSE(optim_box_low_bound_rule("SGRIDMB", bp));
